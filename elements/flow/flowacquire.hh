@@ -29,7 +29,7 @@ class FlowAcquire : public FlowSpaceElement<bool> { public:
     bool can_live_reconfigure() const		{ return true; }
     void add_handlers() CLICK_COLD;
 
-    void push_batch(int port, bool* flowdata, PacketBatch* head);
+    void push_flow(int port, bool* flowdata, PacketBatch* head);
 
   private:
 

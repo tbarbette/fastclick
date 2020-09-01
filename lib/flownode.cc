@@ -210,12 +210,19 @@ void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool sh
     FlowNodePtr* cur = 0;
     while ((cur = it.next()) != 0) {
         if (!cur->is_leaf()) {
+#if FLOW_KEEP_STRUCTURE
             if (!do_release && cur->node->released())
                 continue;
             if (show_ptr)
                 click_chatter("%s|-> %lu Parent:%p",prefix.c_str(),cur->data().get_long(),cur->parent());
             else
-                click_chatter("%s|-> %lu",prefix.c_str(),cur->data().get_long(), cur->node->released());
+                click_chatter("%s|-> %lu",prefix.c_str(),cur->data().get_long());
+#else
+            if (show_ptr)
+                click_chatter("%s|-> %lu Parent:%p",prefix.c_str(),cur->data().get_long(),cur->parent());
+            else
+                click_chatter("%s|-> %lu",prefix.c_str(),cur->data().get_long());
+#endif
             print(cur->node,prefix + "|  ",data_offset, show_ptr, recursive, do_release);
         } else {
             cur->leaf->print(prefix + "|->",data_offset, show_ptr);

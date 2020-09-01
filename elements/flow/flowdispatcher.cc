@@ -387,7 +387,7 @@ int FlowDispatcher::initialize(ErrorHandler *errh) {
 
 
 
-void FlowDispatcher::push_batch(int, int* flowdata, PacketBatch* batch) {
+void FlowDispatcher::push_flow(int, int* flowdata, PacketBatch* batch) {
 	//click_chatter("%s : %d packets to output %d",name().c_str(),batch->count(),*flowdata);
 	checked_output_push_batch(*flowdata, batch);
 }

@@ -58,7 +58,7 @@ public:
 
     int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
 
-    void push_batch(int, fcb_clientack* fcb, PacketBatch *batch) override;
+    void push_flow(int, fcb_clientack* fcb, PacketBatch *batch) override;
 
     /**
      * Set the last data acked while sending packet

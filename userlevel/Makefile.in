@@ -124,7 +124,7 @@ include dpdk.mk
 endif
 EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
 	ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && [ "$(RTE_VER_YEAR)" -ge 20 ] && echo true),true)
-		EXTRA_DRIVER_OBJS := flowparser.o flowparserglue.o $(EXTRA_DRIVER_OBJS)
+		EXTRA_DRIVER_OBJS := flowrulemanager.o flowrulecache.o flowruleparser.o $(EXTRA_DRIVER_OBJS)
 	endif
 endif
 
@@ -153,7 +153,7 @@ ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
 endif
 
-# At of after DPDK 20.02, compile against an additional library librte_parse (flow dispatcher)
+# At of after DPDK 20.02, compile against an additional library librte_parse (flow parser)
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && [ "$(RTE_VER_YEAR)" -ge 20 ] && echo true),true)
 ddeps: Makefile librte_parse.a libclick.a $(OBJS)
 

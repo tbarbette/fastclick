@@ -32,7 +32,7 @@ int TCPClientAck::configure(Vector<String> &conf, ErrorHandler *errh)
 
 
 
-void TCPClientAck::push_batch(int port, fcb_clientack* fcb, PacketBatch *batch)
+void TCPClientAck::push_flow(int port, fcb_clientack* fcb, PacketBatch *batch)
 {
     assert(batch->count() == batch->find_count());
     Packet* packet = batch->tail();

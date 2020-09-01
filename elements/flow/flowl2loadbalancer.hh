@@ -80,7 +80,7 @@ class FlowL2LoadBalancer : public FlowStateElement<FlowL2LoadBalancer,L2LBEntry>
         bool new_flow(L2LBEntry*, Packet*);
         void release_flow(L2LBEntry*) {};
 
-        void push_batch(int, L2LBEntry*, PacketBatch *);
+        void push_flow(int, L2LBEntry*, PacketBatch *);
 
     private:
         bool _own_state;

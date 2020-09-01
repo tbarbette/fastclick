@@ -190,7 +190,7 @@ void FlowNAPTLoadBalancer::release_flow(TTuple* fcb) {
     release_ref(fcb->ref, _own_state);
 }
 
-void FlowNAPTLoadBalancer::push_batch(int, TTuple* flowdata, PacketBatch* batch) {
+void FlowNAPTLoadBalancer::push_flow(int, TTuple* flowdata, PacketBatch* batch) {
     nat_debug_chatter("Forward entry X:X -> %s:%d to %s:X", flowdata->pair.src.unparse().c_str(), ntohs(flowdata->get_port()), flowdata->pair.dst.unparse().c_str());
     state &s = *_state;
 
@@ -321,7 +321,7 @@ void FlowNAPTLoadBalancerReverse::release_flow(LBEntryOut* fcb) {
     release_ref(fcb->ref,_lb->_own_state);
 }
 
-void FlowNAPTLoadBalancerReverse::push_batch(int, LBEntryOut* flowdata, PacketBatch* batch) {
+void FlowNAPTLoadBalancerReverse::push_flow(int, LBEntryOut* flowdata, PacketBatch* batch) {
         nat_debug_chatter("Saved entry X:%d -> %s:%d to %s:X",ntohs(flowdata->get_port()), flowdata->pair.src.unparse().c_str(), ntohs(flowdata->get_original_sport()), flowdata->pair.dst.unparse().c_str());
 
     auto fnt = [this,flowdata](Packet* &p) -> bool {

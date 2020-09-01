@@ -33,7 +33,7 @@ public:
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;
 
-  void push_batch(int, int* flowdata, PacketBatch* batch) override;
+  void push_flow(int, int* flowdata, PacketBatch* batch) override;
 };
 
 CLICK_ENDDECLS

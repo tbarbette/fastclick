@@ -396,7 +396,7 @@ inline FlowARPQuerier::handle_response(Packet *p)
 }
 
 void
-FlowARPQuerier::push_batch(int port, fcb_arpcache* fcb, PacketBatch *batch)
+FlowARPQuerier::push_flow(int port, fcb_arpcache* fcb, PacketBatch *batch)
 {
     if (port == 0) {
         auto fnt = [&fcb,this](Packet*p){return handle_ip(p,fcb);};

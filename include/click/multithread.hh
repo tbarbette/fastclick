@@ -361,11 +361,11 @@ class unprotected_rcu : public unprotected_rcu_singlewriter<T,N> { public:
 
     inline T& write_begin() {
         _write_lock.acquire();
-        return unprotected_rcu_singlewriter<T,N>::write_begin();
+        return this->unprotected_rcu_singlewriter<T,N>::write_begin();
     }
 
     inline void write_commit() {
-        unprotected_rcu_singlewriter<T,N>::write_commit();
+        this->unprotected_rcu_singlewriter<T,N>::write_commit();
         _write_lock.release();
     }
 
@@ -380,7 +380,7 @@ private:
 /**
  * Wrap a pointer to V with a reference count. Call get() and put()
  *  to get and put reference. When created, it has a reference count of 1
- *  when the call to put() goes to 0, nothing is done.
+ *  when the call to put() goes to 0, it calls delete on the pointer.
  */
 template <typename T>
 class shared { public:
@@ -1421,7 +1421,7 @@ class fast_rcu { public:
                 click_relax_fence();
                 goto loop;
             }
-            //TODO : if allow N > 2, compute a min_epoch at the same time so next writer can avoid looping
+            //TODO : if allow RCU_N > 2, compute a min_epoch at the same time so next writer can avoid looping
         }
 
         //All epochs are 0 (no accessed, or at least not to the current ptr)

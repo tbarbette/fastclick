@@ -76,7 +76,7 @@ bool FlowL2LoadBalancer::new_flow(L2LBEntry* flowdata, Packet* p)
 }
 
 
-void FlowL2LoadBalancer::push_batch(int, L2LBEntry* flowdata, PacketBatch* batch)
+void FlowL2LoadBalancer::push_flow(int, L2LBEntry* flowdata, PacketBatch* batch)
 {
     auto fnt = [this,flowdata](Packet*&p) -> bool {
         WritablePacket* q =p->uniqueify();

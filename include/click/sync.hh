@@ -956,7 +956,7 @@ class nolock { public:
 
     inline void release() {}
 
-    inline bool attempt() {return true;}
+    inline bool attempt() { return true; }
 
     inline void read_begin() {}
 

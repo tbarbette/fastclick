@@ -258,7 +258,7 @@ int onMatch(unsigned int id, unsigned long long from, unsigned long long to,
     return 0; // continue matching
 }
 
-void FlowHyperScan::push_batch(int port, FlowHyperScanState* flowdata, PacketBatch* batch)
+void FlowHyperScan::push_flow(int port, FlowHyperScanState* flowdata, PacketBatch* batch)
 {
     if (!flowdata->stream) {
         hs_error_t err = hs_open_stream(db_streaming, 0, &flowdata->stream);

@@ -119,6 +119,11 @@ BitvectorTest::initialize(ErrorHandler *errh)
     CHECK(bv.unparse() == "0-1,3-5");
     CHECK(bv.weight() == 5);
     CHECK(bv.clz() == 0);
+
+    bv.assign(8, false);
+    bv[1] = true;
+    CHECK(bv.clz() == 1);
+
     errh->message("All tests pass!");
     return 0;
 }

@@ -192,7 +192,7 @@ inline int FlowIPOutputCombo::action(Packet* &p_in, bool color, int given_color)
 	  return 2;
 }
 
-void FlowIPOutputCombo::push_batch(int, int* flow_data, PacketBatch * head) {
+void FlowIPOutputCombo::push_flow(int, int* flow_data, PacketBatch * head) {
   Packet* cur = NULL;
   Packet* next = head;
   Packet* last = NULL;

@@ -117,10 +117,10 @@ public:
     //TCPReorder has the same needs than TCPReorder
     FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff",FLOW_TCP);
 
-    int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
-    int initialize(ErrorHandler *errh);
+    int configure(Vector<String>&, ErrorHandler*) override CLICK_COLD;
+    int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
 
-    void push_batch(int, fcb_tcpreorder* fcb, PacketBatch *batch) override;
+    void push_flow(int, fcb_tcpreorder* fcb, PacketBatch *batch) override;
 
     static void fcb_release_fnt(FlowControlBlock* fcb, void* thunk);
 private:

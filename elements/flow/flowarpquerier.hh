@@ -200,7 +200,7 @@ class FlowARPQuerier : public FlowSpaceElement<fcb_arpcache> { public:
     void cleanup(CleanupStage stage) CLICK_COLD;
     void take_state(Element *e, ErrorHandler *errh);
 
-    void push_batch(int port, fcb_arpcache* fcb, PacketBatch *batch);
+    void push_flow(int port, fcb_arpcache* fcb, PacketBatch *batch);
 
   private:
 

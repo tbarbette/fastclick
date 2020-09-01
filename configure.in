@@ -149,15 +149,6 @@ else
 =========================================])
 fi
 
-if test "x$enable_flow" = xyes; then
-    if test "x$enable_batch" != xyes; then
-        enable_flow=no
-        AC_MSG_WARN([--enable-flow needs --enable-batch! Flow subsystem will be disabled.])
-    else
-        AC_DEFINE(HAVE_FLOW)
-    fi
-fi
-
 AC_ARG_ENABLE([netmap-pool],
     [AS_HELP_STRING([  --enable-netmap-pool], [use netmap buffers instead of standard Click buffers])],
     [:], [enable_netmap_pool=no])
@@ -406,52 +397,6 @@ AC_ARG_ENABLE([zerocopy],
     [:], [enable_zerocopy=yes])
 if test "x$enable_zerocopy" = xyes; then
     AC_DEFINE(HAVE_ZEROCOPY)
-fi
-
-AC_ARG_ENABLE([sloppy],
-    [AS_HELP_STRING([  --disable-sloppy], [disable Sloppy flow timeouts])],
-    [:], [enable_sloppy=yes])
-if test "x$enable_sloppy" = xyes; then
-    AC_DEFINE(HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT)
-fi
-
-AC_ARG_ENABLE([flow-atomic],
-    [AS_HELP_STRING([  --disable-flow-atomic], [use non-atomic flow reference counting])],
-    [:], [enable_flow_atomic=yes])
-if test "x$enable_flow_atomic" = xyes; then
-    AC_DEFINE(FLOW_ATOMIC_USE_COUNT)
-fi
-
-AC_ARG_ENABLE([flow-dynamic],
-    [AS_HELP_STRING([  --disable-flow-dynamic], [allow dynamic flow system])],
-    [:], [enable_flow_dynamic=yes])
-if test "x$enable_flow$enable_flow_dynamic" = xyesyes; then
-    AC_DEFINE(HAVE_FLOW_DYNAMIC)
-fi
-
-AC_ARG_ENABLE([flow-structure],
-              [AS_HELP_STRING([  --disable-flow-structure], [do not free classifier nodes in pool, mark them as released to somehow keep the receive strucutre intact])],
-    [:], [enable_flow_structure=yes])
-if test "x$enable_flow_structure" = xyes; then
-    AC_DEFINE(FLOW_KEEP_STRUCTURE)
-fi
-
-AC_ARG_ENABLE([flow-hash],
-    [AS_HELP_STRING([  --enable-flow-hash=[[reset|keep|epoch]]], [set flow hashtable release mechanism])],
-    [:], [enable_flow_hash=""])
-
-if echo "$enable_flow_hash" | grep epoch >/dev/null 2>&1; then
-    AC_DEFINE([FLOW_HASH_RELEASE], [2], [Flow hash is in epoch mode.])
-elif echo "$enable_flow_hash" | grep keep >/dev/null 2>&1; then
-    AC_DEFINE([FLOW_HASH_RELEASE], [1], [Flow hash is in keep mode.])
-elif echo "$enable_flow_hash" | grep reset >/dev/null 2>&1; then
-    AC_DEFINE([FLOW_HASH_RELEASE], [0], [Flow hash is in reset mode.])
-else
-    if test "x$enable_flow_structure" = xyes; then
-        AC_DEFINE([FLOW_HASH_RELEASE], [1], [Flow hash is in keep mode.])
-    else
-        AC_DEFINE([FLOW_HASH_RELEASE], [2], [Flow hash is in epoch mode.])
-    fi
 fi
 
 dnl linuxmodule driver and features
@@ -961,6 +906,19 @@ if test "x$have_aligned_new" = xyes; then
     CXXFLAGS="$CXXFLAGS -faligned-new"
 fi
 
+if test "x$enable_flow" = xyes; then
+    if test "x$enable_batch" != xyes; then
+        AC_MSG_ERROR([--enable-flow needs --enable-batch! Flow subsystem will be disabled.])
+    else
+        AC_DEFINE(HAVE_FLOW)
+        if test "x$enable_flow" = "xyes"; then
+            AC_SUBST(USE_FLOW, yes)
+        fi
+    fi
+fi
+
+
+
 dnl
 dnl check whether tools should be built for host or build
 dnl
@@ -1392,11 +1350,11 @@ if test "x$enable_cpu_load" = xyes; then
 fi
 
 
-AC_ARG_ENABLE([flow-api], [AS_HELP_STRING([--enable-flow-api], [Support for the HW flow classification API. Also needs DPDK>=20.02 ])], :, enable_flow_api=no)
-AC_CHECK_FILE($srcdir/include/click/flowparser.hh, [ac_have_flow_disp_h=yes], [ac_have_flow_disp_h=no])
-AC_CHECK_FILE($srcdir/include/click/flowparserparser.hh, [ac_have_flow_disp_p_h=yes], [ac_have_flow_disp_p_h=no])
-AC_CHECK_FILE($srcdir/include/click/flowparserglue.hh, [ac_have_flow_disp_g_h=yes], [ac_have_flow_disp_g_h=no])
-if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
+AC_ARG_ENABLE([flow-api], [AS_HELP_STRING([--enable-flow-api], [Support for the HW flow classification API. Also needs DPDK>=20.02 ])], [:], [enable_flow_api=no])
+AC_CHECK_FILE($srcdir/include/click/flowruleparser.hh, [ac_have_flow_rule_parser_h=yes], [ac_have_flow_rule_parser_h=no])
+AC_CHECK_FILE($srcdir/include/click/flowrulecache.hh, [ac_have_flow_rule_cache_h=yes], [ac_have_flow_rule_cache_h=no])
+AC_CHECK_FILE($srcdir/include/click/flowrulemanager.hh, [ac_have_flow_rule_man_h=yes], [ac_have_flow_rule_man_h=no])
+if test "x$ac_have_flow_rule_parser_h$ac_have_flow_rule_cache_h$ac_have_flow_rule_man_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
     have_flow_api=yes
     AC_DEFINE([HAVE_FLOW_API])
 else
@@ -1618,10 +1576,6 @@ pcap.h and/or -lpcap not found; user-level driver can't steal packets.
     DRIVERS="$DRIVERS userlevel"
     AC_DEFINE(HAVE_USERLEVEL_DRIVER)
     HAVE_USERLEVEL_DRIVER=1
-fi
-
-if test "x$enable_flow" = "xyes"; then
-    AC_SUBST(USE_FLOW, yes)
 fi
 
 if test "x$enable_netmap_pool" = "xyes"; then
@@ -2536,6 +2490,11 @@ else
     have_pcap=no
 fi
 
+dnl add 'pci' if libpci support is available
+if test "x$have_pci" = xyes; then
+    provisions="$provisions pci"
+fi
+
 dnl add 're2' if re2 is available
 if test "x$have_re2" = xyes; then
     provisions="$provisions re2"
@@ -2601,7 +2560,7 @@ AC_OUTPUT
 feedback="no"
 
 if test "$enable_flow_api$have_flow_api" = "yesno"; then
-    feedback="To enable DPDK's Flow Dispatcher (rte_flow API), use a DPDK version >= 20.02."
+    feedback="To enable DPDK's Flow Rule Manager (rte_flow API), use a DPDK version >= 20.02."
 fi
 
 echo "

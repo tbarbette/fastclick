@@ -662,7 +662,6 @@ XML2CLICK
 PROPER_LIBS
 PROPER_INCLUDES
 HAVE_NETMAP_PACKET_POOL
-USE_FLOW
 NETMAP_INCLUDES
 NUMA_INCLUDES
 PCAP_LIBS
@@ -691,6 +690,7 @@ BUILD_RANLIB
 BUILD_AR
 BUILD_CXX
 BUILD_CC
+USE_FLOW
 POSIX_CLOCK_LIBS
 LIBOBJS
 freebsd_includedir
@@ -816,11 +816,6 @@ enable_dpdk
 enable_dpdk_pool
 enable_dpdk_packet
 enable_zerocopy
-enable_sloppy
-enable_flow_atomic
-enable_flow_dynamic
-enable_flow_structure
-enable_flow_hash
 enable_linuxmodule
 enable_fixincludes
 enable_multithread
@@ -1549,16 +1544,6 @@ Optional Features:
     --enable-dpdk-pool    use DPDK buffer instead of standard Click buffer
     --enable-dpdk-packet  Click packets are DPDK packet
     --disable-zerocopy    disable Zero Copy
-    --disable-sloppy      disable Sloppy flow timeouts
-    --disable-flow-atomic use non-atomic flow reference counting
-    --disable-flow-dynamic
-                          allow dynamic flow system
-    --disable-flow-structure
-                          do not free classifier nodes in pool, mark them as
-                          released to somehow keep the receive strucutre
-                          intact
-    --enable-flow-hash=[reset|keep|epoch]
-                          set flow hashtable release mechanism
   --disable-linuxmodule   disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
     --enable-multithread  support kernel multithreading
@@ -6584,17 +6569,6 @@ else
 =========================================" "$LINENO" 5
 fi
 
-if test "x$enable_flow" = xyes; then
-    if test "x$enable_batch" != xyes; then
-        enable_flow=no
-        { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: --enable-flow needs --enable-batch! Flow subsystem will be disabled." >&5
-$as_echo "$as_me: WARNING: --enable-flow needs --enable-batch! Flow subsystem will be disabled." >&2;}
-    else
-        $as_echo "#define HAVE_FLOW 1" >>confdefs.h
-
-    fi
-fi
-
 # Check whether --enable-netmap-pool was given.
 if test "${enable_netmap_pool+set}" = set; then :
   enableval=$enable_netmap_pool; :
@@ -7278,86 +7252,6 @@ fi
 if test "x$enable_zerocopy" = xyes; then
     $as_echo "#define HAVE_ZEROCOPY 1" >>confdefs.h
 
-fi
-
-# Check whether --enable-sloppy was given.
-if test "${enable_sloppy+set}" = set; then :
-  enableval=$enable_sloppy; :
-else
-  enable_sloppy=yes
-fi
-
-if test "x$enable_sloppy" = xyes; then
-    $as_echo "#define HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT 1" >>confdefs.h
-
-fi
-
-# Check whether --enable-flow-atomic was given.
-if test "${enable_flow_atomic+set}" = set; then :
-  enableval=$enable_flow_atomic; :
-else
-  enable_flow_atomic=yes
-fi
-
-if test "x$enable_flow_atomic" = xyes; then
-    $as_echo "#define FLOW_ATOMIC_USE_COUNT 1" >>confdefs.h
-
-fi
-
-# Check whether --enable-flow-dynamic was given.
-if test "${enable_flow_dynamic+set}" = set; then :
-  enableval=$enable_flow_dynamic; :
-else
-  enable_flow_dynamic=yes
-fi
-
-if test "x$enable_flow$enable_flow_dynamic" = xyesyes; then
-    $as_echo "#define HAVE_FLOW_DYNAMIC 1" >>confdefs.h
-
-fi
-
-# Check whether --enable-flow-structure was given.
-if test "${enable_flow_structure+set}" = set; then :
-  enableval=$enable_flow_structure; :
-else
-  enable_flow_structure=yes
-fi
-
-if test "x$enable_flow_structure" = xyes; then
-    $as_echo "#define FLOW_KEEP_STRUCTURE 1" >>confdefs.h
-
-fi
-
-# Check whether --enable-flow-hash was given.
-if test "${enable_flow_hash+set}" = set; then :
-  enableval=$enable_flow_hash; :
-else
-  enable_flow_hash=""
-fi
-
-
-if echo "$enable_flow_hash" | grep epoch >/dev/null 2>&1; then
-
-$as_echo "#define FLOW_HASH_RELEASE 2" >>confdefs.h
-
-elif echo "$enable_flow_hash" | grep keep >/dev/null 2>&1; then
-
-$as_echo "#define FLOW_HASH_RELEASE 1" >>confdefs.h
-
-elif echo "$enable_flow_hash" | grep reset >/dev/null 2>&1; then
-
-$as_echo "#define FLOW_HASH_RELEASE 0" >>confdefs.h
-
-else
-    if test "x$enable_flow_structure" = xyes; then
-
-$as_echo "#define FLOW_HASH_RELEASE 1" >>confdefs.h
-
-    else
-
-$as_echo "#define FLOW_HASH_RELEASE 2" >>confdefs.h
-
-    fi
 fi
 
 
@@ -9626,6 +9520,21 @@ if test "x$have_aligned_new" = xyes; then
     CXXFLAGS="$CXXFLAGS -faligned-new"
 fi
 
+if test "x$enable_flow" = xyes; then
+    if test "x$enable_batch" != xyes; then
+        as_fn_error $? "--enable-flow needs --enable-batch! Flow subsystem will be disabled." "$LINENO" 5
+    else
+        $as_echo "#define HAVE_FLOW 1" >>confdefs.h
+
+        if test "x$enable_flow" = "xyes"; then
+            USE_FLOW=yes
+
+        fi
+    fi
+fi
+
+
+
 
 # Check whether --enable-tools was given.
 if test "${enable_tools+set}" = set; then :
@@ -11203,15 +11112,15 @@ else
   enable_flow_api=no
 fi
 
-as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowparser.hh" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowparser.hh" >&5
-$as_echo_n "checking for $srcdir/include/click/flowparser.hh... " >&6; }
+as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowruleparser.hh" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowruleparser.hh" >&5
+$as_echo_n "checking for $srcdir/include/click/flowruleparser.hh... " >&6; }
 if eval \${$as_ac_File+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   test "$cross_compiling" = yes &&
   as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$srcdir/include/click/flowparser.hh"; then
+if test -r "$srcdir/include/click/flowruleparser.hh"; then
   eval "$as_ac_File=yes"
 else
   eval "$as_ac_File=no"
@@ -11221,20 +11130,20 @@ eval ac_res=\$$as_ac_File
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  ac_have_flow_disp_h=yes
+  ac_have_flow_rule_parser_h=yes
 else
-  ac_have_flow_disp_h=no
+  ac_have_flow_rule_parser_h=no
 fi
 
-as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowparserparser.hh" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowparserparser.hh" >&5
-$as_echo_n "checking for $srcdir/include/click/flowparserparser.hh... " >&6; }
+as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowrulecache.hh" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowrulecache.hh" >&5
+$as_echo_n "checking for $srcdir/include/click/flowrulecache.hh... " >&6; }
 if eval \${$as_ac_File+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   test "$cross_compiling" = yes &&
   as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$srcdir/include/click/flowparserparser.hh"; then
+if test -r "$srcdir/include/click/flowrulecache.hh"; then
   eval "$as_ac_File=yes"
 else
   eval "$as_ac_File=no"
@@ -11244,20 +11153,20 @@ eval ac_res=\$$as_ac_File
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  ac_have_flow_disp_p_h=yes
+  ac_have_flow_rule_cache_h=yes
 else
-  ac_have_flow_disp_p_h=no
+  ac_have_flow_rule_cache_h=no
 fi
 
-as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowparserglue.hh" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowparserglue.hh" >&5
-$as_echo_n "checking for $srcdir/include/click/flowparserglue.hh... " >&6; }
+as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowrulemanager.hh" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowrulemanager.hh" >&5
+$as_echo_n "checking for $srcdir/include/click/flowrulemanager.hh... " >&6; }
 if eval \${$as_ac_File+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   test "$cross_compiling" = yes &&
   as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$srcdir/include/click/flowparserglue.hh"; then
+if test -r "$srcdir/include/click/flowrulemanager.hh"; then
   eval "$as_ac_File=yes"
 else
   eval "$as_ac_File=no"
@@ -11267,12 +11176,12 @@ eval ac_res=\$$as_ac_File
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  ac_have_flow_disp_g_h=yes
+  ac_have_flow_rule_man_h=yes
 else
-  ac_have_flow_disp_g_h=no
+  ac_have_flow_rule_man_h=no
 fi
 
-if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
+if test "x$ac_have_flow_rule_parser_h$ac_have_flow_rule_cache_h$ac_have_flow_rule_man_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
     have_flow_api=yes
     $as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
 
@@ -12119,11 +12028,6 @@ pcap.h and/or -lpcap not found; user-level driver can't steal packets.
     $as_echo "#define HAVE_USERLEVEL_DRIVER 1" >>confdefs.h
 
     HAVE_USERLEVEL_DRIVER=1
-fi
-
-if test "x$enable_flow" = "xyes"; then
-    USE_FLOW=yes
-
 fi
 
 if test "x$enable_netmap_pool" = "xyes"; then
@@ -14933,6 +14837,10 @@ else
     have_pcap=no
 fi
 
+if test "x$have_pci" = xyes; then
+    provisions="$provisions pci"
+fi
+
 if test "x$have_re2" = xyes; then
     provisions="$provisions re2"
 fi
@@ -16327,7 +16235,7 @@ fi
 feedback="no"
 
 if test "$enable_flow_api$have_flow_api" = "yesno"; then
-    feedback="To enable DPDK's Flow Dispatcher (rte_flow API), use a DPDK version >= 20.02."
+    feedback="To enable DPDK's Flow Rule Manager (rte_flow API), use a DPDK version >= 20.02."
 fi
 
 echo "

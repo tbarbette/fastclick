@@ -31,7 +31,7 @@ ExactCPUSwitch::update_map() {
     Bitvector b = get_pushing_threads();
     map.resize(b.size());
     int j = 0;
-    for (int i = 0; i < b.size(); i++) {
+    for (unsigned i = 0; i < b.size(); i++) {
         if (b[i] == false) {
             map[i] = -1;
             continue;
@@ -43,6 +43,13 @@ ExactCPUSwitch::update_map() {
 
 int
 ExactCPUSwitch::initialize(ErrorHandler* errh) {
+    update_map();
+    return 0;
+}
+
+
+int
+ExactCPUSwitch::thread_configure(ThreadReconfigurationStage, ErrorHandler* errh, Bitvector threads) {
     update_map();
     return 0;
 }

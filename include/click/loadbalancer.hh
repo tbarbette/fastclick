@@ -4,19 +4,26 @@
 
 #include <click/ipflowid.hh>
 #include <algorithm>
+#if HAVE_DPDK
 #include <click/dpdk_glue.hh>
+#endif
 #include <click/hashtable.hh>
-#include <click/multithread.hh>
-#include <click/args.hh>
+#include <click/ipflowid.hh>
+#include <click/tcphelper.hh>
 #include <click/straccum.hh>
+#include <click/args.hh>
+#include <click/timer.hh>
 
-template <typename T>
+template <typename T = IPAddress>
 class LoadBalancer { public:
 
-    LoadBalancer() : _current(0),  _dsts(), _weights_helper(), _mode_case(round_robin) {
+    LoadBalancer() : _current(0), _dsts(), _weights_helper(), _mode_case(round_robin) {
         modetrans.find_insert("rr",round_robin);
         modetrans.find_insert("hash",direct_hash);
+        modetrans.find_insert("hash_ip",direct_hash_ip);
+#if HAVE_DPDK
         modetrans.find_insert("hash_crc",direct_hash_crc);
+#endif
         modetrans.find_insert("hash_agg",direct_hash_agg);
         modetrans.find_insert("cst_hash_agg",constant_hash_agg);
         modetrans.find_insert("wrr",weighted_round_robin);
@@ -38,13 +45,15 @@ class LoadBalancer { public:
         direct_hash,
         direct_hash_crc,
         direct_hash_agg,
+        direct_hash_ip,
         least_load
     };
 
     static bool isLoadBased(LBMode mode) {
-        return mode == pow2 || mode == least_load || mode == weighted_round_robin  || mode == auto_weighted_round_robin;
+        return mode == pow2 || mode == least_load || mode == weighted_round_robin || mode == auto_weighted_round_robin;
     }
 
+    // Metric to use when the LB technique is load-based
     enum LSTMode {
         connections,
         packets,
@@ -67,7 +76,6 @@ class LoadBalancer { public:
         uint64_t cpu_load;
     } CLICK_CACHE_ALIGN;
 
-
 protected:
     HashTable<String, LBMode> modetrans;
     HashTable<String, LSTMode> lsttrans;
@@ -87,7 +95,7 @@ protected:
     bool _autoscale;
 
     uint64_t get_load_metric(int idx) {
-    return get_load_metric(idx, _lst_case);
+        return get_load_metric(idx, _lst_case);
     }
     uint64_t get_load_metric(int idx,LSTMode metric) {
         load& l = _loads[idx];
@@ -109,10 +117,24 @@ protected:
         }
     }
 
+    inline void track_load(Packet*p, int b) {
+    if (_track_load) {
+        if (TCPHelper::isSyn(p))
+                 _loads[b].connection_load++;
+        else if (TCPHelper::isFin(p) || TCPHelper::isRst(p))
+                 _loads[b].connection_load--;
+
+            _loads[b].packets_load++;
+            _loads[b].bytes_load += p->length();
+        }
+    }
+
     unsigned cantor(unsigned a, unsigned b) {
         return ((a + b)  * (a + b + 1))/2 + b;
     }
 
+    /* Builds the constant hashing map
+     */
     void build_hash_ring() {
         Vector<unsigned> new_hash;
         new_hash.resize(_cst_hash.size(), -1);
@@ -170,6 +192,27 @@ protected:
         timer->reschedule_after_msec(lb->_awrr_interval);
     }
 
+    int hash_ip(const Packet* p) {
+        const unsigned char *data = p->data();
+        int o = 32, l = 8;
+        int h;
+        if ((int)p->length() < o + l)
+            h = 0;
+        else {
+            int d = 0;
+            for (int i = o; i < o + l; i++)
+                d += data[i];
+            int n = _selector.size();
+            if (n == 2 || n == 4 || n == 8)
+                h = (d ^ (d>>4)) & (n-1);
+            else
+              h = (d % n);
+        }
+        return h;
+    }
+
+
+    // Parse common LB parameters
     int parseLb(Vector<String> &conf, Element* lb, ErrorHandler* errh) {
         String lb_mode;
         String lst_mode;
@@ -179,7 +222,7 @@ protected:
         bool has_cst_buckets;
         int cst_buckets;
         int nserver;
-	    bool force_track_load;
+    bool force_track_load;
         int ret = Args(lb, errh).bind(conf)
             .read_or_set("LB_MODE", lb_mode,"rr")
             .read_or_set("LST_MODE",lst_mode,"conn")
@@ -195,7 +238,7 @@ protected:
 
         _alpha = alpha;
         _autoscale = autoscale;
-	_force_track_load = force_track_load;
+        _force_track_load = force_track_load;
         if (has_cst_buckets) {
             _cst_hash.resize(cst_buckets, -1);
         }
@@ -205,113 +248,67 @@ protected:
         return ret;
     }
 
-    void add_server() {
-        if (_spares.size() == 0) {
-            click_chatter("No server to add!");
-            return;
-        }
-        int spare = _spares.front();
-        _spares.pop_front();
-
-        int id = click_random() % _selector.size();
-        Vector<unsigned> news;
-        news.reserve(_dsts.size());
-        for (int i = 0; i < _selector.size(); i++) {
-            if (i == id) {
-                news.push_back(spare);
-            }
-            news.push_back(_selector[i]);
-        }
-        _selector.swap(news);
-        if (_mode_case == constant_hash_agg) {
-            build_hash_ring();
-        }
-    }
-
-    void remove_server() {
-        if (_selector.size() == 0) {
-            click_chatter("No server to remove!");
-            return;
-        }
-
-        int id = click_random() % _selector.size();
-        int removed = _selector[id];
-        Vector<unsigned> news;
-        news.reserve(_dsts.size());
-        for (int i = 0; i < _selector.size(); i++) {
-            if (i == id) {
-                continue;
-            }
-            news.push_back(_selector[i]);
-        }
-        _spares.push_back(removed);
-        _selector.swap(news);
-        if (_mode_case == constant_hash_agg) {
-            build_hash_ring();
-        }
-    }
-
-    enum {
+   enum {
             h_load,h_nb_total_servers,h_nb_active_servers,h_load_conn,h_load_packets,h_load_bytes,h_add_server,h_remove_server
     };
 
 
- int lb_handler(int op, String &data, void *r_thunk, void* w_thunk, ErrorHandler *errh) {
+    int lb_handler(int op, String &data, void *r_thunk, void* w_thunk, ErrorHandler *errh) {
 
-    LoadBalancer *cs = this;
-    if (op == Handler::f_read) {
-        switch((uintptr_t) r_thunk) {
-           case h_load: {
-                StringAccum acc;
-		if (data) {
-		    int i = atoi(data.c_str());
-                    if (cs->_loads.size() <= i) {
-		        acc << "unknown";
-		    } else {
-		        acc << cs->_loads[i].cpu_load ;
-		    }
-		} else {
-		    for (int i = 0; i < cs->_dsts.size(); i ++) {
-			if (cs->_loads.size() <= i) {
-			    acc << "unknown";
-			} else {
-			    acc << cs->_loads[i].cpu_load ;
-			}
-			acc << (i == cs->_dsts.size() -1?"":" ");
-		    }
-		}
-                data = acc.take_string();
-		return 0;
-            }
-	}
-    } else {
-       switch((uintptr_t)w_thunk) {
-            case h_load: {
-                String s(data);
-                //click_chatter("Input %s", s.c_str());
-                while (s.length() > 0) {
-                    int ntoken = s.find_left(',');
-                    if (ntoken < 0)
-                        ntoken = s.length() - 1;
-                    int pos = s.find_left(':');
-                    int server_id = atoi(s.substring(0,pos).c_str());
-                    int server_load = atoi(s.substring(pos + 1, ntoken).c_str());
-                    //click_chatter("%d is %d",server_id, server_load);
-                    if (cs->_loads.size() <= server_id) {
-                        click_chatter("Invalid server id %d", server_id);
-                        return 1;
+        LoadBalancer *cs = this;
+        if (op == Handler::f_read) {
+            switch((uintptr_t) r_thunk) {
+               case h_load: {
+                    StringAccum acc;
+                    if (data) {
+                        int i = atoi(data.c_str());
+                                if (cs->_loads.size() <= i) {
+                            acc << "unknown";
+                        } else {
+                            acc << cs->_loads[i].cpu_load ;
+                        }
+                    } else {
+                        for (int i = 0; i < cs->_dsts.size(); i ++) {
+                        if (cs->_loads.size() <= i) {
+                            acc << "unknown";
+                        } else {
+                            acc << cs->_loads[i].cpu_load ;
+                        }
+                        acc << (i == cs->_dsts.size() -1?"":" ");
+                        }
                     }
-                    cs->_loads[server_id].cpu_load = server_load;
-                    s = s.substring(ntoken + 1);
+                            data = acc.take_string();
+                    return 0;
                 }
-                if (cs->_autoscale)
-	           cs->checkload();
-                return 0;
             }
-	}
-      }
-    }
+        } else {
+           switch((uintptr_t)w_thunk) {
+               case h_load:
+               {
+                    String s(data);
+                    //click_chatter("Input %s", s.c_str());
+                    while (s.length() > 0) {
+                        int ntoken = s.find_left(',');
+                        if (ntoken < 0)
+                            ntoken = s.length() - 1;
+                        int pos = s.find_left(':');
+                        int server_id = atoi(s.substring(0,pos).c_str());
+                        int server_load = atoi(s.substring(pos + 1, ntoken).c_str());
+                        //click_chatter("%d is %d",server_id, server_load);
+                        if (cs->_loads.size() <= server_id) {
+                            click_chatter("Invalid server id %d", server_id);
+                            return 1;
+                        }
+                        cs->_loads[server_id].cpu_load = server_load;
+                        s = s.substring(ntoken + 1);
+                    }
 
+                    return 0;
+                }
+            }
+        }
+        return -1;
+    }
 
 
     int lb_write_handler(
@@ -319,11 +316,11 @@ protected:
         LoadBalancer *cs = this;
         switch((uintptr_t) thunk) {
             case h_add_server: {
-                add_server();
+                //add_server();
                 break;
             }
             case h_remove_server: {
-                remove_server();
+                //remove_server();
                 break;
             }
         }
@@ -365,22 +362,17 @@ protected:
         }
     }
 
-
-
-    void checkload() {
-        double tot = 0;
-        for (int i = 0; i < _selector.size(); i++) {
-            tot += _loads[_selector[i]].cpu_load;
-        }
-        double avg = tot / _loads.size();
-        if (avg > 80 && _spares.size() > 0) {
-            click_chatter("Load is %f, adding a server", avg);
-            add_server();
-        } else if (avg < 40 && _selector.size() > 1) {
-            remove_server();
-            click_chatter("Load is %f, removing a server", avg);
-        }
-
+    template <class S>
+    void add_lb_handlers(Element* _e) {
+        S* e = (S*)_e;
+        e->set_handler("load", Handler::f_read | Handler::f_read_param | Handler::f_write, e->handler, h_load, h_load);
+        e->add_read_handler("nb_active_servers", e->read_handler, h_nb_active_servers);
+        e->add_read_handler("nb_total_servers", e->read_handler, h_nb_total_servers);
+        e->add_read_handler("load_conn", e->read_handler, h_load_conn);
+        e->add_read_handler("load_bytes", e->read_handler, h_load_bytes);
+        e->add_read_handler("load_packets", e->read_handler, h_load_packets);
+        //e->add_write_handler("remove_server", e->write_handler, h_remove_server);
+        //e->add_write_handler("add_server", e->write_handler, h_add_server);
     }
 
     void set_mode(String mode, String metric="cpu", Element* owner=0,int awrr_timer_interval = -1, int nserver = 0) {
@@ -411,7 +403,7 @@ protected:
             } else {
                 nserver= _dsts.size();
             }
-        }
+    }
 
         if (_mode_case == round_robin ||_mode_case == weighted_round_robin || _mode_case == auto_weighted_round_robin) {
             int p = nserver / _current.weight();
@@ -461,15 +453,21 @@ protected:
                 }
                 return b;
             }
+#if HAVE_DPDK
             case direct_hash_crc: {
                 IPFlow5ID srv = IPFlow5ID(p);
                 unsigned server_val = ipv4_hash_crc(&srv, sizeof(srv), 0);
                 server_val = ((server_val >> 16) ^ (server_val & 65535)) % _selector.size();
                 return _selector.unchecked_at(server_val);
             }
+#endif
             case direct_hash_agg: {
                 unsigned server_val = AGGREGATE_ANNO(p);
                 server_val = ((server_val >> 16) ^ (server_val & 65535)) % _selector.size();
+                return _selector.unchecked_at(server_val);
+            }
+            case direct_hash_ip: {
+                unsigned server_val = hash_ip(p);
                 return _selector.unchecked_at(server_val);
             }
             case direct_hash: {

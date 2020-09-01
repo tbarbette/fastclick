@@ -49,7 +49,7 @@ class FlowHyperScan : public FlowSpaceElement<FlowHyperScanState> {
         int initialize(ErrorHandler *errh) override CLICK_COLD;
         void cleanup(CleanupStage) CLICK_COLD;
 
-        void push_batch(int, FlowHyperScanState*, PacketBatch *);
+        void push_flow(int, FlowHyperScanState*, PacketBatch *);
 
         bool is_valid_patterns(Vector<String> &patterns, ErrorHandler *errh);
 

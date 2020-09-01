@@ -31,7 +31,7 @@ TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
 
 
 int
-TCPReorder::initialize(ErrorHandler *errh) {
+TCPReorder::solve_initialize(ErrorHandler *errh) {
     ElementCastTracker track(router(), "TCPIn");
     router()->visit_downstream(this,0,&track);
     /*if (track.size() == 0) {
@@ -80,7 +80,7 @@ void TCPReorder::flushListFrom(fcb_tcpreorder *tcpreorder, Packet* toKeep,
     }
 }
 
-void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *batch)
+void TCPReorder::push_flow(int port, fcb_tcpreorder* tcpreorder, PacketBatch *batch)
 {
     //click_chatter("Flow %p, uc %d",tcpreorder,fcb_stack->count());
     // Ensure that the pointer in the FCB is set

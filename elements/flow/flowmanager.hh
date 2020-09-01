@@ -23,7 +23,7 @@ typedef struct FlowCache_t{
     FlowControlBlock* fcb;
 } FlowCache;
 
-class FlowManager: public FlowElement {
+class FlowManager: public VirtualFlowManager {
 protected:
     FlowClassificationTable _table;
     per_thread<FlowCache*> _cache;
@@ -62,8 +62,6 @@ protected:
 
     int _pool_data_size;
 
-
-    void build_fcb();
 public:
     FlowManager() CLICK_COLD;
 

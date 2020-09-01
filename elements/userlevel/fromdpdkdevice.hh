@@ -91,19 +91,19 @@ Integer. The maximum transfer unit of the device.
 =item MODE
 
 String. The device's Rx mode. Can be none, rss, vmdq, vmdq_rss,
-vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 20.02, flow_disp is also
-supported if FastClick was built with --enable-flow-api.
+vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 20.02, 'flow' is also
+supported (DPDK's Flow API) if FastClick was built with --enable-flow-api.
 
 =item FLOW_RULES_FILE
 
 String. For DPDK version >= 20.02, FastClick was built with --enable-flow-api,
-and if MODE is set to flow_disp, a path to a file with Flow Dispatcher rules
+and if MODE is set to flow, a path to a file with Flow Rule Manager rules
 can be supplied to the device. These rules are installed in the NIC using
 DPDK's flow API.
 
 =item FLOW_ISOLATE
 
-Boolean. Requires MODE flow_disp. Isolated mode guarantees that all ingress
+Boolean. Requires MODE flow. Isolated mode guarantees that all ingress
 traffic comes from defined flow rules only (current and future).
 If ingress traffic does not match any of the defined rules, it will be
 discarded by the NIC. Defaults to false.
@@ -145,6 +145,11 @@ Boolean. If True, allocates CPU cores in a NUMA-aware fashion.
 =item NUMA_NODE
 
 Integer. Specify the NUMA node to undertake packet processing.
+
+=item RX_INTR
+
+Integer. Enables Rx interrupts if non-negative value is given.
+Defaults to -1 (no interrupts).
 
 =item SCALE
 
@@ -265,9 +270,24 @@ Sets the status of the device (1 for active, otherwise 0).
 
 Returns the number of packets read by the device.
 
+=h useful read-only
+
+Returns the number of useful runs of this device.
+This number corresponds to the number of times that the element is successfully scheduled to receive input packets.
+
+=h useless read-only
+
+Returns the number of useless runs of this device.
+This number corresponds to the number of times that the element is scheduled to receive input packets,
+but no packets are being received (idle CPU spinning).
+
 =h reset_counts write-only
 
 Resets "count" to zero.
+
+=h reset_load write-only
+
+Resets load counters to zero.
 
 =h nb_rx_queues read-only
 
@@ -350,7 +370,7 @@ Upon success, the number of deleted flow rules is returned, otherwise an error i
 
 =h rules_isolate write-only
 
-Enables/Disables Flow Dispatcher's isolation mode.
+Enables/Disables Flow Rule Manager's isolation mode.
 Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future).
 Usage:
     'rules_isolate 0' disables isolation.
@@ -409,22 +429,28 @@ public:
     void add_handlers() CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
     bool run_task(Task *);
+#if HAVE_DPDK_INTERRUPT
+    void selected(int fd, int mask);
+#endif
+
+    inline DPDKDevice *get_device() {
+        return _dev;
+    }
+
 #if HAVE_DPDK_READ_CLOCK
     static uint64_t read_clock(void* thunk);
 #endif
                                                                                                                                                                                                                                                                                                                                                                                                                                          
-    inline DPDKDevice *get_device() {                                                                                                                                                                                                                                                                                                                                                                                                          return _dev;
-    }
-
-
-    portid_t port_id();
+      portid_t port_id();
     
     #if HAVE_BATCH
         PacketBatch* pull_batch(int, unsigned max) override;
     #endif
 
 private:
-
+    static int reset_load_handler(
+        const String &, Element *, void *, ErrorHandler *
+    ) CLICK_COLD;
     static String read_handler(Element *, void *) CLICK_COLD;
     static int write_handler(
         const String &, Element *, void *, ErrorHandler *
@@ -442,6 +468,16 @@ private:
 
     DPDKDevice* _dev;
 
+#if HAVE_DPDK_INTERRUPT
+    int _rx_intr;
+    class FDState { public:
+        FDState() : timer(), mustresched(0), useful(0) {};
+        Timer* timer;
+        int mustresched;
+        int useful;
+    };
+    per_thread<FDState> _fdstate;
+#endif
     bool _set_timestamp;
 };
 

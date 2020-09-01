@@ -37,7 +37,7 @@ class FlowPaint : public FlowSharedBufferPaintElement { public:
     bool can_live_reconfigure() const		{ return true; }
     void add_handlers() CLICK_COLD;
 
-    void push_batch(int port, int* flowdata, PacketBatch* head);
+    void push_flow(int port, int* flowdata, PacketBatch* head);
 
   private:
 

@@ -23,7 +23,7 @@ TCPStatus::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-void TCPStatus::push_batch(int port, TCPStatusFlowData* flowdata, PacketBatch* head) {
+void TCPStatus::push_flow(int port, TCPStatusFlowData* flowdata, PacketBatch* head) {
 	if (flowdata->status == TCP_DROP) {
 		head->kill();
 		return;

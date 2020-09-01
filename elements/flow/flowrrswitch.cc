@@ -33,7 +33,7 @@ int FlowRoundRobinSwitch::initialize(ErrorHandler *errh) {
 
 
 
-void FlowRoundRobinSwitch::push_batch(int port, int* rr, PacketBatch* batch) {
+void FlowRoundRobinSwitch::push_flow(int port, int* rr, PacketBatch* batch) {
     if (*rr == 0) {
         *rr = (((*_rr)++) % noutputs()) + 1;
     }

@@ -27,7 +27,7 @@ FlowPaint::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-FlowPaint::push_batch(int port, int* flowdata, PacketBatch* head)
+FlowPaint::push_flow(int port, int* flowdata, PacketBatch* head)
 {
 	*flowdata = _color;
 	//click_chatter("%s : %d packets colored with %d",name().c_str(),head->count(),_color);

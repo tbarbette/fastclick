@@ -1,5 +1,5 @@
-#ifndef CLICK_FLOWROUTER_HH
-#define CLICK_FLOWROUTER_HH
+#ifndef CLICK_FLOWROUNDROBINSWITCH_HH
+#define CLICK_FLOWROUNDROBINSWITCH_HH
 #include <click/string.hh>
 #include <click/timer.hh>
 #include "flowmanager.hh"
@@ -22,7 +22,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;
 
-    void push_batch(int, int* flowdata, PacketBatch* batch) override;
+    void push_flow(int, int* flowdata, PacketBatch* batch) override;
 
 
 private :

@@ -27,7 +27,7 @@ FlowAcquire::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-FlowAcquire::push_batch(int port, bool* seen, PacketBatch* head)
+FlowAcquire::push_flow(int port, bool* seen, PacketBatch* head)
 {
 	if (!*seen) {
 		fcb_acquire(1);

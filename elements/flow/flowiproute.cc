@@ -93,7 +93,7 @@ FlowIPRoute::initialize(ErrorHandler *errh)
     return FlowDispatcher::initialize(errh);
 }
 
-void FlowIPRoute::push_batch(int, int* flowdata, PacketBatch* batch) {
+void FlowIPRoute::push_flow(int, int* flowdata, PacketBatch* batch) {
     if (*flowdata >= 0 && *flowdata < noutputs()) { //If valid output
         if (_gw[*flowdata] != IPAddress(0)) {
             FOR_EACH_PACKET(batch,p)

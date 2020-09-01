@@ -115,7 +115,7 @@ public:
     bool new_flow(TTuple*, Packet*);
     void release_flow(TTuple*);
 
-    void push_batch(int, TTuple*, PacketBatch *);
+    void push_flow(int, TTuple*, PacketBatch *);
 
     static String read_handler(Element* e, void* thunk) CLICK_COLD;
     void add_handlers() override CLICK_COLD;
@@ -177,7 +177,7 @@ public:
 
 
 
-    void push_batch(int, LBEntryOut*, PacketBatch *);
+    void push_flow(int, LBEntryOut*, PacketBatch *);
 private:
     FlowNAPTLoadBalancer* _lb;
 };

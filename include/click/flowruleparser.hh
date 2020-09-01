@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * flowparserglue.hh -- element that glues Click and DPDK for
+ * flowruleparser.hh -- glues Click and DPDK for
  * flow parsing and installation on DPDK-based NICs.
  *
  * Copyright (c) 2018 Tom Barbette, University of Liège
@@ -17,8 +17,8 @@
  * legally binding.
  */
 
-#ifndef CLICK_FLOWDISPATCHER_GLUE_H
-#define CLICK_FLOWDISPATCHER_GLUE_H
+#ifndef CLICK_FLOWRULEPARSER_H
+#define CLICK_FLOWRULEPARSER_H
 
 CLICK_DECLS
 
@@ -69,7 +69,7 @@ static struct rte_port *get_ports() {
 static struct rte_port *get_port(const portid_t &port_id) {
     if (!ports) {
         printf(
-            "Flow Dispatcher (port %u): Unallocated DPDK ports\n",
+            "DPDK Flow Parser (port %u): Unallocated DPDK ports\n",
             port_id
         );
         return NULL;
@@ -77,7 +77,7 @@ static struct rte_port *get_port(const portid_t &port_id) {
 
     if (port_id < 0) {
         printf(
-            "Flow Dispatcher (port %u): Invalid port identifier\n",
+            "DPDK Flow Parser (port %u): Invalid port identifier\n",
             port_id
         );
         return NULL;
@@ -129,8 +129,8 @@ int cmdline_parse(
 #ifdef __cplusplus
 }
 
-#define FLOWDISP_ERROR   ((int)-1)
-#define FLOWDISP_SUCCESS ((int) 0)
+#define FLOWRULEPARSER_ERROR   ((int)-1)
+#define FLOWRULEPARSER_SUCCESS ((int) 0)
 
 /**
  * DPDK's Flow parsing API.
@@ -153,17 +153,17 @@ init_port(void)
 }
 
 /**
- * Obtains an instance of the Flow Dispatcher parser.
+ * Obtains an instance of the Flow Parser's parser.
  *
  * @args errh: an instance of the error handler
  * @return a parser object
  */
-struct cmdline *flow_parser_init(
+struct cmdline *flow_rule_parser_init(
 	ErrorHandler *errh
 );
 
 /**
- * Creates an instance of the Flow Dispatcher parser
+ * Creates an instance of the Flow Parser's parser
  * on a given context of instructions, obtained
  * from DPDK.
  *
@@ -171,7 +171,7 @@ struct cmdline *flow_parser_init(
  * @args errh: an instance of the error handler
  * @return a command line object
  */
-struct cmdline *flow_parser_alloc(
+struct cmdline *flow_rule_parser_alloc(
 	const char *prompt,
 	ErrorHandler *errh
 );
@@ -184,7 +184,7 @@ struct cmdline *flow_parser_alloc(
  * @args input_cmd: the input command to parse
  * @return the number of characters read
  */
-char *flow_parser_parse_new_line(char *line, int n, const char **input_cmd);
+char *flow_rule_parser_parse_new_line(char *line, int n, const char **input_cmd);
 
 /**
  * Splits a given command into multiple newline-separated tokens
@@ -195,10 +195,10 @@ char *flow_parser_parse_new_line(char *line, int n, const char **input_cmd);
  * @args errh: an instance of the error handler
  * @return the number of characters read in total
  */
-int flow_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh);
+int flow_rule_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh);
 
 #endif
 
 CLICK_ENDDECLS
 
-#endif /* CLICK_FLOWDISPATCHER_GLUE_H */
+#endif /* CLICK_FLOWRULEPARSER_H */

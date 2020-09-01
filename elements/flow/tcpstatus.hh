@@ -31,7 +31,7 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    void push_batch(int port, TCPStatusFlowData*, PacketBatch*);
+    void push_flow(int port, TCPStatusFlowData*, PacketBatch*);
 
 
  private:

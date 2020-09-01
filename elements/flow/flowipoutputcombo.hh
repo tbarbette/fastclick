@@ -55,9 +55,7 @@ class FlowIPOutputCombo : public FlowSharedBufferPaintElement {
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-
-
-  void push_batch(int, int*, PacketBatch *);
+  void push_flow(int, int*, PacketBatch *);
 
  private:
 

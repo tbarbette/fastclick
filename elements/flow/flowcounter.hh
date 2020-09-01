@@ -3,8 +3,7 @@
 #include <click/element.hh>
 #include <click/vector.hh>
 #include <click/multithread.hh>
-#include "stackelement.hh"
-#include <click/flowbuffer.hh>
+#include <click/flow/flowelement.hh>
 
 CLICK_DECLS
 
@@ -20,7 +19,7 @@ FlowCounter([CLOSECONNECTION])
  */
 
 
-class FlowCounter : public StackStateElement<FlowCounter,int>
+class FlowCounter : public FlowStateElement<FlowCounter,int>
 {
 public:
     /** @brief Construct an FlowCounter element
@@ -41,7 +40,9 @@ public:
         _state->lengths[*fcb - 1]++;
     }
 
-    void push_batch(int port, int* fcb, PacketBatch*);
+    const static int timeout = 15000;
+
+    void push_flow(int port, int* fcb, PacketBatch*);
 
     inline bool new_flow(void*, Packet*) {
         _state->count++;
