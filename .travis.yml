@@ -89,6 +89,7 @@ addons:
         - time
         - linux-headers-generic
         - libnuma-dev
+        - libhyperscan-dev
     config:
         retries: true
 
