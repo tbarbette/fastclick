@@ -67,7 +67,11 @@ ThreadSafeQueue::push(int, Packet *p)
     do {
 	t = tail();
 	nt = next_i(t);
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+    } while (!_xtail.compare_and_swap(t, nt));
+#else
     } while (_xtail.compare_swap(t, nt) != t);
+#endif
     // Other pushers spin until _tail := nt (or _xtail := t)
 
     Storage::index_type h = head();
@@ -89,7 +93,12 @@ ThreadSafeQueue::pull(int)
     do {
 	h = head();
 	nh = next_i(h);
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+    } while (!_xhead.compare_and_swap(h, nh));
+#else
     } while (_xhead.compare_swap(h, nh) != h);
+#endif
+
     // Other pullers spin until _head := nh (or _xhead := h)
 
     Storage::index_type t = tail();
