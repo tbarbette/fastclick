@@ -3,12 +3,13 @@
 #include <click/config.h>
 #include <click/string.hh>
 #include <click/vector.hh>
+#include <click/ipflowid.hh>
 
 CLICK_DECLS
 class DPDKDevice;
 
 struct BatchBuilder {
-	BatchBuilder() : first(0), count(0), last(-1) {
+	BatchBuilder() : first(0), count(0), last(-1), last_id() {
 
 	};
 
@@ -16,6 +17,7 @@ struct BatchBuilder {
 	Packet* tail;
 	int count;
 	int last;
+    IPFlow5ID last_id;
 
 	inline void init() {
 		count = 0;
