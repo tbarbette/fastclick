@@ -88,9 +88,9 @@ FlowIPRoute::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-FlowIPRoute::initialize(ErrorHandler *errh)
+FlowIPRoute::solve_initialize(ErrorHandler *errh)
 {
-    return FlowDispatcher::initialize(errh);
+    return FlowDispatcher::solve_initialize(errh);
 }
 
 void FlowIPRoute::push_flow(int, int* flowdata, PacketBatch* batch) {

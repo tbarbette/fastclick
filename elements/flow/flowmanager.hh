@@ -23,7 +23,7 @@ typedef struct FlowCache_t{
     FlowControlBlock* fcb;
 } FlowCache;
 
-class FlowManager: public VirtualFlowManager {
+class FlowManager: public VirtualFlowManager, Router::InitFuture {
 protected:
     FlowClassificationTable _table;
     per_thread<FlowCache*> _cache;
@@ -54,14 +54,10 @@ protected:
     bool _nocut;
 
     per_thread<FlowBatch*> _builder_batch;
-    static int _n_classifiers;
-    int _reserve;
-    static Vector<FlowManager *> _classifiers;
     typedef Pair<Element*,int> EDPair;
     Vector<EDPair>  _reachable_list;
 
-    int _pool_data_size;
-
+    friend class VirtualFlowManager;
 public:
     FlowManager() CLICK_COLD;
 
@@ -75,7 +71,7 @@ public:
     int configure_phase() const     { return CONFIGURE_PHASE_PRIVILEGED + 1; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *errh) CLICK_COLD;
+    int solve_initialize(ErrorHandler *errh) CLICK_COLD;
     void cleanup(CleanupStage stage) CLICK_COLD;
 
     bool stopClassifier() override CLICK_COLD { return true; };

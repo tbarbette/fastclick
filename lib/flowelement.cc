@@ -19,6 +19,7 @@
 #include <click/glue.hh>
 #include <click/hashtable.hh>
 #include <click/flow/flowelement.hh>
+#include "elements/flow/flowmanager.hh"
 #include <algorithm>
 #include <set>
 
@@ -219,7 +220,8 @@ bool cmp(el a, el b)
 
 VirtualFlowManager::VirtualFlowManager()
 {
-    //_fcb_builded_init_future->add();
+    _fcb_builded_future.add();
+    _fcb_visited_future.add();
 }
 
 void VirtualFlowManager::find_children(int verbose)
@@ -232,14 +234,49 @@ void VirtualFlowManager::find_children(int verbose)
 
     if (verbose > 1) {
         click_chatter("Reachable VirtualFlowSpaceElement element list :");
-        for (int i = 0; i < reachables.elements().size(); i++) {
+    }
+
+    for (int i = 0; i < reachables.elements().size(); i++) {
+        if (verbose > 1) {
             click_chatter("Reachable from %p{element} : %p{element}, max offset %d",this,reachables.elements()[i].first,reachables.elements()[i].second);
         }
     }
 
     _reachable_list = reachables.elements();
     _entries.push_back(this);
+
+    _fcb_visited_future.solve_initialize(ErrorHandler::default_handler());
 }
+
+class UnstackVisitor : public RouterVisitor {
+public:
+    bool visit(Element *e, bool isoutput, int port,
+                   Element *from_e, int from_port, int distance) {
+        FlowElement* fe = dynamic_cast<FlowElement*>(e);
+
+        if (fe && fe->stopClassifier())
+            return false;
+
+        VirtualFlowSpaceElement* fbe = dynamic_cast<VirtualFlowSpaceElement*>(e);
+        if (fbe == NULL) {
+
+            const char *f = e->router()->flow_code_override(e->eindex());
+            if (!f)
+                f = e->flow_code();
+            if (strcmp(f,Element::COMPLETE_FLOW) != 0) {
+#if DEBUG_CLASSIFIER > 0
+                click_chatter("%p{element}: Unstacking flows from port %d", e,
+port);
+#endif
+                const_cast<Element::Port&>(from_e->port(true,from_port)).set_unstack(true);
+                return false;
+            }
+        }
+
+        return true;
+    }
+};
+
 
 void VirtualFlowManager::build_fcb()
 {
@@ -247,7 +284,14 @@ void VirtualFlowManager::build_fcb()
 }
 
 Vector<VirtualFlowManager*> VirtualFlowManager::_entries;
-CounterInitFuture VirtualFlowManager::_fcb_builded_init_future("FCBBuilder", VirtualFlowManager::build_fcb);
+
+//Build the fcb once all VirtualFlowManager have been initialized.
+//Then calls all subscribers (eg FlowManagers)
+//Then call tc_ready
+Router::FctFuture VirtualFlowManager::_on_fcb_builded ([](){ click_chatter("Building fcb"); VirtualFlowManager::build_fcb();click_chatter("Builded. Running dependencies");return 0; });
+Router::InitFuture VirtualFlowManager::_tc_ready_future;
+CounterInitFuture VirtualFlowManager::_fcb_builded_future("FCBBuilder", &VirtualFlowManager::_on_fcb_builded , &VirtualFlowManager::_tc_ready_future);
+CounterInitFuture VirtualFlowManager::_fcb_visited_future("FCBVisited");
 
 
 /**
@@ -273,6 +317,10 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
             if (ptr->second.second < _entries[i]->_reachable_list[j].second) {
                 ptr->second.second = _entries[i]->_reachable_list[j].second;
             }
+
+            //Set unstack before non-compatible element
+            UnstackVisitor uv = UnstackVisitor();
+            router->visit_ports(_entries[i], true, -1, &uv);
         }
     }
 
@@ -280,7 +328,9 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
     Vector<el> elements;
     for (auto it = common.begin(); it != common.end(); it++) {
         elements.push_back(el{it->first,it->second.first, it->second.second});
-    } // Sorting the element, so we place the most shared first, then the minimal distance first. With the current version of the algo, this is not needed anymore
+    }
+
+    // Sorting the element, so we place the most shared first, then the minimal distance first. With the current version of the algo, this is not needed anymore
     std::sort(elements.begin(), elements.end(),cmp);
 
     // We now place all elements
@@ -297,7 +347,7 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
         Bitvector v(false);
 
         /**
-        * THe followoing is for verification purpose
+        * The followoing is for verification purpose
         */
         // For each already placed element that are reachable from this one, we set the assigned bits in the vector
         for (auto ai = already_placed.begin(); ai != already_placed.end(); ai++) {
@@ -320,9 +370,10 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
 
         if (verbose > 0)
             click_chatter("Placing  %p{element} at [%d-%d]",e,my_place,my_place + e->flow_data_size() -1 );
-        already_placed.insert(it->id);
-        e->_flow_data_offset = my_place;
-	_fcb_builded_init_future.post(e);
+            already_placed.insert(it->id);
+            e->_flow_data_offset = my_place;
+            e->_classifier = dynamic_cast<VirtualFlowManager*>(_entries[0]);
+	    _fcb_builded_future.post(e);
     }
 
     //Set pool data size for classifiers
@@ -335,6 +386,9 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
             if (tot > fc->_reserve)
                 fc->_reserve = tot;
         }
+        FlowManager* fm = dynamic_cast<FlowManager*>(fc);
+        if (fm)
+            fm->_table.get_pool()->initialize(fc->_reserve, &fm->_table);
     }
 }
 

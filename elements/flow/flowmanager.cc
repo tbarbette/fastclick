@@ -26,7 +26,6 @@ FlowManager::FlowManager(): _aggcache(false), _cache(0),_cache_size(4096), _cach
     _verbose = 0;
     _size_verbose = 0;
 #endif
-    FlowManager::_n_classifiers++;
 }
 
 FlowManager::~FlowManager() {
@@ -63,7 +62,6 @@ FlowManager::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
 
     _reserve = sizeof(FlowNodeData) + (_aggcache?sizeof(uint32_t):0) + reserve;
-    build_fcb();
 
 
     _cache_mask = _cache_size - 1;
@@ -77,6 +75,12 @@ FlowManager::configure(Vector<String> &conf, ErrorHandler *errh)
     } else
         return errh->error("Invalid context %s !",context.c_str());
 
+    find_children(_verbose);
+
+    router()->get_root_init_future()->postOnce(&_fcb_builded_future);
+//    _fcb_builded_future.post(this);
+
+    VirtualFlowManager::_tc_ready_future.post(this);
     return 0;
 }
 
@@ -386,7 +390,7 @@ int FlowManager::_initialize_timers(ErrorHandler *errh) {
     return 0;
 }
 
-int FlowManager::initialize(ErrorHandler *errh) {
+int FlowManager::solve_initialize(ErrorHandler *errh) {
     if (_initialize_classifier(errh) != 0)
         return -1;
     if (_replace_leafs(errh) != 0)
@@ -641,38 +645,8 @@ void FlowManager::add_handlers() {
 }
 
 
-class UnstackVisitor : public RouterVisitor {
-public:
-    bool visit(Element *e, bool isoutput, int port,
-                   Element *from_e, int from_port, int distance) {
-        FlowElement* fe = dynamic_cast<FlowElement*>(e);
-
-        if (fe && fe->stopClassifier())
-            return false;
-
-        VirtualFlowSpaceElement* fbe = dynamic_cast<VirtualFlowSpaceElement*>(e);
-        if (fbe == NULL) {
-
-            const char *f = e->router()->flow_code_override(e->eindex());
-            if (!f)
-                f = e->flow_code();
-            if (strcmp(f,Element::COMPLETE_FLOW) != 0) {
-#if DEBUG_CLASSIFIER > 0
-                click_chatter("%p{element}: Unstacking flows from port %d", e,
-port);
-#endif
-                const_cast<Element::Port&>(from_e->port(true,from_port)).set_unstack(true);
-                return false;
-            }
-        }
-
-        return true;
-    }
-};
 
 //int FlowBufferVisitor::shared_position[NR_SHARED_FLOW] = {-1};
-int FlowManager::_n_classifiers = 0;
-Vector<FlowManager *> FlowManager::_classifiers;
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(flow)

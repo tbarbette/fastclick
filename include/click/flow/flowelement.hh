@@ -175,37 +175,65 @@ public:
         return 0;
     }
 
+    int initialize(ErrorHandler *errh) override CLICK_COLD {
+	//The element itself is automatically posted by build_fcb via  fcb_builded_init_future
+	return 0;
+    }
 protected:
-	int _flow_data_offset;
-	friend class FlowBufferVisitor;
-	friend class VirtualFlowManager;
+
+    int _flow_data_offset;
+    friend class FlowBufferVisitor;
+    friend class VirtualFlowManager;
 };
 
+/**
+ * This future will only trigger once it is called N times.
+ * N is increased by calling add(). The typical usage is a future
+ * that will only trigger when all parents have called. To do this,
+ * you call add() in the constructor of the parents.
+ */
 class CounterInitFuture : public Router::InitFuture { public:
-    CounterInitFuture(String name, std::function<void(void)> on_reached) : _n(0), _name(name), _on_reached(on_reached) {
+    CounterInitFuture(String name, Router::InitFuture* on_reached = 0, Router::InitFuture* on_finished = 0) : _n(0), _name(name), _on_reached(on_reached), _on_finished(on_finished) {
 
+    }
 
+    void add() {
+        _n ++;
     }
 
     virtual void post(Router::InitFuture* future) {
-        _n++;
-        Router::InitFuture::post(future);
+        if (_n == 0)
+            future->solve_initialize(ErrorHandler::default_handler());
+        else
+            Router::InitFuture::post(future);
     }
 
     virtual int solve_initialize(ErrorHandler* errh) {
-        if (_children.size() == _n) {
-            _on_reached();
-            return Router::InitFuture::solve_initialize(errh);
+        if (--_n == 0) {
+            int e;
+            if (_on_reached) {
+                e = _on_reached->solve_initialize(errh);
+                if (e != 0)
+                    return e;
+            }
+            click_chatter("Counter children");
+            e =  Router::InitFuture::solve_initialize(errh);
+
+            click_chatter("Counter post");
+            if (e != 0)
+                return e;
+            if (_on_finished)
+                e = _on_finished->solve_initialize(errh);
+            return e;
         }
-        else
-            return errh->error("%s: router is trying to initialize while all dependent elements have not called", _name.c_str());
         return 0;
     }
 
 private:
     int _n;
     String _name;
-    std::function<void(void)> _on_reached;
+    Router::InitFuture* _on_reached;
+    Router::InitFuture* _on_finished;
 };
 
 /**
@@ -213,20 +241,26 @@ private:
  */
 class VirtualFlowManager : public FlowElement { public:
     VirtualFlowManager();
+
+    static Router::InitFuture _tc_ready_future;
+    static CounterInitFuture _fcb_visited_future;
+    static CounterInitFuture _fcb_builded_future;
 protected:
+
+    static Router::FctFuture _on_fcb_builded;
     int _reserve;
 
     typedef Pair<Element*,int> EDPair;
     Vector<EDPair>  _reachable_list;
 
     static Vector<VirtualFlowManager*> _entries;
-    static CounterInitFuture _fcb_builded_init_future;
 
     void find_children(int verbose = 0);
 
     static void _build_fcb(int verbose,  bool ordered);
     static void build_fcb();
 
+    bool stopClassifier() { return true; };
 };
 
 template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {

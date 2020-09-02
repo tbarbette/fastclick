@@ -30,11 +30,25 @@ FlowDispatcher::FlowDispatcher() : _table(0)  {
 int
 FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    for (int i = 0; i < conf.size(); i ++)
+        _conf.push_back(conf[i]);
+    ((Router::InitFuture*)&FlowManager::_fcb_builded_future)->post([this](ErrorHandler* errh){
+
+	    return parse_configure(errh);
+    });
+
+    return 0;
+}
+
+int
+FlowDispatcher::parse_configure(ErrorHandler *errh)
+{
 	if (one_upstream_classifier() == 0) {
 		return errh->error("%s : Please place a FlowManager element before any FlowDispatcher",name().c_str());
 	}
-	int defaultOutput = 0;
 
+	int defaultOutput = 0;
+   Vector<String> conf = _conf;
 	rules.resize(conf.size());
 	for (int i = 0; i < conf.size(); i++) {
 	    String s = String(conf[i]);
@@ -109,7 +123,6 @@ bool FlowDispatcher::attach_children(FlowNodePtr* ptr, int output, bool append_d
     }
     return changed;
 }
-
 
 FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
 	if (!_table) {
@@ -379,12 +392,9 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
 }
 
 
-int FlowDispatcher::initialize(ErrorHandler *errh) {
-	//delete _table;
-	return 0;
+int FlowDispatcher::solve_initialize(ErrorHandler *errh) {
+    return 0;
 }
-
-
 
 
 void FlowDispatcher::push_flow(int, int* flowdata, PacketBatch* batch) {

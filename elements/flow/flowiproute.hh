@@ -31,7 +31,7 @@ public:
   const char *port_count() const		{ return "1/-"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-  int initialize(ErrorHandler *) CLICK_COLD;
+  int solve_initialize(ErrorHandler *) CLICK_COLD;
 
   void push_flow(int, int* flowdata, PacketBatch* batch) override;
 };

@@ -156,7 +156,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
     std::smatch result;
     std::string stdstr = std::string(s.c_str());
 
-    if (std::regex_match(stdstr, result, reg)){
+    if (std::regex_match(stdstr, result, reg)) {
         FlowNodeData lastvalue = FlowNodeData((uint64_t)0);
 
         std::string classs = result.str(1);
@@ -172,12 +172,9 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
             output = INT_MAX;
         }
 
-
         FlowNode* parent = 0;
         if (classs != "-") {
-
-
-            std::regex_iterator<std::string::iterator> it (classs.begin(), classs.end(), classreg);
+            std::regex_iterator<std::string::iterator> it(classs.begin(), classs.end(), classreg);
             std::regex_iterator<std::string::iterator> end;
 
             while (it != end)

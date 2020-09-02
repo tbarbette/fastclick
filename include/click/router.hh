@@ -163,13 +163,38 @@ class Router { public:
 
         virtual int solve_initialize(ErrorHandler* errh);
 
-        void postOnce(InitFuture* future);
+        /**
+         * Wrappers that should not be overloaded
+         */
+        virtual void postOnce(InitFuture* future) final;
+        virtual void post(std::function<int(void)>) final;
+        virtual void post(std::function<int(ErrorHandler* errh)>) final;
 
-        void post(std::function<int(void)>);
         virtual void post(InitFuture* future);
     protected:
         Vector<InitFuture*> _children;
     };
+
+    class FctFuture : public Router::InitFuture { public:
+
+        FctFuture(std::function<int(ErrorHandler*)> f) : _f(f) {
+        };
+
+        FctFuture(std::function<int(void)> f) {
+            _f = [f](ErrorHandler*){return f();};
+        };
+
+        ~FctFuture() {};
+
+        int solve_initialize(ErrorHandler* errh) {
+            int r = _f(errh);
+            return r;
+        };
+
+        std::function<int(ErrorHandler*)> _f;
+    };
+
+
     InitFuture _root_init_future;
 
     InitFuture* get_root_init_future() {

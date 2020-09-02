@@ -52,9 +52,9 @@ FlowNode* FlowNode::start_growing(bool impl) {
 int FlowNode::findGetNum() {
     int count = 0;
     apply([&count](FlowNodePtr* p) {
-        flow_assert(p->ptr != DESTRUCTED_NODE);
+//        flow_assert(p->ptr != DESTRUCTED_NODE);
         flow_assert(p->ptr);
-        flow_assert(!IS_FREE_PTR(p->ptr,this));
+//        flow_assert(!IS_FREE_PTR(p->ptr,this));
 #if FLOW_KEEP_STRUCTURE
         if (p->is_leaf()
                 || !p->node->released()
@@ -112,7 +112,7 @@ void FlowNode::check(bool allow_parent, bool allow_default, bool multithread) {
     int prenum = findGetNum();
     while ((cur = it.next()) != 0) {
         flow_assert(cur->ptr != 0);
-        flow_assert(cur->ptr != DESTRUCTED_NODE);
+//        flow_assert(cur->ptr != DESTRUCTED_NODE);
         if (cur->is_node()) {
             if (!allow_parent && cur->node->parent() != node)
                 goto error;
@@ -150,7 +150,7 @@ void FlowNode::check(bool allow_parent, bool allow_default, bool multithread) {
     }
     if (node->default_ptr()->ptr != 0) {
 
-        assert(node->get_default().ptr != DESTRUCTED_NODE);
+//        assert(node->get_default().ptr != DESTRUCTED_NODE);
         if (!allow_parent && node->default_ptr()->parent() != node && dynamic_cast<FlowLevelThread*>(node->level()) != 0)
             goto error;
         if (node->default_ptr()->is_node()) {
@@ -695,7 +695,7 @@ void FlowNodeHash<capacity_n>::destroy() {
     if (this->epoch == MAX_EPOCH) {
         this->epoch = 1;
         for (int i = 0; i < capacity(); i++) {
-            flow_assert(IS_DESTRUCTED_NODE(childs[i].ptr,this));
+            //flow_assert(IS_DESTRUCTED_NODE(childs[i].ptr,this));
             childs[i].ptr = 0;
         }
     }

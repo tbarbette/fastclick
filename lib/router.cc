@@ -1253,21 +1253,11 @@ Router::InitFuture::postOnce(InitFuture* future) {
     post(future);
 }
 
-class FctFuture : public Router::InitFuture { public:
-
-    FctFuture(std::function<int(void)> f) : _f(f) {
-    };
-
-    ~FctFuture() {};
-
-    int solve_initialize(ErrorHandler* errh) {
-        int r = _f();
-        delete this;
-        return r;
-    };
-
-    std::function<int(void)> _f;
-};
+void
+Router::InitFuture::post(std::function<int(ErrorHandler*)> f) {
+    InitFuture* future = new FctFuture(f);
+    post(future);
+}
 
 void
 Router::InitFuture::post(std::function<int(void)> f) {

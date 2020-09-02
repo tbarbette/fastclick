@@ -19,23 +19,24 @@ public:
     const char *port_count() const		{ return "1/-"; }
     const char *processing() const		{ return PUSH; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *errh) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+    int parse_configure(ErrorHandler *) CLICK_COLD;
+    int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
 
     void push_flow(int, int* flowdata, PacketBatch* batch) override;
     FlowNode* get_table(int,Vector<FlowElement*>) override;
 
 private :
 
-
     FlowNode* _table;
-
     bool _verbose;
+
     bool attach_children(FlowNodePtr* ptr, int output, bool append_drop,Vector<FlowElement*> context);
     FlowNode* get_child(int output, bool append_drop,Vector<FlowElement*> context);
 
 protected:
 
+    Vector<String> _conf;
     Vector<FlowClassificationTable::Rule> rules;
     bool _children_merge;
 
