@@ -15,7 +15,7 @@
 
 CLICK_DECLS
 
-FlowIPManagerIMP::FlowIPManagerIMP() : _verbose(1), _flags(0), _timer(this), _task(this), _tables(0) {
+FlowIPManagerIMP::FlowIPManagerIMP() : _verbose(1), _flags(0), _timer(this), _task(this), _tables(0), _cache(true) {
 }
 
 FlowIPManagerIMP::~FlowIPManagerIMP()
@@ -29,6 +29,7 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_or_set_p("CAPACITY", _table_size, 65536)
         .read_or_set("RESERVE", _reserve, 0)
         .read_or_set("TIMEOUT", _timeout, -1)
+        .read_or_set("CACHE", _cache, true)
         .complete() < 0)
         return -1;
 
@@ -147,6 +148,10 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
 {
     IPFlow5ID fid = IPFlow5ID(p);
 
+    if (_cache && fid == b.last_id) {
+        b.append(p);
+        return;
+    }
     auto& tab = _tables[click_current_cpu_id()];
     rte_hash* table = tab.hash;
 
@@ -187,6 +192,9 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
         fcb_stack = fcb;
         b.init();
         b.append(p);
+        b.last = ret;
+        if (_cache)
+            b.last_id = fid;
     }
 }
 

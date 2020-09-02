@@ -27,7 +27,7 @@
 
 CLICK_DECLS
 
-FlowIPManager::FlowIPManager() : _verbose(1), _flags(0), _timer(this), _task(this)
+FlowIPManager::FlowIPManager() : _verbose(1), _flags(0), _timer(this), _task(this), _cache(true)
 {
 }
 
@@ -47,6 +47,7 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
 #if RTE_VERSION > RTE_VERSION_NUM(18,8,0,0)
         .read_or_set("LF", lf, false)
 #endif
+        .read_or_set("CACHE", _cache, true)
         .read_or_set("VERBOSE", _verbose, 1)
         .complete() < 0)
         return -1;
@@ -152,6 +153,12 @@ void FlowIPManager::cleanup(CleanupStage stage)
 void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
 {
     IPFlow5ID fid = IPFlow5ID(p);
+
+    if (_cache && fid == b.last_id) {
+        b.append(p);
+        return;
+    }
+
     rte_hash*& table = hash;
     FlowControlBlock* fcb;
     int ret = rte_hash_lookup(table, &fid);
@@ -195,6 +202,10 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
         fcb_stack = fcb;
         b.init();
         b.append(p);
+        b.last = ret;
+        if (_cache)
+            b.last_id = fid;
+
     }
 }
 
@@ -208,7 +219,7 @@ void FlowIPManager::push_batch(int, PacketBatch* batch)
 
     batch = b.finish();
     if (batch) {
-    fcb_stack->lastseen = recent;
+        fcb_stack->lastseen = recent;
         output_push_batch(0, batch);
     }
 }

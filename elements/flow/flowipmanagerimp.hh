@@ -77,6 +77,7 @@ class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
         int _timeout;
         Timer _timer; //Timer to launch the wheel
         Task _task;
+        bool _cache;
 
         static String read_handler(Element* e, void* thunk);
         inline void process(Packet* p, BatchBuilder& b, const Timestamp& recent);

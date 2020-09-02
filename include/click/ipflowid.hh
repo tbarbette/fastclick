@@ -204,6 +204,8 @@ class IPFlow5ID : public IPFlowID { public:
      * UDP-like positions; TCP, UDP, and DCCP fit the bill. */
     explicit IPFlow5ID(const Packet *p, bool reverse = false);
 
+    explicit IPFlow5ID() {};
+
     uint8_t proto() const {
 	return _proto;
     }
