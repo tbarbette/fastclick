@@ -163,7 +163,6 @@ public:
 #endif
 
 
-
     virtual PacketBatch* pull_batch(int port, unsigned max) override final {
         click_chatter("ERROR : Flow Elements do not support pull");
         return 0;
@@ -242,7 +241,7 @@ public :
 
     FlowSpaceElement() CLICK_COLD;
     virtual int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
-        void fcb_set_init_data(FlowControlBlock* fcb, const T data) CLICK_COLD;
+    void fcb_set_init_data(FlowControlBlock* fcb, const T data) CLICK_COLD;
 
     virtual const size_t flow_data_size()  const override { return sizeof(T); }
 
@@ -372,7 +371,7 @@ template<typename T>
 int
 FlowSpaceElement<T>::solve_initialize(ErrorHandler *errh) {
     if (_flow_data_offset == -1) {
-        return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
+        return errh->error("No FlowManager() element sets the flow context for %s !",name().c_str());
     }
     return 0;
 }
@@ -386,7 +385,7 @@ FlowStateElement<Derived, T>::FlowStateElement() : VirtualFlowSpaceElement() {
 template<class Derived, typename T>
 int FlowStateElement<Derived, T>::solve_initialize(ErrorHandler *errh) {
     if (_flow_data_offset == -1) {
-        return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
+        return errh->error("No FlowManager() element sets the flow context for %s !",name().c_str());
     }
     return 0;
 }
