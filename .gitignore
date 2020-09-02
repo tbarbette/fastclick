@@ -27,3 +27,6 @@ share/click/elementmap.xml
 share/click/pkg-config.mk
 stamp-egroup
 stamp-h
+cscope.*
+**/.nfs*
+compile_commands.json

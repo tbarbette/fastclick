@@ -177,7 +177,7 @@ check-filenames:
 	@a=`find . \( -name \*.cc -or -name \*.c \) -print | sed 's/.*\/\(.*\)\.c*$$/\1.o/' | grep -v 'elements\.o' | sort | uniq -d`; \
 	if test -z $$a; then echo OK; else echo "*** warning: duplicate object file names:"; echo "$$a"; fi
 
-clean: $(CLEAN_TARGETS) clean-doc clean-local
+clean: $(CLEAN_TARGETS) clean-doc clean-local clean-cscope
 clean-doc:
 	@cd doc && $(MAKE) clean
 clean-local:
@@ -250,9 +250,16 @@ distdir: $(srcdir)/configure
 	fi
 
 
+cscope: clean-cscope
+	ack -f --cpp > cscope.files
+	cscope -b -R -q -k
+
+clean-cscope:
+	rm -rf cscope.*
+
 .PHONY: all always elemlist elemlists \
 	bsdmodule linuxmodule ns userlevel minios tools \
 	install install-doc install-lib install-man install-local install-include install-local-include $(INSTALL_TARGETS) \
-	clean clean-doc clean-local $(CLEAN_TARGETS) distclean \
+	clean clean-doc clean-local $(CLEAN_TARGETS) distclean clean-cscope \
 	uninstall uninstall-local uninstall-local-include \
-	dist distdir check
+	dist distdir check cscope
