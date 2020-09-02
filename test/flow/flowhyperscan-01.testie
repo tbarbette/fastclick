@@ -1,5 +1,7 @@
 %require
 click-buildtool provides hs
+click-buildtool provides flow
+click-buildtool provides umultithread
 
 %script
 
@@ -35,7 +37,6 @@ DriverManager(wait,wait)
 4 18.26.4.44 30 10.0.0.4 40 T "tack"
 
 %expect stderr
-{{Pattern.*}}
 {{Placing.*}}
 {{Placing.*}}
    8 | 74686973 20697320
