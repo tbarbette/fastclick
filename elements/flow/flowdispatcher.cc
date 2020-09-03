@@ -252,7 +252,10 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
     #endif*/
 #endif
 		}
+        if (!merged) {
+            click_chatter("ERROR: %p{element} was not visited. Do you have a FlowManager before?",this);
 		assert(merged);
+        }
 
         if (_verbose) {
             click_chatter("Table for %s before merging children :",name().c_str());

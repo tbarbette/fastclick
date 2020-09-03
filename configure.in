@@ -917,6 +917,52 @@ if test "x$enable_flow" = xyes; then
     fi
 fi
 
+AC_ARG_ENABLE([sloppy],
+    [AS_HELP_STRING([  --disable-sloppy], [disable Sloppy flow timeouts])],
+    [:], [enable_sloppy=yes])
+if test "x$enable_sloppy" = xyes; then
+    AC_DEFINE(HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT)
+fi
+
+AC_ARG_ENABLE([flow-atomic],
+    [AS_HELP_STRING([  --disable-flow-atomic], [use non-atomic flow reference counting])],
+    [:], [enable_flow_atomic=yes])
+if test "x$enable_flow_atomic" = xyes; then
+    AC_DEFINE(FLOW_ATOMIC_USE_COUNT)
+fi
+
+AC_ARG_ENABLE([flow-dynamic],
+    [AS_HELP_STRING([  --disable-flow-dynamic], [allow dynamic flow system])],
+    [:], [enable_flow_dynamic=yes])
+if test "x$enable_flow$enable_flow_dynamic" = xyesyes; then
+    AC_DEFINE(HAVE_FLOW_DYNAMIC)
+fi
+
+AC_ARG_ENABLE([flow-structure],
+              [AS_HELP_STRING([  --disable-flow-structure], [do not free classifier nodes in pool, mark them as released to somehow keep the receive strucutre intact])],
+    [:], [enable_flow_structure=yes])
+if test "x$enable_flow_structure" = xyes; then
+    AC_DEFINE(FLOW_KEEP_STRUCTURE)
+fi
+
+AC_ARG_ENABLE([flow-hash],
+    [AS_HELP_STRING([  --enable-flow-hash=[[reset|keep|epoch]]], [set flow hashtable release mechanism])],
+    [:], [enable_flow_hash=""])
+
+if echo "$enable_flow_hash" | grep epoch >/dev/null 2>&1; then
+    AC_DEFINE([FLOW_HASH_RELEASE], [2], [Flow hash is in epoch mode.])
+elif echo "$enable_flow_hash" | grep keep >/dev/null 2>&1; then
+    AC_DEFINE([FLOW_HASH_RELEASE], [1], [Flow hash is in keep mode.])
+elif echo "$enable_flow_hash" | grep reset >/dev/null 2>&1; then
+    AC_DEFINE([FLOW_HASH_RELEASE], [0], [Flow hash is in reset mode.])
+else
+    if test "x$enable_flow_structure" = xyes; then
+        AC_DEFINE([FLOW_HASH_RELEASE], [1], [Flow hash is in keep mode.])
+    else
+        AC_DEFINE([FLOW_HASH_RELEASE], [2], [Flow hash is in epoch mode.])
+    fi
+fi
+
 
 
 dnl

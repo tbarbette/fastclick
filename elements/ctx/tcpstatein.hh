@@ -53,7 +53,6 @@ public:
     const char *port_count() const		{ return "1/1-2"; }
     const char *processing() const		{ return PUSH; }
 
-    //TCP only for now, just to reuse the macro but nothing prevents UDP
     FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(DEFAULT_4TUPLE, FLOW_TCP);
 
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;

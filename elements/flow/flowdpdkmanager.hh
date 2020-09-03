@@ -13,8 +13,8 @@ class FlowDPDKManager : public FlowManager { public:
     const char *class_name() const		{ return "FlowDPDKManager"; }
     void* cast(const char *n) override;
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *errh) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+    int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
 
     void push_batch(int port, PacketBatch* batch) override;
 private:

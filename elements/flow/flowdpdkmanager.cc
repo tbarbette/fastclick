@@ -197,7 +197,7 @@ addthis:
 
 }
 
-int FlowDPDKManager::initialize(ErrorHandler *errh) {
+int FlowDPDKManager::solve_initialize(ErrorHandler *errh) {
     if (_initialize_classifier(errh) != 0)
         return -1;
     if (_replace_leafs(errh) != 0)
