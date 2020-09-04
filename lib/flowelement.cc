@@ -352,6 +352,9 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
                 ptr->second.second = _entries[i]->_reachable_list[j].second;
             }
 
+            //Set unstack before non-compatible element
+            UnstackVisitor uv = UnstackVisitor();
+            router->visit_ports(_entries[i], true, -1, &uv);
         }
     }
 

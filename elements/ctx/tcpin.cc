@@ -754,7 +754,7 @@ reinitforward:
 
 }
 
-int TCPIn::initialize(ErrorHandler *errh) {
+int TCPIn::solve_initialize(ErrorHandler *errh) {
     if (StackSpaceElement<fcb_tcpin>::initialize(errh) != 0)
         return -1;
     if (get_passing_threads(true).weight() <= 1) {

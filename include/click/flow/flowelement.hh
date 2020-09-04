@@ -47,7 +47,7 @@ public:
 /**
  * Element that needs FCB space
  */
-class VirtualFlowSpaceElement : public FlowElement, Router::InitFuture {
+class VirtualFlowSpaceElement : public FlowElement, public Router::InitFuture {
 public:
     VirtualFlowSpaceElement() :_flow_data_offset(-1) {
     }

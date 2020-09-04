@@ -41,9 +41,7 @@ FlowStack::push_batch(int, PacketBatch *head)
     }
     FlowControlBlock* tmp_stack = fcb_stack;
     fcb_stack = 0;
-
     output_push_batch(0, head);
-
     fcb_stack = tmp_stack;
 }
 

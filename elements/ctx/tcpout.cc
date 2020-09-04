@@ -23,6 +23,8 @@ int TCPOut::configure(Vector<String> &conf, ErrorHandler *errh)
         .complete() < 0)
             return -1;
     return 0;
+
+   router()->_root_init_future.post(this);
 }
 
 int

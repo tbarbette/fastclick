@@ -157,7 +157,7 @@ public:
     const char *processing() const        { return PROCESSING_A_AH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *) CLICK_COLD;
+    int solve_initialize(ErrorHandler *) CLICK_COLD;
 
     FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(DEFAULT_4TUPLE,FLOW_TCP);
 

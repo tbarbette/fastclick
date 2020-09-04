@@ -42,7 +42,7 @@ public:
     const char *port_count() const        { return PORTS_1_1X2; }
     const char *processing() const        { return PROCESSING_A_AH; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
 
     int initialize(ErrorHandler* errh) override CLICK_COLD;
 

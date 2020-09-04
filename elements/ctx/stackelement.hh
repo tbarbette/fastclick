@@ -261,8 +261,8 @@ public :
     ~StackSpaceElement();
 
 
-    virtual int initialize(ErrorHandler *errh) {
-        StackElement::initialize(errh);
+    virtual int solve_initialize(ErrorHandler *errh) {
+        VirtualFlowSpaceElement::solve_initialize(errh);
         if (_flow_data_offset == -1) {
             return errh->error("No FlowManager() element sets the flow context for %s !",name().c_str());
         }
