@@ -44,7 +44,10 @@ TimestampAccum::initialize(ErrorHandler *)
 inline Packet *
 TimestampAccum::simple_action(Packet *p)
 {
-    double val =  (Timestamp::now() - p->timestamp_anno()).doubleval();
+    Timestamp t = p->timestamp_anno();
+    if (!t)
+        return p;
+    double val =  (Timestamp::now() - t).doubleval();
     _usec_accum += val;
     if (val < _min)
         _min = val;

@@ -43,10 +43,10 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *errh);
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+    int initialize(ErrorHandler *errh) override CLICK_COLD;
 
-    void push_flow(int, SMapInfo*, PacketBatch *);
+    void push_flow(int, SMapInfo*, PacketBatch *) override;
 private:
     struct state {
         int last;
@@ -57,7 +57,7 @@ private:
     friend class CTXIPLoadBalancerReverse;
 };
 
-class CTXIPLoadBalancerReverse : public FlowElement {
+class CTXIPLoadBalancerReverse : public BatchElement {
 
 public:
 
@@ -68,10 +68,10 @@ public:
     const char *port_count() const      { return "1/1"; }
     const char *processing() const      { return PUSH; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *errh);
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+    int initialize(ErrorHandler *errh) override CLICK_COLD;
 
-    void push_flow(int, PacketBatch *);
+    void push_batch(int, PacketBatch *) override;
 private:
     IPAddress _ip;
 };

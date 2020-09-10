@@ -89,7 +89,7 @@ int CTXIPLoadBalancerReverse::initialize(ErrorHandler *errh) {
 
 
 
-void CTXIPLoadBalancerReverse::push_flow(int, PacketBatch* batch) {
+void CTXIPLoadBalancerReverse::push_batch(int, PacketBatch* batch) {
     auto fnt = [this](Packet*p) -> Packet*{
         WritablePacket* q=p->uniqueify();
         q->rewrite_ip(_ip,0, true);
