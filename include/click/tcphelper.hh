@@ -9,6 +9,7 @@
 
 #include <click/config.h>
 #include <click/glue.hh>
+#include <click/ipflowid.hh>
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
 #include <click/element.hh>
