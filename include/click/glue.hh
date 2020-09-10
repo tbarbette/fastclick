@@ -744,7 +744,11 @@ click_get_cycles()
 #elif CLICK_MINIOS
     /* FIXME: Implement click_get_cycles for MiniOS */
     return 0;
+#elif HAVE_DPDK
+    // On other architectures we use DPDK implementation, if available
+    return rte_get_tsc_cycles();
 #else
+#error "click_get_cycles is not implemented for your architecture!"
     // add other architectures here
     return 0;
 #endif
