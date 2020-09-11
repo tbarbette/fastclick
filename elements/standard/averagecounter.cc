@@ -98,7 +98,8 @@ AverageCounterBase<Stats>::simple_action_batch(PacketBatch *batch)
         }
 
     } else {
-        _stats.set_last(jpart);
+        if (d < _max)
+            _stats.set_last(jpart);
     }
 
     return batch;
