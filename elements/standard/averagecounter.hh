@@ -69,6 +69,8 @@ class AverageCounterBase : public BatchElement { public:
     static String averagecounter_read_rate_handler(Element *e, void *thunk);
     Stats _stats;
     uint64_t _ignore;
+    uint32_t _threshold;
+    uint32_t _max;
 };
 
 
