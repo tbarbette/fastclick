@@ -49,6 +49,9 @@ public:
         _state->open++;
         return true;
     }
+
+
+    void add_handlers() override CLICK_COLD;
 protected:
 
 
@@ -58,6 +61,9 @@ protected:
         Vector<int> lengths;
     };
     per_thread<fcstate> _state;
+
+    static String read_handler(Element *, void *) CLICK_COLD;
+    static int write_handler(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
 };
 
 CLICK_ENDDECLS
