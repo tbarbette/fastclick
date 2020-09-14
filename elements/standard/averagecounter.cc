@@ -35,6 +35,8 @@ template <typename Stats>
 int
 AverageCounterBase<Stats>::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+  uint32_t max = 0;
+  uint32_t threshold = 0;
 #if HAVE_FLOAT_TYPES
   double ignore = 0;
 #else
@@ -43,6 +45,8 @@ AverageCounterBase<Stats>::configure(Vector<String> &conf, ErrorHandler *errh)
   if (Args(conf, this, errh)
           .read_p("IGNORE", ignore)
           .read_p("LINK_FCS", _link_fcs)
+          .read_or_set("MAX", max, 0)
+          .read_or_set("THRESHOLD", threshold, 0)
           .complete() < 0)
     return -1;
 #if HAVE_FLOAT_TYPES
@@ -50,6 +54,13 @@ AverageCounterBase<Stats>::configure(Vector<String> &conf, ErrorHandler *errh)
 #else
   _ignore = ignore * CLICK_HZ;
 #endif
+
+  if (max > 0)
+      _max = max * CLICK_HZ;
+  else
+      _max = UINT32_MAX;
+
+  _threshold = threshold;
   return 0;
 }
 
@@ -69,14 +80,28 @@ AverageCounterBase<Stats>::simple_action_batch(PacketBatch *batch)
     click_jiffies_t jpart = click_jiffies();
     if (_stats.my_first() == 0)
         _stats.set_first(jpart);
-    if (jpart - _stats.my_first() >= _ignore) {
+    auto d = jpart - _stats.my_first();
+    if (likely(d >= _ignore && d < _max)) {
         uint64_t l = 0;
         FOR_EACH_PACKET(batch,p) {
             l+=p->length();
         }
-		_stats.add_count(batch->count(), l);
-	}
-    _stats.set_last(jpart);
+        _stats.add_count(batch->count(), l);
+        _stats.set_last(jpart);
+        if (unlikely(_threshold > 0 && jpart - _stats.my_first() > CLICK_HZ)) {
+            uint64_t rate = _stats.count() * 1000 / (jpart - _stats.first());
+            if (rate > _threshold) {
+                click_chatter("%p{element} : starting compute (rate %d pps)", this, rate);
+                _threshold = 0;
+                _stats.reset();
+            }
+        }
+
+    } else {
+        if (d < _max)
+            _stats.set_last(jpart);
+    }
+
     return batch;
 }
 #endif
@@ -87,9 +112,9 @@ AverageCounterBase<Stats>::simple_action(Packet *p)
 {
     click_jiffies_t jpart = click_jiffies();
     if (_stats.my_first() == 0)
-	_stats.set_first(jpart);
+    _stats.set_first(jpart);
     if (jpart - _stats.my_first() >= _ignore) {
-	    _stats.add_count(1,p->length());
+        _stats.add_count(1,p->length());
     }
     _stats.set_last(jpart);
     return p;

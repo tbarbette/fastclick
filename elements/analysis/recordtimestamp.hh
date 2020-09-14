@@ -100,7 +100,7 @@ const Timestamp read_timestamp = Timestamp::make_sec(1);
 
 inline Timestamp RecordTimestamp::get(uint64_t i) {
     if (i >= (unsigned)_timestamps.size()) {
-        click_chatter("Out of index !");
+        click_chatter("%p{element}: Index %d is out of range !", this, i);
         return Timestamp::uninitialized_t();
     }
     Timestamp t = _timestamps[i];

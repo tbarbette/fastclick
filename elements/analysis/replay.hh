@@ -221,7 +221,7 @@ inline void ReplayBase::check_end_loop(Task* t, bool force_time) {
         reset_time();
         if (_stop_time == 0) {
             if (_verbose)
-                click_chatter("Replay loop");
+                click_chatter("%p{element}: Replay loop", this);
             if (_stop > 0)
                 _stop--;
         } else {

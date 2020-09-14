@@ -21,6 +21,7 @@
 #include "fromdump.hh"
 #include <click/args.hh>
 #include <click/router.hh>
+#include <click/routervisitor.hh>
 #include <click/straccum.hh>
 #include <click/standard/scheduleinfo.hh>
 #include <click/error.hh>
@@ -170,11 +171,15 @@ FromDump::configure(Vector<String> &conf, ErrorHandler *errh)
 
     // User feedback regarding a potential frame length manipulation
     if (_force_len == DISABLED) {
-        errh->warning(
-            "Frames will be loaded with their capture lengths; "
-            "this might cause issues when the length of the capture is different from the actual frame length. \n"
-            "Use Pad() to avoid frame drops, e.g., caused by a subsequent CheckIPHeader element."
-        );
+        auto t = ElementCastTracker(router(), "Pad");
+        int ok = router()->visit_downstream(this, 0, &t);
+
+        if (ok != 0 || t.elements().size() < 0)
+            errh->warning(
+                "Frames will be loaded with their capture lengths; "
+                "this might cause issues when the length of the capture is different from the actual frame length. \n"
+                "Use Pad() to avoid frame drops, e.g., caused by a subsequent CheckIPHeader element."
+            );
     } else if (_force_len == REAL_LEN) {
         errh->warning(
             "Frames will be loaded with their actual lengths; "
