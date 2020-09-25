@@ -22,7 +22,7 @@
 #include <rte_pci.h>
 #include <rte_version.h>
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     #include <click/flowruleparser.hh>
 #endif
 
@@ -82,8 +82,10 @@ public:
             vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
             init_mac(), init_mtu(0), init_rss(-1), init_fc_mode(FC_UNSET),
             rx_queues(0, false), tx_queues(0, false), n_rx_descs(0), n_tx_descs(0),
-            num_pools(0), mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
-            promisc(false), flow_isolate(false), rx_offload(0), tx_offload(0),
+            num_pools(0), promisc(false),
+	    mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
+            rx_offload(0), tx_offload(0),	
+	    flow_isolate(false),
             vlan_filter(false), vlan_strip(false), vlan_extend(false), vf_vlan(),
             lro(false), jumbo(false)
         {
@@ -148,7 +150,7 @@ public:
         bool jumbo;
     };
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     void initialize_flow_rule_manager(
         const portid_t &port_id,
         ErrorHandler   *errh
@@ -197,7 +199,7 @@ public:
 
     static int get_port_numa_node(portid_t port_id);
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     int set_mode(
         String mode, int num_pools, Vector<int> vf_vlan,
         const String &flow_rules_filename, ErrorHandler *errh
@@ -243,7 +245,7 @@ public:
 
     static unsigned int get_nb_txdesc(const portid_t &port_id);
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     static int configure_nic(const portid_t &port_id);
 #endif
 

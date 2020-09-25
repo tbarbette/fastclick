@@ -675,10 +675,12 @@ HAVE_LINUXMODULE_DRIVER
 HAVE_USERLEVEL_DRIVER
 DRIVERS
 POSSIBLE_DRIVERS
+HAVE_FLOW_API
 LINUXMODULE_2_6
 EXTRA_TOOL_OBJS
 EXTRA_DRIVER_OBJS
 SOCKET_LIBS
+CLICK_SHARED
 BUILD_DL_LIBS
 BUILD_DL_LDFLAGS
 SOSUFFIX
@@ -7150,6 +7152,8 @@ $as_echo_n "checking for DPDK library... " >&6; }
 
     if pkg-config --exists libdpdk ; then
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
+      RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
+      rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
     else
@@ -7161,6 +7165,8 @@ $as_echo "yes" >&6; }
 Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
 Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
 or install DPDK using meson, or the system package manager.
+Note with the system package manager, you need the devel package
+version (dpdk-dev or dpdk-devel).
 
 =========================================" "$LINENO" 5
       fi
@@ -10070,6 +10076,9 @@ Try running 'configure' with the '--disable-dynamic-linking' option.
     eval "$saver"
 
     fi
+    CLICK_SHARED=1
+else
+    CLICK_SHARED=0
 fi
 
 
@@ -11181,8 +11190,12 @@ if test "x$ac_have_flow_rule_parser_h$ac_have_flow_rule_cache_h$ac_have_flow_rul
     have_flow_api=yes
     $as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
 
+    HAVE_FLOW_API=1
+
 else
     have_flow_api=no
+    HAVE_FLOW_API=0
+
 fi
 
 
