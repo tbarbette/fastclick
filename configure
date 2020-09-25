@@ -7149,7 +7149,9 @@ $as_echo_n "checking for DPDK library... " >&6; }
 
 
     if pkg-config --exists libdpdk ; then
-      RTE_LIB=pkg-config --variable=libdir libdpdk
+      RTE_LIB=$(pkg-config --variable=libdir libdpdk)
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
     else
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
@@ -7163,7 +7165,7 @@ or install DPDK using meson, or the system package manager.
 =========================================" "$LINENO" 5
       fi
 
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes, found at $RTE_SDK_BIN" >&5
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes, found at $RTE_SDK_BIN" >&5
 $as_echo "yes, found at $RTE_SDK_BIN" >&6; }
 
       if test -e "$RTE_SRCDIR/VERSION"; then
@@ -7194,18 +7196,6 @@ $as_echo "yes, found at $RTE_SDK_BIN" >&6; }
 
       DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
 
-
-      { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether DPDK has rte_eth_read_clock" >&5
-$as_echo_n "checking whether DPDK has rte_eth_read_clock... " >&6; }
-      if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null ; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-        $as_echo "#define HAVE_DPDK_READ_CLOCK 1" >>confdefs.h
-
-      else
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-      fi
     fi
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
@@ -7213,6 +7203,17 @@ $as_echo "no" >&6; }
     USE_DPDK=yes
 
 
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether DPDK has rte_eth_read_clock" >&5
+$as_echo_n "checking whether DPDK has rte_eth_read_clock... " >&6; }
+    if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null ; then
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+      $as_echo "#define HAVE_DPDK_READ_CLOCK 1" >>confdefs.h
+
+    else
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+    fi
 fi
 
 if test "x$enable_dpdk_pool" = "xyes"; then
