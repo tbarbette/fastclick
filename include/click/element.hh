@@ -604,6 +604,8 @@ Element::Port::Port()
 {
     PORT_ASSIGN(0);
 }
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpmf-conversions"
 
 inline void
 Element::Port::assign(bool isoutput, Element *e, int port)
@@ -635,6 +637,8 @@ Element::Port::assign(bool isoutput, Element *e, int port)
     }
 #endif
 }
+
+#pragma GCC diagnostic pop
 
 inline void
 Element::Port::assign(bool isoutput, Element *owner, Element *e, int port)

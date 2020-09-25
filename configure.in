@@ -315,6 +315,8 @@ if test "x$enable_dpdk" = "xyes"; then
 
     if pkg-config --exists libdpdk ; then
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
+      RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
+      rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       AC_MSG_RESULT([yes])
     else
       RTE_LIB="$RTE_SDK_BIN/lib"
@@ -325,6 +327,8 @@ if test "x$enable_dpdk" = "xyes"; then
 Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
 Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
 or install DPDK using meson, or the system package manager.
+Note with the system package manager, you need the devel package
+version (dpdk-dev or dpdk-devel).
 
 =========================================])
       fi
@@ -975,8 +979,11 @@ if test "x$enable_dynamic_linking" = xyes; then
     if test "$HOST_TOOLS" != host -a "$enable_tools" != no; then
         CLICK_CHECK_BUILD_DYNAMIC_LINKING
     fi
+    CLICK_SHARED=1
+else
+    CLICK_SHARED=0
 fi
-
+AC_SUBST(CLICK_SHARED)
 
 dnl
 dnl sockets
@@ -1353,9 +1360,11 @@ AC_CHECK_FILE($srcdir/include/click/flowrulecache.hh, [ac_have_flow_rule_cache_h
 AC_CHECK_FILE($srcdir/include/click/flowrulemanager.hh, [ac_have_flow_rule_man_h=yes], [ac_have_flow_rule_man_h=no])
 if test "x$ac_have_flow_rule_parser_h$ac_have_flow_rule_cache_h$ac_have_flow_rule_man_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
     have_flow_api=yes
-    AC_DEFINE([HAVE_FLOW_API])
+    AC_DEFINE([HAVE_FLOW_API],1)
+    AC_SUBST([HAVE_FLOW_API],1)
 else
     have_flow_api=no
+    AC_SUBST([HAVE_FLOW_API],0)
 fi
 
 dnl debugging malloc

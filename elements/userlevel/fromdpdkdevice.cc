@@ -33,7 +33,7 @@
 #include "../json/json.hh"
 #endif
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     #include <click/flowrulemanager.hh>
 #endif
 
@@ -76,7 +76,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     Vector<int> vf_vlan;
     int max_rss = 0;
     bool has_rss = false;
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     String flow_rules_filename;
     bool flow_isolate = false;
 #endif
@@ -93,7 +93,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAC", mac).read_status(has_mac)
         .read("MTU", mtu).read_status(has_mtu)
         .read("MODE", mode)
-    #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+    #if HAVE_FLOW_API
         .read("FLOW_RULES_FILE", flow_rules_filename)
         .read("FLOW_ISOLATE", flow_isolate)
     #endif
@@ -164,7 +164,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (has_rss)
         _dev->set_init_rss_max(max_rss);
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     if ((mode == FlowRuleManager::DISPATCHING_MODE) && (flow_rules_filename.empty())) {
         errh->warning(
             "DPDK Flow Rule Manager (port %s): FLOW_RULES_FILE is not set, "
@@ -402,7 +402,7 @@ enum {
     h_mac, h_add_mac, h_remove_mac, h_vf_mac,
     h_mtu,
     h_device,
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     h_rule_add, h_rules_del, h_rules_isolate, h_rules_flush,
     h_rules_list, h_rules_list_with_hits, h_rules_ids_global, h_rules_ids_internal,
     h_rules_count, h_rules_count_with_hits, h_rule_packet_hits, h_rule_byte_count,
@@ -526,7 +526,7 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
-    #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+    #if HAVE_FLOW_API
         case h_rules_list: {
             portid_t port_id = fd->get_device()->get_port_id();
             return FlowRuleManager::get_flow_rule_mgr(port_id)->flow_rules_list();
@@ -632,7 +632,7 @@ int FromDPDKDevice::write_handler(
     return -1;
 }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
 int FromDPDKDevice::flow_handler(
         const String &input, Element *e, void *thunk, ErrorHandler *errh)
 {
@@ -773,7 +773,7 @@ int FromDPDKDevice::xstats_handler(
                 input = String(v);
             }
             return 0;
-    #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+    #if HAVE_FLOW_API
         case h_rule_byte_count:
         case h_rule_packet_hits: {
             portid_t port_id = fd->get_device()->get_port_id();
@@ -840,7 +840,7 @@ void FromDPDKDevice::add_handlers()
     set_handler("queue_count", Handler::f_read | Handler::f_read_param, xstats_handler, h_queue_count);
     set_handler("queue_packets", Handler::f_read | Handler::f_read_param, xstats_handler, h_stats_packets);
     set_handler("queue_bytes", Handler::f_read | Handler::f_read_param, xstats_handler, h_stats_bytes);
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     set_handler(FlowRuleManager::FLOW_RULE_PACKET_HITS, Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_packet_hits);
     set_handler(FlowRuleManager::FLOW_RULE_BYTE_COUNT,  Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_byte_count);
     set_handler(FlowRuleManager::FLOW_RULE_AGGR_STATS,  Handler::f_read | Handler::f_read_param, xstats_handler, h_rules_aggr_stats);
@@ -872,7 +872,7 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
     add_read_handler("nombufs",statistics_handler, h_nombufs);
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     add_write_handler(FlowRuleManager::FLOW_RULE_ADD,     flow_handler, h_rule_add,    0);
     add_write_handler(FlowRuleManager::FLOW_RULE_DEL,     flow_handler, h_rules_del,   0);
     add_write_handler(FlowRuleManager::FLOW_RULE_ISOLATE, flow_handler, h_rules_isolate, 0);

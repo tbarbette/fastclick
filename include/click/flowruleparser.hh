@@ -30,7 +30,7 @@ extern "C" {
 
 #include <rte_version.h>
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
 
 #include <rte_malloc.h>
 #include <rte_ethdev.h>
@@ -124,7 +124,7 @@ int cmdline_parse(
     const char *buf
 );
 
-#endif // /* RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0) */
+#endif // /* HAVE_FLOW_API */
 
 #ifdef __cplusplus
 }

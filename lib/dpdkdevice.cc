@@ -26,7 +26,7 @@
 #include <click/userutils.hh>
 #include <rte_errno.h>
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     #include <click/flowrulemanager.hh>
 extern "C" {
     #include <rte_pmd_ixgbe.h>
@@ -39,7 +39,7 @@ DPDKDevice::DPDKDevice() : port_id(-1), info() {
 }
 
 DPDKDevice::DPDKDevice(portid_t port_id) : port_id(port_id) {
-    #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+    #if HAVE_FLOW_API
         if (port_id >= 0)
             initialize_flow_rule_manager(port_id, ErrorHandler::default_handler());
     #endif
@@ -94,7 +94,7 @@ int DPDKDevice::set_rss_max(int max)
     return status;
 }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
 /**
  * Called by the constructor of DPDKDevice.
  * Flow Rule Manager must be strictly invoked once for each port.
@@ -113,7 +113,7 @@ void DPDKDevice::initialize_flow_rule_manager(const portid_t &port_id, ErrorHand
     const portid_t p_id = flow_rule_mgr->get_port_id();
     assert((p_id >= 0) && (p_id == port_id));
 }
-#endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
+#endif /* HAVE_FLOW_API */
 
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
@@ -313,7 +313,7 @@ static String keep_token_left(String str, char delimiter)
 }
 
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
 int DPDKDevice::set_mode(
         String mode, int num_pools, Vector<int> vf_vlan,
         const String &flow_rules_filename, ErrorHandler *errh)
@@ -329,7 +329,7 @@ int DPDKDevice::set_mode(
 
     if (mode == "none") {
         m = ETH_MQ_RX_NONE;
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     } else if ((mode == "rss") || (mode == FlowRuleManager::DISPATCHING_MODE) || (mode == "")) {
 #else
     } else if ((mode == "rss") || (mode == "")) {
@@ -378,7 +378,7 @@ int DPDKDevice::set_mode(
 
     }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     if (mode == FlowRuleManager::DISPATCHING_MODE) {
         FlowRuleManager *flow_rule_mgr = FlowRuleManager::get_flow_rule_mgr(port_id, errh);
         flow_rule_mgr->set_active(true);
@@ -694,7 +694,7 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         }
     }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     if (info.flow_isolate) {
         FlowRuleManager::set_isolation_mode(port_id, true);
     } else {
@@ -745,7 +745,7 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         /*
          * Set mac for each pool and parameters
          */
-        for (unsigned q = 0; q < info.num_pools; q++) {
+        for (int q = 0; q < info.num_pools; q++) {
             struct rte_ether_addr mac = gen_mac(port_id, q);
             printf("Port %u vmdq pool %u set mac %02x:%02x:%02x:%02x:%02x:%02x\n",
                         port_id, q,
@@ -1054,7 +1054,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     _is_initialized = true;
 
     // Configure Flow Rule Manager
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
     for (HashTable<portid_t, FlowRuleManager *>::iterator
             it = FlowRuleManager::dev_flow_rule_mgr.begin();
             it != FlowRuleManager::dev_flow_rule_mgr.end(); ++it) {
@@ -1078,7 +1078,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     return 0;
 }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if HAVE_FLOW_API
 int DPDKDevice::configure_nic(const portid_t &port_id)
 {
     if (!_is_initialized) {
@@ -1113,7 +1113,8 @@ void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 
 void DPDKDevice::cleanup(ErrorHandler *errh)
 {
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+    (void)errh;
+#if HAVE_FLOW_API
     HashTable<portid_t, FlowRuleManager *> map = FlowRuleManager::flow_rule_manager_map();
 
     for (HashTable<portid_t, FlowRuleManager *>::const_iterator
@@ -1203,7 +1204,7 @@ DPDKDeviceArg::parse(
 #endif
     }
 
-    if (port_id >= 0 && port_id < DPDKDevice::dev_count()) {
+    if (port_id < DPDKDevice::dev_count()) {
         result = DPDKDevice::ensure_device(port_id);
     } else {
         ctx.error("Cannot resolve PCI address to DPDK device");
@@ -1216,7 +1217,7 @@ DPDKDeviceArg::parse(
 
 bool
 FlowControlModeArg::parse(
-    const String &str, FlowControlMode &result, const ArgContext &ctx) {
+    const String &str, FlowControlMode &result, const ArgContext &) {
     str.lower();
     if (str == "full" || str == "on") {
         result = FC_FULL;

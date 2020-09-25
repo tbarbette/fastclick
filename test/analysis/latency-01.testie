@@ -24,7 +24,7 @@ true
 
 %expect stderr
 diff.average:
-{{[0-9]{1,2}[.][0-9]+}}
+{{[0-9.e-]+}}
 diff.perc100:
 {{[0-9]+}}
 diff.perc:
