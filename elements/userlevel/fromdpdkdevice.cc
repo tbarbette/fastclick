@@ -405,7 +405,7 @@ void FromDPDKDevice::selected(int fd, int mask) {
 
 enum {
     h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
-    h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,
+    h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs, h_out_of_buffer,
     h_stats_packets, h_stats_bytes,
     h_active, h_safe_active,
     h_xstats, h_queue_count,
@@ -570,6 +570,22 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
     #endif
         case h_nombufs:
             return String(stats.rx_nombuf);
+	case h_out_of_buffer:
+	{
+	  const char *name = "rx_out_of_buffer";
+	  uint64_t id = 0;
+	  if (rte_eth_xstats_get_id_by_name(fd->_dev->port_id, name, &id))
+	    return String("Could not retrieve rx_out_of_buffer counter");
+	  else {
+	    struct rte_eth_xstat *xstat;
+	    uint64_t val = 0;
+	    if (rte_eth_xstats_get_by_id(fd->_dev->port_id, &id, &val, 1) == 1)
+	      return String(val);
+	    else
+	      return String("Error while retrieving rx_out_of_buffer counter");
+	  }
+	}
+
         default:
             return "<unknown>";
     }
@@ -883,6 +899,7 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("hw_dropped",statistics_handler, h_imissed);
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
     add_read_handler("nombufs",statistics_handler, h_nombufs);
+    add_read_handler("out_of_buffer",statistics_handler, h_out_of_buffer);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     add_write_handler(FlowRuleManager::FLOW_RULE_ADD,     flow_handler, h_rule_add,    0);
