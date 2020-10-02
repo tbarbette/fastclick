@@ -341,7 +341,11 @@ Returns the number of errors of this device, as computed by the hardware.
 
 =h nombufs read-only
 
-Returns the number of mbufs allocated for this devce.
+Returns the total number of RX mbuf allocation failures. 
+
+=h out_of_buffer read-only
+
+Returns the number of times receive queue had no software buffers allocated for the adapter's incoming traffic.
 
 =h rule_add write-only
 
