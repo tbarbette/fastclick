@@ -60,10 +60,10 @@ public:
   LookupLocalGridRoute2();
   ~LookupLocalGridRoute2();
 
-  const char *class_name() const	{ return "LookupLocalGridRoute2"; }
+  const char *class_name() const override	{ return "LookupLocalGridRoute2"; }
   void *cast(const char *);
-  const char *port_count() const	{ return PORTS_1_1; }
-  const char *processing() const	{ return AGNOSTIC; }
+  const char *port_count() const override	{ return PORTS_1_1; }
+  const char *processing() const override	{ return AGNOSTIC; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

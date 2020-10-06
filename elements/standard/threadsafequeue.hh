@@ -55,7 +55,7 @@ class ThreadSafeQueue : public FullNoteQueue { public:
 
     ThreadSafeQueue() CLICK_COLD;
 
-    const char *class_name() const		{ return "ThreadSafeQueue"; }
+    const char *class_name() const override		{ return "ThreadSafeQueue"; }
     void *cast(const char *);
 
     int live_reconfigure(Vector<String> &conf, ErrorHandler *errh);

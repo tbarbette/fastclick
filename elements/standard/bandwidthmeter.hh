@@ -51,9 +51,9 @@ class BandwidthMeter : public Element { protected:
   BandwidthMeter() CLICK_COLD;
   ~BandwidthMeter() CLICK_COLD;
 
-  const char *class_name() const		{ return "BandwidthMeter"; }
-  const char *port_count() const		{ return "1/2-"; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "BandwidthMeter"; }
+  const char *port_count() const override		{ return "1/2-"; }
+  const char *processing() const override		{ return PUSH; }
 
   unsigned scaled_rate() const		{ return _rate.scaled_average(); }
   unsigned rate_scale() const		{ return _rate.scale(); }

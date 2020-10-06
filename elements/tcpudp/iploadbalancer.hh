@@ -51,9 +51,9 @@ public:
     IPLoadBalancer() CLICK_COLD;
     ~IPLoadBalancer() CLICK_COLD;
 
-    const char *class_name() const		{ return "IPLoadBalancer"; }
-    const char *port_count() const		{ return "1/1"; }
-    const char *processing() const		{ return PUSH; }
+    const char *class_name() const override		{ return "IPLoadBalancer"; }
+    const char *port_count() const override		{ return "1/1"; }
+    const char *processing() const override		{ return PUSH; }
 
 
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
@@ -88,9 +88,9 @@ public:
     IPLoadBalancerReverse() CLICK_COLD;
     ~IPLoadBalancerReverse() CLICK_COLD;
 
-    const char *class_name() const      { return "IPLoadBalancerReverse"; }
-    const char *port_count() const      { return "1/1"; }
-    const char *processing() const      { return PUSH; }
+    const char *class_name() const override      { return "IPLoadBalancerReverse"; }
+    const char *port_count() const override      { return "1/1"; }
+    const char *processing() const override      { return PUSH; }
 
 
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;

@@ -99,7 +99,7 @@ class ChatterSocket : public Element { public:
   ChatterSocket() CLICK_COLD;
   ~ChatterSocket() CLICK_COLD;
 
-  const char *class_name() const	{ return "ChatterSocket"; }
+  const char *class_name() const override	{ return "ChatterSocket"; }
 
   int configure_phase() const		{ return CONFIGURE_PHASE_INFO; }
   int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;

@@ -29,9 +29,9 @@ public:
     TestFlowSpace() CLICK_COLD;
     ~TestFlowSpace() CLICK_COLD;
 
-    const char *class_name() const		{ return "TestFlowSpace"; }
-    const char *port_count() const		{ return "1/1"; }
-    const char *processing() const		{ return PUSH; }
+    const char *class_name() const override		{ return "TestFlowSpace"; }
+    const char *port_count() const override		{ return "1/1"; }
+    const char *processing() const override		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
     int initialize(ErrorHandler *errh) override CLICK_COLD;

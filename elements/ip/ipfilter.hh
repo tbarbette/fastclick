@@ -163,9 +163,9 @@ class IPFilter : public BatchElement { public:
     static void static_initialize();
     static void static_cleanup();
 
-    const char *class_name() const      { return "IPFilter"; }
-    const char *port_count() const      { return "1/-"; }
-    const char *processing() const      { return PUSH; }
+    const char *class_name() const override      { return "IPFilter"; }
+    const char *port_count() const override      { return "1/-"; }
+    const char *processing() const override      { return PUSH; }
     // this element does not need AlignmentInfo; override Classifier's "A" flag
     const char *flags() const           { return ""; }
     bool can_live_reconfigure() const       { return true; }

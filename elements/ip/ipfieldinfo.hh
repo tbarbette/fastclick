@@ -56,7 +56,7 @@ class IPFieldInfo : public Element { public:
 
     IPFieldInfo()			{ }
 
-    const char *class_name() const	{ return "IPFieldInfo"; }
+    const char *class_name() const override	{ return "IPFieldInfo"; }
 
     static void static_initialize();
     static void static_cleanup();

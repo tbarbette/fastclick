@@ -79,10 +79,10 @@ public:
   DSRArpTable() CLICK_COLD;
   ~DSRArpTable() CLICK_COLD;
 
-  const char *class_name() const	{ return "DSRArpTable"; }
-  const char *port_count() const	{ return "3/3"; }
-  const char *processing() const	{ return "aah/aah"; }
-  const char *flow_code() const		{ return "#/#"; }
+  const char *class_name() const override	{ return "DSRArpTable"; }
+  const char *port_count() const override	{ return "3/3"; }
+  const char *processing() const override	{ return "aah/aah"; }
+  const char *flow_code() const override		{ return "#/#"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *errh) CLICK_COLD;

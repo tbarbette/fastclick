@@ -174,10 +174,10 @@ class Socket : public Element { public:
   ~Socket() CLICK_COLD;
 
 
-  const char *class_name() const	{ return "Socket"; }
-  const char *port_count() const	{ return "0-1/0-1"; }
-  const char *processing() const	{ return "a/h"; }
-  const char *flow_code() const		{ return "x/y"; }
+  const char *class_name() const override	{ return "Socket"; }
+  const char *port_count() const override	{ return "0-1/0-1"; }
+  const char *processing() const override	{ return "a/h"; }
+  const char *flow_code() const override		{ return "x/y"; }
   const char *flags() const		{ return "S3"; }
 
   virtual int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;

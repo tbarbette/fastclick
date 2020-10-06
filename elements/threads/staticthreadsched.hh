@@ -23,7 +23,7 @@ class StaticThreadSched : public Element, public ThreadSched { public:
     StaticThreadSched() CLICK_COLD;
     ~StaticThreadSched() CLICK_COLD;
 
-    const char *class_name() const	{ return "StaticThreadSched"; }
+    const char *class_name() const override	{ return "StaticThreadSched"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

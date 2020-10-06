@@ -49,9 +49,9 @@ public:
     ToHost() CLICK_COLD;
     ~ToHost() CLICK_COLD;
 
-    const char *class_name() const	{ return "ToHost"; }
-    const char *port_count() const	{ return PORTS_1_0; }
-    const char *processing() const	{ return PUSH; }
+    const char *class_name() const override	{ return "ToHost"; }
+    const char *port_count() const override	{ return PORTS_1_0; }
+    const char *processing() const override	{ return PUSH; }
 
     int configure_phase() const		{ return FromHost::CONFIGURE_PHASE_TOHOST; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

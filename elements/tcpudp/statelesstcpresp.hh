@@ -10,7 +10,7 @@ class StatelessTCPResponder : public Element { public:
     StatelessTCPResponder()		{ }
     ~StatelessTCPResponder()		{ }
 
-    const char *class_name() const	{ return "StatelessTCPResponder"; }
+    const char *class_name() const override	{ return "StatelessTCPResponder"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

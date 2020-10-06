@@ -36,8 +36,8 @@ class Print80211 : public Element { public:
   Print80211();
   ~Print80211();
 
-  const char *class_name() const		{ return "Print80211"; }
-  const char *port_count() const		{ return PORTS_1_1; }
+  const char *class_name() const override		{ return "Print80211"; }
+  const char *port_count() const override		{ return PORTS_1_1; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const		{ return true; }

@@ -45,7 +45,7 @@ class PullSwitch : public SimplePullSwitch { public:
 
     PullSwitch() CLICK_COLD;
 
-    const char *class_name() const		{ return "PullSwitch"; }
+    const char *class_name() const override		{ return "PullSwitch"; }
     void *cast(const char *name);
 
     int initialize(ErrorHandler *errh) CLICK_COLD;

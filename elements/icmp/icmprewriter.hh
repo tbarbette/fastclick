@@ -63,9 +63,9 @@ class ICMPRewriter : public BatchElement { public:
     ICMPRewriter() CLICK_COLD;
     ~ICMPRewriter() CLICK_COLD;
 
-    const char *class_name() const	{ return "ICMPRewriter"; }
-    const char *port_count() const	{ return "1/1-"; }
-    const char *processing() const	{ return PUSH; }
+    const char *class_name() const override	{ return "ICMPRewriter"; }
+    const char *port_count() const override	{ return "1/1-"; }
+    const char *processing() const override	{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

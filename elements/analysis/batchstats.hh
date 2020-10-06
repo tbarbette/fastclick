@@ -33,8 +33,8 @@ class BatchStats : public BatchElement, StatVector<int> { public:
     BatchStats() CLICK_COLD;
     ~BatchStats() CLICK_COLD;
 
-    const char *class_name() const	{ return "BatchStats"; }
-    const char *port_count() const	{ return PORTS_1_1; }
+    const char *class_name() const override	{ return "BatchStats"; }
+    const char *port_count() const override	{ return PORTS_1_1; }
     void * cast(const char *name);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

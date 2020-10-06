@@ -64,10 +64,10 @@ public:
     RecordTimestamp() CLICK_COLD;
     ~RecordTimestamp() CLICK_COLD;
 
-    const char *class_name() const { return "RecordTimestamp"; }
-    const char *port_count() const { return PORTS_1_1; }
-    const char *processing() const { return PUSH; }
-    const char *flow_code() const { return "x/x"; }
+    const char *class_name() const override { return "RecordTimestamp"; }
+    const char *port_count() const override { return PORTS_1_1; }
+    const char *processing() const override { return PUSH; }
+    const char *flow_code() const override { return "x/x"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

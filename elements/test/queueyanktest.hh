@@ -63,7 +63,7 @@ class QueueYankTest : public Element { public:
 
     QueueYankTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "QueueYankTest"; }
+    const char *class_name() const override		{ return "QueueYankTest"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;

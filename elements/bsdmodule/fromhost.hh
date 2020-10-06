@@ -12,9 +12,9 @@ class FromHost : public AnyDevice {
     FromHost() CLICK_COLD;
     ~FromHost() CLICK_COLD;
 
-    const char *class_name() const	{ return "FromHost"; }
-    const char *port_count() const	{ return PORTS_0_1; }
-    const char *processing() const	{ return PUSH; }
+    const char *class_name() const override	{ return "FromHost"; }
+    const char *port_count() const override	{ return PORTS_0_1; }
+    const char *processing() const override	{ return PUSH; }
 
     int configure_phase() const		{ return CONFIGURE_PHASE_FROMHOST; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

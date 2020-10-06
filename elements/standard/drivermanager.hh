@@ -47,7 +47,7 @@ class DriverManager : public Script { public:
 
     DriverManager() CLICK_COLD;
 
-    const char *class_name() const	{ return "DriverManager"; }
+    const char *class_name() const override	{ return "DriverManager"; }
 
 };
 

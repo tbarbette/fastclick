@@ -59,7 +59,7 @@ class SortTest : public Element { public:
 
     SortTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "SortTest"; }
+    const char *class_name() const override		{ return "SortTest"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;

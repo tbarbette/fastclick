@@ -25,7 +25,7 @@ class CheckIPHeader2 : public CheckIPHeader {
         CheckIPHeader2();
         ~CheckIPHeader2();
 
-        const char *class_name() const { return "CheckIPHeader2"; }
+        const char *class_name() const override { return "CheckIPHeader2"; }
 };
 
 CLICK_ENDDECLS

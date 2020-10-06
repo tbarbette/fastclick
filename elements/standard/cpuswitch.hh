@@ -22,9 +22,9 @@ class CPUSwitch : public BatchElement {
   CPUSwitch() CLICK_COLD;
   ~CPUSwitch() CLICK_COLD;
 
-  const char *class_name() const		{ return "CPUSwitch"; }
-  const char *port_count() const		{ return "1/1-"; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "CPUSwitch"; }
+  const char *port_count() const override		{ return "1/1-"; }
+  const char *processing() const override		{ return PUSH; }
 
 
   bool get_spawning_threads(Bitvector& b, bool, int port) override;

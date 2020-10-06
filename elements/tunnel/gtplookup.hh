@@ -30,9 +30,9 @@ class GTPLookup : public BatchElement { public:
     GTPLookup() CLICK_COLD;
     ~GTPLookup() CLICK_COLD;
 
-    const char *class_name() const	{ return "GTPLookup"; }
-    const char *port_count() const	{ return "1/1"; }
-    const char *flow_code() const  { return "x/x"; }
+    const char *class_name() const override	{ return "GTPLookup"; }
+    const char *port_count() const override	{ return "1/1"; }
+    const char *flow_code() const override  { return "x/x"; }
     const char *flags() const		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

@@ -84,9 +84,9 @@ class SimpleQueue : public BatchElement, public Storage { public:
     template <typename Filter> Packet* yank1_peek(Filter);
     template <typename Filter> int yank(Filter, Vector<Packet *> &);
 
-    const char *class_name() const		{ return "SimpleQueue"; }
-    const char *port_count() const		{ return PORTS_1_1X2; }
-    const char *processing() const		{ return "h/lh"; }
+    const char *class_name() const override		{ return "SimpleQueue"; }
+    const char *port_count() const override		{ return PORTS_1_1X2; }
+    const char *processing() const override		{ return "h/lh"; }
     void* cast(const char*);
 
     int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;

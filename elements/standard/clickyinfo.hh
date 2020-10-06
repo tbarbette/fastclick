@@ -21,7 +21,7 @@ class ClickyInfo : public Element { public:
 
     ClickyInfo() CLICK_COLD;
 
-    const char *class_name() const	{ return "ClickyInfo"; }
+    const char *class_name() const override	{ return "ClickyInfo"; }
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
 
 };

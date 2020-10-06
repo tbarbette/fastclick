@@ -24,7 +24,7 @@ class BigHashMapTest : public Element { public:
 
     BigHashMapTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "BigHashMapTest"; }
+    const char *class_name() const override		{ return "BigHashMapTest"; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
 

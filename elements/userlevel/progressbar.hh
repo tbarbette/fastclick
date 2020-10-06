@@ -140,7 +140,7 @@ class ProgressBar : public Element { public:
     ProgressBar() CLICK_COLD;
     ~ProgressBar() CLICK_COLD;
 
-    const char *class_name() const		{ return "ProgressBar"; }
+    const char *class_name() const override		{ return "ProgressBar"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;

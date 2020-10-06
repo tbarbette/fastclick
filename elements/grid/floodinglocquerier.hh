@@ -43,9 +43,9 @@ class FloodingLocQuerier : public Element, public GridRouteActor {
   FloodingLocQuerier() CLICK_COLD;
   ~FloodingLocQuerier() CLICK_COLD;
 
-  const char *class_name() const		{ return "FloodingLocQuerier"; }
-  const char *port_count() const		{ return "2/2"; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "FloodingLocQuerier"; }
+  const char *port_count() const override		{ return "2/2"; }
+  const char *processing() const override		{ return PUSH; }
   void add_handlers() CLICK_COLD;
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

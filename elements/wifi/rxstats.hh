@@ -35,9 +35,9 @@ class RXStats : public Element { public:
   RXStats() CLICK_COLD;
   ~RXStats() CLICK_COLD;
 
-  const char *class_name() const		{ return "RXStats"; }
-  const char *port_count() const		{ return PORTS_1_1; }
-  const char *processing() const		{ return AGNOSTIC; }
+  const char *class_name() const override		{ return "RXStats"; }
+  const char *port_count() const override		{ return PORTS_1_1; }
+  const char *processing() const override		{ return AGNOSTIC; }
 
   Packet *simple_action(Packet *);
 

@@ -103,9 +103,9 @@ class TimeFilter : public Element { public:
     TimeFilter() CLICK_COLD;
     ~TimeFilter() CLICK_COLD;
 
-    const char *class_name() const	{ return "TimeFilter"; }
-    const char *port_count() const	{ return PORTS_1_1X2; }
-    const char *processing() const	{ return PROCESSING_A_AH; }
+    const char *class_name() const override	{ return "TimeFilter"; }
+    const char *port_count() const override	{ return PORTS_1_1X2; }
+    const char *processing() const override	{ return PROCESSING_A_AH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;

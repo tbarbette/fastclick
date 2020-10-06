@@ -44,9 +44,9 @@ class Unqueue2 : public Element { public:
 
     Unqueue2();
 
-    const char *class_name() const		{ return "Unqueue2"; }
-    const char *port_count() const		{ return PORTS_1_1; }
-    const char *processing() const		{ return PULL_TO_PUSH; }
+    const char *class_name() const override		{ return "Unqueue2"; }
+    const char *port_count() const override		{ return PORTS_1_1; }
+    const char *processing() const override		{ return PULL_TO_PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
     int initialize(ErrorHandler *) override CLICK_COLD;

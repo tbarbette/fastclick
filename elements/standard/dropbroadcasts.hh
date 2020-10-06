@@ -22,9 +22,9 @@ class DropBroadcasts : public BatchElement {
 
   DropBroadcasts() CLICK_COLD;
 
-  const char *class_name() const	{ return "DropBroadcasts"; }
-  const char *port_count() const	{ return PORTS_1_1X2; }
-  const char *processing() const	{ return PROCESSING_A_AH; }
+  const char *class_name() const override	{ return "DropBroadcasts"; }
+  const char *port_count() const override	{ return PORTS_1_1X2; }
+  const char *processing() const override	{ return PROCESSING_A_AH; }
   void add_handlers() CLICK_COLD;
 
   uint32_t drops() const		{ return _drops; }

@@ -39,7 +39,7 @@ class QueueNotify : public NotifierQueue { public:
 
   QueueNotify();
 
-  const char *class_name() const { return "QueueNotify";}
+  const char *class_name() const override { return "QueueNotify";}
   void *cast(const char *);
 
   void subscribe_notification(NotifiedElement *e);

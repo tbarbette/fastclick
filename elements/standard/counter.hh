@@ -203,9 +203,9 @@ class Counter : public CounterBase { public:
 	Counter() CLICK_COLD;
     ~Counter() CLICK_COLD;
 
-    const char *class_name() const		{ return "Counter"; }
-    const char *processing() const		{ return AGNOSTIC; }
-    const char *port_count() const		{ return PORTS_1_1; }
+    const char *class_name() const override		{ return "Counter"; }
+    const char *processing() const override		{ return AGNOSTIC; }
+    const char *port_count() const override		{ return PORTS_1_1; }
 
     void* cast(const char *name)
     {
@@ -258,9 +258,9 @@ class CounterMPBase : public CounterBase { public:
 	CounterMPBase() CLICK_COLD;
     ~CounterMPBase() CLICK_COLD;
 
-    const char *class_name() const		{ return "CounterMP"; }
-    const char *processing() const		{ return AGNOSTIC; }
-    const char *port_count() const		{ return PORTS_1_1; }
+    const char *class_name() const override		{ return "CounterMP"; }
+    const char *processing() const override		{ return AGNOSTIC; }
+    const char *port_count() const override		{ return PORTS_1_1; }
 
     void* cast(const char *name)
     {

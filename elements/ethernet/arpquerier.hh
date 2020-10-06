@@ -176,10 +176,10 @@ class ARPQuerier : public BatchElement { public:
     ARPQuerier() CLICK_COLD;
     ~ARPQuerier() CLICK_COLD;
 
-    const char *class_name() const		{ return "ARPQuerier"; }
-    const char *port_count() const		{ return "2/1-2"; }
-    const char *processing() const		{ return PUSH; }
-    const char *flow_code() const		{ return "xy/x"; }
+    const char *class_name() const override		{ return "ARPQuerier"; }
+    const char *port_count() const override		{ return "2/1-2"; }
+    const char *processing() const override		{ return PUSH; }
+    const char *flow_code() const override		{ return "xy/x"; }
     // click-undead should consider all paths live (not just "xy/x"):
     const char *flags() const			{ return "L2"; }
     void *cast(const char *name);

@@ -24,7 +24,7 @@ class ThreadIPMapper : public Element, public IPMapper { public:
     ThreadIPMapper() CLICK_COLD;
     ~ThreadIPMapper() CLICK_COLD;
 
-    const char *class_name() const	{ return "ThreadIPMapper"; }
+    const char *class_name() const override	{ return "ThreadIPMapper"; }
     void *cast(const char *);
 
     int configure_phase() const		{ return IPRewriterBase::CONFIGURE_PHASE_MAPPER;}

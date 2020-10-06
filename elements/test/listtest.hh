@@ -23,7 +23,7 @@ class ListTest : public Element { public:
 
     ListTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "ListTest"; }
+    const char *class_name() const override		{ return "ListTest"; }
 
     int initialize(ErrorHandler *errh) CLICK_COLD;
 

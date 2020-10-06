@@ -20,8 +20,8 @@ class SpinlockAcquire : public Element { public:
     SpinlockAcquire()			: _lock(0) {}
     ~SpinlockAcquire()			{}
 
-    const char *class_name() const	{ return "SpinlockAcquire"; }
-    const char *port_count() const	{ return PORTS_1_1; }
+    const char *class_name() const override	{ return "SpinlockAcquire"; }
+    const char *port_count() const override	{ return PORTS_1_1; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

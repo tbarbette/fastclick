@@ -29,10 +29,10 @@ class SnoopTCP : public Element { public:
   SnoopTCP() CLICK_COLD;
   ~SnoopTCP() CLICK_COLD;
 
-  const char *class_name() const		{ return "SnoopTCP"; }
-  const char *port_count() const		{ return "2/4"; }
-  const char *processing() const		{ return "aa/aahh"; }
-  const char *flow_code() const			{ return "xyz/xy"; }
+  const char *class_name() const override		{ return "SnoopTCP"; }
+  const char *port_count() const override		{ return "2/4"; }
+  const char *processing() const override		{ return "aa/aahh"; }
+  const char *flow_code() const override			{ return "xyz/xy"; }
 
   int initialize(ErrorHandler *) CLICK_COLD;
 

@@ -20,7 +20,7 @@ class ScheduleLinux : public Element { public:
   ScheduleLinux() CLICK_COLD;
   ~ScheduleLinux() CLICK_COLD;
 
-  const char *class_name() const		{ return "ScheduleLinux"; }
+  const char *class_name() const override		{ return "ScheduleLinux"; }
 
   int initialize(ErrorHandler *) CLICK_COLD;
   void add_handlers() CLICK_COLD;

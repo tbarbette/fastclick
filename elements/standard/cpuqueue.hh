@@ -42,9 +42,9 @@ class CPUQueue : public Element {
   CPUQueue() CLICK_COLD;
   ~CPUQueue() CLICK_COLD;
 
-  const char *class_name() const		{ return "CPUQueue"; }
-  const char *port_count() const		{ return "1/1-"; }
-  const char *processing() const		{ return PUSH_TO_PULL; }
+  const char *class_name() const override		{ return "CPUQueue"; }
+  const char *port_count() const override		{ return "1/1-"; }
+  const char *processing() const override		{ return PUSH_TO_PULL; }
   int initialize(ErrorHandler *) CLICK_COLD;
   void cleanup(CleanupStage) CLICK_COLD;
 

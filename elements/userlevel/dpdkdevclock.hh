@@ -20,7 +20,7 @@ class DPDKDeviceClock : public TSCClock { public:
   DPDKDeviceClock() CLICK_COLD;
   ~DPDKDeviceClock() CLICK_COLD;
 
-  const char *class_name() const        { return "DPDKDeviceClock"; }
+  const char *class_name() const override        { return "DPDKDeviceClock"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

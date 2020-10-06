@@ -72,7 +72,7 @@ class NotifierQueue : public SimpleQueue { public:
 
     NotifierQueue() CLICK_COLD;
 
-    const char *class_name() const		{ return "NotifierQueue"; }
+    const char *class_name() const override		{ return "NotifierQueue"; }
     void *cast(const char *);
 
     int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;

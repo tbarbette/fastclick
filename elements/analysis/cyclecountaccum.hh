@@ -49,8 +49,8 @@ class CycleCountAccum : public SimpleBatchElement<CycleCountAccum> { public:
     CycleCountAccum() CLICK_COLD;
     ~CycleCountAccum() CLICK_COLD;
 
-    const char *class_name() const	{ return "CycleCountAccum"; }
-    const char *port_count() const	{ return PORTS_1_1; }
+    const char *class_name() const override	{ return "CycleCountAccum"; }
+    const char *port_count() const override	{ return PORTS_1_1; }
 
     void add_handlers() override CLICK_COLD;
 

@@ -26,7 +26,7 @@ class BalancedThreadSched : public Element { public:
     BalancedThreadSched() CLICK_COLD;
     ~BalancedThreadSched() CLICK_COLD;
 
-    const char *class_name() const	{ return "BalancedThreadSched"; }
+    const char *class_name() const override	{ return "BalancedThreadSched"; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     int initialize(ErrorHandler *) CLICK_COLD;

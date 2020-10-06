@@ -26,8 +26,8 @@ class NotifierDebug : public Element { public:
 
     NotifierDebug() CLICK_COLD;
 
-    const char *class_name() const	{ return "NotifierDebug"; }
-    const char *port_count() const	{ return PORTS_1_1; }
+    const char *class_name() const override	{ return "NotifierDebug"; }
+    const char *port_count() const override	{ return PORTS_1_1; }
 
     int initialize(ErrorHandler *errh) CLICK_COLD;
 

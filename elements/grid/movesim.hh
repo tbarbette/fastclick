@@ -31,7 +31,7 @@ public:
   MovementSimulator() CLICK_COLD;
   ~MovementSimulator() CLICK_COLD;
 
-  const char *class_name() const { return "MovementSimulator"; }
+  const char *class_name() const override { return "MovementSimulator"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

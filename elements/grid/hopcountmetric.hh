@@ -22,9 +22,9 @@ public:
   HopcountMetric() CLICK_COLD;
   ~HopcountMetric() CLICK_COLD;
 
-  const char *class_name() const { return "HopcountMetric"; }
-  const char *port_count() const { return PORTS_0_0; }
-  const char *processing() const { return AGNOSTIC; }
+  const char *class_name() const override { return "HopcountMetric"; }
+  const char *port_count() const override { return PORTS_0_0; }
+  const char *processing() const override { return AGNOSTIC; }
 
   bool can_live_reconfigure() const { return false; }
 

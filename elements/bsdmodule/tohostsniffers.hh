@@ -16,7 +16,7 @@ class ToHostSniffers : public ToHost { public:
     ToHostSniffers() CLICK_COLD;
     ~ToHostSniffers() CLICK_COLD;
 
-    const char *class_name() const		{ return "ToHostSniffers"; }
+    const char *class_name() const override		{ return "ToHostSniffers"; }
 
 };
 

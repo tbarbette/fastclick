@@ -41,9 +41,9 @@ class FromRawSocket : public RawSocket { public:
   FromRawSocket() CLICK_COLD;
   ~FromRawSocket() CLICK_COLD;
 
-  const char *class_name() const	{ return "FromRawSocket"; }
-  const char *processing() const	{ return PUSH; }
-  const char *flow_code() const		{ return "x/y"; }
+  const char *class_name() const override	{ return "FromRawSocket"; }
+  const char *processing() const override	{ return PUSH; }
+  const char *flow_code() const override		{ return "x/y"; }
 
 };
 

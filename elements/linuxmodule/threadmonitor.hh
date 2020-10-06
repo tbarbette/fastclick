@@ -25,7 +25,7 @@ class ThreadMonitor : public Element { public:
     ThreadMonitor() CLICK_COLD;
     ~ThreadMonitor() CLICK_COLD;
 
-    const char *class_name() const	{ return "ThreadMonitor"; }
+    const char *class_name() const override	{ return "ThreadMonitor"; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     int initialize(ErrorHandler *) CLICK_COLD;

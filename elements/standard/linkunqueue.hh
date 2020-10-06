@@ -60,9 +60,9 @@ class LinkUnqueue : public Element, public Storage { public:
 
     LinkUnqueue() CLICK_COLD;
 
-    const char *class_name() const	{ return "LinkUnqueue"; }
-    const char *port_count() const	{ return PORTS_1_1; }
-    const char *processing() const	{ return PULL_TO_PUSH; }
+    const char *class_name() const override	{ return "LinkUnqueue"; }
+    const char *port_count() const override	{ return PORTS_1_1; }
+    const char *processing() const override	{ return PULL_TO_PUSH; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

@@ -17,8 +17,8 @@ class CounterRxWMPBase : public CounterMPBase<T> {
         CounterRxWMPBase() CLICK_COLD {}
         ~CounterRxWMPBase() CLICK_COLD {}
 
-        const char *processing() const { return Element::AGNOSTIC; }
-        const char *port_count() const { return Element::PORTS_1_1; }
+        const char *processing() const override { return Element::AGNOSTIC; }
+        const char *port_count() const override { return Element::PORTS_1_1; }
 };
 
 /**
@@ -48,9 +48,9 @@ class CounterRxWMP : public CounterRxWMPBase<rXwlock> {
         CounterRxWMP() CLICK_COLD;
         ~CounterRxWMP() CLICK_COLD;
 
-        const char *class_name() const { return "CounterRxWMP"; }
-        const char *processing() const { return AGNOSTIC; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "CounterRxWMP"; }
+        const char *processing() const override { return AGNOSTIC; }
+        const char *port_count() const override { return PORTS_1_1; }
 };
 
 class CounterRxWMPPR : public CounterRxWMPBase<rXwlockPR> {
@@ -58,9 +58,9 @@ class CounterRxWMPPR : public CounterRxWMPBase<rXwlockPR> {
         CounterRxWMPPR() CLICK_COLD;
         ~CounterRxWMPPR() CLICK_COLD;
 
-        const char *class_name() const { return "CounterRxWMPPR"; }
-        const char *processing() const { return AGNOSTIC; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "CounterRxWMPPR"; }
+        const char *processing() const override { return AGNOSTIC; }
+        const char *port_count() const override { return PORTS_1_1; }
 };
 
 class CounterRxWMPPW : public CounterRxWMPBase<rXwlockPW> {
@@ -68,9 +68,9 @@ class CounterRxWMPPW : public CounterRxWMPBase<rXwlockPW> {
         CounterRxWMPPW() CLICK_COLD;
         ~CounterRxWMPPW() CLICK_COLD;
 
-        const char *class_name() const { return "CounterRxWMPPW"; }
-        const char *processing() const { return AGNOSTIC; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "CounterRxWMPPW"; }
+        const char *processing() const override { return AGNOSTIC; }
+        const char *port_count() const override { return PORTS_1_1; }
 };
 
 /*
@@ -87,9 +87,9 @@ class CounterLockMP : public CounterBase {
         CounterLockMP() CLICK_COLD;
         ~CounterLockMP() CLICK_COLD;
 
-        const char *class_name() const { return "CounterLockMP"; }
-        const char *processing() const { return AGNOSTIC; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "CounterLockMP"; }
+        const char *processing() const override { return AGNOSTIC; }
+        const char *port_count() const override { return PORTS_1_1; }
 
         int initialize(ErrorHandler *) CLICK_COLD;
 
@@ -183,9 +183,9 @@ class CounterPLockMP : public CounterLockMP {
         CounterPLockMP() CLICK_COLD;
         ~CounterPLockMP() CLICK_COLD;
 
-        const char *class_name() const { return "CounterPLockMP"; }
-        const char *processing() const { return AGNOSTIC; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "CounterPLockMP"; }
+        const char *processing() const override { return AGNOSTIC; }
+        const char *port_count() const override { return PORTS_1_1; }
 };
 
 /*
@@ -203,9 +203,9 @@ class CounterRWMP : public CounterBase {
         CounterRWMP() CLICK_COLD;
         ~CounterRWMP() CLICK_COLD;
 
-        const char *class_name() const { return "CounterRWMP"; }
-        const char *processing() const { return AGNOSTIC; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "CounterRWMP"; }
+        const char *processing() const override { return AGNOSTIC; }
+        const char *port_count() const override { return PORTS_1_1; }
 
         int initialize(ErrorHandler *) CLICK_COLD;
 
@@ -314,9 +314,9 @@ class CounterPRWMP : public CounterRWMP {
         CounterPRWMP() CLICK_COLD;
         ~CounterPRWMP() CLICK_COLD;
 
-        const char *class_name() const { return "CounterPRWMP"; }
-        const char *processing() const { return AGNOSTIC; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "CounterPRWMP"; }
+        const char *processing() const override { return AGNOSTIC; }
+        const char *port_count() const override { return PORTS_1_1; }
 };
 
 
@@ -326,9 +326,9 @@ class CounterRCUMP : public CounterBase {
         CounterRCUMP() CLICK_COLD;
         ~CounterRCUMP() CLICK_COLD;
 
-        const char *class_name() const      { return "CounterRCUMP"; }
-        const char *processing() const      { return AGNOSTIC; }
-        const char *port_count() const      { return PORTS_1_1; }
+        const char *class_name() const override      { return "CounterRCUMP"; }
+        const char *processing() const override      { return AGNOSTIC; }
+        const char *port_count() const override      { return PORTS_1_1; }
 
         void* cast(const char *name) {
             if (strcmp("CounterRCUMP", name) == 0)
@@ -394,9 +394,9 @@ class CounterRCU : public CounterBase {
         CounterRCU() CLICK_COLD;
         ~CounterRCU() CLICK_COLD;
 
-        const char *class_name() const { return "CounterRCU"; }
-        const char *processing() const { return AGNOSTIC; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "CounterRCU"; }
+        const char *processing() const override { return AGNOSTIC; }
+        const char *port_count() const override { return PORTS_1_1; }
 
         void* cast(const char *name) {
             if (strcmp("CounterRCU", name) == 0)
@@ -481,9 +481,9 @@ class CounterAtomic : public CounterBase {
         CounterAtomic() CLICK_COLD;
         ~CounterAtomic() CLICK_COLD;
 
-        const char *class_name() const { return "CounterAtomic"; }
-        const char *processing() const { return AGNOSTIC; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "CounterAtomic"; }
+        const char *processing() const override { return AGNOSTIC; }
+        const char *port_count() const override { return PORTS_1_1; }
 
         void* cast(const char *name) {
             if (strcmp("CounterAtomic", name) == 0)
@@ -538,9 +538,9 @@ class CounterLock : public CounterBase {
         CounterLock() CLICK_COLD;
         ~CounterLock() CLICK_COLD;
 
-        const char *class_name() const { return "CounterLock"; }
-        const char *processing() const { return AGNOSTIC; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "CounterLock"; }
+        const char *processing() const override { return AGNOSTIC; }
+        const char *port_count() const override { return PORTS_1_1; }
 
         void* cast(const char *name) {
             if (strcmp("CounterLock", name) == 0)
@@ -609,9 +609,9 @@ class CounterRW : public CounterBase {
         CounterRW() CLICK_COLD;
         ~CounterRW() CLICK_COLD;
 
-        const char *class_name() const { return "CounterRW"; }
-        const char *processing() const { return AGNOSTIC; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "CounterRW"; }
+        const char *processing() const override { return AGNOSTIC; }
+        const char *port_count() const override { return PORTS_1_1; }
 
         void* cast(const char *name) {
             if (strcmp("CounterRW", name) == 0)
@@ -682,9 +682,9 @@ class CounterPRW : public CounterBase {
         CounterPRW() CLICK_COLD;
         ~CounterPRW() CLICK_COLD;
 
-        const char *class_name() const { return "CounterPRW"; }
-        const char *processing() const { return AGNOSTIC; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "CounterPRW"; }
+        const char *processing() const override { return AGNOSTIC; }
+        const char *port_count() const override { return PORTS_1_1; }
 
         void* cast(const char *name) {
             if (strcmp("CounterPRW", name) == 0)

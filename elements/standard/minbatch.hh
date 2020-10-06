@@ -11,9 +11,9 @@ class MinBatch: public BatchElement { public:
 
     MinBatch() CLICK_COLD;
 
-    const char *class_name() const		{ return "MinBatch"; }
-    const char *port_count() const		{ return "1/1"; }
-    const char *processing() const		{ return PUSH; }
+    const char *class_name() const override		{ return "MinBatch"; }
+    const char *port_count() const override		{ return "1/1"; }
+    const char *processing() const override		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     bool can_live_reconfigure() const		{ return false; }
