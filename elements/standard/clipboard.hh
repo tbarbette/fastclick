@@ -47,10 +47,10 @@ class Clipboard : public Element {
 public:
     Clipboard() CLICK_COLD;
 
-    const char *class_name() const { return "Clipboard"; }
+    const char *class_name() const override { return "Clipboard"; }
     const char *flags()      const { return "S0"; }
     const char *flow_code()  const { return "#/#"; }
-    const char *port_count() const { return "2/2"; }
+    const char *port_count() const override { return "2/2"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     bool can_live_reconfigure() const { return true; }

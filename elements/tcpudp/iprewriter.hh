@@ -223,7 +223,7 @@ class IPRewriter : public TCPRewriter { public:
     IPRewriter() CLICK_COLD;
     ~IPRewriter() CLICK_COLD;
 
-    const char *class_name() const		{ return "IPRewriter"; }
+    const char *class_name() const override		{ return "IPRewriter"; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

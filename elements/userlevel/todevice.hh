@@ -85,12 +85,12 @@ class ToDevice : public BatchElement { public:
     ToDevice() CLICK_COLD;
     ~ToDevice() CLICK_COLD;
 
-    const char *class_name() const		{ return "ToDevice"; }
-    const char *port_count() const		{ return "1/0-2"; }
-    const char *processing() const		{ return "l/h"; }
+    const char *class_name() const override		{ return "ToDevice"; }
+    const char *port_count() const override		{ return "1/0-2"; }
+    const char *processing() const override		{ return "l/h"; }
     const char *flags() const			{ return "S2"; }
 
-    int configure_phase() const { return KernelFilter::CONFIGURE_PHASE_TODEVICE; }
+    int configure_phase() const override { return KernelFilter::CONFIGURE_PHASE_TODEVICE; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;

@@ -28,7 +28,7 @@ class AlignmentInfo : public Element { public:
 
     AlignmentInfo();
 
-    const char *class_name() const	{ return "AlignmentInfo"; }
+    const char *class_name() const override	{ return "AlignmentInfo"; }
     int configure_phase() const		{ return CONFIGURE_PHASE_INFO; }
     int configure(Vector<String> &, ErrorHandler *);
 

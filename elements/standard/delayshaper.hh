@@ -39,9 +39,9 @@ class DelayShaper : public BatchElement, public ActiveNotifier { public:
 
     DelayShaper() CLICK_COLD;
 
-    const char *class_name() const	{ return "DelayShaper"; }
-    const char *port_count() const	{ return PORTS_1_1; }
-    const char *processing() const	{ return PULL; }
+    const char *class_name() const override	{ return "DelayShaper"; }
+    const char *port_count() const override	{ return PORTS_1_1; }
+    const char *processing() const override	{ return PULL; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

@@ -37,7 +37,7 @@ public:
   LocationTable() CLICK_COLD;
   ~LocationTable() CLICK_COLD;
 
-  const char *class_name() const { return "LocationTable"; }
+  const char *class_name() const override { return "LocationTable"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const { return true; }

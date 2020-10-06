@@ -31,7 +31,7 @@ class AdaptiveRED : public RED { public:
     AdaptiveRED() CLICK_COLD;
     ~AdaptiveRED() CLICK_COLD;
 
-    const char *class_name() const		{ return "AdaptiveRED"; }
+    const char *class_name() const override		{ return "AdaptiveRED"; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

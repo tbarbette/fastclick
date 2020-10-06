@@ -36,9 +36,9 @@ class SetTXRate : public Element { public:
   SetTXRate() CLICK_COLD;
   ~SetTXRate() CLICK_COLD;
 
-  const char *class_name() const		{ return "SetTXRate"; }
-  const char *port_count() const		{ return PORTS_1_1; }
-  const char *processing() const		{ return AGNOSTIC; }
+  const char *class_name() const override		{ return "SetTXRate"; }
+  const char *port_count() const override		{ return PORTS_1_1; }
+  const char *processing() const override		{ return AGNOSTIC; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const		{ return true; }

@@ -26,8 +26,8 @@ class Resize : public Element {
 public:
     Resize() CLICK_COLD;
 
-    const char *class_name() const { return "Resize"; }
-    const char *port_count() const { return PORTS_1_1; }
+    const char *class_name() const override { return "Resize"; }
+    const char *port_count() const override { return PORTS_1_1; }
 
     // This element neither generates nor consumes packets.
     const char *flags()      const { return "S0"; }

@@ -227,7 +227,7 @@ class ControlSocket : public Element { public:
     ControlSocket() CLICK_COLD;
     ~ControlSocket() CLICK_COLD;
 
-    const char *class_name() const	{ return "ControlSocket"; }
+    const char *class_name() const override	{ return "ControlSocket"; }
 
     int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;

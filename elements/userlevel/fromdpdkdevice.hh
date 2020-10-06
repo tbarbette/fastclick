@@ -403,12 +403,12 @@ public:
     FromDPDKDevice() CLICK_COLD;
     ~FromDPDKDevice() CLICK_COLD;
 
-    const char *class_name() const { return "FromDPDKDevice"; }
-    const char *port_count() const { return PORTS_0_1; }
-    const char *processing() const { return PUSH; }
+    const char *class_name() const override { return "FromDPDKDevice"; }
+    const char *port_count() const override { return PORTS_0_1; }
+    const char *processing() const override { return PUSH; }
     void* cast(const char* name) override;
 
-    int configure_phase() const {
+    int configure_phase() const override {
         return CONFIGURE_PHASE_PRIVILEGED - 5;
     }
     bool can_live_reconfigure() const { return false; }

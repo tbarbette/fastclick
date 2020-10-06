@@ -37,9 +37,9 @@ class TimedUnqueue : public Element { public:
 
     TimedUnqueue() CLICK_COLD;
 
-    const char *class_name() const		{ return "TimedUnqueue"; }
-    const char *port_count() const		{ return PORTS_1_1; }
-    const char *processing() const		{ return PULL_TO_PUSH; }
+    const char *class_name() const override		{ return "TimedUnqueue"; }
+    const char *port_count() const override		{ return PORTS_1_1; }
+    const char *processing() const override		{ return PULL_TO_PUSH; }
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;

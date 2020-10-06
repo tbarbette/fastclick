@@ -60,9 +60,9 @@ public:
   EtherSpanTree() CLICK_COLD;
   ~EtherSpanTree() CLICK_COLD;
 
-  const char *class_name() const		{ return "EtherSpanTree"; }
-  const char *port_count() const		{ return "-/="; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "EtherSpanTree"; }
+  const char *port_count() const override		{ return "-/="; }
+  const char *processing() const override		{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

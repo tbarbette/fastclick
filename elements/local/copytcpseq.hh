@@ -31,8 +31,8 @@ public:
   CopyTCPSeq() CLICK_COLD;
   ~CopyTCPSeq() CLICK_COLD;
 
-  const char *class_name() const	{ return "CopyTCPSeq"; }
-  const char *port_count() const	{ return "2/2"; }
+  const char *class_name() const override	{ return "CopyTCPSeq"; }
+  const char *port_count() const override	{ return "2/2"; }
 
   int initialize(ErrorHandler *) CLICK_COLD;
   int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;

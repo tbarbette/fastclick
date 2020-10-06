@@ -46,9 +46,9 @@ public:
   TCPConn() CLICK_COLD;
   ~TCPConn() CLICK_COLD;
 
-  const char *class_name() const		{ return "TCPConn"; }
-  const char *port_count() const		{ return "2/3"; }
-  const char *processing() const		{ return "hl/hlh"; }
+  const char *class_name() const override		{ return "TCPConn"; }
+  const char *port_count() const override		{ return "2/3"; }
+  const char *processing() const override		{ return "hl/hlh"; }
 
   int initialize(ErrorHandler *) CLICK_COLD;
   void cleanup(CleanupStage) CLICK_COLD;

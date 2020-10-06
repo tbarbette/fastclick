@@ -20,8 +20,8 @@ public:
   ForceUDP() CLICK_COLD;
   ~ForceUDP() CLICK_COLD;
 
-  const char *class_name() const		{ return "ForceUDP"; }
-  const char *port_count() const		{ return PORTS_1_1; }
+  const char *class_name() const override		{ return "ForceUDP"; }
+  const char *port_count() const override		{ return PORTS_1_1; }
   int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
 
   Packet *simple_action(Packet *);

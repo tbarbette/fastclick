@@ -28,7 +28,7 @@ class SortedIPLookup : public LinearIPLookup { public:
     SortedIPLookup() CLICK_COLD;
     ~SortedIPLookup() CLICK_COLD;
 
-    const char *class_name() const	{ return "SortedIPLookup"; }
+    const char *class_name() const override	{ return "SortedIPLookup"; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     inline int smaction(Packet* p);

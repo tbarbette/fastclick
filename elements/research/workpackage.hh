@@ -21,9 +21,9 @@ class WorkPackage : public BatchElement {
     public:
         WorkPackage() CLICK_COLD;
 
-        const char *class_name() const { return "WorkPackage"; }
-        const char *port_count() const { return "1-/="; }
-        const char *processing() const { return PUSH; }
+        const char *class_name() const override { return "WorkPackage"; }
+        const char *port_count() const override { return "1-/="; }
+        const char *processing() const override { return PUSH; }
 
         int configure(Vector<String>&, ErrorHandler*) override;
         void rmaction(Packet* p, int&);

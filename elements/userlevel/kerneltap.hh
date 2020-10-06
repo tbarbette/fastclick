@@ -82,7 +82,7 @@ class KernelTap : public KernelTun { public:
 
     KernelTap() CLICK_COLD;
 
-    const char *class_name() const	{ return "KernelTap"; }
+    const char *class_name() const override	{ return "KernelTap"; }
 
 };
 

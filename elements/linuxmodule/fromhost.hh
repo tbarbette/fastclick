@@ -137,9 +137,9 @@ class FromHost : public AnyDevice, public Storage { public:
 
     static void static_initialize();
 
-    const char *class_name() const	{ return "FromHost"; }
-    const char *port_count() const	{ return "0/1-2"; }
-    const char *processing() const	{ return PUSH; }
+    const char *class_name() const override	{ return "FromHost"; }
+    const char *port_count() const override	{ return "0/1-2"; }
+    const char *processing() const override	{ return PUSH; }
     void *cast(const char *name);
 
     int configure_phase() const		{ return CONFIGURE_PHASE_FROMHOST; }

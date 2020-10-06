@@ -74,9 +74,9 @@ class RadixIPLookup : public IPRouteTable { public:
     RadixIPLookup() CLICK_COLD;
     ~RadixIPLookup() CLICK_COLD;
 
-    const char *class_name() const		{ return "RadixIPLookup"; }
-    const char *port_count() const		{ return "1/-"; }
-    const char *processing() const		{ return PUSH; }
+    const char *class_name() const override		{ return "RadixIPLookup"; }
+    const char *port_count() const override		{ return "1/-"; }
+    const char *processing() const override		{ return PUSH; }
 
 
     void cleanup(CleanupStage) CLICK_COLD;

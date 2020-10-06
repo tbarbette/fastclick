@@ -38,9 +38,9 @@ class IPGWOptions : public BatchElement { public:
   IPGWOptions() CLICK_COLD;
   ~IPGWOptions() CLICK_COLD;
 
-  const char *class_name() const		{ return "IPGWOptions"; }
-  const char *port_count() const		{ return PORTS_1_1X2; }
-  const char *processing() const		{ return PROCESSING_A_AH; }
+  const char *class_name() const override		{ return "IPGWOptions"; }
+  const char *port_count() const override		{ return PORTS_1_1X2; }
+  const char *processing() const override		{ return PROCESSING_A_AH; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   void add_handlers() CLICK_COLD;
 

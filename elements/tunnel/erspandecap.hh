@@ -21,8 +21,8 @@ class ERSPANDecap : public ClassifyElement<ERSPANDecap> { public:
     ERSPANDecap() CLICK_COLD;
     ~ERSPANDecap() CLICK_COLD;
 
-    const char *class_name() const	{ return "ERSPANDecap"; }
-    const char *port_count() const	{ return PORTS_1_1X2; }
+    const char *class_name() const override	{ return "ERSPANDecap"; }
+    const char *port_count() const override	{ return PORTS_1_1X2; }
     const char *flags() const		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

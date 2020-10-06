@@ -29,9 +29,9 @@ class PathSpinlock : public BatchElement { public:
     PathSpinlock()			: _lock(0) {}
     ~PathSpinlock()			{}
 
-    const char *class_name() const	{ return "PathSpinlock"; }
-    const char *port_count() const	{ return "1-/="; }
-    const char *processing() const	{ return AGNOSTIC; }
+    const char *class_name() const override	{ return "PathSpinlock"; }
+    const char *port_count() const override	{ return "1-/="; }
+    const char *processing() const override	{ return AGNOSTIC; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

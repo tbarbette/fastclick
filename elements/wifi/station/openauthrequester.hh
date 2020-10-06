@@ -41,9 +41,9 @@ class OpenAuthRequester : public Element { public:
   OpenAuthRequester() CLICK_COLD;
   ~OpenAuthRequester() CLICK_COLD;
 
-  const char *class_name() const	{ return "OpenAuthRequester"; }
-  const char *port_count() const	{ return PORTS_1_1; }
-  const char *processing() const	{ return PUSH; }
+  const char *class_name() const override	{ return "OpenAuthRequester"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
+  const char *processing() const override	{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const	{ return true; }

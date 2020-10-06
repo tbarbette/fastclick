@@ -30,7 +30,7 @@ class AnnotationInfo : public Element { public:
 
     AnnotationInfo() CLICK_COLD;
 
-    const char *class_name() const	{ return "AnnotationInfo"; }
+    const char *class_name() const override	{ return "AnnotationInfo"; }
 
     int configure_phase() const		{ return CONFIGURE_PHASE_FIRST; }
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;

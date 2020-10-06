@@ -29,8 +29,8 @@ class GTPEncap : public BatchElement { public:
     GTPEncap() CLICK_COLD;
     ~GTPEncap() CLICK_COLD;
 
-    const char *class_name() const	{ return "GTPEncap"; }
-    const char *port_count() const	{ return PORTS_1_1; }
+    const char *class_name() const override	{ return "GTPEncap"; }
+    const char *port_count() const override	{ return PORTS_1_1; }
     const char *flags() const		{ return "A"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

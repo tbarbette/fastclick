@@ -27,8 +27,8 @@ class QueueThreadTest1 : public Element { public:
 
     QueueThreadTest1();
 
-    const char *class_name() const		{ return "QueueThreadTest1"; }
-    const char *port_count() const		{ return PORTS_0_1; }
+    const char *class_name() const override		{ return "QueueThreadTest1"; }
+    const char *port_count() const override		{ return PORTS_0_1; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
@@ -60,9 +60,9 @@ class QueueThreadTest2 : public Element { public:
 
     QueueThreadTest2();
 
-    const char *class_name() const		{ return "QueueThreadTest2"; }
-    const char *port_count() const		{ return PORTS_1_0; }
-    const char *processing() const		{ return PULL; }
+    const char *class_name() const override		{ return "QueueThreadTest2"; }
+    const char *port_count() const override		{ return PORTS_1_0; }
+    const char *processing() const override		{ return PULL; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
     bool run_task(Task *);

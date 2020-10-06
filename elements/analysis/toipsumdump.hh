@@ -352,9 +352,9 @@ class ToIPSummaryDump : public Element, public IPSummaryDumpInfo { public:
     ToIPSummaryDump() CLICK_COLD;
     ~ToIPSummaryDump() CLICK_COLD;
 
-    const char *class_name() const	{ return "ToIPSummaryDump"; }
-    const char *port_count() const	{ return "1/0-1"; }
-    const char *processing() const	{ return "a/h"; }
+    const char *class_name() const override	{ return "ToIPSummaryDump"; }
+    const char *port_count() const override	{ return "1/0-1"; }
+    const char *processing() const override	{ return "a/h"; }
     const char *flags() const		{ return "S2"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

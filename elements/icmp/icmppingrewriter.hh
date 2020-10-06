@@ -100,7 +100,7 @@ class ICMPPingRewriter : public IPRewriterBase { public:
     ICMPPingRewriter() CLICK_COLD;
     ~ICMPPingRewriter() CLICK_COLD;
 
-    const char *class_name() const	{ return "ICMPPingRewriter"; }
+    const char *class_name() const override	{ return "ICMPPingRewriter"; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

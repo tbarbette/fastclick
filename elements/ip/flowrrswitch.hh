@@ -36,9 +36,9 @@ class FlowRRSwitch : public BatchElement {
         FlowRRSwitch() CLICK_COLD;
         ~FlowRRSwitch() CLICK_COLD;
 
-        const char *class_name() const { return "FlowRRSwitch"; }
-        const char *port_count() const { return "1/1-"; }
-        const char *processing() const { return PUSH; }
+        const char *class_name() const override { return "FlowRRSwitch"; }
+        const char *port_count() const override { return "1/1-"; }
+        const char *processing() const override { return PUSH; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
         void cleanup(CleanupStage) CLICK_COLD;

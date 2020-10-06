@@ -29,9 +29,9 @@ public:
   ETX2Metric();
   ~ETX2Metric();
 
-  const char *class_name() const { return "ETX2Metric"; }
-  const char *port_count() const { return PORTS_0_0; }
-  const char *processing() const { return AGNOSTIC; }
+  const char *class_name() const override { return "ETX2Metric"; }
+  const char *port_count() const override { return PORTS_0_0; }
+  const char *processing() const override { return AGNOSTIC; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const { return false; }

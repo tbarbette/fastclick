@@ -127,9 +127,9 @@ public:
     McastSocket() CLICK_COLD;
     ~McastSocket() CLICK_COLD;
 
-    const char *class_name() const { return "McastSocket"; }
-    const char *port_count() const { return "0-1/0-1"; }
-    const char *processing() const { return "a/h"; }
+    const char *class_name() const override { return "McastSocket"; }
+    const char *port_count() const override { return "0-1/0-1"; }
+    const char *processing() const override { return "a/h"; }
     const char *flow_code()  const { return "x/y"; }
     const char *flags()      const { return "S3"; }
 

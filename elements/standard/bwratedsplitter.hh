@@ -51,7 +51,7 @@ class BandwidthRatedSplitter : public RatedSplitter { public:
 
     BandwidthRatedSplitter() CLICK_COLD;
 
-    const char *class_name() const	{ return "BandwidthRatedSplitter"; }
+    const char *class_name() const override	{ return "BandwidthRatedSplitter"; }
 
     void push(int port, Packet *);
 

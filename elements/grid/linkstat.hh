@@ -230,10 +230,10 @@ private:
   LinkStat() CLICK_COLD;
   ~LinkStat() CLICK_COLD;
 
-  const char *class_name() const		{ return "LinkStat"; }
-  const char *port_count() const		{ return "1/0-1"; }
-  const char *processing() const		{ return PUSH; }
-  const char *flow_code() const                 { return "x/y"; }
+  const char *class_name() const override		{ return "LinkStat"; }
+  const char *port_count() const override		{ return "1/0-1"; }
+  const char *processing() const override		{ return PUSH; }
+  const char *flow_code() const override                 { return "x/y"; }
 
   void add_handlers() CLICK_COLD;
 

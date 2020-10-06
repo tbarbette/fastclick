@@ -46,8 +46,8 @@ class NullElement : public BatchElement { public:
 
   NullElement() CLICK_COLD;
 
-  const char *class_name() const	{ return "Null"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+  const char *class_name() const override	{ return "Null"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
 
   Packet *simple_action(Packet *);
   PacketBatch *simple_action_batch(PacketBatch *);
@@ -72,9 +72,9 @@ class PushNullElement : public Element { public:
 
   PushNullElement() CLICK_COLD;
 
-  const char *class_name() const	{ return "PushNull"; }
-  const char *port_count() const	{ return PORTS_1_1; }
-  const char *processing() const	{ return PUSH; }
+  const char *class_name() const override	{ return "PushNull"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
+  const char *processing() const override	{ return PUSH; }
 
   void push(int, Packet *);
 
@@ -98,9 +98,9 @@ class PullNullElement : public Element { public:
 
   PullNullElement() CLICK_COLD;
 
-  const char *class_name() const	{ return "PullNull"; }
-  const char *port_count() const	{ return PORTS_1_1; }
-  const char *processing() const	{ return PULL; }
+  const char *class_name() const override	{ return "PullNull"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
+  const char *processing() const override	{ return PULL; }
 
   Packet *pull(int);
 

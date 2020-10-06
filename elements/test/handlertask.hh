@@ -48,7 +48,7 @@ class HandlerTask : public Element { public:
 
     HandlerTask() CLICK_COLD;
 
-    const char *class_name() const		{ return "HandlerTask"; }
+    const char *class_name() const override		{ return "HandlerTask"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;

@@ -76,9 +76,9 @@ class GTPTable : public BatchElement { public:
     GTPTable() CLICK_COLD;
     ~GTPTable() CLICK_COLD;
 
-    const char *class_name() const	{ return "GTPTable"; }
-    const char *port_count() const	{ return "2/2"; }
-    const char *flow_code() const  { return "xy/xz"; }
+    const char *class_name() const override	{ return "GTPTable"; }
+    const char *port_count() const override	{ return "2/2"; }
+    const char *flow_code() const override  { return "xy/xz"; }
     const char *flags() const		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

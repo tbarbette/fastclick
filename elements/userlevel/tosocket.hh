@@ -38,9 +38,9 @@ class ToSocket : public Socket { public:
   ToSocket() CLICK_COLD;
   ~ToSocket() CLICK_COLD;
 
-  const char *class_name() const	{ return "ToSocket"; }
-  const char *processing() const	{ return PULL; }
-  const char *flow_code() const		{ return "x/y"; }
+  const char *class_name() const override	{ return "ToSocket"; }
+  const char *processing() const override	{ return PULL; }
+  const char *flow_code() const override		{ return "x/y"; }
 
 };
 

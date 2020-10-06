@@ -60,8 +60,8 @@ class VLANEncap : public BatchElement { public:
     VLANEncap() CLICK_COLD;
     ~VLANEncap() CLICK_COLD;
 
-    const char *class_name() const	{ return "VLANEncap"; }
-    const char *port_count() const	{ return PORTS_1_1; }
+    const char *class_name() const override	{ return "VLANEncap"; }
+    const char *port_count() const override	{ return PORTS_1_1; }
     void add_handlers() CLICK_COLD;
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

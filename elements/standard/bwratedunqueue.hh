@@ -53,7 +53,7 @@ class BandwidthRatedUnqueue : public RatedUnqueue { public:
 
     BandwidthRatedUnqueue() CLICK_COLD;
 
-    const char *class_name() const	{ return "BandwidthRatedUnqueue"; }
+    const char *class_name() const override	{ return "BandwidthRatedUnqueue"; }
 
     int configure(Vector<String> &conf, ErrorHandler *errh) override CLICK_COLD;
 

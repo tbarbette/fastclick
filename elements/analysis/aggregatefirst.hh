@@ -48,9 +48,9 @@ class AggregateFirst : public Element, public AggregateListener { public:
     AggregateFirst() CLICK_COLD;
     ~AggregateFirst() CLICK_COLD;
 
-    const char *class_name() const	{ return "AggregateFirst"; }
-    const char *port_count() const	{ return PORTS_1_1X2; }
-    const char *processing() const	{ return PROCESSING_A_AH; }
+    const char *class_name() const override	{ return "AggregateFirst"; }
+    const char *port_count() const override	{ return PORTS_1_1X2; }
+    const char *processing() const override	{ return PROCESSING_A_AH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;

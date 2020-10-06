@@ -35,7 +35,7 @@ class PerfCountInfo : public PerfCountUser { public:
   PerfCountInfo() CLICK_COLD;
   ~PerfCountInfo() CLICK_COLD;
 
-  const char *class_name() const	{ return "PerfCountInfo"; }
+  const char *class_name() const override	{ return "PerfCountInfo"; }
   void *cast(const char *);
   int configure_phase() const		{ return CONFIGURE_PHASE_INFO; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

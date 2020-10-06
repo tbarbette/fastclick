@@ -37,8 +37,8 @@ class CompareBlock : public Element { public:
 
   CompareBlock() CLICK_COLD;
 
-  const char *class_name() const		{ return "CompareBlock"; }
-  const char *port_count() const		{ return "1/2"; }
+  const char *class_name() const override		{ return "CompareBlock"; }
+  const char *port_count() const override		{ return "1/2"; }
   void add_handlers() CLICK_COLD;
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

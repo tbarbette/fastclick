@@ -18,8 +18,8 @@ class DiscardNoFree : public BatchElement { public:
 
   DiscardNoFree() CLICK_COLD;
 
-  const char *class_name() const		{ return "DiscardNoFree"; }
-  const char *port_count() const		{ return PORTS_1_0; }
+  const char *class_name() const override		{ return "DiscardNoFree"; }
+  const char *port_count() const override		{ return PORTS_1_0; }
 
   int initialize(ErrorHandler *) CLICK_COLD;
   void add_handlers() CLICK_COLD;

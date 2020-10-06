@@ -44,9 +44,9 @@ public:
   LookupIP6Route();
   ~LookupIP6Route();
 
-  const char *class_name() const		{ return "LookupIP6Route"; }
-  const char *port_count() const		{ return "1/-"; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "LookupIP6Route"; }
+  const char *port_count() const override		{ return "1/-"; }
+  const char *processing() const override		{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

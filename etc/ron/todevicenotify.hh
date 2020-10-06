@@ -56,7 +56,7 @@ class ToDeviceNotify : public ToDevice, public NotifiedElement { public:
   ToDeviceNotify();
   ~ToDeviceNotify();
 
-  const char *class_name() const		{ return "ToDeviceNotify"; }
+  const char *class_name() const override		{ return "ToDeviceNotify"; }
   int initialize(ErrorHandler *);
   bool run_task(Task *);
   void notify(int signal);

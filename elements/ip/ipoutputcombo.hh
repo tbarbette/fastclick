@@ -47,9 +47,9 @@ class IPOutputCombo : public BatchElement {
   IPOutputCombo() CLICK_COLD;
   ~IPOutputCombo() CLICK_COLD;
 
-  const char *class_name() const		{ return "IPOutputCombo"; }
-  const char *port_count() const		{ return "1/5"; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "IPOutputCombo"; }
+  const char *port_count() const override		{ return "1/5"; }
+  const char *processing() const override		{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

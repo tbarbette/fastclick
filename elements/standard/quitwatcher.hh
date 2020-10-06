@@ -25,7 +25,7 @@ class QuitWatcher : public Element { public:
 
   QuitWatcher() CLICK_COLD;
 
-  const char *class_name() const		{ return "QuitWatcher"; }
+  const char *class_name() const override		{ return "QuitWatcher"; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;
 

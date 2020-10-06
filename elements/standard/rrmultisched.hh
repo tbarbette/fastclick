@@ -28,7 +28,7 @@ class RRMultiSched : public RRSched {
     public:
         RRMultiSched() CLICK_COLD;
 
-        const char *class_name() const { return "RoundRobinMultiSched"; }
+        const char *class_name() const override { return "RoundRobinMultiSched"; }
         int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;
         Packet *pull(int port);
     #if HAVE_BATCH

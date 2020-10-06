@@ -86,7 +86,7 @@ class RandomSource : public InfiniteSource { public:
 
   RandomSource() CLICK_COLD;
 
-  const char *class_name() const		{ return "RandomSource"; }
+  const char *class_name() const override		{ return "RandomSource"; }
   void add_handlers() CLICK_COLD;
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

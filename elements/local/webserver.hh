@@ -34,8 +34,8 @@ class WebServer : public TCPReflector {
     WebServer() CLICK_COLD;
   ~WebServer() CLICK_COLD;
 
-  const char *class_name() const		{ return "WebServer"; }
-  const char *port_count() const		{ return PORTS_1_1; }
+  const char *class_name() const override		{ return "WebServer"; }
+  const char *port_count() const override		{ return PORTS_1_1; }
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
 

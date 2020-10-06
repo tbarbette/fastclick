@@ -23,8 +23,8 @@ class SetIP6DSCP : public Element { public:
     SetIP6DSCP();
     ~SetIP6DSCP();
 
-    const char *class_name() const	{ return "SetIP6DSCP"; }
-    const char *port_count() const	{ return PORTS_1_1; }
+    const char *class_name() const override	{ return "SetIP6DSCP"; }
+    const char *port_count() const override	{ return PORTS_1_1; }
 
     uint8_t dscp() const		{ return ntohl(_dscp) >> IP6_DSCP_SHIFT; }
 

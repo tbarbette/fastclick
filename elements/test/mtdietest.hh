@@ -20,7 +20,7 @@ class MTDieTest : public Element { public:
 
     MTDieTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "MTDieTest"; }
+    const char *class_name() const override		{ return "MTDieTest"; }
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;

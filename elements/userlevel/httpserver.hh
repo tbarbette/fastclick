@@ -20,8 +20,8 @@ class HTTPServer : public Element { public:
     HTTPServer() CLICK_COLD;
     ~HTTPServer() CLICK_COLD;
 
-    const char *class_name() const  { return "HTTPServer"; }
-    const char *port_count() const  { return PORTS_0_0; }
+    const char *class_name() const override  { return "HTTPServer"; }
+    const char *port_count() const override  { return PORTS_0_0; }
 
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

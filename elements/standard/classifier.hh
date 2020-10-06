@@ -77,9 +77,9 @@ class Classifier : public BatchElement { public:
 
     Classifier() CLICK_COLD;
 
-    const char *class_name() const		{ return "Classifier"; }
-    const char *port_count() const		{ return "1/-"; }
-    const char *processing() const		{ return PUSH; }
+    const char *class_name() const override		{ return "Classifier"; }
+    const char *port_count() const override		{ return "1/-"; }
+    const char *processing() const override		{ return PUSH; }
     // this element needs AlignmentInfo, so supply the "A" flag
     const char *flags() const			{ return "A"; }
     bool can_live_reconfigure() const		{ return true; }

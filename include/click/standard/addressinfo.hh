@@ -109,7 +109,7 @@ class AddressInfo : public Element { public:
 
     AddressInfo();
 
-    const char *class_name() const	{ return "AddressInfo"; }
+    const char *class_name() const override	{ return "AddressInfo"; }
 
     int configure_phase() const		{ return CONFIGURE_PHASE_FIRST; }
     int configure(Vector<String> &conf, ErrorHandler *errh);

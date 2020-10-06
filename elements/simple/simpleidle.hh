@@ -20,10 +20,10 @@ class SimpleIdle : public Element { public:
     SimpleIdle() CLICK_COLD;
     ~SimpleIdle() CLICK_COLD;
 
-    const char *class_name() const	{ return "SimpleIdle"; }
-    const char *port_count() const	{ return "-/-"; }
-    const char *processing() const	{ return "a/a"; }
-    const char *flow_code() const	{ return "x/y"; }
+    const char *class_name() const override	{ return "SimpleIdle"; }
+    const char *port_count() const override	{ return "-/-"; }
+    const char *processing() const override	{ return "a/a"; }
+    const char *flow_code() const override	{ return "x/y"; }
 
     void push(int, Packet *);
     Packet *pull(int);

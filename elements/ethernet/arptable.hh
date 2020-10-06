@@ -98,7 +98,7 @@ class ARPTable : public Element { public:
     ARPTable() CLICK_COLD;
     ~ARPTable() CLICK_COLD;
 
-    const char *class_name() const		{ return "ARPTable"; }
+    const char *class_name() const override		{ return "ARPTable"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     bool can_live_reconfigure() const		{ return true; }

@@ -39,9 +39,9 @@ public:
   RONRouteModular();
   ~RONRouteModular();
 
-  const char *class_name() const		{ return "RONRouteModular"; }
-  const char *port_count() const		{ return "-/="; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "RONRouteModular"; }
+  const char *port_count() const override		{ return "-/="; }
+  const char *processing() const override		{ return PUSH; }
 
   int configure(const Vector<String> &, ErrorHandler *);
   int initialize(ErrorHandler *);

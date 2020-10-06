@@ -36,9 +36,9 @@ class ICMPPingResponder : public BatchElement {
         ICMPPingResponder() CLICK_COLD;
         ~ICMPPingResponder() CLICK_COLD;
 
-        const char *class_name() const    { return "ICMPPingResponder"; }
-        const char *port_count() const    { return PORTS_1_1X2; }
-        const char *processing() const    { return PROCESSING_A_AH; }
+        const char *class_name() const override    { return "ICMPPingResponder"; }
+        const char *port_count() const override    { return PORTS_1_1X2; }
+        const char *processing() const override    { return PROCESSING_A_AH; }
 
         Packet      *simple_action      (Packet *);
     #if HAVE_BATCH

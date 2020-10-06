@@ -72,10 +72,10 @@ class LookupLocalGridRoute : public Element, public GridRouteActor  {
   LookupLocalGridRoute() CLICK_COLD;
   ~LookupLocalGridRoute() CLICK_COLD;
 
-  const char *class_name() const		{ return "LookupLocalGridRoute"; }
+  const char *class_name() const override		{ return "LookupLocalGridRoute"; }
   void *cast(const char *);
-  const char *port_count() const		{ return "2/4"; }
-  const char *processing() const		{ return PUSH; }
+  const char *port_count() const override		{ return "2/4"; }
+  const char *processing() const override		{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

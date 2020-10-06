@@ -470,9 +470,9 @@ class Script : public Element { public:
     static void static_initialize();
     static void static_cleanup();
 
-    const char *class_name() const      { return "Script"; }
-    const char *port_count() const      { return "-/-"; }
-    const char *processing() const      { return "ah/ah"; }
+    const char *class_name() const override      { return "Script"; }
+    const char *port_count() const override      { return "-/-"; }
+    const char *processing() const override      { return "ah/ah"; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;

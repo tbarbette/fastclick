@@ -187,7 +187,7 @@ class UDPRewriter : public IPRewriterBase { public:
     UDPRewriter() CLICK_COLD;
     ~UDPRewriter() CLICK_COLD;
 
-    const char *class_name() const		{ return "UDPRewriter"; }
+    const char *class_name() const override		{ return "UDPRewriter"; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

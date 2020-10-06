@@ -263,9 +263,9 @@ public:
   DSRRouteTable() CLICK_COLD;
   ~DSRRouteTable() CLICK_COLD;
 
-  const char *class_name() const { return "DSRRouteTable"; }
-  const char *port_count() const { return "3/3"; }
-  const char *processing() const { return PUSH; }
+  const char *class_name() const override { return "DSRRouteTable"; }
+  const char *port_count() const override { return "3/3"; }
+  const char *processing() const override { return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

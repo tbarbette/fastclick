@@ -27,10 +27,10 @@ class Hub : public Element { public:
 
     Hub() CLICK_COLD;
 
-    const char *class_name() const		{ return "Hub"; }
-    const char *port_count() const		{ return "-/="; }
-    const char *processing() const		{ return PUSH; }
-    const char *flow_code() const		{ return "#/[^#]"; }
+    const char *class_name() const override		{ return "Hub"; }
+    const char *port_count() const override		{ return "-/="; }
+    const char *processing() const override		{ return PUSH; }
+    const char *flow_code() const override		{ return "#/[^#]"; }
 
     void push(int port, Packet* p);
 
