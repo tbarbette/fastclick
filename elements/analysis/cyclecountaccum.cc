@@ -87,7 +87,11 @@ CycleCountAccum::read_handler(Element *e, void *thunk)
       case 3: {
 	  PER_THREAD_MEMBER_SUM(uint64_t,accum,cca->_state,accum);
 	  PER_THREAD_MEMBER_SUM(uint64_t,count,cca->_state,count);
-	  return String(accum / count); }
+	  if(likely(count))
+	    return String(accum / count);
+	  else
+	    return String(0);
+	  }
       default:
 	  return String();
     }
