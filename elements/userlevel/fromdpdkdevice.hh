@@ -458,6 +458,9 @@ private:
     per_thread<FDState> _fdstate;
 #endif
     bool _set_timestamp;
+    bool _tco;
+    bool _uco;
+    bool _ipco;
 };
 
 CLICK_ENDDECLS
