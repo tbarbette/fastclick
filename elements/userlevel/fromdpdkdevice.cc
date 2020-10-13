@@ -42,7 +42,7 @@ CLICK_DECLS
 #define LOAD_UNIT 10
 
 FromDPDKDevice::FromDPDKDevice() :
-    _dev(0)
+    _dev(0), _tco(false), _uco(false), _ipco(false)
 #if HAVE_DPDK_INTERRUPT
     ,_rx_intr(-1)
 #endif
@@ -107,6 +107,11 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAX_RSS", max_rss).read_status(has_rss)
         .read("TIMESTAMP", set_timestamp)
         .read("PAUSE", fc_mode)
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+        .read("IPCO", _ipco)
+        .read("TCO", _tco)
+        .read("UCO", _uco)
+#endif
         .complete() < 0)
         return -1;
 
@@ -149,6 +154,13 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (fc_mode != FC_UNSET)
         _dev->set_init_fc_mode(fc_mode);
+
+    if (_ipco || _tco || _uco)
+        _dev->set_rx_offload(DEV_RX_OFFLOAD_IPV4_CKSUM);
+    if (_tco)
+        _dev->set_rx_offload(DEV_RX_OFFLOAD_TCP_CKSUM);
+    if (_uco)
+        _dev->set_rx_offload(DEV_RX_OFFLOAD_UDP_CKSUM);
 
     if (set_timestamp) {
 #if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
