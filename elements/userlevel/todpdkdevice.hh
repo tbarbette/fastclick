@@ -163,6 +163,7 @@ private:
     bool _vlan;
     uint32_t _tso;
     bool _tco;
+    bool _uco;
     bool _ipco;
 
     friend class FromDPDKDevice;
