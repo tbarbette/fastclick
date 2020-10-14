@@ -649,15 +649,17 @@ FlowRuleManager::flow_rules_add_from_file(const String &filename)
  * Translates a set of newline-separated flow rules into flow rule objects and installs them in a NIC.
  *
  * @args rules: a string of newline-separated flow rules
- * @args rules_nb: the number of flow rules to install
+ * @args rules_nb: the number of flow rules to installS
+ * @args verbose: if true, prints messages (dafults to true)
  * @return installation status
  */
 int
-FlowRuleManager::flow_rules_install(const String &rules, const uint32_t &rules_nb)
+FlowRuleManager::flow_rules_install(const String &rules, const uint32_t &rules_nb, const bool verbose)
 {
     // Only active instances can configure a NIC
     if (!active()) {
-        _errh->error("DPDK Flow Rule Manager (port %u): Inactive instance cannot install rules", _port_id);
+	//if(unlikely(verbose))
+	 _errh->error("DPDK Flow Rule Manager (port %u): Inactive instance cannot install rules", _port_id);
         return FLOWRULEPARSER_ERROR;
     }
 
@@ -671,11 +673,13 @@ FlowRuleManager::flow_rules_install(const String &rules, const uint32_t &rules_n
     if (res >= 0) {
         // Workaround DPDK's deficiency to report rule installation issues
         if ((rules_before + rules_nb) != rules_after) {
-            _errh->message("DPDK Flow Rule Manager (port %u): Flow installation failed - Has %" PRIu32 ", but expected %" PRIu32 " rules", _port_id, rules_after, rules_before + rules_nb);
+	    if(unlikely(verbose))
+		_errh->message("DPDK Flow Rule Manager (port %u): Flow installation failed - Has %" PRIu32 ", but expected %" PRIu32 " rules", _port_id, rules_after, rules_before + rules_nb);
             return FLOWRULEPARSER_ERROR;
         } else {
-            _errh->message("DPDK Flow Rule Manager (port %u): Parsed and installed a batch of %" PRIu32 " rules", _port_id, rules_nb);
-            return FLOWRULEPARSER_SUCCESS;
+	    if(unlikely(verbose))
+	        _errh->message("DPDK Flow Rule Manager (port %u): Parsed and installed a batch of %" PRIu32 " rules", _port_id, rules_nb);
+	    return FLOWRULEPARSER_SUCCESS;
         }
     }
 
@@ -713,13 +717,14 @@ FlowRuleManager::flow_rules_install(const String &rules, const uint32_t &rules_n
  * @args core_id: a CPU core ID associated with this flow rule
  * @args rule: a flow rule as a string
  * @args with_cache: if true, the flow cache is updated accordingly (defaults to true)
+ * @args verbose: if true, print messages about the operations (defaults to true)
  * @return installation status
  */
 int
-FlowRuleManager::flow_rule_install(const uint32_t &int_rule_id, const uint32_t &rule_id, const int &core_id, const String &rule, const bool with_cache)
+FlowRuleManager::flow_rule_install(const uint32_t &int_rule_id, const uint32_t &rule_id, const int &core_id, const String &rule, const bool with_cache, const bool verbose)
 {
     // Insert in NIC
-    if (flow_rules_install(rule, 1) != FLOWRULEPARSER_SUCCESS) {
+    if (flow_rules_install(rule, 1, verbose) != FLOWRULEPARSER_SUCCESS) {
         return FLOWRULEPARSER_ERROR;
     }
 
