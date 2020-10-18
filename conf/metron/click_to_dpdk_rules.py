@@ -159,14 +159,21 @@ def rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb,
 
 	# If group > 0, we will generate an extra jump rule
 	start_pos = 0
-	if target_group_nb > 0:
+	if (target_group_nb > 0) and (rules_nb >= 2):
 		start_pos = 1
 		rule_pos += 1
+	elif (target_group_nb > 0) and (rules_nb ==1):
+		start_pos = 0
+		rule_pos = 0
 
 	if (rule_pos >= rules_nb):
 		rule_pos -= 1
 
-	for i in xrange(start_pos, rules_nb):
+	# print(" Rule pos: {}".format(rule_pos))
+	# print("Start pos: {}".format(start_pos))
+	# print("Rules Num: {}".format(rules_nb))
+
+	for i in range(start_pos, rules_nb):
 		if (i == rule_pos):
 			rule = get_desired_dpdk_rule(i)
 		else:

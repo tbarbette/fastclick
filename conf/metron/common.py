@@ -382,8 +382,8 @@ def get_random_dpdk_rule(rule_nb, proto):
 def get_desired_dpdk_rule(rule_nb):
 	rule_map = {}
 	rule_map[IPVF] = {}
-	rule_map[IPVF][SRC_SPEC] = get_desired_src_ipv4_address()
-	rule_map[IPVF][SRC_MASK] = get_desired_src_ipv4_mask()
+	# rule_map[IPVF][SRC_SPEC] = get_desired_src_ipv4_address()
+	# rule_map[IPVF][SRC_MASK] = get_desired_src_ipv4_mask()
 	rule_map[IPVF][DST_SPEC] = get_desired_dst_ipv4_address()
 	rule_map[IPVF][DST_MASK] = get_desired_dst_ipv4_mask()
 	rule_map[OUTPUT_PORT_ELEMENT] = 0
