@@ -444,8 +444,6 @@ private:
         const String &, Element *, void *, ErrorHandler *
     ) CLICK_COLD;
 #endif
-    static int simple_flow_handler(int operation, String &input, Element *e,
-        const Handler *handler, ErrorHandler *errh);
     static String status_handler(Element *e, void *thunk) CLICK_COLD;
     static String statistics_handler(Element *e, void *thunk) CLICK_COLD;
     static int xstats_handler(int operation, String &input, Element *e,
