@@ -37,6 +37,8 @@
     #include <click/flowrulemanager.hh>
 #endif
 
+#include <rte_flow.h>
+
 CLICK_DECLS
 
 #define LOAD_UNIT 10
@@ -414,6 +416,7 @@ enum {
     h_mac, h_add_mac, h_remove_mac, h_vf_mac,
     h_mtu,
     h_device,
+    h_flow_create_5t, h_flow_update_5t,
 #if HAVE_FLOW_API
     h_rule_add, h_rules_del, h_rules_isolate, h_rules_flush,
     h_rules_list, h_rules_list_with_hits, h_rules_ids_global, h_rules_ids_internal,
@@ -643,6 +646,111 @@ int FromDPDKDevice::write_handler(
     }
     return -1;
 }
+
+int FromDPDKDevice::simple_flow_handler(
+        int operation, String &input, Element *e,
+        const Handler *handler, ErrorHandler *errh) {
+
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+    switch((uintptr_t)handler->read_user_data()) {
+        case h_flow_create_5t: {
+            Vector<String> words = input.split(' ');
+            if (words.size() != 5) {
+                input = "Arguments must be 5 : tcp|udp ip_src port_src ip_dst port_dst";
+                return -1;
+            }
+
+            if (words[0] == "tcp") {
+
+            } else if (words[0] == "udp") {
+                input = "Only TCP supported for now";
+                return -1;
+            } else {
+                input = "Protocol must be tcp or udp";
+                return -1;
+            }
+
+            struct rte_flow_attr attr;
+            memset(&attr, 0, sizeof(struct rte_flow_attr));
+            attr.ingress = 1;
+            attr.group = 0;
+            attr.priority = 0;
+
+            struct rte_flow_action action[2];
+            struct rte_flow_action_queue queue = {.index = 0};
+
+
+            memset(action, 0, sizeof(struct rte_flow_action) * 2);
+            action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
+            action[0].conf = &queue;
+
+            action[1].type = RTE_FLOW_ACTION_TYPE_END;
+
+            Vector<rte_flow_item> pattern;
+            {
+                rte_flow_item pat;
+                pat.type = RTE_FLOW_ITEM_TYPE_IPV4;
+                struct rte_flow_item_ipv4* spec = (struct rte_flow_item_ipv4*) malloc(sizeof(rte_flow_item_ipv4));
+                struct rte_flow_item_ipv4* mask = (struct rte_flow_item_ipv4*) malloc(sizeof(rte_flow_item_ipv4));
+                bzero(spec, sizeof(rte_flow_item_ipv4));
+                bzero(mask, sizeof(rte_flow_item_ipv4));
+                spec->hdr.src_addr = IPAddress(words[1]);
+                mask->hdr.src_addr = -1;
+                spec->hdr.dst_addr = IPAddress(words[3]);
+                mask->hdr.dst_addr = -1;
+                pat.spec = spec;
+                pat.mask = mask;
+                pat.last = 0;
+                pattern.push_back(pat);
+            }
+            {
+
+                rte_flow_item pat;
+                pat.type = RTE_FLOW_ITEM_TYPE_TCP;
+                struct rte_flow_item_tcp* spec = (struct rte_flow_item_tcp*) malloc(sizeof(rte_flow_item_tcp));
+                struct rte_flow_item_tcp* mask = (struct rte_flow_item_tcp*) malloc(sizeof(rte_flow_item_tcp));
+                bzero(spec, sizeof(rte_flow_item_tcp));
+                bzero(mask, sizeof(rte_flow_item_tcp));
+                spec->hdr.src_port = atoi(words[2].c_str());
+                mask->hdr.src_port = -1;
+                spec->hdr.dst_port = atoi(words[2].c_str());
+                mask->hdr.dst_port = -1;
+                pat.spec = spec;
+                pat.mask = mask;
+                pat.last = 0;
+                pattern.push_back(pat);
+            }
+
+            rte_flow_item end;
+            memset(&end, 0, sizeof(struct rte_flow_item));
+            end.type =  RTE_FLOW_ITEM_TYPE_END;
+            pattern.push_back(end);
+
+            struct rte_flow_error error;
+            int res = 0;
+
+
+            res = rte_flow_validate(fd->_dev->port_id, &attr, pattern.data(), action, &error);
+            if (res == 0) {
+
+                struct rte_flow *flow = rte_flow_create(fd->_dev->port_id, &attr, pattern.data(), action, &error);
+                if (flow != 0)
+                    return -1;
+            }
+
+            return res;
+                            }
+            case h_flow_update_5t: {
+
+            }
+            default:
+                input = "<error>";
+                return -1;
+    }
+
+    return -1;
+}
+
 
 #if HAVE_FLOW_API
 int FromDPDKDevice::flow_handler(
@@ -883,6 +991,10 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("hw_dropped",statistics_handler, h_imissed);
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
     add_read_handler("nombufs",statistics_handler, h_nombufs);
+
+
+    set_handler("flow_create_5t", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_create_5t);
+    set_handler("flow_update_5t", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_update_5t);
 
 #if HAVE_FLOW_API
     add_write_handler(FlowRuleManager::FLOW_RULE_ADD,     flow_handler, h_rule_add,    0);
