@@ -874,7 +874,7 @@ void DPDKDevice::set_tx_offload(uint64_t offload) {
     info.tx_offload |= offload;
 }
 
-void DPDKDevice::set_flow_isolate(const bool &flow_isolate) {
+void DPDKDevice::set_init_flow_isolate(const bool &flow_isolate) {
     info.flow_isolate = flow_isolate;
 }
 

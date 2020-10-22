@@ -78,9 +78,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     Vector<int> vf_vlan;
     int max_rss = 0;
     bool has_rss = false;
+    bool flow_isolate = false;
 #if HAVE_FLOW_API
     String flow_rules_filename;
-    bool flow_isolate = false;
 #endif
     if (Args(this, errh).bind(conf)
         .read_mp("PORT", dev)
@@ -95,9 +95,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAC", mac).read_status(has_mac)
         .read("MTU", mtu).read_status(has_mtu)
         .read("MODE", mode)
+        .read("FLOW_ISOLATE", flow_isolate)
     #if HAVE_FLOW_API
         .read("FLOW_RULES_FILE", flow_rules_filename)
-        .read("FLOW_ISOLATE", flow_isolate)
     #endif
         .read("VF_POOLS", num_pools)
         .read_all("VF_VLAN", vf_vlan)
@@ -416,9 +416,10 @@ enum {
     h_mac, h_add_mac, h_remove_mac, h_vf_mac,
     h_mtu,
     h_device,
-    h_flow_create_5t, h_flow_update_5t,
+    h_flow_create_5t, h_flow_update_5t, h_flow_jump, h_flow_flush,
+    h_isolate,
 #if HAVE_FLOW_API
-    h_rule_add, h_rules_del, h_rules_isolate, h_rules_flush,
+    h_rule_add, h_rules_del, h_rules_flush,
     h_rules_list, h_rules_list_with_hits, h_rules_ids_global, h_rules_ids_internal,
     h_rules_count, h_rules_count_with_hits, h_rule_packet_hits, h_rule_byte_count,
     h_rules_aggr_stats
@@ -541,6 +542,9 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
+        case h_isolate: {
+            return String(fd->get_device()->isolated() ? "1" : "0");
+        }
     #if HAVE_FLOW_API
         case h_rules_list: {
             portid_t port_id = fd->get_device()->get_port_id();
@@ -565,10 +569,6 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
         case h_rules_count_with_hits: {
             portid_t port_id = fd->get_device()->get_port_id();
             return String(FlowRuleManager::get_flow_rule_mgr(port_id)->flow_rules_with_hits_count());
-        }
-        case h_rules_isolate: {
-            portid_t port_id = fd->get_device()->get_port_id();
-            return String(FlowRuleManager::isolated(port_id) ? "1" : "0");
         }
     #endif
         case h_nombufs:
@@ -643,48 +643,20 @@ int FromDPDKDevice::write_handler(
                 return errh->error("Not a valid integer");
             return fd->_dev->set_rss_max(max);
         }
+        case h_isolate: {
+            if (input.empty()) {
+                return errh->error("DPDK Flow Rule Manager (port %u): Specify isolation mode (true/1 -> isolation, otherwise no isolation)", fd->_dev->port_id);
+            }
+            bool status = (input.lower() == "true") || (input.lower() == "1") ? true : false;
+            fd->_dev->set_isolation_mode(status);
+            return 0;
+        }
+
     }
     return -1;
 }
 
-int FromDPDKDevice::simple_flow_handler(
-        int operation, String &input, Element *e,
-        const Handler *handler, ErrorHandler *errh) {
-
-    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
-    switch((uintptr_t)handler->read_user_data()) {
-        case h_flow_create_5t: {
-            Vector<String> words = input.split(' ');
-            if (words.size() != 5) {
-                input = "Arguments must be 5 : tcp|udp ip_src port_src ip_dst port_dst";
-                return -1;
-            }
-
-            if (words[0] == "tcp") {
-
-            } else if (words[0] == "udp") {
-                input = "Only TCP supported for now";
-                return -1;
-            } else {
-                input = "Protocol must be tcp or udp";
-                return -1;
-            }
-
-            struct rte_flow_attr attr;
-            memset(&attr, 0, sizeof(struct rte_flow_attr));
-            attr.ingress = 1;
-            attr.group = 0;
-            attr.priority = 0;
-
-            struct rte_flow_action action[2];
-            struct rte_flow_action_queue queue = {.index = 0};
-
-
-            memset(action, 0, sizeof(struct rte_flow_action) * 2);
-            action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
-            action[0].conf = &queue;
-
-            action[1].type = RTE_FLOW_ACTION_TYPE_END;
+Vector<rte_flow_item> parse_5t(Vector<String> words) {
 
             Vector<rte_flow_item> pattern;
             {
@@ -713,7 +685,7 @@ int FromDPDKDevice::simple_flow_handler(
                 bzero(mask, sizeof(rte_flow_item_tcp));
                 spec->hdr.src_port = atoi(words[2].c_str());
                 mask->hdr.src_port = -1;
-                spec->hdr.dst_port = atoi(words[2].c_str());
+                spec->hdr.dst_port = atoi(words[4].c_str());
                 mask->hdr.dst_port = -1;
                 pat.spec = spec;
                 pat.mask = mask;
@@ -725,6 +697,98 @@ int FromDPDKDevice::simple_flow_handler(
             memset(&end, 0, sizeof(struct rte_flow_item));
             end.type =  RTE_FLOW_ITEM_TYPE_END;
             pattern.push_back(end);
+            return pattern;
+}
+
+inline rte_flow* flow_add_redirect(int port_id, int from, int to, bool validate, int priority = 0) {
+        struct rte_flow_attr attr;
+        memset(&attr, 0, sizeof(struct rte_flow_attr));
+        attr.ingress = 1;
+        attr.group = from;
+        attr.priority =  priority;
+
+        struct rte_flow_action action[2];
+        struct rte_flow_action_jump jump;
+
+
+        memset(action, 0, sizeof(struct rte_flow_action) * 2);
+        action[0].type = RTE_FLOW_ACTION_TYPE_JUMP;
+        action[0].conf = &jump;
+        action[1].type = RTE_FLOW_ACTION_TYPE_END;
+        jump.group=to;
+
+        Vector<rte_flow_item> pattern;
+        rte_flow_item pat;
+        pat.type = RTE_FLOW_ITEM_TYPE_ETH;
+        pat.spec = 0;
+        pat.mask = 0;
+        pat.last = 0;
+        pattern.push_back(pat);
+        rte_flow_item end;
+        memset(&end, 0, sizeof(struct rte_flow_item));
+        end.type =  RTE_FLOW_ITEM_TYPE_END;
+        pattern.push_back(end);
+
+        struct rte_flow_error error;
+        int res = 0;
+        if (validate)
+            res = rte_flow_validate(port_id, &attr, pattern.data(), action, &error);
+        if (res == 0) {
+
+            struct rte_flow *flow = rte_flow_create(port_id, &attr, pattern.data(), action, &error);
+            if (flow)
+                click_chatter("Redirect from %d to %d prio %d success",from,to,priority);
+
+            return flow;
+        } else {
+            if (validate) {
+                click_chatter("Rule did not validate.");
+            }
+            return 0;
+        }
+}
+
+
+int FromDPDKDevice::simple_flow_handler(
+        int operation, String &input, Element *e,
+        const Handler *handler, ErrorHandler *errh) {
+
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+    switch((uintptr_t)handler->read_user_data()) {
+        case h_flow_create_5t: {
+
+            Vector<String> words = input.split(' ');
+            if (words.size() != 5) {
+                input = "Arguments must be 5 : tcp|udp ip_src port_src ip_dst port_dst";
+                return -1;
+            }
+            if (words[0] == "tcp") {
+
+            } else if (words[0] == "udp") {
+                input = "Only TCP supported for now";
+                return -1;
+            } else {
+                input = "Protocol must be tcp or udp";
+                return -1;
+            }
+            Vector<rte_flow_item> pattern = parse_5t(words);
+
+            struct rte_flow_attr attr;
+            memset(&attr, 0, sizeof(struct rte_flow_attr));
+            attr.ingress = 1;
+            attr.group = 1;
+            attr.priority = 0;
+
+            struct rte_flow_action action[2];
+            struct rte_flow_action_queue queue = {.index = 0};
+
+
+            memset(action, 0, sizeof(struct rte_flow_action) * 2);
+            action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
+            action[0].conf = &queue;
+
+            action[1].type = RTE_FLOW_ACTION_TYPE_END;
+
 
             struct rte_flow_error error;
             int res = 0;
@@ -734,15 +798,59 @@ int FromDPDKDevice::simple_flow_handler(
             if (res == 0) {
 
                 struct rte_flow *flow = rte_flow_create(fd->_dev->port_id, &attr, pattern.data(), action, &error);
-                if (flow != 0)
+                if (flow != 0) {
+                    click_chatter("Rule inserted %p", flow);
+                    input = String((uintptr_t)flow);
+                    return 0;
+                } else {
+
                     return -1;
+                }
+            }
+            else  {
+                click_chatter("Rule did not validate");
             }
 
             return res;
                             }
             case h_flow_update_5t: {
+                Vector<String> words = input.split(' ');
+
+                if (words.size() != 5) {
+                    input = "Arguments must be 5 : rule_id ip_src port_src ip_dst port_dst";
+                    return -1;
+                }
+
+                rte_flow* rule = (rte_flow*)(uintptr_t)atoll(words[0].c_str());
+                Vector<rte_flow_item> pattern = parse_5t(words);
+
+                struct rte_flow_error error;
+                click_chatter("Updating port %p\n", rule);
+                int res = rte_flow_update(fd->_dev->port_id, rule, pattern.data(), 0, &error);
+                if (res == 0) {
+                    click_chatter("Update success");
+                    return 0;
+                } else {
+
+                    return -1;
+                }
+
 
             }
+			case h_flow_jump:{
+				Vector<String> args = input.split(' ');
+				if (args.size() != 2) {
+					input = "The argument must be 'from to'";
+					return -1;
+				}
+				int from = atoi(args[0].c_str());
+                int to = atoi(args[1].c_str());
+				flow_add_redirect(fd->_dev->port_id, from, to, true, 0);
+                break;
+    }
+            case h_flow_flush:
+                rte_flow_flush(fd->_dev->port_id,0);
+                break;
             default:
                 input = "<error>";
                 return -1;
@@ -816,14 +924,6 @@ int FromDPDKDevice::flow_handler(
 
             // Batch deletion
             return flow_rule_mgr->flow_rules_delete((uint32_t *) rule_ids, rules_nb);
-        }
-        case h_rules_isolate: {
-            if (input.empty()) {
-                return errh->error("DPDK Flow Rule Manager (port %u): Specify isolation mode (true/1 -> isolation, otherwise no isolation)", port_id);
-            }
-            bool status = (input.lower() == "true") || (input.lower() == "1") ? true : false;
-            FlowRuleManager::set_isolation_mode(port_id, status);
-            return 0;
         }
         case h_rules_flush: {
             return flow_rule_mgr->flow_rules_flush();
@@ -995,11 +1095,16 @@ void FromDPDKDevice::add_handlers()
 
     set_handler("flow_create_5t", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_create_5t);
     set_handler("flow_update_5t", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_update_5t);
+    set_handler("flow_jump", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_jump);
 
+    set_handler("flow_flush", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_flush);
+
+    add_write_handler("flow_isolate", write_handler, h_isolate, 0);
+    add_read_handler ("flow_isolate", statistics_handler, h_isolate);
 #if HAVE_FLOW_API
     add_write_handler(FlowRuleManager::FLOW_RULE_ADD,     flow_handler, h_rule_add,    0);
     add_write_handler(FlowRuleManager::FLOW_RULE_DEL,     flow_handler, h_rules_del,   0);
-    add_write_handler(FlowRuleManager::FLOW_RULE_ISOLATE, flow_handler, h_rules_isolate, 0);
+    add_write_handler(FlowRuleManager::FLOW_RULE_ISOLATE, write_handler, h_isolate, 0);
     add_write_handler(FlowRuleManager::FLOW_RULE_FLUSH,   flow_handler, h_rules_flush, 0);
     add_read_handler (FlowRuleManager::FLOW_RULE_IDS_GLB,         statistics_handler, h_rules_ids_global);
     add_read_handler (FlowRuleManager::FLOW_RULE_IDS_INT,         statistics_handler, h_rules_ids_internal);
