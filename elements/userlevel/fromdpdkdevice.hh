@@ -423,6 +423,8 @@ public:
     void selected(int fd, int mask) override;
 #endif
 
+    ToDPDKDevice *find_output_element();
+
     inline DPDKDevice *get_device() {
         return _dev;
     }
