@@ -35,146 +35,6 @@
 CLICK_DECLS
 
 /******************************
- * NIC
- ******************************/
-/**
- * NIC constructor.
- */
-NIC::NIC(bool verbose) :
-    _element(0), _index(-1), _verbose(verbose), mirror(0)
-{}
-
-/**
- * NIC copy constructor.
- */
-NIC::NIC(const NIC &n)
-{
-    _index = n._index;
-    _verbose = n._verbose;
-    _element = n._element;
-}
-
-/**
- * NIC destructor.
- */
-NIC::~NIC()
-{}
-
-/**
- * Sets the Click element that represents this NIC.
- */
-void
-NIC::set_element(Element *el)
-{
-    assert(el);
-    _element = el;
-}
-
-/**
- * Sets the device's Click port index.
- */
-void
-NIC::set_index(const int &index)
-{
-    assert(index >= 0);
-    _index = index;
-}
-
-/**
- * Casts a NIC object to its Click counterpart.
- */
-FromDPDKDevice *
-NIC::cast()
-{
-    if (!get_element()) {
-        return NULL;
-    }
-    return dynamic_cast<FromDPDKDevice *>(get_element());
-}
-
-/**
- * Returns the number of queues per VF pool.
- */
-int
-NIC::queue_per_pool()
-{
-    int nb_vf_pools = atoi(call_rx_read("nb_vf_pools").c_str());
-    if (nb_vf_pools == 0) {
-        return 1;
-    }
-
-    return atoi(call_rx_read("nb_rx_queues").c_str()) / nb_vf_pools;
-}
-
-/**
- * Maps a physical CPU core ID to a hardware queue ID.
- */
-int
-NIC::phys_cpu_to_queue(int phys_cpu_id)
-{
-    assert(phys_cpu_id >= 0);
-    return phys_cpu_id * (queue_per_pool());
-}
-
-/**
- * Implements read handlers for a NIC.
- */
-String
-NIC::call_rx_read(String h)
-{
-    const Handler *hc = Router::handler(_element, h);
-
-    if (hc && hc->visible()) {
-        return hc->call_read(_element, ErrorHandler::default_handler());
-    }
-
-    return "undefined";
-}
-
-/**
- * Relays handler calls to a NIC's underlying TX element.
- */
-String
-NIC::call_tx_read(String h)
-{
-    // TODO: Ensure element type
-    ToDPDKDevice *td = dynamic_cast<FromDPDKDevice *>(_element)->find_output_element();
-    if (!td) {
-        return "[NIC " + String(get_device_address()) + "] Could not find matching ToDPDKDevice";
-    }
-
-    const Handler *hc = Router::handler(td, h);
-    if (hc && hc->visible()) {
-        return hc->call_read(td, ErrorHandler::default_handler());
-    }
-
-    return "undefined";
-}
-
-/**
- * Relays handler calls to a NIC's underlying Rx element.
- */
-int
-NIC::call_rx_write(String h, const String input)
-{
-    FromDPDKDevice *fd = dynamic_cast<FromDPDKDevice *>(_element);
-    if (!fd) {
-        click_chatter("[NIC %s] Could not find matching FromDPDKDevice", get_device_address().c_str());
-        return -1;
-    }
-
-    const Handler *hc = Router::handler(fd, h);
-    if (hc && hc->visible()) {
-        return hc->call_write(input, fd, ErrorHandler::default_handler());
-    }
-
-    click_chatter("[NIC %s] Could not find matching handler %s", get_device_address().c_str(), h.c_str());
-
-    return -1;
-}
-
-
-/******************************
  * FlowRuleInstaller
  ******************************/
 /**
@@ -192,19 +52,7 @@ FlowRuleInstaller::FlowRuleInstaller() :
  */
 FlowRuleInstaller::~FlowRuleInstaller()
 {
-    // Delete stored rules
-    auto nic_rules = _rules.begin();
-    while (nic_rules != _rules.end()) {
-        Vector<struct rte_flow *> port_rule_list = nic_rules.value();
-        for (auto it = port_rule_list.begin(); it != port_rule_list.end(); ++it) {
-            delete it;
-        }
-        port_rule_list.clear();
-        nic_rules++;
-    }
-    _rules.clear();
-
-    _nics.clear();
+    //Cleanup() does the cleanup
 }
 
 /**
@@ -213,11 +61,11 @@ FlowRuleInstaller::~FlowRuleInstaller()
 int
 FlowRuleInstaller::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    Vector<Element *> nics;
+    Element * nic;
 
     if (Args(conf, this, errh)
-        .read_all("NIC",           nics)
-        .read    ("GROUP",         _group)
+        .read    ("NIC",           nic)
+	.read    ("GROUP",         _group)
         .read    ("PIN_TO_CORE",   _core_id)
         .read    ("VERBOSE",       _verbose)
         .read    ("TIMER_PERIOD",  _timer_period)
@@ -235,13 +83,7 @@ FlowRuleInstaller::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
     // Setup pointers with the underlying NICs
-    int index = 0;
-    for (Element *e : nics) {
-        NIC nic(_verbose);
-        nic.set_index(index++);
-        nic.set_element(e);
-        _nics.insert(nic.get_name(), nic);
-    }
+    _fd = (FromDPDKDevice*)nic->cast("FromDPDKDevice");
 
     return 0;
 }
@@ -252,8 +94,6 @@ FlowRuleInstaller::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 FlowRuleInstaller::initialize(ErrorHandler *errh)
 {
-    _rules.resize(_nics.size());
-
     _timer.initialize(this);
     _timer.move_thread(_core_id);
     _timer.schedule_after_msec(_timer_period);
@@ -279,14 +119,9 @@ void
 FlowRuleInstaller::cleanup(CleanupStage)
 {
     // Delete stored rules
-    auto nic_rules = _rules.begin();
-    while (nic_rules != _rules.end()) {
-        Vector<struct rte_flow *> port_rule_list = nic_rules.value();
-        for (auto it = port_rule_list.begin(); it != port_rule_list.end(); ++it) {
-            delete it;
-        }
-        port_rule_list.clear();
-        nic_rules++;
+    Vector<struct rte_flow *> &port_rule_list = _rules;
+    for (auto it = port_rule_list.begin(); it != port_rule_list.end(); ++it) {
+        delete it;
     }
     _rules.clear();
 }
@@ -297,38 +132,16 @@ FlowRuleInstaller::get_nic_name_from_handler_input(String &input)
     int delim = input.find_left(' ');
     // Only one argument was given
     if (delim < 0) {
-        return input;
+        click_chatter("Handler requires a NIC name first and the rest of the argument");
+        return "";
     }
     return input.substring(0, delim).trim_space_left();
 }
 
-FromDPDKDevice *
-FlowRuleInstaller::get_nic_device_from_name(String &nic_name)
-{
-    NIC *nic = get_nic_by_name(nic_name);
-    if (!nic) {
-        click_chatter("Invalid NIC %s", nic_name.c_str());
-        return NULL;
-    }
-
-    FromDPDKDevice *fd = nic->cast();
-    if (!fd) {
-        click_chatter("Invalid NIC %s", nic_name.c_str());
-        return NULL;
-    }
-    return fd;
-}
-
 int
-FlowRuleInstaller::store_inserted_rule(portid_t port_id, struct rte_flow *rule)
+FlowRuleInstaller::store_inserted_rule(struct rte_flow *rule)
 {
-    if (port_id < 0) {
-        click_chatter("Cannot store rule on invalid port ID");
-        return -1;
-    }
-
-    Vector<struct rte_flow *> port_rules = _rules.find(port_id);
-    port_rules.push_back(rule);
+    _rules.push_back(rule);
 
     return 0;
 }
@@ -406,7 +219,7 @@ FlowRuleInstaller::parse_5t(Vector<String> words, bool is_tcp, bool have_ports)
 }
 
 struct rte_flow *
-FlowRuleInstaller::flow_add_redirect(int port_id, int from, int to, bool validate, int priority)
+FlowRuleInstaller::flow_add_redirect(portid_t port_id, int from, int to, bool validate, int priority)
 {
     struct rte_flow_attr attr;
     memset(&attr, 0, sizeof(struct rte_flow_attr));
@@ -458,31 +271,51 @@ FlowRuleInstaller::flow_add_redirect(int port_id, int from, int to, bool validat
 }
 
 Vector<String>
-FlowRuleInstaller::rule_list_generate(const int &rules_nb)
+FlowRuleInstaller::rule_list_generate(const int &rules_nb, bool do_port, String mask)
 {
     Vector<String> rules;
 
     for (int i = 0; i < rules_nb; i++) {
         StringAccum acc;
-        acc << "udp " << IPAddress::make_random().unparse() << " " << rand() % 0xfff0
-            << " " << IPAddress::make_random().unparse() << " " << rand() % 0xfff0;
+        IPAddress i_mask = IPAddress(mask);
+        IPAddress src =  IPAddress::make_random() & i_mask;
+        IPAddress dst =  IPAddress::make_random() & i_mask;
+        int sport = 0;
+
+        int dport = 0;
+        acc << "udp " << src.unparse() << "%" << mask << " ";
+        if (do_port) {
+            sport = rand() % 0xfff0;
+            acc << String(sport) << " ";
+        }
+        acc << dst.unparse() << "%" << mask;
+        if (do_port) {
+            dport = rand() % 0xff0;
+            acc << " " << dport;
+        }
+/*
+        IPFlowID tuple = IPFlowID(src | i_mask, sport, dst |i_mask, dport);
+        if (set.find(tuple))
+            goto again;*/
         rules.push_back(acc.take_string());
+        click_chatter("%s", rules.back().c_str());
     }
 
     return rules;
 }
 
 struct rte_flow *
-FlowRuleInstaller::flow_generate(portid_t port_id, int group, Vector<rte_flow_item> &pattern)
+FlowRuleInstaller::flow_generate(portid_t port_id, Vector<rte_flow_item> &pattern, int table, int priority, int index)
 {
     struct rte_flow_attr attr;
     memset(&attr, 0, sizeof(struct rte_flow_attr));
     attr.ingress = 1;
-    attr.group = group;
-    attr.priority = 0;
+    attr.group = table;
+    attr.priority = priority;
 
     struct rte_flow_action action[2];
-    struct rte_flow_action_queue queue = {.index = 0};
+    struct rte_flow_action_queue queue = {.index = (unsigned)index};
+
 
     memset(action, 0, sizeof(struct rte_flow_action) * 2);
     action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
@@ -491,31 +324,25 @@ FlowRuleInstaller::flow_generate(portid_t port_id, int group, Vector<rte_flow_it
     action[1].type = RTE_FLOW_ACTION_TYPE_END;
 
     struct rte_flow_error error;
-    int res = rte_flow_validate(port_id, &attr, pattern.data(), action, &error);
-    if (res != 0) {
-        click_chatter("Flow rule can't be validated %d message: %s\n",
-            error.type,
-            error.message ? error.message : "(no stated reason)");
-        return NULL;
+    int res = 0;
+
+    res = rte_flow_validate(port_id, &attr, pattern.data(), action, &error);
+    if (res == 0) {
+        return rte_flow_create(port_id, &attr, pattern.data(), action, &error);
+    }
+    else  {
+        click_chatter("Rule did not validate");
     }
 
-    struct rte_flow *flow = rte_flow_create(port_id, &attr, pattern.data(), action, &error);
-    if (!flow) {
-        click_chatter("Flow rule can't be created %d message: %s\n",
-            error.type,
-            error.message ? error.message : "(no stated reason)");
-        return NULL;
-    }
-
-    return flow;
+    return NULL;
 }
 
 /**
  * Read and write handlers.
  */
 enum {
-    h_flow_create_5t, h_flow_create_5t_list, h_flow_create_pair,
-    h_flow_update_5t, h_flow_jump, h_flow_flush
+    h_flow_create_5t, h_flow_create_5t_list, h_flow_create_pair, h_flow_create_pair_list,
+    h_flow_update_5t, h_flow_jump, h_flow_flush, h_flow_count
 };
 
 int FlowRuleInstaller::flow_handler(
@@ -528,22 +355,26 @@ int FlowRuleInstaller::flow_handler(
     }
 
     int delim = input.find_left(' ');
-
-    String nic_name = fr->get_nic_name_from_handler_input(input);
-    FromDPDKDevice *fd = fr->get_nic_device_from_name(nic_name);
-    if (!fd) {
-        return errh->error("Invalid NIC %s", nic_name.c_str());
+    // Only one argument was given
+    if (delim < 0) {
+        delim = input.length() - 1;
     }
-    portid_t port_id = fd->get_device()->get_port_id();
+
+    portid_t port_id = fr->_fd->get_device()->get_port_id();
 
     // The rest of the arguments
     String args = input.substring(delim + 1).trim_space_left();
 
     switch((uintptr_t)handler->read_user_data()) {
+
+        case h_flow_count: {
+                input = String(fr->_rules.size());
+                return 0;
+        }
         case h_flow_create_5t: {
             Vector<String> words = args.split(' ');
-            if (words.size() != 5) {
-                input = "Usage: nic-name tcp|udp ip-src port-src ip-dst port-dst";
+            if (words.size() < 5) {
+                input = "Usage: tcp|udp ip_src port_src ip_dst port_dst [table]";
                 return -1;
             }
             bool is_tcp;
@@ -558,13 +389,13 @@ int FlowRuleInstaller::flow_handler(
 
             Vector<rte_flow_item> pattern = parse_5t(words);
 
-            struct rte_flow *flow = flow_generate(port_id, fr->_group, pattern);
+            struct rte_flow *flow = flow_generate(port_id, pattern, words.size()>3?atoi(words[3].c_str()) : 1, 1, 0);
             if (!flow) {
                 input = "Failed to insert rule: " + input;
                 return -1;
             }
 
-            if (fr->store_inserted_rule(port_id, flow) != 0) {
+            if (fr->store_inserted_rule(flow) != 0) {
                 input = "Failed to insert rule";
                 return -1;
             }
@@ -576,42 +407,10 @@ int FlowRuleInstaller::flow_handler(
             input = String((uintptr_t) flow);
             return 0;
         }
-        case h_flow_create_5t_list: {
-            int rules_nb = atoi(args.data());
-            if (fr->_verbose)
-                click_chatter("Generating %d 5-tuple rules\n", rules_nb);
-
-            int i = 0;
-            Vector<String> rules = rule_list_generate(rules_nb);
-            for (String rule : rules) {
-                Vector<String> words = rule.split(' ');
-                bool is_tcp = false;
-
-                Vector<rte_flow_item> pattern = parse_5t(words, false);
-                struct rte_flow *flow = flow_generate(port_id, fr->_group, pattern);
-                if (!flow) {
-                    input = "Failed to insert rule " + String(i);
-                    return -1;
-                }
-
-                if (fr->store_inserted_rule(port_id, flow) != 0) {
-                    input = "Failed to insert rule " + String(i);
-                    return -1;
-                }
-
-                if (fr->_verbose) {
-                    click_chatter("[Rule %d]: Inserted at %p", i, flow);
-                }
-                i++;
-            }
-
-            input = "Successfully created " + String(rules_nb) + " rules for NIC " + nic_name;
-            return 0;
-        }
         case h_flow_create_pair: {
             Vector<String> words = args.split(' ');
-            if (words.size() != 3) {
-                click_chatter("Usage: nic-name tcp|udp ip-src ip-dst");
+            if (words.size() < 3) {
+                click_chatter("Usage: tcp|udp ip_src ip_dst [table]");
                 return -1;
             }
 
@@ -627,13 +426,13 @@ int FlowRuleInstaller::flow_handler(
 
             Vector<rte_flow_item> pattern = parse_5t(words, is_tcp, false);
 
-            struct rte_flow *flow = flow_generate(port_id, fr->_group, pattern);
+            struct rte_flow *flow = flow_generate(port_id, pattern, words.size()>3?atoi(words[3].c_str()) : 1, 1, 0);
             if (!flow) {
-                input = "Failed to insert rule";
+                click_chatter("Failed to insert rule: ");
                 return -1;
             }
 
-            if (fr->store_inserted_rule(port_id, flow) != 0) {
+            if (fr->store_inserted_rule(flow) != 0) {
                 input = "Failed to insert rule";
                 return -1;
             }
@@ -645,65 +444,121 @@ int FlowRuleInstaller::flow_handler(
             input = String((uintptr_t) flow);
             return 0;
         }
+
+        case h_flow_create_5t_list: {
+
+            Vector<String> words = args.split(' ');
+            int rules_nb = atoi(words[0].c_str());
+
+            if (fr->_verbose)
+                click_chatter("Generating %d 5-tuple rules\n", rules_nb);
+
+            int table = words.size()>1?atoi(words[1].c_str()) : 1    ;
+
+            String mask = words.size()>2?words[2]:"255.255.255.255";
+            int i = 0;
+            Vector<String> rules = rule_list_generate(rules_nb, true, mask);
+            for (String rule : rules) {
+                Vector<String> words = rule.split(' ');
+                bool is_tcp = false;
+                Vector<rte_flow_item> pattern = parse_5t(words, false, true);
+                struct rte_flow *flow = flow_generate(port_id, pattern, table, 0, 1);
+                if (!flow) {
+                    click_chatter("Failed to insert rule %d", i);
+                    return -1;
+                }
+
+                if (fr->store_inserted_rule(flow) != 0) {
+                    click_chatter("Failed to insert rule %d", i);
+                    return -1;
+                }
+
+                if (fr->_verbose) {
+                    click_chatter("[Rule %d]: Inserted at %p", i, flow);
+                }
+                i++;
+            }
+
+            return 0;
+        }
+        case h_flow_create_pair_list: {
+
+            Vector<String> words = args.split(' ');
+            int rules_nb = atoi(words[0].c_str());
+
+            if (fr->_verbose)
+                click_chatter("Generating %d pair-tuple rules\n", rules_nb);
+
+            int table = words.size()>1?atoi(words[1].c_str()) : 1    ;
+            String mask = words.size()>2?words[2]:"255.255.255.255";
+            int i = 0;
+            Vector<String> rules = rule_list_generate(rules_nb, false, mask);
+            for (String rule : rules) {
+                Vector<String> words = rule.split(' ');
+                bool is_tcp = false;
+                Vector<rte_flow_item> pattern = parse_5t(words, false, false);
+                struct rte_flow *flow = flow_generate(port_id, pattern, table, 0, 1);
+                if (!flow) {
+                    click_chatter("Failed to insert rule %d", i);
+                    return -1;
+                }
+
+                if (fr->store_inserted_rule(flow) != 0) {
+                    click_chatter("Failed to insert rule %d", i);
+                    return -1;
+                }
+
+                if (fr->_verbose) {
+                    click_chatter("[Rule %d]: Inserted at %p", i, flow);
+                }
+                i++;
+            }
+
+            return 0;
+        }
+
         case h_flow_update_5t: {
             Vector<String> words = args.split(' ');
 
             if (words.size() != 5) {
-                input = "Usage: nic-name rule-id ip-src port-src ip-dst port-dst";
+                input = "Arguments must be 5: rule_id ip_src port_src ip_dst port_dst";
                 return -1;
             }
 
-            long int rule_id = atoll(words[0].c_str());
-
-            rte_flow *rule = (rte_flow*)(uintptr_t) rule_id;
+            rte_flow *rule = (rte_flow*)(uintptr_t)atoll(words[0].c_str());
             Vector<rte_flow_item> pattern = parse_5t(words);
 
             struct rte_flow_error error;
             click_chatter("Updating port %p\n", rule);
             // int res = rte_flow_update(port_id, rule, pattern.data(), 0, &error);
             int res = 0;
-            if (res != 0) {
-                input = "Flow rule can't be created " + String(error.type) +
-                    " message " + error.message ? error.message : "(no stated reason)";
-                click_chatter("%s\n", input);
+            if (res == 0) {
+                if (fr->_verbose) {
+                    click_chatter("Update success");
+                }
+                return 0;
+            } else {
+                input = "Failed to update rule";
                 return -1;
             }
-
-            if (fr->_verbose) {
-                input = "Successfully updated rule " + String(rule_id) + " in NIC " + nic_name;
-            }
-
-            return 0;
         }
         case h_flow_jump:{
             Vector<String> groups = args.split(' ');
             if (groups.size() != 2) {
-                input = "Usage: nic-name from-group to-group";
+                click_chatter("The argument must be 'from <group> to <another-group>'");
                 return -1;
             }
             int from = atoi(groups[0].c_str());
             int to = atoi(groups[1].c_str());
-
-            if (flow_add_redirect(port_id, from, to, true, 0) == NULL) {
-                input = "Failed to create jump rule from group " + String(from) +
-                    " to group " + String(to) + " in NIC " + nic_name;
-                return -1;
-            }
-
-            input = "Successfully created jump rule from group " + String(from) +
-                " to group " + String(to) + " in NIC " + nic_name;
-            return 0;
+            flow_add_redirect(port_id, from, to, true, 0);
+            break;
         }
         case h_flow_flush:
-            if (rte_flow_flush(port_id, 0) != 0) {
-                input = "Failed to flush NIC " + nic_name;
-                return -1;
-            }
-            input = "Successfully flushed NIC " + nic_name;
-            return 0;
+            rte_flow_flush(port_id, 0);
+            break;
         default:
             input = "<error>";
-            break;
+            return -1;
     }
 
     return -1;
@@ -712,11 +567,16 @@ int FlowRuleInstaller::flow_handler(
 void FlowRuleInstaller::add_handlers()
 {
     set_handler("flow_create_5t_list", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_create_5t_list);
+
+    set_handler("flow_create_pair_list", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_create_pair_list);
     set_handler("flow_create_5t", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_create_5t);
+
     set_handler("flow_create_pair", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_create_pair);
     set_handler("flow_update_5t", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_update_5t);
     set_handler("flow_jump", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_jump);
+
     set_handler("flow_flush", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_flush);
+    set_handler("flow_count", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_count);
 }
 
 CLICK_ENDDECLS
