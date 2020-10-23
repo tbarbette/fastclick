@@ -91,14 +91,6 @@ class FlowRuleInstaller : public Element {
             return NULL;
         }
 
-        /**
-         * Read and write handlers.
-         */
-        enum {
-            h_flow_create_5t, h_flow_create_5t_list,
-            h_flow_update_5t, h_flow_jump, h_flow_flush
-        };
-
     private:
         int _core_id;
         unsigned _timer_period;
@@ -115,7 +107,7 @@ class FlowRuleInstaller : public Element {
         String get_nic_name_from_handler_input(String &input);
         FromDPDKDevice *get_nic_device_from_handler_input(String &input);
 
-        static Vector<rte_flow_item> parse_5t(Vector<String> words);
+        static Vector<rte_flow_item> parse_5t(Vector<String> words,bool is_tcp = true, bool have_ports = true);
         static struct rte_flow *flow_add_redirect(int port_id, int from, int to, bool validate, int priority = 0);
         static Vector<String> rule_list_generate(const int &rules_nb);
         static struct rte_flow *flow_generate(portid_t port_id, Vector<rte_flow_item> &pattern);

@@ -347,12 +347,13 @@ FlowRuleInstaller::store_inserted_rule(portid_t port_id, struct rte_flow *rule)
 void
 FlowRuleInstaller::run_timer(Timer *t)
 {
-    click_chatter("Re-scheduling FlowRuleInstaller");
+    if (_verbose)
+        click_chatter("Re-scheduling FlowRuleInstaller");
     _timer.reschedule_after_msec(_timer_period);
 }
 
 Vector<rte_flow_item>
-FlowRuleInstaller::parse_5t(Vector<String> words)
+FlowRuleInstaller::parse_5t(Vector<String> words, bool is_tcp, bool have_ports)
 {
     Vector<rte_flow_item> pattern;
     {
@@ -362,15 +363,18 @@ FlowRuleInstaller::parse_5t(Vector<String> words)
         struct rte_flow_item_ipv4* mask = (struct rte_flow_item_ipv4*) malloc(sizeof(rte_flow_item_ipv4));
         bzero(spec, sizeof(rte_flow_item_ipv4));
         bzero(mask, sizeof(rte_flow_item_ipv4));
-        spec->hdr.src_addr = IPAddress(words[1]);
-        mask->hdr.src_addr = -1;
-        spec->hdr.dst_addr = IPAddress(words[3]);
-        mask->hdr.dst_addr = -1;
+        Vector<String> src = words[1].split('%');
+        Vector<String> dst = words[have_ports?3:2].split('%');
+        spec->hdr.src_addr = IPAddress(src[0]);
+        mask->hdr.src_addr = src.size() > 1?IPAddress(src[1]) : IPAddress(-1);
+        spec->hdr.dst_addr = IPAddress(dst[0]);
+        mask->hdr.dst_addr = dst.size() > 1?IPAddress(dst[1]) : IPAddress(-1);
         pat.spec = spec;
         pat.mask = mask;
         pat.last = 0;
         pattern.push_back(pat);
     }
+    if (have_ports && is_tcp)
     {
         rte_flow_item pat;
         pat.type = RTE_FLOW_ITEM_TYPE_TCP;
@@ -378,6 +382,23 @@ FlowRuleInstaller::parse_5t(Vector<String> words)
         struct rte_flow_item_tcp* mask = (struct rte_flow_item_tcp*) malloc(sizeof(rte_flow_item_tcp));
         bzero(spec, sizeof(rte_flow_item_tcp));
         bzero(mask, sizeof(rte_flow_item_tcp));
+        spec->hdr.src_port = atoi(words[2].c_str());
+        mask->hdr.src_port = -1;
+        spec->hdr.dst_port = atoi(words[4].c_str());
+        mask->hdr.dst_port = -1;
+        pat.spec = spec;
+        pat.mask = mask;
+        pat.last = 0;
+        pattern.push_back(pat);
+    }
+    else if (have_ports && !is_tcp)
+    {
+        rte_flow_item pat;
+        pat.type = RTE_FLOW_ITEM_TYPE_UDP;
+        struct rte_flow_item_udp* spec = (struct rte_flow_item_udp*) malloc(sizeof(rte_flow_item_udp));
+        struct rte_flow_item_udp* mask = (struct rte_flow_item_udp*) malloc(sizeof(rte_flow_item_udp));
+        bzero(spec, sizeof(rte_flow_item_udp));
+        bzero(mask, sizeof(rte_flow_item_udp));
         spec->hdr.src_port = atoi(words[2].c_str());
         mask->hdr.src_port = -1;
         spec->hdr.dst_port = atoi(words[4].c_str());
@@ -451,13 +472,21 @@ FlowRuleInstaller::rule_list_generate(const int &rules_nb)
 
     for (int i = 0; i < rules_nb; i++) {
         StringAccum acc;
-        acc << "tcp " << IPAddress::make_random().unparse() << " " << rand() % 0xfff0
+        acc << "udp " << IPAddress::make_random().unparse() << " " << rand() % 0xfff0
             << " " << IPAddress::make_random().unparse() << " " << rand() % 0xfff0;
         rules.push_back(acc.take_string());
     }
 
     return rules;
 }
+
+/**
+ * Read and write handlers.
+ */
+enum {
+    h_flow_create_5t, h_flow_create_5t_list, h_flow_create_pair,
+    h_flow_update_5t, h_flow_jump, h_flow_flush
+};
 
 struct rte_flow *
 FlowRuleInstaller::flow_generate(portid_t port_id, Vector<rte_flow_item> &pattern)
@@ -530,11 +559,11 @@ int FlowRuleInstaller::flow_handler(
                 input = "Usage: tcp|udp ip_src port_src ip_dst port_dst";
                 return -1;
             }
+            bool is_tcp;
             if (words[0] == "tcp") {
-
+                is_tcp = true;
             } else if (words[0] == "udp") {
-                input = "Only TCP supported for now";
-                return -1;
+                is_tcp = false;
             } else {
                 input = "Protocol must be tcp or udp";
                 return -1;
@@ -560,29 +589,56 @@ int FlowRuleInstaller::flow_handler(
             input = String((uintptr_t) flow);
             return 0;
         }
+        case h_flow_create_pair: {
+            Vector<String> words = args.split(' ');
+            if (words.size() != 3) {
+                click_chatter("Usage: tcp|udp ip_src ip_dst");
+                return -1;
+            }
+
+            bool is_tcp;
+            if (words[0] == "tcp") {
+                is_tcp = true;
+            } else if (words[0] == "udp") {
+                is_tcp = false;
+            } else {
+                input = "Protocol must be tcp or udp";
+                return -1;
+            }
+
+            Vector<rte_flow_item> pattern = parse_5t(words, is_tcp, false);
+
+            struct rte_flow *flow = flow_generate(port_id, pattern);
+            if (!flow) {
+                click_chatter("Failed to insert rule: ");
+                return -1;
+            }
+
+            if (fr->store_inserted_rule(port_id, flow) != 0) {
+                input = "Failed to insert rule";
+                return -1;
+            }
+
+            if (fr->_verbose) {
+                click_chatter("Rule inserted %p", flow);
+            }
+
+            input = String((uintptr_t) flow);
+            return 0;
+        }
+
         case h_flow_create_5t_list: {
             int rules_nb = atoi(args.data());
-            click_chatter("Generating %d 5-tuple rules\n", rules_nb);
+            if (fr->_verbose)
+                click_chatter("Generating %d 5-tuple rules\n", rules_nb);
 
             int i = 0;
             Vector<String> rules = rule_list_generate(rules_nb);
             for (String rule : rules) {
                 Vector<String> words = rule.split(' ');
-                if (words.size() != 5) {
-                    input = "Usage: tcp|udp ip_src port_src ip_dst port_dst";
-                    return -1;
-                }
-                if (words[0] == "tcp") {
+                bool is_tcp = false;
 
-                } else if (words[0] == "udp") {
-                    input = "Only TCP supported for now";
-                    return -1;
-                } else {
-                    input = "Protocol must be tcp or udp";
-                    return -1;
-                }
-
-                Vector<rte_flow_item> pattern = parse_5t(words);
+                Vector<rte_flow_item> pattern = parse_5t(words, false);
                 struct rte_flow *flow = flow_generate(port_id, pattern);
                 if (!flow) {
                     input = "Failed to insert rule " + String(i);
@@ -653,6 +709,8 @@ void FlowRuleInstaller::add_handlers()
 {
     set_handler("flow_create_5t_list", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_create_5t_list);
     set_handler("flow_create_5t", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_create_5t);
+
+    set_handler("flow_create_pair", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_create_pair);
     set_handler("flow_update_5t", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_update_5t);
     set_handler("flow_jump", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_jump);
 }
