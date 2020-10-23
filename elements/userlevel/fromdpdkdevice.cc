@@ -416,7 +416,7 @@ enum {
     h_mac, h_add_mac, h_remove_mac, h_vf_mac,
     h_mtu,
     h_device,
-    h_flow_create_5t, h_flow_update_5t, h_flow_jump, h_flow_flush,
+    h_flow_create_5t, h_flow_update_5t, h_flow_jump, h_flow_flush, h_flow_create_ether, h_flow_update_ether, h_flow_destroy,
     h_isolate,
 #if HAVE_FLOW_API
     h_rule_add, h_rules_del, h_rules_flush,
@@ -656,6 +656,42 @@ int FromDPDKDevice::write_handler(
     return -1;
 }
 
+Vector<rte_flow_item> parse_ether(Vector<String> words) {
+
+            Vector<rte_flow_item> pattern;
+            {
+                rte_flow_item pat;
+
+                bzero(&pat, sizeof(rte_flow_item));
+                pat.type = RTE_FLOW_ITEM_TYPE_ETH;
+                struct rte_flow_item_eth* spec = (struct rte_flow_item_eth*) malloc(sizeof(rte_flow_item_eth));
+                struct rte_flow_item_eth* mask = (struct rte_flow_item_eth*) malloc(sizeof(rte_flow_item_eth));
+                bzero(spec, sizeof(rte_flow_item_eth));
+                bzero(mask, sizeof(rte_flow_item_eth));
+                EtherAddress src,dst;
+                uint8_t broadcast[6] = {0xff,0xff,0xff,0xff,0xff,0xff};
+                EtherAddressArg().parse(words[1].c_str(),dst);
+
+                EtherAddressArg().parse(words[0].c_str(),src);
+                memcpy(&spec->dst, src.data(), 6);
+                memcpy(&mask->dst, &broadcast, 6);
+                memcpy(&spec->src, dst.data(), 6);
+                memcpy(&mask->src, &broadcast, 6);
+                spec->type = htons(0x0800);
+                mask->type = 0xffff;
+                pat.spec = spec;
+                pat.mask = mask;
+                pat.last = 0;
+                pattern.push_back(pat);
+            }
+
+            rte_flow_item end;
+            memset(&end, 0, sizeof(struct rte_flow_item));
+            end.type =  RTE_FLOW_ITEM_TYPE_END;
+            pattern.push_back(end);
+            return pattern;
+}
+
 Vector<rte_flow_item> parse_5t(Vector<String> words) {
 
             Vector<rte_flow_item> pattern;
@@ -719,7 +755,7 @@ inline rte_flow* flow_add_redirect(int port_id, int from, int to, bool validate,
 
         Vector<rte_flow_item> pattern;
         rte_flow_item pat;
-        pat.type = RTE_FLOW_ITEM_TYPE_ETH;
+        pat.type = RTE_FLOW_ITEM_TYPE_VOID;
         pat.spec = 0;
         pat.mask = 0;
         pat.last = 0;
@@ -755,6 +791,83 @@ int FromDPDKDevice::simple_flow_handler(
 
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
     switch((uintptr_t)handler->read_user_data()) {
+        case h_flow_create_ether: {
+
+            Vector<String> words = input.split(' ');
+            if (words.size() != 2) {
+                click_chatter("Arguments must be 2 : src dst");
+                return -1;
+            }
+            Vector<rte_flow_item> pattern = parse_ether(words);
+            assert(pattern.size() == 2);
+
+            struct rte_flow_attr attr;
+            memset(&attr, 0, sizeof(struct rte_flow_attr));
+            attr.ingress = 1;
+            attr.group = 1;
+            attr.priority = 0;
+
+            struct rte_flow_action action[2];
+            struct rte_flow_action_queue queue = {.index = 0};
+
+
+            memset(action, 0, sizeof(struct rte_flow_action) * 2);
+            action[0].type = RTE_FLOW_ACTION_TYPE_DROP;
+            action[0].conf = &queue;
+
+            action[1].type = RTE_FLOW_ACTION_TYPE_END;
+
+
+            struct rte_flow_error error;
+            int res = 0;
+
+
+            res = rte_flow_validate(fd->_dev->port_id, &attr, pattern.data(), action, &error);
+            if (res == 0) {
+
+                struct rte_flow *flow = rte_flow_create(fd->_dev->port_id, &attr, pattern.data(), action, &error);
+                if (flow != 0) {
+                    click_chatter("Rule inserted %p", flow);
+                    input = String((uintptr_t)flow);
+                    return 0;
+                } else {
+
+                    click_chatter("Rule insertion failed");
+                    return -1;
+                }
+            }
+            else  {
+                click_chatter("Rule did not validate");
+            }
+
+            return res;
+                            }
+            case h_flow_update_ether: {
+                Vector<String> words = input.split(' ');
+
+                if (words.size() != 3) {
+                    input = "Arguments must be 3 : rule_id src dst";
+                    return -1;
+                }
+
+                rte_flow* rule = (rte_flow*)(uintptr_t)atoll(words[0].c_str());
+                words.pop_front();
+                Vector<rte_flow_item> pattern = parse_ether(words);
+
+                struct rte_flow_error error;
+                click_chatter("Updating port %p\n", rule);
+                int res = rte_flow_update(fd->_dev->port_id, rule, pattern.data(), 0, &error);
+                if (res == 0) {
+                    click_chatter("Update success");
+                    return 0;
+                } else {
+
+                    return -1;
+                }
+
+
+            }
+
         case h_flow_create_5t: {
 
             Vector<String> words = input.split(' ');
@@ -799,7 +912,7 @@ int FromDPDKDevice::simple_flow_handler(
 
                 struct rte_flow *flow = rte_flow_create(fd->_dev->port_id, &attr, pattern.data(), action, &error);
                 if (flow != 0) {
-                    click_chatter("Rule inserted %p", flow);
+//                    click_chatter("Rule inserted %p", flow);
                     input = String((uintptr_t)flow);
                     return 0;
                 } else {
@@ -828,7 +941,25 @@ int FromDPDKDevice::simple_flow_handler(
                 click_chatter("Updating port %p\n", rule);
                 int res = rte_flow_update(fd->_dev->port_id, rule, pattern.data(), 0, &error);
                 if (res == 0) {
-                    click_chatter("Update success");
+                    return 0;
+                } else {
+
+                    return -1;
+                }
+
+
+            }
+            case h_flow_destroy: {
+                Vector<String> words = input.split(' ');
+
+                if (words.size() != 1) {
+                    input = "Arguments must be 5 : rule_id";
+                    return -1;
+                }
+
+                rte_flow* rule = (rte_flow*)(uintptr_t)atoll(words[0].c_str());
+                int res = rte_flow_destroy(fd->_dev->port_id, rule, 0);
+                if (res == 0) {
                     return 0;
                 } else {
 
@@ -1095,8 +1226,11 @@ void FromDPDKDevice::add_handlers()
 
     set_handler("flow_create_5t", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_create_5t);
     set_handler("flow_update_5t", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_update_5t);
+    set_handler("flow_create_ether", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_create_ether);
+    set_handler("flow_update_ether", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_update_ether);
     set_handler("flow_jump", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_jump);
 
+    set_handler("flow_destroy", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_destroy);
     set_handler("flow_flush", Handler::f_read | Handler::f_read_param, simple_flow_handler, h_flow_flush);
 
     add_write_handler("flow_isolate", write_handler, h_isolate, 0);
