@@ -92,25 +92,25 @@ class FlowRuleInstaller : public Element {
         }
 
     private:
+        int _group;
         int _core_id;
         unsigned _timer_period;
 
         HashMap<String, NIC> _nics;
         HashMap<portid_t, Vector<struct rte_flow *>> _rules;
 
-        /* Verbose */
         bool _verbose;
 
         Timer _timer;
 
         int store_inserted_rule(portid_t port_id, struct rte_flow *rule);
         String get_nic_name_from_handler_input(String &input);
-        FromDPDKDevice *get_nic_device_from_handler_input(String &input);
+        FromDPDKDevice *get_nic_device_from_name(String &nic_name);
 
         static Vector<rte_flow_item> parse_5t(Vector<String> words,bool is_tcp = true, bool have_ports = true);
         static struct rte_flow *flow_add_redirect(int port_id, int from, int to, bool validate, int priority = 0);
         static Vector<String> rule_list_generate(const int &rules_nb);
-        static struct rte_flow *flow_generate(portid_t port_id, Vector<rte_flow_item> &pattern);
+        static struct rte_flow *flow_generate(portid_t port_id, int group, Vector<rte_flow_item> &pattern);
 
         static int flow_handler(int operation, String &input, Element *e, const Handler *handler, ErrorHandler *errh);
 };
