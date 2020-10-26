@@ -1814,7 +1814,7 @@ bool Element::do_mt_safe_check(ErrorHandler* errh) {
 	if (n == 0) {
 		/*This makes a lot of testie fails because this message is added in a lot of case where it is normal in
 		test conditions where we use Idle to test only handlers. Before-reenabling this, add ignore line to all
-		failing testies*/
+		failing click tests*/
 		//errh->warning("%s seems to be traversed by no threads...",name().c_str());
 		return true;
 	}
