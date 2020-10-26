@@ -41,7 +41,7 @@ CLICK_DECLS
  * FlowRuleInstaller constructor.
  */
 FlowRuleInstaller::FlowRuleInstaller() :
-    _timer(this), _timer_period(1000), _verbose(false)
+    _timer(this), _verbose(false)
 {
     _group = 1;
     _core_id = click_max_cpu_ids() - 1;
@@ -68,7 +68,6 @@ FlowRuleInstaller::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read    ("GROUP",         _group)
         .read    ("PIN_TO_CORE",   _core_id)
         .read    ("VERBOSE",       _verbose)
-        .read    ("TIMER_PERIOD",  _timer_period)
         .complete() < 0)
         return -1;
 
@@ -96,7 +95,6 @@ FlowRuleInstaller::initialize(ErrorHandler *errh)
 {
     _timer.initialize(this);
     _timer.move_thread(_core_id);
-    _timer.schedule_after_msec(_timer_period);
 
     click_chatter("Successful initialization! \n\n");
 
@@ -144,14 +142,6 @@ FlowRuleInstaller::store_inserted_rule(struct rte_flow *rule)
     _rules.push_back(rule);
 
     return 0;
-}
-
-void
-FlowRuleInstaller::run_timer(Timer *t)
-{
-    if (_verbose)
-        click_chatter("Re-scheduling FlowRuleInstaller");
-    _timer.reschedule_after_msec(_timer_period);
 }
 
 Vector<rte_flow_item>
@@ -317,8 +307,7 @@ FlowRuleInstaller::flow_generate(portid_t port_id, Vector<rte_flow_item> &patter
     attr.priority = priority;
 
     struct rte_flow_action action[2];
-    struct rte_flow_action_queue queue = {.index = (unsigned)index};
-
+    struct rte_flow_action_queue queue = {.index = (uint16_t)index};
 
     memset(action, 0, sizeof(struct rte_flow_action) * 2);
     action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
