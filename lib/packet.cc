@@ -260,7 +260,7 @@ Packet::~Packet()
 #else
 #  define CLICK_PACKET_POOL_BUFSIZ		2048
 #endif
-// see LIMIT in packetpool-01.testie
+// see LIMIT in packetpool-01.clicktest
 #  define CLICK_PACKET_POOL_SIZE		4096 
 #  define CLICK_PACKET_DATA_POOL_SIZE		4096
 #  define CLICK_GLOBAL_PACKET_POOL_COUNT	32

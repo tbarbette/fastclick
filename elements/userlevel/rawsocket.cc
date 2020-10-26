@@ -34,7 +34,11 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
-#include <linux/sockios.h>
+
+#if RAWSOCKET_ALLOW_LINUX
+# include <linux/sockios.h>
+#endif
+
 #ifndef __sun
 #include <sys/ioctl.h>
 #else
