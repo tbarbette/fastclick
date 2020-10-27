@@ -7151,21 +7151,12 @@ $as_echo_n "checking for DPDK library... " >&6; }
 
 
     if pkg-config --exists libdpdk ; then
-    { $as_echo "$as_me:${as_lineno-$LINENO}: configuring using pkg-config: " >&5
-$as_echo_n "configuring using pkg-config: " >&6; }
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
       rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
-      rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
-      #rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
-      rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
-      
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
     else
-    { $as_echo "$as_me:${as_lineno-$LINENO}: configuring without pkg-config: " >&5
-$as_echo_n "configuring without pkg-config: " >&6; }
-
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         as_fn_error $? "
@@ -7199,16 +7190,19 @@ $as_echo "yes, found at $RTE_SDK_BIN" >&6; }
         rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
       fi
 
-      DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
-    fi
 
-    RTE_VER_MAJOR=$rte_ver_major
-    RTE_VER_MINOR=$rte_ver_minor
-    RTE_VER_YEAR=$rte_ver_year
-    RTE_VER_MONTH=$rte_ver_month
-	
-    { $as_echo "$as_me:${as_lineno-$LINENO}DPDK version is  $RTE_VER_YEAR $RTE_VER_MONTH $RTE_VER_MINOR" >&5
-$as_echo "DPDK version is $RTE_VER_YEAR $RTE_VER_MONTH $RTE_VER_MINOR" >&6; }
+
+      RTE_VER_MAJOR=$rte_ver_major
+
+      RTE_VER_MINOR=$rte_ver_minor
+
+      RTE_VER_YEAR=$rte_ver_year
+
+      RTE_VER_MONTH=$rte_ver_month
+
+      DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
+
+    fi
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
 
@@ -11193,17 +11187,10 @@ else
 fi
 
 if test "x$ac_have_flow_rule_parser_h$ac_have_flow_rule_cache_h$ac_have_flow_rule_man_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
-    if test "x$RTE_SDK" != "x"; then
-	have_flow_api=yes
-	$as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
+    have_flow_api=yes
+    $as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
 
-	HAVE_FLOW_API=1
-    else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Missing RTE_SDK environment variable" >&5
-$as_echo "$as_me: WARNING: Missing RTE_SDK environment variable" >&2;}
-	have_flow_api=no
-	HAVE_FLOW_API=0
-    fi
+    HAVE_FLOW_API=1
 
 else
     have_flow_api=no
@@ -16259,9 +16246,6 @@ feedback="no"
 if test "$enable_flow_api$have_flow_api" = "yesno"; then
     feedback="To enable DPDK's Flow Rule Manager (rte_flow API), use a DPDK version >= 20.02."
 fi
-if test "$enable_flow_api$RTE_SDK" = "yes"; then
-    feedback=$feedback"\nRTE_SDK must be set to the DPDK's source folder."
-fi
 
 echo "
 
@@ -16285,7 +16269,7 @@ Configuration Summary:
 
 if test "$feedback" != no; then
     echo ""
-    echo -e "$feedback"
+    echo $feedback
     echo ""
 else
     echo "Now type make to build FastClick..."
