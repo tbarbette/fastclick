@@ -1,7 +1,7 @@
 cache:
   apt: true
   directories:
-    - dpdk-16.04
+    - dpdk-stable-16.11.11
     - dpdk-18.08
     - dpdk-19.11
     - dpdk-20.02
@@ -18,10 +18,6 @@ compiler:
 matrix:
   exclude:
     - compiler: clang
-      env: FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --disable-verbose-batch"
-    - compiler: clang
-      env: FRAMEWORK=dpdk VERSION=16.04 CONFIG="--disable-batch"
-    - compiler: clang
       env: FRAMEWORK=libdpdk VERSION=20.08 CONFIG="--disable-batch"
     - compiler: clang
       env: FRAMEWORK=libdpdk VERSION=20.08 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
@@ -33,7 +29,7 @@ env:
     - FRAMEWORK=vanilla CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
     - FRAMEWORK=umultithread CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
     - FRAMEWORK=netmap VERSION=11.1 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=16.11.11 CONFIG="--enable-batch --enable-flow --disable-verbose-batch" STABLE=stable-
     - FRAMEWORK=dpdk VERSION=18.08 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
     - FRAMEWORK=dpdk VERSION=19.11 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
     - FRAMEWORK=dpdk VERSION=20.02 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
@@ -52,12 +48,12 @@ script:
 
   - if [ $FRAMEWORK = "dpdk" ] ; then
       FRAMEWORK_FLAGS="--enable-user-multithread --enable-dpdk";
-      export RTE_SDK=`pwd`/dpdk-$VERSION;
+      export RTE_SDK=`pwd`/dpdk-$STABLE$VERSION;
       export RTE_TARGET=x86_64-default-linuxapp-gcc;
       if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" -o ! -e "$RTE_SDK/$RTE_TARGET/build/lib/librte_eal/linuxapp/eal/librte_eal.a" ]; then
             wget http://fast.dpdk.org/rel/dpdk-$VERSION.tar.gz &&
             tar -zxf dpdk-$VERSION.tar.gz &&
-            cd dpdk-$VERSION &&
+            cd dpdk-$STABLE$VERSION &&
             sed -i "s/CONFIG_RTE_KNI_KMOD=.*/CONFIG_RTE_KNI_KMOD=n/g" config/common_linux* &&
             sed -i "s/CONFIG_RTE_LIBRTE_KNI=.*/CONFIG_RTE_LIBRTE_KNI=n/g" config/common_linux* &&
             sed -i "s/CONFIG_RTE_EAL_IGB_UIO=.*/CONFIG_RTE_EAL_IGB_UIO=n/g" config/common_linux* &&
@@ -72,12 +68,12 @@ script:
 
   - if [ $FRAMEWORK = "libdpdk" ] ; then
         FRAMEWORK_FLAGS="--enable-user-multithread --enable-dpdk";
-        export PKG_CONFIG_PATH=$(pwd)/dpdk-$VERSION/install/lib/x86_64-linux-gnu/pkgconfig/ ;
-        export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(pwd)/dpdk-$VERSION/install/lib/x86_64-linux-gnu/ ;
-        if [ ! -e "dpdk-$VERSION" ] || ! pkg-config --exists libdpdk ; then
+        export PKG_CONFIG_PATH=$(pwd)/dpdk-$STABLE$VERSION/install/lib/x86_64-linux-gnu/pkgconfig/ ;
+        export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(pwd)/dpdk-$STABLE$VERSION/install/lib/x86_64-linux-gnu/ ;
+        if [ ! -e "dpdk-$STABLE$VERSION" ] || ! pkg-config --exists libdpdk ; then
             wget http://fast.dpdk.org/rel/dpdk-$VERSION.tar.gz &&
             tar -zxf dpdk-$VERSION.tar.gz &&
-            cd dpdk-$VERSION &&
+            cd dpdk-$STABLE$VERSION &&
             pip3 install --user meson ninja &&
             meson -Dprefix=$(pwd)/install/ build &&
             cd build &&
