@@ -426,7 +426,7 @@ enum {
     h_rss,
     h_mac, h_add_mac, h_remove_mac, h_vf_mac,
     h_mtu,
-    h_device,
+    h_device, h_isolate,
 #if HAVE_FLOW_API
     h_rule_add, h_rules_del, h_rules_isolate, h_rules_flush,
     h_rules_list, h_rules_list_with_hits, h_rules_ids_global, h_rules_ids_internal,

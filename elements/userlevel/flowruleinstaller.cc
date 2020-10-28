@@ -493,7 +493,8 @@ int FlowRuleInstaller::flow_handler(
 
                 struct rte_flow_error error;
                 click_chatter("Updating port %p\n", rule);
-                int res = rte_flow_update(port_id, rule, pattern.data(), 0, &error);
+                int res = 0;
+                // int res = rte_flow_update(port_id, rule, pattern.data(), 0, &error);
                 if (res == 0) {
                     click_chatter("Update success");
                     return 0;
@@ -501,8 +502,6 @@ int FlowRuleInstaller::flow_handler(
 
                     return -1;
                 }
-
-
             }
 
         // 5-tuple
