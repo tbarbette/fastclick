@@ -35,7 +35,7 @@ class FlowRuleInstaller : public Element {
         int _core_id;
         int _group;
 
-        FromDPDKDevice* _fd;
+        FromDPDKDevice *_fd;
         Vector<struct rte_flow *> _rules;
 
         /* Verbose */
@@ -43,7 +43,8 @@ class FlowRuleInstaller : public Element {
 
         Timer _timer;
 
-        int store_inserted_rule(struct rte_flow *rule);
+        int store_rule_local(struct rte_flow *rule);
+        int remove_rule_local(struct rte_flow *rule);
         String get_nic_name_from_handler_input(String &input);
 
         static Vector<rte_flow_item> parse_5t(Vector<String> words,bool is_tcp = true, bool have_ports = true);

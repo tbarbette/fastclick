@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4; related-file-name: "flowruleinstaller.hh" -*-
 /*
- * flowruleinstaller.{cc,hh} -- element that performs DPDK Flow API installations
- * and/or updates.
+ * flowruleinstaller.{cc,hh} -- element that performs DPDK Flow API installations,
+ * updates, and deletions.
  *
  * Copyright (c) 2020 Tom Barbette, KTH Royal Institute of Technology
  * Copyright (c) 2020 Georgios Katsikas, KTH Royal Institute of Technology
@@ -37,14 +37,16 @@ CLICK_DECLS
 /******************************
  * FlowRuleInstaller
  ******************************/
+
 /**
  * FlowRuleInstaller constructor.
  */
 FlowRuleInstaller::FlowRuleInstaller() :
-    _timer(this), _verbose(false)
+    _timer(this), _rules(), _verbose(false)
 {
-    _group = 1;
     _core_id = click_max_cpu_ids() - 1;
+    _group = 1;
+    _fd = 0;
 }
 
 /**
@@ -52,7 +54,6 @@ FlowRuleInstaller::FlowRuleInstaller() :
  */
 FlowRuleInstaller::~FlowRuleInstaller()
 {
-    //Cleanup() does the cleanup
 }
 
 /**
@@ -61,13 +62,13 @@ FlowRuleInstaller::~FlowRuleInstaller()
 int
 FlowRuleInstaller::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    Element * nic;
+    Element *nic;
 
     if (Args(conf, this, errh)
-        .read    ("NIC",           nic)
-        .read    ("GROUP",         _group)
-        .read    ("PIN_TO_CORE",   _core_id)
-        .read    ("VERBOSE",       _verbose)
+        .read    ("NIC",          nic)
+        .read    ("GROUP",        _group)
+        .read    ("PIN_TO_CORE",  _core_id)
+        .read    ("VERBOSE",      _verbose)
         .complete() < 0)
         return -1;
 
@@ -81,7 +82,7 @@ FlowRuleInstaller::configure(Vector<String> &conf, ErrorHandler *errh)
         );
     }
 
-    // Setup pointers with the underlying NICs
+    // Setup pointers with the underlying NIC
     _fd = (FromDPDKDevice*)nic->cast("FromDPDKDevice");
 
     return 0;
@@ -117,10 +118,6 @@ void
 FlowRuleInstaller::cleanup(CleanupStage)
 {
     // Delete stored rules
-    Vector<struct rte_flow *> &port_rule_list = _rules;
-    for (auto it = port_rule_list.begin(); it != port_rule_list.end(); ++it) {
-        delete it;
-    }
     _rules.clear();
 }
 
@@ -137,11 +134,26 @@ FlowRuleInstaller::get_nic_name_from_handler_input(String &input)
 }
 
 int
-FlowRuleInstaller::store_inserted_rule(struct rte_flow *rule)
+FlowRuleInstaller::store_rule_local(struct rte_flow *rule)
 {
     _rules.push_back(rule);
 
     return 0;
+}
+
+int
+FlowRuleInstaller::remove_rule_local(struct rte_flow *rule)
+{
+    for (auto it = _rules.begin(); it != _rules.end(); ++it) {
+        struct rte_flow *flow = *it;
+        if (flow == rule) {
+            _rules.erase(it);
+            return 0;
+        }
+        it++;
+    }
+
+    return -1;
 }
 
 Vector<rte_flow_item> parse_ether(Vector<String> words) {
@@ -321,13 +333,13 @@ FlowRuleInstaller::rule_list_generate(const int &rules_nb, bool do_port, String 
             dport = rand() % 0xff0;
             acc << " " << dport;
         }
-/*
+        /*
         IPFlowID tuple = IPFlowID(src | i_mask, sport, dst |i_mask, dport);
         if (set.find(tuple))
-            goto again;*/
+            goto again;
+        */
         rules.push_back(acc.take_string());
-    //    click_chatter("%s", rules.back().c_str());
-
+        // click_chatter("%s", rules.back().c_str());
     }
 
     return rules;
@@ -357,8 +369,7 @@ FlowRuleInstaller::flow_generate(portid_t port_id, Vector<rte_flow_item> &patter
     res = rte_flow_validate(port_id, &attr, pattern.data(), action, &error);
     if (res == 0) {
         return rte_flow_create(port_id, &attr, pattern.data(), action, &error);
-    }
-    else  {
+    } else  {
         click_chatter("Rule did not validate");
     }
 
@@ -389,12 +400,11 @@ int FlowRuleInstaller::flow_handler(
 
     switch((uintptr_t)handler->read_user_data()) {
 
-        //Rule-agnostics operations:
+        // Rule-agnostic operations
         case h_flow_count: {
             input = String(fr->_rules.size());
             return 0;
         }
-
         case h_flow_jump:{
             Vector<String> groups = args.split(' ');
             if (groups.size() != 2) {
@@ -403,38 +413,53 @@ int FlowRuleInstaller::flow_handler(
             }
             int from = atoi(groups[0].c_str());
             int to = atoi(groups[1].c_str());
-            flow_add_redirect(port_id, from, to, true, 0);
-            break;
+            if (flow_add_redirect(port_id, from, to, true, 0) == NULL) {
+                input = "Failed to jump from group " + String(from) +  " to group " + String(to);
+                return -1;
+            }
+            input = "Successfully jumped from group " + String(from) +  " to group " + String(to);
+            return 0;
         }
-
         case h_flow_destroy: {
-		Vector<String> words = input.split(' ');
+            Vector<String> words = input.split(' ');
 
-		if (words.size() != 1) {
-			input = "Arguments must be 5 : rule_id";
-			return -1;
-		}
+            if (words.size() != 1) {
+                input = "Argument must be: rule_id";
+                return -1;
+            }
 
-		rte_flow* rule = (rte_flow*)(uintptr_t)atoll(words[0].c_str());
-		int res = rte_flow_destroy(port_id, rule, 0);
-		if (res == 0) {
-			return 0;
-		} else {
-			return -1;
-		}
+            rte_flow *rule = (rte_flow *)(uintptr_t)atoll(words[0].c_str());
+            click_chatter("Deleting rule with ID: %ld", atoll(words[0].c_str()));
+
+            int res = rte_flow_destroy(port_id, rule, 0);
+            if (res != 0) {
+                return -1;
+            }
+
+            res = fr->remove_rule_local(rule);
+            if (res != 0) {
+                input = "Failed to find local rule " + String(rule);
+                return -1;
+            }
+
+            input = "Successfully removed rule " + words[0];
+            return 0;
         }
-
         case h_flow_flush: {
-            rte_flow_flush(port_id, 0);
-            break;
-        }
+            if (rte_flow_flush(port_id, 0) != 0) {
+                input = "Failed to flush NIC " + String(port_id);
+                return -1;
+            }
 
-        //Ethernet
+            input = "Successfully flushed NIC " + String(port_id);
+            return 0;
+        }
+        // Ethernet
         case h_flow_create_ether: {
 
             Vector<String> words = input.split(' ');
             if (words.size() != 2) {
-                click_chatter("Arguments must be 2 : src dst");
+                click_chatter("Arguments must be 2: src dst");
                 return -1;
             }
             Vector<rte_flow_item> pattern = parse_ether(words);
@@ -468,7 +493,6 @@ int FlowRuleInstaller::flow_handler(
                     input = String((uintptr_t)flow);
                     return 0;
                 } else {
-
                     click_chatter("Rule insertion failed");
                     return -1;
                 }
@@ -478,32 +502,31 @@ int FlowRuleInstaller::flow_handler(
             }
 
             return res;
-                            }
-            case h_flow_update_ether: {
-                Vector<String> words = input.split(' ');
+        }
+        case h_flow_update_ether: {
+            Vector<String> words = input.split(' ');
 
-                if (words.size() != 3) {
-                    input = "Arguments must be 3 : rule_id src dst";
-                    return -1;
-                }
-
-                rte_flow* rule = (rte_flow*)(uintptr_t)atoll(words[0].c_str());
-                words.pop_front();
-                Vector<rte_flow_item> pattern = parse_ether(words);
-
-                struct rte_flow_error error;
-                click_chatter("Updating port %p\n", rule);
-                int res = 0;
-                // int res = rte_flow_update(port_id, rule, pattern.data(), 0, &error);
-                if (res == 0) {
-                    click_chatter("Update success");
-                    return 0;
-                } else {
-
-                    return -1;
-                }
+            if (words.size() != 3) {
+                input = "Arguments must be 3: rule_id src dst";
+                return -1;
             }
 
+            rte_flow *rule = (rte_flow *)(uintptr_t)atoll(words[0].c_str());
+            words.pop_front();
+            Vector<rte_flow_item> pattern = parse_ether(words);
+
+            struct rte_flow_error error;
+            click_chatter("Updating rule %p\n", rule);
+            int res = 0;
+            // int res = rte_flow_update(port_id, rule, pattern.data(), 0, &error);
+            if (res != 0) {
+                input = "Failed to update rule " + String(rule);
+                return -1;
+            }
+
+            input = "Successfully updated rule " + String(rule);
+            return 0;
+        }
         // 5-tuple
         case h_flow_create_5t: {
             Vector<String> words = args.split(' ');
@@ -529,7 +552,7 @@ int FlowRuleInstaller::flow_handler(
                 return -1;
             }
 
-            if (fr->store_inserted_rule(flow) != 0) {
+            if (fr->store_rule_local(flow) != 0) {
                 input = "Failed to insert rule";
                 return -1;
             }
@@ -541,31 +564,29 @@ int FlowRuleInstaller::flow_handler(
             input = String((uintptr_t) flow);
             return 0;
         }
-
         case h_flow_create_5t_list: {
-
             Vector<String> words = args.split(' ');
             int rules_nb = atoi(words[0].c_str());
 
             if (fr->_verbose)
                 click_chatter("Generating %d 5-tuple rules\n", rules_nb);
 
-            int table = words.size()>1?atoi(words[1].c_str()) : 1    ;
+            int table = words.size() > 1? atoi(words[1].c_str()) : 1;
 
-            String mask = words.size()>2?words[2]:"255.255.255.255";
+            String mask = words.size() > 2? words[2] : "255.255.255.255";
             int i = 0;
             Vector<String> rules = rule_list_generate(rules_nb, true, mask);
             for (String rule : rules) {
                 Vector<String> words = rule.split(' ');
                 bool is_tcp = false;
                 Vector<rte_flow_item> pattern = parse_5t(words, false, true);
-                struct rte_flow *flow = flow_generate(port_id, pattern, table, 0, 1);
+                struct rte_flow *flow = flow_generate(port_id, pattern, table, 0, 0);
                 if (!flow) {
                     click_chatter("Failed to insert rule %d", i);
                     return -1;
                 }
 
-                if (fr->store_inserted_rule(flow) != 0) {
+                if (fr->store_rule_local(flow) != 0) {
                     click_chatter("Failed to insert rule %d", i);
                     return -1;
                 }
@@ -576,9 +597,10 @@ int FlowRuleInstaller::flow_handler(
                 i++;
             }
 
+            input = "Successfully installed " + String(i) +  " rules in NIC " + String(port_id);
+
             return 0;
         }
-
         case h_flow_update_5t: {
             Vector<String> words = args.split(' ');
 
@@ -587,7 +609,7 @@ int FlowRuleInstaller::flow_handler(
                 return -1;
             }
 
-            rte_flow *rule = (rte_flow*)(uintptr_t)atoll(words[0].c_str());
+            rte_flow *rule = (rte_flow *)(uintptr_t)atoll(words[0].c_str());
             Vector<rte_flow_item> pattern = parse_5t(words);
 
             struct rte_flow_error error;
@@ -604,7 +626,6 @@ int FlowRuleInstaller::flow_handler(
                 return -1;
             }
         }
-
         // Pair
         case h_flow_create_pair: {
             Vector<String> words = args.split(' ');
@@ -627,13 +648,13 @@ int FlowRuleInstaller::flow_handler(
 
             int table = words.size()>3?atoi(words[3].c_str()) : 1;
             int priority = words.size()>4?atoi(words[4].c_str()) : 0;
-            struct rte_flow *flow = flow_generate(port_id, pattern, table, priority, 1-priority);
+            struct rte_flow *flow = flow_generate(port_id, pattern, table, priority, 1 - priority);
             if (!flow) {
                 click_chatter("Failed to insert rule: ");
                 return -1;
             }
 
-            if (fr->store_inserted_rule(flow) != 0) {
+            if (fr->store_rule_local(flow) != 0) {
                 input = "Failed to insert rule";
                 return -1;
             }
@@ -645,7 +666,6 @@ int FlowRuleInstaller::flow_handler(
             input = String((uintptr_t) flow);
             return 0;
         }
-
         case h_flow_create_pair_list: {
             Vector<String> words = args.split(' ');
             int rules_nb = atoi(words[0].c_str());
@@ -667,7 +687,7 @@ int FlowRuleInstaller::flow_handler(
                     return -1;
                 }
 
-                if (fr->store_inserted_rule(flow) != 0) {
+                if (fr->store_rule_local(flow) != 0) {
                     click_chatter("Failed to insert rule %d", i);
                     return -1;
                 }
@@ -680,8 +700,6 @@ int FlowRuleInstaller::flow_handler(
 
             return 0;
         }
-
-
         default:
             input = "<error>";
             return -1;
