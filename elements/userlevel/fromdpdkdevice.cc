@@ -337,7 +337,7 @@ bool FromDPDKDevice::run_task(Task *t)
                 SET_PAINT_ANNO(p, iqueue);
             }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0) && RTE_VERSION < RTE_VERSION_NUM(20,11,0,0)
             if (_set_timestamp && (pkts[i]->ol_flags & PKT_RX_TIMESTAMP)) {
                 p->timestamp_anno().assignlong(pkts[i]->timestamp);
             }
