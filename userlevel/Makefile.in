@@ -105,31 +105,25 @@ LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
 
 USE_DPDK = @USE_DPDK@
 ifeq ($(USE_DPDK),yes)
-ifeq ($(shell pkg-config --exists libdpdk && echo 1), 1)
-CFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
-CXXFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
-RTE_SDK = @RTE_SDK@
-RTE_TARGET = @RTE_TARGET@
-RTE_VER_MAJOR = @RTE_VER_MAJOR@
-RTE_VER_MINOR = @RTE_VER_MINOR@
-RTE_VER_YEAR = @RTE_VER_YEAR@
-RTE_VER_MONTH = @RTE_VER_MONTH@
-include rte_parse.mk
-ifeq ($(CLICK_SHARED),1)
-LIBS := $(LIBS) $(shell pkg-config --libs libdpdk)
-else
-LIBS := $(LIBS) $(shell pkg-config --static --libs libdpdk)
-endif
-else
-RTE_SDK = @RTE_SDK@
-RTE_TARGET = @RTE_TARGET@
-RTE_VER_MAJOR = @RTE_VER_MAJOR@
-RTE_VER_MINOR = @RTE_VER_MINOR@
-RTE_VER_YEAR = @RTE_VER_YEAR@
-RTE_VER_MONTH = @RTE_VER_MONTH@
-include dpdk.mk
-endif
-EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
+	RTE_SDK = @RTE_SDK@
+	RTE_TARGET = @RTE_TARGET@
+	RTE_VER_MAJOR = @RTE_VER_MAJOR@
+	RTE_VER_MINOR = @RTE_VER_MINOR@
+	RTE_VER_YEAR = @RTE_VER_YEAR@
+	RTE_VER_MONTH = @RTE_VER_MONTH@
+	ifeq ($(shell pkg-config --exists libdpdk && echo 1), 1)
+		CFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
+		CXXFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
+		include rte_parse.mk
+		ifeq ($(CLICK_SHARED),1)
+			LIBS := $(LIBS) $(shell pkg-config --libs libdpdk)
+		else
+			LIBS := $(LIBS) $(shell pkg-config --static --libs libdpdk)
+		endif
+	else
+		include dpdk.mk
+	endif
+	EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
 	ifeq ($(shell [ ${HAVE_FLOW_API} -eq 1 ] && echo true),true)
 		EXTRA_DRIVER_OBJS := flowrulemanager.o flowrulecache.o flowruleparser.o $(EXTRA_DRIVER_OBJS)
 	endif
