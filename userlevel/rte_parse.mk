@@ -1,8 +1,9 @@
 ############################################################
-## Flow director library available at or after DPDK v20.02
+## Flow API library available at or after DPDK v20.02
 ############################################################
 
 ifeq ($(shell [ -n $(RTE_VER_YEAR) ] && [ $(RTE_VER_YEAR) -ge 20 ] && [ -n $(HAVE_FLOW_API) ] && echo true),true)
+
 $(debug LIBRTE_PARSE=YES)
 
 RTE_VERSION=$(RTE_VER_YEAR).$(RTE_VER_MONTH).$(RTE_VER_MINOR)
