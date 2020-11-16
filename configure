@@ -709,10 +709,10 @@ INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
 USE_DPDK
 DPDK_INCLUDES
-RTE_VER_MONTH
-RTE_VER_YEAR
 RTE_VER_MINOR
 RTE_VER_MAJOR
+RTE_VER_MONTH
+RTE_VER_YEAR
 RTE_SDK_BIN
 RTE_TARGET
 RTE_SDK
@@ -7150,10 +7150,13 @@ $as_echo_n "checking for DPDK library... " >&6; }
     fi
 
 
-    if pkg-config --exists libdpdk ; then
+    if pkg-config --exists libdpdk; then
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
       rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_major=$rte_ver_year
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
     else
@@ -7178,31 +7181,33 @@ $as_echo "yes, found at $RTE_SDK_BIN" >&6; }
         rte_ver_year=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($1)}'`
         rte_ver_month=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($2)}'`
         rte_ver_minor=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($3)}'`
+        rte_ver_major=$rte_ver_year
       else
-        if grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_config.h" &> /dev/null ; then
+        if grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_config.h" &> /dev/null; then
             verfile=rte_config
         else
             verfile=rte_version
         fi
-        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
         rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
         rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
       fi
-
-
-
-      RTE_VER_MAJOR=$rte_ver_major
-
-      RTE_VER_MINOR=$rte_ver_minor
-
-      RTE_VER_YEAR=$rte_ver_year
-
-      RTE_VER_MONTH=$rte_ver_month
-
-      DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
-
     fi
+
+
+
+
+    RTE_VER_YEAR=$rte_ver_year
+
+    RTE_VER_MONTH=$rte_ver_month
+
+    RTE_VER_MAJOR=$rte_ver_major
+
+    RTE_VER_MINOR=$rte_ver_minor
+
+    DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
+
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
 
@@ -7211,7 +7216,7 @@ $as_echo "yes, found at $RTE_SDK_BIN" >&6; }
 
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether DPDK has rte_eth_read_clock" >&5
 $as_echo_n "checking whether DPDK has rte_eth_read_clock... " >&6; }
-    if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null ; then
+    if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null; then
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
       $as_echo "#define HAVE_DPDK_READ_CLOCK 1" >>confdefs.h
@@ -11186,7 +11191,7 @@ else
   ac_have_flow_rule_man_h=no
 fi
 
-if test "x$ac_have_flow_rule_parser_h$ac_have_flow_rule_cache_h$ac_have_flow_rule_man_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
+if test "x$ac_have_flow_rule_parser_h$ac_have_flow_rule_cache_h$ac_have_flow_rule_man_h$enable_flow_api" = "xyesyesyesyes"; then
     have_flow_api=yes
     $as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
 
@@ -16250,6 +16255,16 @@ if test "$enable_flow_api$have_flow_api" = "yesno"; then
     feedback="To enable DPDK's Flow Rule Manager (rte_flow API), use a DPDK version >= 20.02."
 fi
 
+if test "$enable_dpdk" = yes; then
+    dpdk_info="${enable_dpdk}
+    DPDK    Target:              ${RTE_TARGET}
+    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}
+    DPDK     Major:              ${RTE_VER_MAJOR}
+    DPDK     Minor:              ${RTE_VER_MINOR}"
+else
+    dpdk_info=${enable_dpdk}
+fi
+
 echo "
 
 Configuration Summary:
@@ -16260,7 +16275,8 @@ Configuration Summary:
     Flow Subsystem:              ${enable_flow}
        HW Flow API:              ${have_flow_api}
 
-    DPDK   support:              ${enable_dpdk}
+    DPDK   support:              ${dpdk_info}
+
     Netmap support:              ${HAVE_NETMAP}
     PCAP   support:              ${have_pcap}
 
