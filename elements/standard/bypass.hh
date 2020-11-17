@@ -81,9 +81,9 @@ class Bypass : public BatchElement { public:
 
     Bypass() CLICK_COLD;
 
-    const char *class_name() const	{ return "Bypass"; }
-    const char *port_count() const	{ return "1-2/1-2"; }
-    const char *flow_code() const	{ return "xy/[xy]x"; }
+    const char *class_name() const override	{ return "Bypass"; }
+    const char *port_count() const override	{ return "1-2/1-2"; }
+    const char *flow_code() const override	{ return "xy/[xy]x"; }
     void *cast(const char *name);
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;

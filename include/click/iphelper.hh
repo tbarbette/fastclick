@@ -44,13 +44,13 @@ public:
      * @param packet The IP packet
      * @return The IP destination address of the packet
      */
-    inline const uint32_t getDestinationAddress(Packet* packet) const;
+    inline uint32_t getDestinationAddress(Packet* packet) const;
 
     /** @brief Return the IP source address of the packet
      * @param packet The IP packet
      * @return The IP source address of the packet
      */
-    inline const uint32_t getSourceAddress(Packet* packet) const;
+    inline uint32_t getSourceAddress(Packet* packet) const;
 
     /** @brief Recompute the IP checksum of the packet and set it in the IP header
      * @param packet The IP packet
@@ -95,14 +95,14 @@ inline void IPHelper::computeIPChecksum(WritablePacket *packet) const
     iph->ip_sum = click_in_cksum((const unsigned char *)iph, hlen);
 }
 
-inline const uint32_t IPHelper::getSourceAddress(Packet* packet) const
+inline uint32_t IPHelper::getSourceAddress(Packet* packet) const
 {
     const click_ip *iph = packet->ip_header();
 
     return *(const uint32_t*)&iph->ip_src;
 }
 
-inline const uint32_t IPHelper::getDestinationAddress(Packet* packet) const
+inline uint32_t IPHelper::getDestinationAddress(Packet* packet) const
 {
     const click_ip *iph = packet->ip_header();
 

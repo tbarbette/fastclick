@@ -67,7 +67,7 @@ class QuickNoteQueue : public FullNoteQueue { public:
 
     QuickNoteQueue() CLICK_COLD;
 
-    const char *class_name() const		{ return "QuickNoteQueue"; }
+    const char *class_name() const override		{ return "QuickNoteQueue"; }
     void *cast(const char *name);
 
     // FullNoteQueue's configure() suffices

@@ -44,7 +44,7 @@ class Meter : public BandwidthMeter { public:
 
   Meter() CLICK_COLD;
 
-  const char *class_name() const		{ return "Meter"; }
+  const char *class_name() const override		{ return "Meter"; }
 
   void push(int port, Packet *);
 

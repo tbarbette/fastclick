@@ -40,10 +40,10 @@ class PacketLogger2 : public Element { public:
   PacketLogger2();
   ~PacketLogger2();
 
-  const char *class_name() const		{ return "PacketLogger2"; }
-  const char *port_count() const		{ return PORTS_1_1; }
-  const char *processing() const		{ return AGNOSTIC; }
-  const char *flow_code() const			{ return "#/#"; }
+  const char *class_name() const override		{ return "PacketLogger2"; }
+  const char *port_count() const override		{ return PORTS_1_1; }
+  const char *processing() const override		{ return AGNOSTIC; }
+  const char *flow_code() const override			{ return "#/#"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const		{ return true; }

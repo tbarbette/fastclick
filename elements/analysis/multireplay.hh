@@ -14,9 +14,9 @@ class MultiReplay : public ReplayBase { public:
 	MultiReplay() CLICK_COLD;
     ~MultiReplay() CLICK_COLD;
 
-    const char *class_name() const	{ return "MultiReplay"; }
-    const char *flow_code() const	{ return "#/#"; }
-    const char *processing() const	{ return PULL; }
+    const char *class_name() const override	{ return "MultiReplay"; }
+    const char *flow_code() const override	{ return "#/#"; }
+    const char *processing() const override	{ return PULL; }
 
     bool get_spawning_threads(Bitvector&, bool, int) override {
         return false;
@@ -50,9 +50,9 @@ class MultiReplayUnqueue : public ReplayBase { public:
 	MultiReplayUnqueue() CLICK_COLD;
     ~MultiReplayUnqueue() CLICK_COLD;
 
-    const char *class_name() const	{ return "MultiReplayUnqueue"; }
-    const char *flow_code() const	{ return "#/#"; }
-    const char *processing() const	{ return PULL_TO_PUSH; }
+    const char *class_name() const override	{ return "MultiReplayUnqueue"; }
+    const char *flow_code() const override	{ return "#/#"; }
+    const char *processing() const override	{ return PULL_TO_PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;

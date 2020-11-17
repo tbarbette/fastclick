@@ -38,8 +38,8 @@ class Block : public Element {
 
   Block() CLICK_COLD;
 
-  const char *class_name() const		{ return "Block"; }
-  const char *port_count() const		{ return "1/2"; }
+  const char *class_name() const override		{ return "Block"; }
+  const char *port_count() const override		{ return "1/2"; }
   void add_handlers() CLICK_COLD;
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

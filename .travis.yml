@@ -8,9 +8,9 @@ cache:
     - dpdk-18.02
     - dpdk-18.05
     - dpdk-18.08
-    - dpdk-19.08
     - dpdk-19.11
     - dpdk-20.02
+    - dpdk-20.08
     - tcpdump-4.9.3
     - netmap-11.1
 
@@ -23,34 +23,34 @@ compiler:
 matrix:
   exclude:
     - compiler: clang
-      env: FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --disable-verbose-batch"
+      env: FRAMEWORK=libdpdk VERSION=20.08 CONFIG="--disable-batch"
     - compiler: clang
-      env: FRAMEWORK=dpdk VERSION=16.04 CONFIG="--disable-batch"
-
+      env: FRAMEWORK=libdpdk VERSION=20.08 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
 env:
   global:
-    - FLAGS="--enable-ip6 --enable-json --disable-linuxmodule --enable-tunnel --enable-research --enable-flow --enable-flow-api"
+    - FLAGS="--enable-ip6 --disable-linuxmodule --enable-tunnel --enable-research --enable-flow --enable-flow-api --enable-json --enable-cpu-load"
     - CXXFLAGS="-std=gnu++11"
   matrix:
-    - FRAMEWORK=vanilla CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=umultithread CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=netmap VERSION=11.1 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=17.08 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=17.11 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=18.02 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=18.05 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=18.08 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=19.08 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=19.11 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=20.02 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=20.05 CONFIG="--enable-batch --disable-verbose-batch"
+    - FRAMEWORK=vanilla CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=umultithread CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=netmap VERSION=11.1 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=17.08 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=17.11 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=18.02 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=18.05 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=18.08 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=19.08 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=19.11 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=20.02 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=20.05 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=libdpdk VERSION=20.08 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
     - FRAMEWORK=vanilla CONFIG="--disable-batch"
     - FRAMEWORK=umultithread CONFIG="--disable-batch"
     - FRAMEWORK=netmap VERSION=11.1 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=18.08 CONFIG="--disable-batch"
-    - FRAMEWORK=dpdk VERSION=19.08 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=19.11 CONFIG="--disable-batch"
+    - FRAMEWORK=libdpdk VERSION=20.08 CONFIG="--disable-batch"
 
 script:
   - if [ $FRAMEWORK = "netmap" ]; then
@@ -59,12 +59,12 @@ script:
 
   - if [ $FRAMEWORK = "dpdk" ] ; then
       FRAMEWORK_FLAGS="--enable-user-multithread --enable-dpdk";
-      export RTE_SDK=`pwd`/dpdk-$VERSION;
+      export RTE_SDK=`pwd`/dpdk-$STABLE$VERSION;
       export RTE_TARGET=x86_64-default-linuxapp-gcc;
       if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" -o ! -e "$RTE_SDK/$RTE_TARGET/build/lib/librte_eal/linuxapp/eal/librte_eal.a" ]; then
             wget http://fast.dpdk.org/rel/dpdk-$VERSION.tar.gz &&
             tar -zxf dpdk-$VERSION.tar.gz &&
-            cd dpdk-$VERSION &&
+            cd dpdk-$STABLE$VERSION &&
             sed -i "s/CONFIG_RTE_KNI_KMOD=.*/CONFIG_RTE_KNI_KMOD=n/g" config/common_linux* &&
             sed -i "s/CONFIG_RTE_LIBRTE_KNI=.*/CONFIG_RTE_LIBRTE_KNI=n/g" config/common_linux* &&
             sed -i "s/CONFIG_RTE_EAL_IGB_UIO=.*/CONFIG_RTE_EAL_IGB_UIO=n/g" config/common_linux* &&
@@ -74,7 +74,25 @@ script:
             make config T=$RTE_TARGET &&
             make install T=$RTE_TARGET &&
             cd ..;
-      fi;
+      fi
+    fi
+
+  - if [ $FRAMEWORK = "libdpdk" ] ; then
+        FRAMEWORK_FLAGS="--enable-user-multithread --enable-dpdk";
+        export PKG_CONFIG_PATH=$(pwd)/dpdk-$STABLE$VERSION/install/lib/x86_64-linux-gnu/pkgconfig/ ;
+        export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(pwd)/dpdk-$STABLE$VERSION/install/lib/x86_64-linux-gnu/ ;
+        if [ ! -e "dpdk-$STABLE$VERSION" ] || ! pkg-config --exists libdpdk ; then
+            wget http://fast.dpdk.org/rel/dpdk-$VERSION.tar.gz &&
+            tar -zxf dpdk-$VERSION.tar.gz &&
+            cd dpdk-$STABLE$VERSION &&
+            pip3 install --user meson ninja &&
+            meson -Dprefix=$(pwd)/install/ build &&
+            cd build &&
+            ninja &&
+            ninja install &&
+            cd .. &&
+            cd .. ;
+        fi
     fi
 
   - if [ "$CXX" = "clang++" ]; then export CXXGLAGS="$CXXFLAGS -Wno-inconsistent-missing-override"; fi
@@ -98,6 +116,9 @@ addons:
         - linux-headers-generic
         - libnuma-dev
         - libhyperscan-dev
+        - python3
+        - python3-pip
+        - python3-setuptools
     config:
         retries: true
 

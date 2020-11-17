@@ -43,6 +43,11 @@
 #define rte_ether_addr ether_addr
 #endif
 
+#if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
+#define rte_ipv4_hdr ipv4_hdr
+#define rte_ether_addr ether_addr
+#endif
+
 /**
  * Unified type for DPDK port IDs.
  * Until DPDK v17.05 was uint8_t
@@ -82,8 +87,10 @@ public:
             vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
             init_mac(), init_mtu(0), init_rss(-1), init_fc_mode(FC_UNSET),
             rx_queues(0, false), tx_queues(0, false), n_rx_descs(0), n_tx_descs(0),
-            num_pools(0), mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
-            promisc(false), flow_isolate(false), rx_offload(0), tx_offload(0),
+            num_pools(0), promisc(false),
+            mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
+            rx_offload(0), tx_offload(0),
+            flow_isolate(false),
             vlan_filter(false), vlan_strip(false), vlan_extend(false), vf_vlan(),
             lro(false), jumbo(false)
         {

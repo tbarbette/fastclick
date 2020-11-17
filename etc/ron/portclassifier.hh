@@ -25,9 +25,9 @@ class PortClassifier : public Element { public:
   PortClassifier();
   ~PortClassifier();
 
-  const char *class_name() const		{ return "PortClassifier"; }
-  const char *port_count() const		{ return "1/-"; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "PortClassifier"; }
+  const char *port_count() const override		{ return "1/-"; }
+  const char *processing() const override		{ return PUSH; }
 
   int configure(const Vector<String> &, ErrorHandler *);
 

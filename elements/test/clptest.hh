@@ -24,7 +24,7 @@ class CLPTest : public Element { public:
 
     CLPTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "CLPTest"; }
+    const char *class_name() const override		{ return "CLPTest"; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
 

@@ -147,8 +147,8 @@ class ToIPFlowDumps : public Element, public AggregateListener { public:
     ToIPFlowDumps() CLICK_COLD;
     ~ToIPFlowDumps() CLICK_COLD;
 
-    const char *class_name() const	{ return "ToIPFlowDumps"; }
-    const char *port_count() const	{ return "1/0-1"; }
+    const char *class_name() const override	{ return "ToIPFlowDumps"; }
+    const char *port_count() const override	{ return "1/0-1"; }
 
     enum { CONFIGURE_PHASE = CONFIGURE_PHASE_DEFAULT };
     int configure_phase() const		{ return CONFIGURE_PHASE; }

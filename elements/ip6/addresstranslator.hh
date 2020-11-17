@@ -74,8 +74,8 @@ class AddressTranslator : public Element {
   AddressTranslator() CLICK_COLD;
   ~AddressTranslator() CLICK_COLD;
 
-  const char *class_name() const		{ return "AddressTranslator"; }
-  const char *port_count() const		{ return "2/2"; }
+  const char *class_name() const override		{ return "AddressTranslator"; }
+  const char *port_count() const override		{ return "2/2"; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   void push(int port, Packet *p);
   void add_map(IP6Address &mai,  bool binding);

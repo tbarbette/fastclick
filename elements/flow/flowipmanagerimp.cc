@@ -56,6 +56,7 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
     char buf[32];
     hash_params.name = buf;
     auto passing = get_passing_threads();
+    _tables_count = passing.size();
     _table_size = next_pow2(_table_size/passing.weight());
     click_chatter("Real capacity for each table will be %d", _table_size);
     hash_params.entries = _table_size;
@@ -66,10 +67,10 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
 
     _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
-    _tables = CLICK_ALIGNED_NEW(gtable, passing.size());
+    _tables = CLICK_ALIGNED_NEW(gtable, _tables_count);
     CLICK_ASSERT_ALIGNED(_tables);
 
-    for (int i = 0; i < passing.size(); i++) {
+    for (int i = 0; i < _tables_count; i++) {
         if (!passing[i])
             continue;
         sprintf(buf, "%s-%d",name().c_str(), i);
@@ -216,12 +217,21 @@ void FlowIPManagerIMP::push_batch(int, PacketBatch* batch)
 enum {h_count};
 String FlowIPManagerIMP::read_handler(Element* e, void* thunk)
 {
+
     FlowIPManagerIMP* fc = static_cast<FlowIPManagerIMP*>(e);
-    click_chatter("ENTERED in the read_handler function");
-    rte_hash* table = fc->_tables[click_current_cpu_id()].hash;
     switch ((intptr_t)thunk) {
     case h_count:
-        return String(rte_hash_count(table));
+	{
+	    int count = 0;
+	    for(int i=0; i< fc->_tables_count; i++)
+	    {	
+		gtable * t = (fc->_tables)+i;
+		rte_hash* table = t->hash;
+		if(table)
+		    count+=rte_hash_count(table);
+	    }
+	    return String(count);
+	}
     default:
         return "<error>";
     }
@@ -229,7 +239,7 @@ String FlowIPManagerIMP::read_handler(Element* e, void* thunk)
 
 void FlowIPManagerIMP::add_handlers()
 {
-
+    add_read_handler("count", read_handler, h_count);
 }
 
 CLICK_ENDDECLS

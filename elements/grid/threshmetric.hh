@@ -57,9 +57,9 @@ public:
   ThresholdMetric() CLICK_COLD;
   ~ThresholdMetric() CLICK_COLD;
 
-  const char *class_name() const { return "ThresholdMetric"; }
-  const char *port_count() const { return PORTS_0_0; }
-  const char *processing() const { return AGNOSTIC; }
+  const char *class_name() const override { return "ThresholdMetric"; }
+  const char *port_count() const override { return PORTS_0_0; }
+  const char *processing() const override { return AGNOSTIC; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const { return false; }

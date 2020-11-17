@@ -24,7 +24,7 @@ class ConfParseTest : public Element { public:
 
     ConfParseTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "ConfParseTest"; }
+    const char *class_name() const override		{ return "ConfParseTest"; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
 

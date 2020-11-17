@@ -65,7 +65,7 @@ class TimerTest : public Element { public:
 
     TimerTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "TimerTest"; }
+    const char *class_name() const override		{ return "TimerTest"; }
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;

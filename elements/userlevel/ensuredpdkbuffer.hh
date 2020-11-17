@@ -33,10 +33,14 @@ public:
     EnsureDPDKBuffer() CLICK_COLD;
     ~EnsureDPDKBuffer() CLICK_COLD;
 
-    const char *class_name() const        { return "EnsureDPDKBuffer"; }
-    const char *port_count() const        { return PORTS_1_1; }
-    const char *processing() const        { return AGNOSTIC; }
-    int configure(Vector<String> &conf, ErrorHandler *errh);
+    const char *class_name() const override        { return "EnsureDPDKBuffer"; }
+    const char *port_count() const override        { return PORTS_1_1; }
+    const char *processing() const override        { return AGNOSTIC; }
+    int configure(Vector<String> &conf, ErrorHandler *errh) override CLICK_COLD;
+    int configure_phase() const override {
+        return CONFIGURE_PHASE_PRIVILEGED + 3;
+    }
+    int initialize(ErrorHandler *errh) override CLICK_COLD;
 
     Packet* smaction(Packet*);
 #if HAVE_BATCH

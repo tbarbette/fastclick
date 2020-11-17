@@ -157,7 +157,7 @@ class TCPRewriter : public IPRewriterBase { public:
     TCPRewriter() CLICK_COLD;
     ~TCPRewriter() CLICK_COLD;
 
-    const char *class_name() const		{ return "TCPRewriter"; }
+    const char *class_name() const override		{ return "TCPRewriter"; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

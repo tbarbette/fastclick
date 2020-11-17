@@ -44,8 +44,8 @@ MinBatch::configure(Vector<String> &conf, ErrorHandler *errh)
 bool MinBatch::run_task(Task *task) {
     State &s = _state.get();
 
-    if (s.last_batch) {
-        return true;
+    if (!s.last_batch) {
+        return false;
     }
 
     PacketBatch* p = s.last_batch;
@@ -59,7 +59,6 @@ void MinBatch::push_batch(int port, PacketBatch *p) {
 
     if (s.last_batch == nullptr) {
         s.last_batch = p;
-
     } else {
         s.last_batch->append_batch(p);
     }

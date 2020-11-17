@@ -56,7 +56,7 @@ class NullTask : public Element { public:
 
     NullTask() CLICK_COLD;
 
-    const char *class_name() const		{ return "NullTask"; }
+    const char *class_name() const override		{ return "NullTask"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;

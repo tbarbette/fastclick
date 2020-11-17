@@ -22,8 +22,8 @@ class MarkMACHeader : public SimpleElement<MarkMACHeader> {
     public:
         MarkMACHeader() CLICK_COLD;
 
-        const char *class_name() const      { return "MarkMACHeader"; }
-        const char *port_count() const      { return PORTS_1_1; }
+        const char *class_name() const override      { return "MarkMACHeader"; }
+        const char *port_count() const override      { return PORTS_1_1; }
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
         bool can_live_reconfigure() const       { return true; }
 

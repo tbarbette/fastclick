@@ -30,9 +30,9 @@ class FilterFailures : public Element { public:
   FilterFailures() CLICK_COLD;
   ~FilterFailures() CLICK_COLD;
 
-  const char *class_name() const		{ return "FilterFailures"; }
-  const char *port_count() const		{ return "1/1-2"; }
-  const char *processing() const		{ return PROCESSING_A_AH; }
+  const char *class_name() const override		{ return "FilterFailures"; }
+  const char *port_count() const override		{ return "1/1-2"; }
+  const char *processing() const override		{ return PROCESSING_A_AH; }
 
   void add_handlers() CLICK_COLD;
   static String static_print_drops(Element *, void *);

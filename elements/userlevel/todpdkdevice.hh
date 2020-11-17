@@ -145,11 +145,11 @@ public:
     ToDPDKDevice() CLICK_COLD;
     ~ToDPDKDevice() CLICK_COLD;
 
-    const char *class_name() const { return "ToDPDKDevice"; }
-    const char *port_count() const { return PORTS_1_0; }
-    const char *processing() const { return PUSH; }
+    const char *class_name() const override { return "ToDPDKDevice"; }
+    const char *port_count() const override { return PORTS_1_0; }
+    const char *processing() const override { return PUSH; }
 
-    int configure_phase() const {
+    int configure_phase() const override {
         return CONFIGURE_PHASE_PRIVILEGED;
     }
     bool can_live_reconfigure() const { return false; }
@@ -190,6 +190,7 @@ private:
     bool _vlan;
     uint32_t _tso;
     bool _tco;
+    bool _uco;
     bool _ipco;
 
     friend class FromDPDKDevice;

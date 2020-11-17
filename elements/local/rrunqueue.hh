@@ -23,9 +23,9 @@ class RoundRobinUnqueue : public Element { public:
   RoundRobinUnqueue() CLICK_COLD;
   ~RoundRobinUnqueue() CLICK_COLD;
 
-  const char *class_name() const	{ return "RoundRobinUnqueue"; }
-  const char *port_count() const	{ return "-/-"; }
-  const char *processing() const	{ return PULL_TO_PUSH; }
+  const char *class_name() const override	{ return "RoundRobinUnqueue"; }
+  const char *port_count() const override	{ return "-/-"; }
+  const char *processing() const override	{ return PULL_TO_PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

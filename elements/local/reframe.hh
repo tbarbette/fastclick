@@ -110,9 +110,9 @@ class Reframe : public Element { public:
     Reframe() CLICK_COLD;
     ~Reframe() CLICK_COLD;
 
-    const char *class_name() const	{ return "Reframe"; }
-    const char *port_count() const	{ return PORTS_1_1; }
-    const char *processing() const	{ return "h/a"; }
+    const char *class_name() const override	{ return "Reframe"; }
+    const char *port_count() const override	{ return PORTS_1_1; }
+    const char *processing() const override	{ return "h/a"; }
 
   int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

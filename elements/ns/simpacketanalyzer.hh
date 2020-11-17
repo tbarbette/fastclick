@@ -26,9 +26,9 @@ public:
   SimPacketAnalyzer() CLICK_COLD;
   ~SimPacketAnalyzer() CLICK_COLD;
 
-  const char *class_name() const  { return "SimPacketAnalyzer"; }
-  const char *processing() const  { return PUSH; }
-  const char *port_count() const  { return PORTS_0_0; }
+  const char *class_name() const override  { return "SimPacketAnalyzer"; }
+  const char *processing() const override  { return PUSH; }
+  const char *port_count() const override  { return PORTS_0_0; }
 
   virtual String analyze(Packet*, int offset) = 0;
 

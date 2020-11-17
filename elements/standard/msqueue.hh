@@ -29,7 +29,7 @@ class MSQueue : public ThreadSafeQueue { public:
 
     MSQueue() CLICK_COLD;
 
-    const char *class_name() const		{ return "MSQueue"; }
+    const char *class_name() const override		{ return "MSQueue"; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

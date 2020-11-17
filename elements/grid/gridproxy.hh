@@ -56,9 +56,9 @@ public:
     GridProxy() CLICK_COLD;
     ~GridProxy() CLICK_COLD;
 
-    const char *class_name() const { return "GridProxy"; }
-    const char *port_count() const { return "2/2"; }
-    const char *processing() const { return PUSH; }
+    const char *class_name() const override { return "GridProxy"; }
+    const char *port_count() const override { return "2/2"; }
+    const char *processing() const override { return PUSH; }
     const char *flags() const	   { return "A"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

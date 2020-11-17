@@ -141,10 +141,10 @@ public:
   UpdateGridRoutes() CLICK_COLD;
   ~UpdateGridRoutes() CLICK_COLD;
 
-  const char *class_name() const		{ return "UpdateGridRoutes"; }
+  const char *class_name() const override		{ return "UpdateGridRoutes"; }
   void *cast(const char *);
-  const char *port_count() const		{ return "1/2"; }
-  const char *processing() const		{ return AGNOSTIC; }
+  const char *port_count() const override		{ return "1/2"; }
+  const char *processing() const override		{ return AGNOSTIC; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

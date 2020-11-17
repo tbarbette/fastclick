@@ -26,9 +26,9 @@ class IPRewriterMap : public Element { public:
   IPRewriterMap() CLICK_COLD;
   ~IPRewriterMap() CLICK_COLD;
 
-  const char *class_name() const		{ return "IPRewriterMap"; }
-  const char *port_count() const		{ return "2/2"; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "IPRewriterMap"; }
+  const char *port_count() const override		{ return "2/2"; }
+  const char *processing() const override		{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

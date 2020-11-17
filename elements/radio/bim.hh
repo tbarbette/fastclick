@@ -18,9 +18,9 @@ class BIM : public Element {
   BIM() CLICK_COLD;
   ~BIM() CLICK_COLD;
 
-  const char *class_name() const	{ return "BIM"; }
-  const char *port_count() const	{ return PORTS_1_1; }
-  const char *processing() const	{ return PULL_TO_PUSH; }
+  const char *class_name() const override	{ return "BIM"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
+  const char *processing() const override	{ return PULL_TO_PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

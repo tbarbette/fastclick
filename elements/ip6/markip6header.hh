@@ -22,8 +22,8 @@ class MarkIP6Header : public SimpleElement<MarkIP6Header> {
         MarkIP6Header();
         ~MarkIP6Header();
 
-        const char *class_name() const { return "MarkIP6Header"; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "MarkIP6Header"; }
+        const char *port_count() const override { return PORTS_1_1; }
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
         Packet *simple_action(Packet *p);

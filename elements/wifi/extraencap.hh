@@ -24,9 +24,9 @@ class ExtraEncap : public Element { public:
   ExtraEncap() CLICK_COLD;
   ~ExtraEncap() CLICK_COLD;
 
-  const char *class_name() const	{ return "ExtraEncap"; }
-  const char *port_count() const	{ return PORTS_1_1; }
-  const char *processing() const	{ return AGNOSTIC; }
+  const char *class_name() const override	{ return "ExtraEncap"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
+  const char *processing() const override	{ return AGNOSTIC; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const	{ return true; }

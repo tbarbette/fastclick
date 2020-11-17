@@ -131,7 +131,8 @@ int DPDKDevice::dpdk_set_rss_reta(unsigned* reta, unsigned reta_sz)
 /**
  * Returns the current RSS RETA table size
  */
-int DPDKDevice::dpdk_get_rss_reta_size() const {
+int DPDKDevice::dpdk_get_rss_reta_size() const
+{
     struct rte_eth_dev_info dev_info;
 
     rte_eth_dev_info_get(port_id, &dev_info);
@@ -190,7 +191,7 @@ void DPDKDevice::initialize_flow_rule_manager(const portid_t &port_id, ErrorHand
     const portid_t p_id = flow_rule_mgr->get_port_id();
     assert((p_id >= 0) && (p_id == port_id));
 }
-#endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
+#endif /* HAVE_FLOW_API */
 
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
@@ -822,7 +823,7 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         /*
          * Set mac for each pool and parameters
          */
-        for (unsigned q = 0; q < info.num_pools; q++) {
+        for (int q = 0; q < info.num_pools; q++) {
             struct rte_ether_addr mac = gen_mac(port_id, q);
             printf("Port %u vmdq pool %u set mac %02x:%02x:%02x:%02x:%02x:%02x\n",
                         port_id, q,
@@ -1280,7 +1281,7 @@ DPDKDeviceArg::parse(
 #endif
     }
 
-    if (port_id >= 0 && port_id < DPDKDevice::dev_count()) {
+    if (port_id < DPDKDevice::dev_count()) {
         result = DPDKDevice::ensure_device(port_id);
     } else {
         ctx.error("Cannot resolve PCI address to DPDK device");
@@ -1293,7 +1294,7 @@ DPDKDeviceArg::parse(
 
 bool
 FlowControlModeArg::parse(
-    const String &str, FlowControlMode &result, const ArgContext &ctx) {
+    const String &str, FlowControlMode &result, const ArgContext &) {
     str.lower();
     if (str == "full" || str == "on") {
         result = FC_FULL;

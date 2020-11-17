@@ -24,7 +24,7 @@ class SpinlockInfo : public Element { public:
     SpinlockInfo() CLICK_COLD;
     ~SpinlockInfo() CLICK_COLD;
 
-    const char *class_name() const	{ return "SpinlockInfo"; }
+    const char *class_name() const override	{ return "SpinlockInfo"; }
     int configure_phase() const		{ return CONFIGURE_PHASE_INFO; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

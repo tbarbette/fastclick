@@ -58,9 +58,9 @@ class Shaper : public Element { public:
 
     Shaper() CLICK_COLD;
 
-    const char *class_name() const	{ return "Shaper"; }
-    const char *port_count() const	{ return PORTS_1_1X2; }
-    const char *processing() const	{ return PULL; }
+    const char *class_name() const override	{ return "Shaper"; }
+    const char *port_count() const override	{ return PORTS_1_1X2; }
+    const char *processing() const override	{ return PULL; }
     bool is_bandwidth() const		{ return class_name()[0] == 'B'; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

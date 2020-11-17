@@ -227,6 +227,7 @@ Returns the device's link type (only fiber is currently supported).
 =h xstats read-only
 
 Returns a device's detailed packet and byte counters.
+If a parameter is given, only the matching counter will be returned.
 
 =h queue_count read-only
 
@@ -348,7 +349,7 @@ Returns the number of errors of this device, as computed by the hardware.
 
 =h nombufs read-only
 
-Returns the number of mbufs allocated for this devce.
+Returns the total number of RX mbuf allocation failures. 
 
 =h rule_add write-only
 
@@ -410,12 +411,12 @@ public:
     FromDPDKDevice() CLICK_COLD;
     ~FromDPDKDevice() CLICK_COLD;
 
-    const char *class_name() const { return "FromDPDKDevice"; }
-    const char *port_count() const { return PORTS_0_1; }
-    const char *processing() const { return PUSH; }
+    const char *class_name() const override { return "FromDPDKDevice"; }
+    const char *port_count() const override { return PORTS_0_1; }
+    const char *processing() const override { return PUSH; }
     void* cast(const char* name) override;
 
-    int configure_phase() const {
+    int configure_phase() const override {
         return CONFIGURE_PHASE_PRIVILEGED - 5;
     }
     bool can_live_reconfigure() const { return false; }
@@ -469,6 +470,9 @@ private:
     per_thread<FDState> _fdstate;
 #endif
     bool _set_timestamp;
+    bool _tco;
+    bool _uco;
+    bool _ipco;
 };
 
 CLICK_ENDDECLS

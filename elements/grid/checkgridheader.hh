@@ -34,9 +34,9 @@ class CheckGridHeader : public SimpleElement<CheckGridHeader> {
         CheckGridHeader() CLICK_COLD;
         ~CheckGridHeader() CLICK_COLD;
 
-        const char *class_name() const { return "CheckGridHeader"; }
-        const char *port_count() const { return "1/1-2"; }
-        const char *processing() const { return PROCESSING_A_AH; }
+        const char *class_name() const override { return "CheckGridHeader"; }
+        const char *port_count() const override { return "1/1-2"; }
+        const char *processing() const override { return PROCESSING_A_AH; }
 
         void add_handlers() CLICK_COLD;
 

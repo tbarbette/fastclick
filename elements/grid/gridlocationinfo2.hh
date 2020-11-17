@@ -67,7 +67,7 @@ public:
   GridLocationInfo2();
   ~GridLocationInfo2();
 
-  const char *class_name() const { return "GridLocationInfo2"; }
+  const char *class_name() const override { return "GridLocationInfo2"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const { return true; }

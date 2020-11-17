@@ -26,8 +26,8 @@ class Null1 : public Element {
 
   Null1()				{ }
 
-  const char *class_name() const	{ return "Null1"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+  const char *class_name() const override	{ return "Null1"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
 
   Packet *simple_action(Packet *p)	{ return p; }
 
@@ -39,8 +39,8 @@ class Null2 : public Element {
 
   Null2()				{ }
 
-  const char *class_name() const	{ return "Null2"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+  const char *class_name() const override	{ return "Null2"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
 
   Packet *simple_action(Packet *p)	{ return p; }
 
@@ -52,8 +52,8 @@ class Null3 : public Element {
 
   Null3()				{ }
 
-  const char *class_name() const	{ return "Null3"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+  const char *class_name() const override	{ return "Null3"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
 
   Packet *simple_action(Packet *p)	{ return p; }
 
@@ -65,8 +65,8 @@ class Null4 : public Element {
 
   Null4()				{ }
 
-  const char *class_name() const	{ return "Null4"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+  const char *class_name() const override	{ return "Null4"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
 
   Packet *simple_action(Packet *p)	{ return p; }
 
@@ -78,8 +78,8 @@ class Null5 : public Element {
 
   Null5()				{ }
 
-  const char *class_name() const	{ return "Null5"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+  const char *class_name() const override	{ return "Null5"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
 
   Packet *simple_action(Packet *p)	{ return p; }
 
@@ -91,8 +91,8 @@ class Null6 : public Element {
 
   Null6()				{ }
 
-  const char *class_name() const	{ return "Null6"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+  const char *class_name() const override	{ return "Null6"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
 
   Packet *simple_action(Packet *p)	{ return p; }
 
@@ -104,8 +104,8 @@ class Null7 : public Element {
 
   Null7()				{ }
 
-  const char *class_name() const	{ return "Null7"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+  const char *class_name() const override	{ return "Null7"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
 
   Packet *simple_action(Packet *p)	{ return p; }
 
@@ -117,8 +117,8 @@ class Null8 : public Element {
 
   Null8()				{ }
 
-  const char *class_name() const	{ return "Null8"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+  const char *class_name() const override	{ return "Null8"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
 
   Packet *simple_action(Packet *p)	{ return p; }
 

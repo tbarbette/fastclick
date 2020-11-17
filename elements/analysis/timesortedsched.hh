@@ -82,9 +82,9 @@ class TimeSortedSched : public Element { public:
     TimeSortedSched() CLICK_COLD;
     ~TimeSortedSched() CLICK_COLD;
 
-    const char *class_name() const	{ return "TimeSortedSched"; }
-    const char *port_count() const	{ return "-/1"; }
-    const char *processing() const	{ return PULL; }
+    const char *class_name() const override	{ return "TimeSortedSched"; }
+    const char *port_count() const override	{ return "-/1"; }
+    const char *processing() const override	{ return PULL; }
     const char *flags() const		{ return "S0"; }
     void *cast(const char *);
 

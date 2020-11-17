@@ -3,7 +3,7 @@ Repeated RecordTimestamp
 
 Test the RecordTimestamp ecosystem (TimestampDiff, NumberPacket, ...) in
 repeat mode, that is the crafted packets are replayed multiple time through
-the same record timestamp. With OFFSET setted, RecordTimestamp should
+the same record timestamp. With OFFSET set, RecordTimestamp should
 loop in its internal array reading the timestamp number instead of growing.
 
 %script
@@ -28,6 +28,6 @@ DriverManager(wait,read diff.average, read counter.count)
 Loading replay with 1 inputs.
 replay : Successfully loaded 1000 packets. Input 0 dried out.
 diff.average:
-{{[0-9]{1,2}[.][0-9]+}}
+{{[0-9.e-]+}}
 counter.count:
 100000

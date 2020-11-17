@@ -35,9 +35,9 @@ class GridProbeReplyReceiver : public Element {
   GridProbeReplyReceiver() CLICK_COLD;
   ~GridProbeReplyReceiver() CLICK_COLD;
 
-  const char *class_name() const		{ return "GridProbeReplyReceiver"; }
-  const char *port_count() const		{ return PORTS_1_0; }
-  const char *processing() const		{ return AGNOSTIC; }
+  const char *class_name() const override		{ return "GridProbeReplyReceiver"; }
+  const char *port_count() const override		{ return PORTS_1_0; }
+  const char *processing() const override		{ return AGNOSTIC; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;
 

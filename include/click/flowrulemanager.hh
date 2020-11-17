@@ -211,11 +211,12 @@ class FlowRuleManager {
         String flow_rules_from_file_to_string(const String &filename);
 
         // Install flow rule(s) in a NIC
-        int flow_rules_install(const String &rules, const uint32_t &rules_nb);
+        int flow_rules_install(const String &rules, const uint32_t &rules_nb, const bool verbose=true);
         int flow_rule_install(
             const uint32_t &int_rule_id, const uint32_t &rule_id,
             const int &core_id, const String &rule,
-            const bool with_cache = true
+            const bool with_cache = true,
+	    const bool verbose=true
         );
 
         // Verify the presence/absence of a list of rules in/from the NIC

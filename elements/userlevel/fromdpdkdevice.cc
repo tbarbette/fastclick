@@ -42,7 +42,7 @@ CLICK_DECLS
 #define LOAD_UNIT 10
 
 FromDPDKDevice::FromDPDKDevice() :
-    _dev(0)
+    _dev(0), _tco(false), _uco(false), _ipco(false)
 #if HAVE_DPDK_INTERRUPT
     ,_rx_intr(-1)
 #endif
@@ -107,6 +107,11 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAX_RSS", max_rss).read_status(has_rss)
         .read("TIMESTAMP", set_timestamp)
         .read("PAUSE", fc_mode)
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+        .read("IPCO", _ipco)
+        .read("TCO", _tco)
+        .read("UCO", _uco)
+#endif
         .complete() < 0)
         return -1;
 
@@ -149,6 +154,13 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (fc_mode != FC_UNSET)
         _dev->set_init_fc_mode(fc_mode);
+
+    if (_ipco || _tco || _uco)
+        _dev->set_rx_offload(DEV_RX_OFFLOAD_IPV4_CKSUM);
+    if (_tco)
+        _dev->set_rx_offload(DEV_RX_OFFLOAD_TCP_CKSUM);
+    if (_uco)
+        _dev->set_rx_offload(DEV_RX_OFFLOAD_UDP_CKSUM);
 
     if (set_timestamp) {
 #if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
@@ -423,22 +435,22 @@ FromDPDKDevice::find_output_element() {
 }
 
 enum {
-        h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
-        h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,
-        h_active, h_safe_active,
-        h_xstats, h_queue_count, h_stats_packets, h_stats_bytes,
-        h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
-        h_rss, h_rss_reta, h_rss_reta_size,
-        h_mac, h_add_mac, h_remove_mac, h_vf_mac,
-        h_mtu,
-        h_device,
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        h_rule_add, h_rules_del, h_rules_flush,
-        h_rules_list, h_rules_ids_global, h_rules_ids_internal, h_rules_count,
-        h_rules_count_with_hits,
-        h_rule_packet_hits, h_rule_byte_count, h_rules_aggr_stats,
-        h_rules_list_with_hits, h_rules_isolate
-    #endif
+    h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
+    h_stats_packets, h_stats_bytes,
+    h_active, h_safe_active,
+    h_xstats, h_queue_count,
+    h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
+    h_rss, h_rss_reta, h_rss_reta_size,
+    h_mac, h_add_mac, h_remove_mac, h_vf_mac,
+    h_mtu,
+    h_device,
+    h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    h_rule_add, h_rules_del, h_rules_isolate, h_rules_flush,
+    h_rules_list, h_rules_list_with_hits, h_rules_ids_global, h_rules_ids_internal,
+    h_rules_count, h_rules_count_with_hits, h_rule_packet_hits, h_rule_byte_count,
+    h_rules_aggr_stats
+#endif
 };
 
 String FromDPDKDevice::read_handler(Element *e, void * thunk)

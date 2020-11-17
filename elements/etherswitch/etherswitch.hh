@@ -66,10 +66,10 @@ class EtherSwitch : public Element { public:
   EtherSwitch() CLICK_COLD;
   ~EtherSwitch() CLICK_COLD;
 
-  const char *class_name() const		{ return "EtherSwitch"; }
-  const char *port_count() const		{ return "2-/="; }
-  const char *processing() const		{ return PUSH; }
-  const char *flow_code() const			{ return "#/[^#]"; }
+  const char *class_name() const override		{ return "EtherSwitch"; }
+  const char *port_count() const override		{ return "2-/="; }
+  const char *processing() const override		{ return PUSH; }
+  const char *flow_code() const override			{ return "#/[^#]"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;

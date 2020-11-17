@@ -134,7 +134,7 @@ class IPAddrPairRewriter : public IPRewriterBase { public:
     IPAddrPairRewriter() CLICK_COLD;
     ~IPAddrPairRewriter() CLICK_COLD;
 
-    const char *class_name() const		{ return "IPAddrPairRewriter"; }
+    const char *class_name() const override		{ return "IPAddrPairRewriter"; }
     void *cast(const char *);
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;

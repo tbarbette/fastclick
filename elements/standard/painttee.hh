@@ -32,9 +32,9 @@ class PaintTee : public BatchElement { public:
 
     PaintTee() CLICK_COLD;
 
-    const char *class_name() const	{ return "PaintTee"; }
-    const char *port_count() const	{ return "1/2"; }
-    const char *processing() const	{ return PROCESSING_A_AH; }
+    const char *class_name() const override	{ return "PaintTee"; }
+    const char *port_count() const override	{ return "1/2"; }
+    const char *processing() const override	{ return PROCESSING_A_AH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;

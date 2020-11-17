@@ -27,7 +27,7 @@ class HandlerAggregate : public Element { public:
 	HandlerAggregate() CLICK_COLD;
     ~HandlerAggregate() CLICK_COLD;
 
-    const char *class_name() const  {return "HandlerAggregate";};
+    const char *class_name() const override  {return "HandlerAggregate";};
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;

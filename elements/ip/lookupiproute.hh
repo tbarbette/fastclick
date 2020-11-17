@@ -39,7 +39,7 @@ class StaticIPLookup : public LinearIPLookup { public:
     StaticIPLookup() CLICK_COLD;
     ~StaticIPLookup() CLICK_COLD;
 
-    const char *class_name() const	{ return "StaticIPLookup"; }
+    const char *class_name() const override	{ return "StaticIPLookup"; }
     void add_handlers() CLICK_COLD;
 
     int add_route(const IPRoute&, bool, IPRoute*, ErrorHandler *);

@@ -58,6 +58,8 @@ int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("MAXDELAY", _max_delay_ms)
             .read_or_set("SAMPLE", _sample, 1)
             .read_or_set("VERBOSE", _verbose, false)
+            .read_or_set("TC_OFFSET", _tc_offset, -1)
+            .read_or_set("TC_MASK", _tc_mask, 0xff)
             .complete() < 0)
         return -1;
 
@@ -67,7 +69,7 @@ int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh)
     _net_order = _rt->has_net_order();
 
     if (_limit) {
-        _delays.resize(_limit, 0);
+        _delays.resize(_limit, {0,0});
     }
 
     return 0;
@@ -84,6 +86,7 @@ int TimestampDiff::initialize(ErrorHandler *errh)
 
 enum {
     TSD_AVG_HANDLER,
+    TSD_AVG_TC_HANDLER,
     TSD_MIN_HANDLER,
     TSD_MAX_HANDLER,
     TSD_STD_HANDLER,
@@ -114,6 +117,7 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
     unsigned max = 0;
     unsigned begin = 0;
     double perc = 0;
+    int tc = -1;
     int opt = reinterpret_cast<intptr_t>(handler->user_data(Handler::f_read));
 
     if (data != "") {
@@ -121,6 +125,14 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
             int pos = data.find_left(' ');
             if (pos == -1) pos = data.length();
             if (!DoubleArg().parse(data.substring(0, pos), perc)) {
+                data = "<error>";
+                return -1;
+            }
+            data = data.substring(pos);
+        } else if (opt == TSD_AVG_TC_HANDLER) {
+             int pos = data.find_left(' ');
+            if (pos == -1) pos = data.length();
+            if (!IntArg().parse(data.substring(0, pos), tc)) {
                 data = "<error>";
                 return -1;
             }
@@ -141,6 +153,9 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
             data = String(min); break;
         case TSD_AVG_HANDLER:
             tsd->min_mean_max(min, mean, max, begin);
+            data = String(mean); break;
+        case TSD_AVG_TC_HANDLER:
+            tsd->min_mean_max(min, mean, max, begin, tc);
             data = String(mean); break;
         case TSD_MAX_HANDLER:
             tsd->min_mean_max(min, mean, max, begin);
@@ -184,9 +199,9 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
             StringAccum s;
             for (size_t i = 0; i < tsd->_nd; ++i) {
                 if (opt == TSD_DUMP_HANDLER)
-                    s << i << ": " << String(tsd->_delays[i]) << "\n";
+                    s << i << ": " << String(tsd->_delays[i].delay) << "\n";
                 else
-                    s << String(tsd->_delays[i]) << "\n";
+                    s << String(tsd->_delays[i].delay) << "\n";
             }
             data = s.take_string(); break;
         }
@@ -200,6 +215,8 @@ void TimestampDiff::add_handlers()
 {
     set_handler("average", Handler::f_read | Handler::f_read_param, handler, TSD_AVG_HANDLER, 0);
     set_handler("avg", Handler::f_read | Handler::f_read_param, handler, TSD_AVG_HANDLER, 0);
+
+    set_handler("avg_tc", Handler::f_read | Handler::f_read_param, handler, TSD_AVG_TC_HANDLER, 0);
 
     set_handler("min", Handler::f_read | Handler::f_read_param, handler, TSD_MIN_HANDLER, 0);
     set_handler("max", Handler::f_read | Handler::f_read_param, handler, TSD_MAX_HANDLER, 0);
@@ -249,10 +266,14 @@ inline int TimestampDiff::smaction(Packet *p)
     }
     else {
         uint32_t next_index = _nd.fetch_and_add(1);
+        unsigned char tc = 0;
+        if (_tc_offset >= 0) {
+            tc = p->data()[_tc_offset] & _tc_mask;
+        }
         if (_limit) {
-            _delays[next_index] = diff.usec();
+            _delays[next_index] = {diff.usec(),tc};
         } else {
-            _delays.push_back(diff.usec());
+            _delays.push_back({diff.usec(),tc});
         }
     }
     return 0;
@@ -278,13 +299,15 @@ RecordTimestamp* TimestampDiff::get_recordtimestamp_instance()
 }
 
 void
-TimestampDiff::min_mean_max(unsigned &min, double &mean, unsigned &max, uint32_t begin)
+TimestampDiff::min_mean_max(unsigned &min, double &mean, unsigned &max, uint32_t begin, int tc)
 {
     const uint32_t current_vector_length = static_cast<const uint32_t>(_nd.value());
     double sum = 0.0;
 
+    uint32_t n = 0;
     for (uint32_t i=begin; i<current_vector_length; i++) {
-        unsigned delay = _delays[i];
+        if (tc > -1 && _delays[i].tc != tc) continue;
+        unsigned delay = _delays[i].delay;
 
         sum += static_cast<double>(delay);
         if (delay < min) {
@@ -293,6 +316,7 @@ TimestampDiff::min_mean_max(unsigned &min, double &mean, unsigned &max, uint32_t
         if (delay > max) {
             max = delay;
         }
+        n++;
     }
 
     // Set minimum properly if not updated above
@@ -305,7 +329,7 @@ TimestampDiff::min_mean_max(unsigned &min, double &mean, unsigned &max, uint32_t
         return;
     }
 
-    mean = sum / static_cast<double>(current_vector_length - begin);
+    mean = sum / static_cast<double>(n);
 }
 
 double
@@ -315,7 +339,7 @@ TimestampDiff::standard_deviation(const double mean, uint32_t begin)
     double var = 0.0;
 
     for (uint32_t i=begin; i<current_vector_length; i++) {
-        var += pow(_delays[i] - mean, 2);
+        var += pow(_delays[i].delay - mean, 2);
     }
 
     // Prevent square root of zero
@@ -343,16 +367,16 @@ TimestampDiff::percentile(const double percent, uint32_t begin)
 
     // Implies that user asked for the 0 percetile (i.e., min).
     if (idx <= begin) {
-        return (double)*std::min_element(_delays.begin() + begin, _delays.begin() + current_vector_length);
+        return (double)(*std::min_element(_delays.begin() + begin, _delays.begin() + current_vector_length)).delay;
     // Implies that user asked for the 100 percetile (i.e., max).
     } else if (idx >= current_vector_length) {
-        return (double)*std::max_element(_delays.begin() + begin, _delays.begin() + current_vector_length);
+        return (double)(*std::max_element(_delays.begin() + begin, _delays.begin() + current_vector_length)).delay;
     }
     //else no need to sort, we use nth_element
 
     auto nth = _delays.begin() + idx;
     std::nth_element(_delays.begin() + begin, nth, _delays.begin() + current_vector_length);
-    perc = (double)*nth;
+    perc = (double)(*nth).delay;
     return perc;
 }
 
@@ -365,7 +389,7 @@ TimestampDiff::last_value_seen()
         return 0;
     }
 
-    return _delays[last_vector_index];
+    return _delays[last_vector_index].delay;
 }
 
 CLICK_ENDDECLS

@@ -23,6 +23,8 @@ DEPCFLAGS = @DEPCFLAGS@
 AR_CREATE = @AR@ @AR_CREATEFLAGS@
 RANLIB = @RANLIB@
 INSTALL = @INSTALL@
+CLICK_SHARED = @CLICK_SHARED@
+HAVE_FLOW_API = @HAVE_FLOW_API@
 mkinstalldirs = $(conf_auxdir)/mkinstalldirs
 
 CLICK_BUILDTOOL = $(top_builddir)/bin/click-buildtool
@@ -103,20 +105,28 @@ LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
 
 USE_DPDK = @USE_DPDK@
 ifeq ($(USE_DPDK),yes)
-ifeq ($(shell pkg-config --exists libdpdk && echo 1), 1)
-CFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
-CXXFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
-LDFLAGS := $(LDFLAGS) $(shell pkg-config --libs libdpdk) -Wl,-Bstatic $(shell pkg-config --static --libs libdpdk)
-else
-RTE_SDK = @RTE_SDK@
-RTE_TARGET = @RTE_TARGET@
-RTE_VER_MAJOR = @RTE_VER_MAJOR@
-RTE_VER_MINOR = @RTE_VER_MINOR@
-RTE_VER_YEAR = @RTE_VER_YEAR@
-RTE_VER_MONTH = @RTE_VER_MONTH@
-include dpdk.mk
-endif
-EXTRA_DRIVER_OBJS := dpdkdevice.o flowrulemanager.o flowrulecache.o flowruleparser.o servicechain.o $(EXTRA_DRIVER_OBJS)
+	RTE_SDK = @RTE_SDK@
+	RTE_TARGET = @RTE_TARGET@
+	RTE_VER_MAJOR = @RTE_VER_MAJOR@
+	RTE_VER_MINOR = @RTE_VER_MINOR@
+	RTE_VER_YEAR = @RTE_VER_YEAR@
+	RTE_VER_MONTH = @RTE_VER_MONTH@
+	ifeq ($(shell pkg-config --exists libdpdk && echo 1), 1)
+		CFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
+		CXXFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
+		include rte_parse.mk
+		ifeq ($(CLICK_SHARED),1)
+			LIBS := $(LIBS) $(shell pkg-config --libs libdpdk)
+		else
+			LIBS := $(LIBS) $(shell pkg-config --static --libs libdpdk)
+		endif
+	else
+		include dpdk.mk
+	endif
+	EXTRA_DRIVER_OBJS := dpdkdevice.o servicechain.o $(EXTRA_DRIVER_OBJS)
+	ifeq ($(shell [ ${HAVE_FLOW_API} -eq 1 ] && echo true),true)
+		EXTRA_DRIVER_OBJS := flowrulemanager.o flowrulecache.o flowruleparser.o $(EXTRA_DRIVER_OBJS)
+	endif
 endif
 
 ifndef MINDRIVER
@@ -153,7 +163,7 @@ $(DRIVER): ${PARSE_PATH}.sentinel ddeps
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 else
 $(DRIVER): Makefile libclick.a $(OBJS)
-	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a $(LIBS) $(DPDK_LIBS),LINK)
+	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a $(LIBS),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 endif
 

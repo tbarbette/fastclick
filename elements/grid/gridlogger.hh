@@ -182,7 +182,7 @@ public:
   GridLogger() CLICK_COLD;
   ~GridLogger() CLICK_COLD;
 
-  const char *class_name() const { return "GridLogger"; }
+  const char *class_name() const override { return "GridLogger"; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const { return false; }
   void *cast(const char *);

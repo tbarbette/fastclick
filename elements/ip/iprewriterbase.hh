@@ -108,8 +108,8 @@ class IPRewriterBase : public BatchElement { public:
 	CONFIGURE_PHASE_USER = CONFIGURE_PHASE_REWRITER + 1
     };
 
-    const char *port_count() const	{ return "1-/1-"; }
-    const char *processing() const	{ return PUSH; }
+    const char *port_count() const override	{ return "1-/1-"; }
+    const char *processing() const override	{ return PUSH; }
 
     int thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) override;
 

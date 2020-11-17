@@ -85,9 +85,9 @@ public:
 
     void selected(int, int);
 
-    const char *class_name() const		{ return "ToNetmapDevice"; }
-    const char *port_count() const		{ return "1/0-2"; }
-    const char *processing() const		{ return "a/h"; }
+    const char *class_name() const override		{ return "ToNetmapDevice"; }
+    const char *port_count() const override		{ return "1/0-2"; }
+    const char *processing() const override		{ return "a/h"; }
     const char *flags() const			{ return "S2"; }
     int	configure_phase() const			{ return CONFIGURE_PHASE_PRIVILEGED; }
 

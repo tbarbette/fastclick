@@ -33,8 +33,8 @@ class ProtocolTranslator64 : public Element {
   ProtocolTranslator64();
   ~ProtocolTranslator64();
 
-  const char *class_name() const		{ return "ProtocolTranslator64"; }
-  const char *port_count() const		{ return PORTS_1_1; }
+  const char *class_name() const override		{ return "ProtocolTranslator64"; }
+  const char *port_count() const override		{ return PORTS_1_1; }
   void push(int port, Packet *p);
   void handle_ip6(Packet *);
 

@@ -133,7 +133,7 @@ class IPAddrRewriter : public IPRewriterBase { public:
     IPAddrRewriter() CLICK_COLD;
     ~IPAddrRewriter() CLICK_COLD;
 
-    const char *class_name() const		{ return "IPAddrRewriter"; }
+    const char *class_name() const override		{ return "IPAddrRewriter"; }
     void *cast(const char *);
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;

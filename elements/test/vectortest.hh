@@ -24,7 +24,7 @@ class VectorTest : public Element { public:
 
     VectorTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "VectorTest"; }
+    const char *class_name() const override		{ return "VectorTest"; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
 

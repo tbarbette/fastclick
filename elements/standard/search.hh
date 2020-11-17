@@ -32,9 +32,9 @@ class Search : public Element { public:
 
     Search() CLICK_COLD;
 
-    const char *class_name() const		{ return "Search"; }
-    const char *port_count() const		{ return PORTS_1_1X2; }
-    const char *processing() const		{ return PUSH; }
+    const char *class_name() const override		{ return "Search"; }
+    const char *port_count() const override		{ return PORTS_1_1X2; }
+    const char *processing() const override		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

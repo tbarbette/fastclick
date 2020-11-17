@@ -24,7 +24,7 @@ class StringTest : public Element { public:
 
     StringTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "StringTest"; }
+    const char *class_name() const override		{ return "StringTest"; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
 

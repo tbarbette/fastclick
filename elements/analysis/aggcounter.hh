@@ -232,7 +232,7 @@ class AggregateCounterBase : public BatchElement { public:
     AggregateCounterBase() CLICK_COLD;
     ~AggregateCounterBase() CLICK_COLD;
 
-    const char *port_count() const	{ return "1-2/1-2"; }
+    const char *port_count() const override	{ return "1-2/1-2"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
@@ -291,11 +291,11 @@ class AggregateCounterBase : public BatchElement { public:
 
 };
 class AggregateCounter : public AggregateCounterBase<not_per_thread<AggregateCounterState> > { public:
-    const char *class_name() const  { return "AggregateCounter"; }
+    const char *class_name() const override  { return "AggregateCounter"; }
 };
 
 class AggregateCounterIMP : public AggregateCounterBase<per_thread<AggregateCounterState> > { public:
-    const char *class_name() const  { return "AggregateCounterIMP"; }
+    const char *class_name() const override  { return "AggregateCounterIMP"; }
 };
 
 

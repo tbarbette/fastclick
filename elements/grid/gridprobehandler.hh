@@ -38,9 +38,9 @@ class GridProbeHandler : public Element, GridRouteActionCallback {
   GridProbeHandler() CLICK_COLD;
   ~GridProbeHandler() CLICK_COLD;
 
-  const char *class_name() const		{ return "GridProbeHandler"; }
-  const char *port_count() const		{ return "1/2"; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "GridProbeHandler"; }
+  const char *port_count() const override		{ return "1/2"; }
+  const char *processing() const override		{ return PUSH; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;
 

@@ -32,9 +32,9 @@ public:
   PingPong() CLICK_COLD;
   ~PingPong() CLICK_COLD;
 
-  const char *class_name() const		{ return "PingPong"; }
-  const char *port_count() const		{ return PORTS_1_1; }
-  const char *processing() const		{ return "a/a"; }
+  const char *class_name() const override		{ return "PingPong"; }
+  const char *port_count() const override		{ return PORTS_1_1; }
+  const char *processing() const override		{ return "a/a"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

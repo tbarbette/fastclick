@@ -28,9 +28,9 @@ class FilterPhyErr : public Element { public:
   FilterPhyErr() CLICK_COLD;
   ~FilterPhyErr() CLICK_COLD;
 
-  const char *class_name() const		{ return "FilterPhyErr"; }
-  const char *port_count() const		{ return "1/1-3"; }
-  const char *processing() const		{ return PROCESSING_A_AH; }
+  const char *class_name() const override		{ return "FilterPhyErr"; }
+  const char *port_count() const override		{ return "1/1-3"; }
+  const char *processing() const override		{ return PROCESSING_A_AH; }
 
   void add_handlers() CLICK_COLD;
   Packet *simple_action(Packet *);

@@ -7,7 +7,7 @@
 CLICK_DECLS
 
 class NetmapInfo : public Element { public:
-    const char *class_name() const	{ return "NetmapInfo"; }
+    const char *class_name() const override	{ return "NetmapInfo"; }
 
     int configure_phase() const		{ return CONFIGURE_PHASE_FIRST; }
 

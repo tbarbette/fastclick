@@ -30,9 +30,9 @@ public:
   TCPIPSend() CLICK_COLD;
   ~TCPIPSend() CLICK_COLD;
 
-  const char *class_name() const	{ return "TCPIPSend"; }
-  const char *port_count() const	{ return PORTS_0_1; }
-  const char *processing() const	{ return PUSH; }
+  const char *class_name() const override	{ return "TCPIPSend"; }
+  const char *port_count() const override	{ return PORTS_0_1; }
+  const char *processing() const override	{ return PUSH; }
 
 private:
   void add_handlers() CLICK_COLD;

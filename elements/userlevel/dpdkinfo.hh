@@ -112,9 +112,9 @@ support.
 class DPDKInfo : public Element {
 public:
 
-    const char *class_name() const { return "DPDKInfo"; }
+    const char *class_name() const override { return "DPDKInfo"; }
 
-    int configure_phase() const { return CONFIGURE_PHASE_FIRST; }
+    int configure_phase() const override { return CONFIGURE_PHASE_FIRST; }
 
     int configure(Vector<String> &conf, ErrorHandler *errh);
 

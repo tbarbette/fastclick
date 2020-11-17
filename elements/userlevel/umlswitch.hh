@@ -47,9 +47,9 @@ class UMLSwitch : public Socket { public:
   UMLSwitch() : _ctl_path("/tmp/uml.ctl") {};
   ~UMLSwitch() {};
 
-  const char *class_name() const	{ return "UMLSwitch"; }
-  const char *processing() const	{ return "l/h"; }
-  const char *flow_code() const		{ return "x/y"; }
+  const char *class_name() const override	{ return "UMLSwitch"; }
+  const char *processing() const override	{ return "l/h"; }
+  const char *flow_code() const override		{ return "x/y"; }
 
   int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

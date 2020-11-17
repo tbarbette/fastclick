@@ -32,8 +32,8 @@ class RTCycles : public BatchElement { public:
   RTCycles() CLICK_COLD;
   ~RTCycles() CLICK_COLD;
 
-  const char *class_name() const	{ return "RoundTripCycleCount"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+  const char *class_name() const override	{ return "RoundTripCycleCount"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
 
   void push(int, Packet *p);
   Packet *pull(int);

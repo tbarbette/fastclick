@@ -347,8 +347,14 @@ if test "x$enable_dpdk" = "xyes"; then
     fi
 
 
-    if pkg-config --exists libdpdk ; then
-      RTE_LIB=pkg-config --variable=libdir libdpdk
+    if pkg-config --exists libdpdk; then
+      RTE_LIB=$(pkg-config --variable=libdir libdpdk)
+      RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
+      rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_major=$rte_ver_year
+      AC_MSG_RESULT([yes])
     else
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
@@ -358,48 +364,51 @@ if test "x$enable_dpdk" = "xyes"; then
 Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
 Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
 or install DPDK using meson, or the system package manager.
+Note with the system package manager, you need the devel package
+version (dpdk-dev or dpdk-devel).
 
 =========================================])
       fi
 
-    AC_MSG_RESULT([yes, found at $RTE_SDK_BIN])
+      AC_MSG_RESULT([yes, found at $RTE_SDK_BIN])
 
       if test -e "$RTE_SRCDIR/VERSION"; then
         rte_ver_year=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($1)}'`
         rte_ver_month=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($2)}'`
         rte_ver_minor=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($3)}'`
+        rte_ver_major=$rte_ver_year
       else
-        if grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_config.h" &> /dev/null ; then
+        if grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_config.h" &> /dev/null; then
             verfile=rte_config
         else
             verfile=rte_version
         fi
-        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
         rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
         rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
-      fi
-      AC_SUBST(RTE_SDK)
-      AC_SUBST(RTE_TARGET)
-      AC_SUBST(RTE_SDK_BIN)
-      AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
-      AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
-      AC_SUBST(RTE_VER_YEAR, $rte_ver_year)
-      AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
-      AC_SUBST(DPDK_INCLUDES, -I${RTE_SDK_BIN}/include/)
-
-      AC_MSG_CHECKING([whether DPDK has rte_eth_read_clock])
-      if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null ; then
-        AC_MSG_RESULT([yes])
-        AC_DEFINE([HAVE_DPDK_READ_CLOCK])
-      else
-        AC_MSG_RESULT([no])
+        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
       fi
     fi
+
+    AC_SUBST(RTE_SDK)
+    AC_SUBST(RTE_TARGET)
+    AC_SUBST(RTE_SDK_BIN)
+    AC_SUBST(RTE_VER_YEAR,  $rte_ver_year)
+    AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
+    AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
+    AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
+    AC_SUBST(DPDK_INCLUDES, -I${RTE_SDK_BIN}/include/)
 
     AC_DEFINE([HAVE_DPDK])
     AC_SUBST(USE_DPDK, yes)
 
+    AC_MSG_CHECKING([whether DPDK has rte_eth_read_clock])
+    if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null; then
+      AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_DPDK_READ_CLOCK])
+    else
+      AC_MSG_RESULT([no])
+    fi
 fi
 
 if test "x$enable_dpdk_pool" = "xyes"; then
@@ -1009,8 +1018,11 @@ if test "x$enable_dynamic_linking" = xyes; then
     if test "$HOST_TOOLS" != host -a "$enable_tools" != no; then
         CLICK_CHECK_BUILD_DYNAMIC_LINKING
     fi
+    CLICK_SHARED=1
+else
+    CLICK_SHARED=0
 fi
-
+AC_SUBST(CLICK_SHARED)
 
 dnl
 dnl sockets
@@ -1387,9 +1399,11 @@ AC_CHECK_FILE($srcdir/include/click/flowrulecache.hh, [ac_have_flow_rule_cache_h
 AC_CHECK_FILE($srcdir/include/click/flowrulemanager.hh, [ac_have_flow_rule_man_h=yes], [ac_have_flow_rule_man_h=no])
 if test "x$ac_have_flow_rule_parser_h$ac_have_flow_rule_cache_h$ac_have_flow_rule_man_h$enable_flow_api" = "xyesyesyesyes"; then
     have_flow_api=yes
-    AC_DEFINE([HAVE_FLOW_API])
+    AC_DEFINE([HAVE_FLOW_API],1)
+    AC_SUBST([HAVE_FLOW_API],1)
 else
     have_flow_api=no
+    AC_SUBST([HAVE_FLOW_API],0)
 fi
 
 dnl debugging malloc
@@ -2450,6 +2464,9 @@ if test "x$enable_dpdk" = xyes; then
     if test "$rte_ver_year" -ge 19; then
         provisions="$provisions dpdk19"
     fi
+    if test "$rte_ver_year" -ge 17; then
+        provisions="$provisions dpdk17"
+    fi
 fi
 
 dnl add 'experimental' if --enable-experimental was supplied
@@ -2612,6 +2629,16 @@ else
     feedback="Metron requires to configure with '--enable-flow-api --enable-json --enable-cpu-load' and install libcurl and libmicrohttpd."
 fi
 
+if test "$enable_dpdk" = yes; then
+    dpdk_info="${enable_dpdk}
+    DPDK    Target:              ${RTE_TARGET}
+    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}
+    DPDK     Major:              ${RTE_VER_MAJOR}
+    DPDK     Minor:              ${RTE_VER_MINOR}"
+else
+    dpdk_info=${enable_dpdk}
+fi
+
 echo "
 
 Configuration Summary:
@@ -2622,7 +2649,8 @@ Configuration Summary:
     Flow Subsystem:              ${enable_flow}
        HW Flow API:              ${have_flow_api}
 
-    DPDK   support:              ${enable_dpdk}
+    DPDK   support:              ${dpdk_info}
+
     Netmap support:              ${HAVE_NETMAP}
     PCAP   support:              ${have_pcap}
 

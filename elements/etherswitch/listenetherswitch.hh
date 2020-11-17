@@ -30,8 +30,8 @@ class ListenEtherSwitch : public EtherSwitch { public:
     ListenEtherSwitch() CLICK_COLD;
     ~ListenEtherSwitch() CLICK_COLD;
 
-    const char *class_name() const		{ return "ListenEtherSwitch"; }
-    const char *port_count() const		{ return "-/=+"; }
+    const char *class_name() const override		{ return "ListenEtherSwitch"; }
+    const char *port_count() const override		{ return "-/=+"; }
 
     void push(int port, Packet* p);
 

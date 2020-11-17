@@ -42,8 +42,8 @@ public:
   LinuxIPLookup() CLICK_COLD;
   ~LinuxIPLookup() CLICK_COLD;
 
-  const char *class_name() const	{ return "LinuxIPLookup"; }
-  const char *port_count() const	{ return "1/1-"; }
+  const char *class_name() const override	{ return "LinuxIPLookup"; }
+  const char *port_count() const override	{ return "1/1-"; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;
 

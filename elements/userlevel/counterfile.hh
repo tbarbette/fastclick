@@ -82,9 +82,9 @@ class CounterFile : public BatchElement { public:
     CounterFile() CLICK_COLD;
     ~CounterFile() CLICK_COLD;
 
-    const char *class_name() const      { return "CounterFile"; }
-    const char *processing() const      { return AGNOSTIC; }
-    const char *port_count() const      { return PORTS_1_1; }
+    const char *class_name() const override      { return "CounterFile"; }
+    const char *processing() const override      { return AGNOSTIC; }
+    const char *port_count() const override      { return PORTS_1_1; }
 
     counter_int_type count() {
         return _mmapped_stats->_count;

@@ -24,7 +24,7 @@ class ErrorTest : public Element { public:
 
     ErrorTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "ErrorTest"; }
+    const char *class_name() const override		{ return "ErrorTest"; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
 

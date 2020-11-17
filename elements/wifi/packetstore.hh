@@ -36,11 +36,11 @@ class PacketStore : public Element { public:
   PacketStore() CLICK_COLD;
   ~PacketStore() CLICK_COLD;
 
-  const char *class_name() const		{ return "PacketStore"; }
-  const char *port_count() const		{ return PORTS_1_1; }
+  const char *class_name() const override		{ return "PacketStore"; }
+  const char *port_count() const override		{ return PORTS_1_1; }
   const char* processing() const		{ return AGNOSTIC; }
   int initialize(ErrorHandler *) CLICK_COLD;
-  const char *flow_code() const			{ return "#/#"; }
+  const char *flow_code() const override			{ return "#/#"; }
   void *cast(const char *);
 
   Packet *simple_action(Packet *);

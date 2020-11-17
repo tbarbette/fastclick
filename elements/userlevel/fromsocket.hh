@@ -38,9 +38,9 @@ class FromSocket : public Socket { public:
   FromSocket() CLICK_COLD;
   ~FromSocket() CLICK_COLD;
 
-  const char *class_name() const	{ return "FromSocket"; }
-  const char *processing() const	{ return PUSH; }
-  const char *flow_code() const		{ return "x/y"; }
+  const char *class_name() const override	{ return "FromSocket"; }
+  const char *processing() const override	{ return PUSH; }
+  const char *flow_code() const override		{ return "x/y"; }
 
 };
 

@@ -33,7 +33,6 @@ EnsureDPDKBuffer::~EnsureDPDKBuffer()
     //TODO : make this work even without FromDPDK/ToDPDK
 }
 
-
 int
 EnsureDPDKBuffer::configure(Vector<String> &conf, ErrorHandler *errh)
 {
@@ -51,8 +50,15 @@ EnsureDPDKBuffer::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+int
+EnsureDPDKBuffer::initialize(ErrorHandler *errh)
+{
+    return DPDKDevice::initialize(errh);
+}
+
 inline Packet*
-EnsureDPDKBuffer::smaction(Packet* p) {
+EnsureDPDKBuffer::smaction(Packet* p)
+{
     if (!_force && (DPDKDevice::is_dpdk_buffer(p))) {
         return p;
     } else if (_noalloc) {
@@ -102,16 +108,14 @@ EnsureDPDKBuffer::simple_action_batch(PacketBatch *head)
 }
 #endif
 Packet*
-EnsureDPDKBuffer::simple_action(Packet* p) {
+EnsureDPDKBuffer::simple_action(Packet* p)
+{
 #if HAVE_ZEROCOPY
     return smaction(p);
 #else
     return p;
 #endif
 }
-
-
-
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel dpdk)

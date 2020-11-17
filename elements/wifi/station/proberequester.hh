@@ -34,9 +34,9 @@ class ProbeRequester : public Element { public:
   ProbeRequester() CLICK_COLD;
   ~ProbeRequester() CLICK_COLD;
 
-  const char *class_name() const	{ return "ProbeRequester"; }
-  const char *port_count() const	{ return PORTS_0_1; }
-  const char *processing() const	{ return PUSH; }
+  const char *class_name() const override	{ return "ProbeRequester"; }
+  const char *port_count() const override	{ return PORTS_0_1; }
+  const char *processing() const override	{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const	{ return true; }
