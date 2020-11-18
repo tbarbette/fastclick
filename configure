@@ -15103,6 +15103,9 @@ if test "x$enable_dpdk" = xyes; then
     if test "$rte_ver_year" -ge 19; then
         provisions="$provisions dpdk19"
     fi
+    if test "$rte_ver_year" -ge 18; then
+        provisions="$provisions dpdk18"
+    fi
     if test "$rte_ver_year" -ge 17; then
         provisions="$provisions dpdk17"
     fi
