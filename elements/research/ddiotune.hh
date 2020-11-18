@@ -1,5 +1,5 @@
-#ifndef CLICK_DDIOTune_HH
-#define CLICK_DDIOTune_HH
+#ifndef CLICK_DDIOTUNE_HH
+#define CLICK_DDIOTUNE_HH
 #include <click/element.hh>
 #include <click/hashtable.hh>
 #include <rte_pci.h>
@@ -148,4 +148,5 @@ private:
 };
 
 CLICK_ENDDECLS
-#endif
+
+#endif /* CLICK_DDIOTUNE_HH */
