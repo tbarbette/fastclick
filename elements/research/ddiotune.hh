@@ -43,7 +43,7 @@ element.
 
 For more information, you can check out our paper published in ATC'20.
 
-This element requires at least DPDK 17.04, or higher.
+This element requires at least DPDK 17.11 or higher.
 
 Arguments:
 
