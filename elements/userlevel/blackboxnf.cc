@@ -500,6 +500,6 @@ BlackboxNF::add_handlers()
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(userlevel dpdk batch)
+ELEMENT_REQUIRES(userlevel dpdk17 batch)
 EXPORT_ELEMENT(BlackboxNF)
 ELEMENT_MT_SAFE(BlackboxNF)

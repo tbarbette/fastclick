@@ -4670,7 +4670,7 @@ ServiceChain::print()
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(userlevel dpdk Json)
+ELEMENT_REQUIRES(userlevel dpdk17 Json)
 
 EXPORT_ELEMENT(Metron)
 ELEMENT_MT_SAFE(Metron)
