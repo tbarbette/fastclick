@@ -37,7 +37,28 @@
     #include <click/flowrulemanager.hh>
 #endif
 
-#include <rte_flow.h>
+#if RTE_VERSION < RTE_VERSION_NUM(20,11,0,0)
+#define TIMESTAMP_FIELD(mbuf) \
+            (mbuf->timestamp)
+#define HAS_TIMESTAMP(mbuf) \
+        (mbuf->ol_flags & PKT_RX_TIMESTAMP)
+#else
+#include <rte_mbuf_dyn.h>
+#include <rte_bitops.h>
+#define TIMESTAMP_FIELD(mbuf) \
+           (*RTE_MBUF_DYNFIELD(mbuf, timestamp_dynfield_offset, uint64_t *))
+static const struct rte_mbuf_dynflag rx_flag_desc = {
+    RTE_MBUF_DYNFLAG_RX_TIMESTAMP_NAME,
+};
+struct rte_mbuf_dynfield timestamp_dynfield_desc = {
+    RTE_MBUF_DYNFIELD_TIMESTAMP_NAME,
+    sizeof(uint64_t),
+    __alignof__(uint64_t),
+};
+#define HAS_TIMESTAMP(mbuf) \
+        ((mbuf)->ol_flags & timestamp_dynflag)
+#endif
+
 
 CLICK_DECLS
 
@@ -165,6 +186,20 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         _dev->set_rx_offload(DEV_RX_OFFLOAD_UDP_CKSUM);
 
     if (set_timestamp) {
+#if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
+        timestamp_dynfield_offset =
+            rte_mbuf_dynfield_register(&timestamp_dynfield_desc);
+        if (timestamp_dynfield_offset < 0) {
+            rte_exit(EXIT_FAILURE, "Cannot register mbuf field\n");
+        }
+        int offset = rte_mbuf_dynflag_register(&rx_flag_desc);
+        if (offset < 0) {
+            RTE_ETHDEV_LOG(ERR,
+                    "Failed to register mbuf flag for Rx timestamp\n");
+            return -rte_errno;
+        }
+        timestamp_dynflag = RTE_BIT64(offset);
+#endif
 #if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
         _dev->set_rx_offload(DEV_RX_OFFLOAD_TIMESTAMP);
         _set_timestamp = true;
@@ -337,9 +372,9 @@ bool FromDPDKDevice::run_task(Task *t)
                 SET_PAINT_ANNO(p, iqueue);
             }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0) && RTE_VERSION < RTE_VERSION_NUM(20,11,0,0)
-            if (_set_timestamp && (pkts[i]->ol_flags & PKT_RX_TIMESTAMP)) {
-                p->timestamp_anno().assignlong(pkts[i]->timestamp);
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+            if (_set_timestamp && HAS_TIMESTAMP(pkts[i])) {
+                p->timestamp_anno().assignlong(TIMESTAMP_FIELD(pkts[i]));
             }
 #endif
 #if HAVE_BATCH
@@ -915,7 +950,6 @@ void FromDPDKDevice::add_handlers()
 #if HAVE_FLOW_API
     add_write_handler(FlowRuleManager::FLOW_RULE_ADD,     flow_handler, h_rule_add,    0);
     add_write_handler(FlowRuleManager::FLOW_RULE_DEL,     flow_handler, h_rules_del,   0);
-    add_write_handler(FlowRuleManager::FLOW_RULE_ISOLATE, write_handler, h_isolate, 0);
     add_write_handler(FlowRuleManager::FLOW_RULE_FLUSH,   flow_handler, h_rules_flush, 0);
     add_read_handler (FlowRuleManager::FLOW_RULE_IDS_GLB,         statistics_handler, h_rules_ids_global);
     add_read_handler (FlowRuleManager::FLOW_RULE_IDS_INT,         statistics_handler, h_rules_ids_internal);
