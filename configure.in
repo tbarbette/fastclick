@@ -317,6 +317,8 @@ if test "x$enable_dpdk" = "xyes"; then
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
       rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       AC_MSG_RESULT([yes])
     else
       RTE_LIB="$RTE_SDK_BIN/lib"
@@ -353,12 +355,13 @@ version (dpdk-dev or dpdk-devel).
       AC_SUBST(RTE_SDK)
       AC_SUBST(RTE_TARGET)
       AC_SUBST(RTE_SDK_BIN)
-      AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
-      AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
-      AC_SUBST(RTE_VER_YEAR, $rte_ver_year)
-      AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
       AC_SUBST(DPDK_INCLUDES, -I${RTE_SDK_BIN}/include/)
     fi
+
+    AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
+    AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
+    AC_SUBST(RTE_VER_YEAR, $rte_ver_year)
+    AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
 
     AC_DEFINE([HAVE_DPDK])
     AC_SUBST(USE_DPDK, yes)

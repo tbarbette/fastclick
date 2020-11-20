@@ -708,11 +708,11 @@ xen_dir
 INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
 USE_DPDK
-DPDK_INCLUDES
 RTE_VER_MONTH
 RTE_VER_YEAR
 RTE_VER_MINOR
 RTE_VER_MAJOR
+DPDK_INCLUDES
 RTE_SDK_BIN
 RTE_TARGET
 RTE_SDK
@@ -7154,6 +7154,8 @@ $as_echo_n "checking for DPDK library... " >&6; }
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
       rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
     else
@@ -7192,17 +7194,18 @@ $as_echo "yes, found at $RTE_SDK_BIN" >&6; }
 
 
 
-      RTE_VER_MAJOR=$rte_ver_major
-
-      RTE_VER_MINOR=$rte_ver_minor
-
-      RTE_VER_YEAR=$rte_ver_year
-
-      RTE_VER_MONTH=$rte_ver_month
-
       DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
 
     fi
+
+    RTE_VER_MAJOR=$rte_ver_major
+
+    RTE_VER_MINOR=$rte_ver_minor
+
+    RTE_VER_YEAR=$rte_ver_year
+
+    RTE_VER_MONTH=$rte_ver_month
+
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
 
