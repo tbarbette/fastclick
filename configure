@@ -7466,10 +7466,12 @@ $as_echo_n "checking for DPDK library... " >&6; }
       rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       rte_ver_major=$rte_ver_year
+      RTE_IS_MESON=1
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
     else
       RTE_LIB="$RTE_SDK_BIN/lib"
+      RTE_IS_MESON=0
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         as_fn_error $? "
 =========================================
@@ -11501,6 +11503,9 @@ else
 fi
 
 if test "x$ac_have_flow_rule_parser_h$ac_have_flow_rule_cache_h$ac_have_flow_rule_man_h$enable_flow_api" = "xyesyesyesyes"; then
+    if test "x$RTE_IS_MESON$CLICK_SHARED" = "x11"; then
+        as_fn_error $? "--enable-flow-api requires --disable-dynamic-linking" "$LINENO" 5
+    fi
     have_flow_api=yes
     $as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
 

@@ -354,9 +354,11 @@ if test "x$enable_dpdk" = "xyes"; then
       rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       rte_ver_major=$rte_ver_year
+      RTE_IS_MESON=1
       AC_MSG_RESULT([yes])
     else
       RTE_LIB="$RTE_SDK_BIN/lib"
+      RTE_IS_MESON=0
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         AC_MSG_ERROR([
 =========================================
@@ -1398,6 +1400,9 @@ AC_CHECK_FILE($srcdir/include/click/flowruleparser.hh, [ac_have_flow_rule_parser
 AC_CHECK_FILE($srcdir/include/click/flowrulecache.hh, [ac_have_flow_rule_cache_h=yes], [ac_have_flow_rule_cache_h=no])
 AC_CHECK_FILE($srcdir/include/click/flowrulemanager.hh, [ac_have_flow_rule_man_h=yes], [ac_have_flow_rule_man_h=no])
 if test "x$ac_have_flow_rule_parser_h$ac_have_flow_rule_cache_h$ac_have_flow_rule_man_h$enable_flow_api" = "xyesyesyesyes"; then
+    if test "x$RTE_IS_MESON$CLICK_SHARED" = "x11"; then
+        AC_MSG_ERROR([--enable-flow-api requires --disable-dynamic-linking])
+    fi
     have_flow_api=yes
     AC_DEFINE([HAVE_FLOW_API],1)
     AC_SUBST([HAVE_FLOW_API],1)

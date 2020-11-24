@@ -32,7 +32,7 @@ matrix:
       env: FRAMEWORK=libdpdk VERSION=20.08 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
 env:
   global:
-    - FLAGS="--enable-ip6 --disable-linuxmodule --enable-tunnel --enable-research --enable-flow --enable-flow-api --enable-json"
+    - FLAGS="--enable-ip6 --disable-linuxmodule --enable-tunnel --enable-research --enable-flow --enable-flow-api --enable-json --disable-dynamic-linking"
     - CXXFLAGS="-std=gnu++11"
   matrix:
     - FRAMEWORK=vanilla CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
