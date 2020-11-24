@@ -245,9 +245,13 @@ class RouterThread { public:
     // task running functions
     void driver_lock_tasks();
     inline void driver_unlock_tasks() {
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+        assert(_task_blocker.compare_and_swap((uint32_t) -1, 0));
+#else
         uint32_t val = _task_blocker.compare_swap((uint32_t) -1, 0);
         (void) val;
         assert(val == (uint32_t) -1);
+#endif
     }
 
     inline void run_tasks(int ntasks);
@@ -432,7 +436,11 @@ RouterThread::block_tasks(bool scheduled)
     while (1) {
         uint32_t blocker = _task_blocker.value();
         if ((int32_t) blocker >= 0
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+            && _task_blocker.compare_and_swap(blocker, blocker + 1))
+#else
             && _task_blocker.compare_swap(blocker, blocker + 1) == blocker)
+#endif
             break;
 #if CLICK_LINUXMODULE
         // 3.Nov.2008: Must allow other threads a chance to run.  Otherwise,

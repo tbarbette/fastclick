@@ -103,7 +103,11 @@ Storage::reserve_tail_atomic()
         nt = next_i(t);
         if (nt == _head)
             return invalid_index;
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+    } while (!atomic_uint32_t::compare_and_swap(_tail, t, nt));
+#else
     } while (atomic_uint32_t::compare_swap(_tail, t, nt) != t);
+#endif
     return t;
 }
 
