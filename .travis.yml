@@ -87,6 +87,7 @@ script:
   - if [ $FRAMEWORK = "libdpdk" ] ; then
         FRAMEWORK_FLAGS="--enable-user-multithread --enable-dpdk";
         export RTE_TARGET=x86_64-linux-gnu
+        export RTE_SDK=`pwd`/dpdk-$STABLE$VERSION;
         export PKG_CONFIG_PATH=$(pwd)/dpdk-$STABLE$VERSION/install/lib/$RTE_TARGET/pkgconfig/ ;
         export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(pwd)/dpdk-$STABLE$VERSION/install/lib/$RTE_TARGET/ ;
         if [ ! -e "dpdk-$STABLE$VERSION" ] || ! pkg-config --exists libdpdk ; then
