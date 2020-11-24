@@ -127,6 +127,8 @@ protected :
 #else
 class BatchElement : public Element { public:
     inline void checked_output_push_batch(int port, PacketBatch* batch) {
+        (void)port;
+        (void)batch;
         click_chatter("Error : checked_output_push_batch called without batching being enabled");
         assert(false);
     }
