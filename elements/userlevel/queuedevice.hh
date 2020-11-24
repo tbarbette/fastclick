@@ -80,7 +80,7 @@ protected:
      */
     class ThreadState {
         public:
-        ThreadState() : _count(0), _dropped(0), first_queue_id(-1) {};
+        ThreadState() : _count(0), _dropped(0), task(0), first_queue_id(-1) {};
         long long unsigned _count;
         long long unsigned _dropped;
         Task*       task;
@@ -89,9 +89,9 @@ protected:
 
     per_thread<ThreadState> _thread_state;
 
-    int _this_node; //Numa node index
+    int _this_node; // Numa node index
 
-    bool _active; //Is this element active
+    bool _active; // Is this element active
 
     //Verbosity level
     int _verbose;
@@ -142,7 +142,7 @@ protected:
         }
     }
 
-    enum {h_count};
+    enum {h_count,h_useful,h_useless};
 
     unsigned long long n_count();
     unsigned long long n_dropped();

@@ -41,6 +41,11 @@ If CONTENTS or PAYLOAD printing is on, then MAXLENGTH determines the maximum
 number of bytes to print. -1 means print the entire packet or payload. Default
 is 1500.
 
+=item ETHER
+
+Boolean. Determines whether to print each packet's Ethernet addresses.
+Default is false.
+
 =item ID
 
 Boolean. Determines whether to print each packet's IP ID field. Default is
@@ -69,6 +74,11 @@ Boolean. Determines whether to print each packet's timestamp in seconds since
 =item AGGREGATE
 
 Boolean. Determines whether to print each packet's aggregate annotation.
+Default is false.
+
+=item VLAN
+
+Boolean. Determines whether to print each packet's VLAN ID.
 Default is false.
 
 =item PAINT
@@ -101,8 +111,8 @@ class IPPrint : public SimpleElement<IPPrint> {
         IPPrint() CLICK_COLD;
         ~IPPrint() CLICK_COLD;
 
-        const char *class_name() const { return "IPPrint"; }
-        const char *port_count() const { return PORTS_1_1; }
+        const char *class_name() const override { return "IPPrint"; }
+        const char *port_count() const override { return PORTS_1_1; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
         int initialize(ErrorHandler *) CLICK_COLD;
@@ -116,6 +126,7 @@ class IPPrint : public SimpleElement<IPPrint> {
         bool _active;
         String _label;
         int _bytes;               // Number of bytes to dump
+        bool _print_ether : 1;    // Print Ethernet addresses?
         bool _print_id : 1;       // Print IP ID?
         bool _print_timestamp : 1;
         bool _print_paint : 1;
@@ -137,6 +148,7 @@ class IPPrint : public SimpleElement<IPPrint> {
         void tcp_line(StringAccum &, const Packet *, int transport_len) const;
         void udp_line(StringAccum &, const Packet *, int transport_len) const;
         void icmp_line(StringAccum &, const Packet *, int transport_len) const;
+
 };
 
 CLICK_ENDDECLS

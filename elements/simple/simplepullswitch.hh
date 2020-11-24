@@ -40,9 +40,9 @@ class SimplePullSwitch : public Element { public:
     SimplePullSwitch() CLICK_COLD;
     ~SimplePullSwitch() CLICK_COLD;
 
-    const char *class_name() const		{ return "SimplePullSwitch"; }
-    const char *port_count() const		{ return "-/1"; }
-    const char *processing() const		{ return PULL; }
+    const char *class_name() const override		{ return "SimplePullSwitch"; }
+    const char *port_count() const override		{ return "-/1"; }
+    const char *processing() const override		{ return PULL; }
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     bool can_live_reconfigure() const		{ return true; }

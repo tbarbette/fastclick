@@ -15,7 +15,7 @@
 
 CLICK_DECLS
 
-FlowIPManagerIMP::FlowIPManagerIMP() : _verbose(1), _flags(0), _timer(this), _task(this), _tables(0) {
+FlowIPManagerIMP::FlowIPManagerIMP() : _verbose(1), _flags(0), _timer(this), _task(this), _tables(0), _cache(true) {
 }
 
 FlowIPManagerIMP::~FlowIPManagerIMP()
@@ -29,6 +29,7 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
         .CLICK_NEVER_REPLACE(read_or_set_p)("CAPACITY", _table_size, 65536)
         .CLICK_NEVER_REPLACE(read_or_set)("RESERVE", _reserve, 0)
         .read_or_set("TIMEOUT", _timeout, -1)
+        .read_or_set("CACHE", _cache, true)
         .complete() < 0)
         return -1;
 
@@ -55,6 +56,7 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
     char buf[32];
     hash_params.name = buf;
     auto passing = get_passing_threads();
+    _tables_count = passing.size();
     _table_size = next_pow2(_table_size/passing.weight());
     click_chatter("Real capacity for each table will be %d", _table_size);
     hash_params.entries = _table_size;
@@ -65,13 +67,13 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
 
     _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
-    _tables = CLICK_ALIGNED_NEW(gtable, passing.size());
+    _tables = CLICK_ALIGNED_NEW(gtable, _tables_count);
     CLICK_ASSERT_ALIGNED(_tables);
 
-    for (int i = 0; i < passing.size(); i++) {
+    for (int i = 0; i < _tables_count; i++) {
         if (!passing[i])
             continue;
-        sprintf(buf, "flowipmanager%d", i);
+        sprintf(buf, "%s-%d",name().c_str(), i);
         _tables[i].hash = rte_hash_create(&hash_params);
         if (!_tables[i].hash)
             return errh->error("Could not init flow table %d!", i);
@@ -95,6 +97,11 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
     return 0;
 }
 
+
+const auto fim_setter = [](FlowControlBlock* prev, FlowControlBlock* next)
+{
+        *((FlowControlBlock**)&prev->data_32[2]) = next;
+};
 
 bool FlowIPManagerIMP::run_task(Task* t)
 {
@@ -144,6 +151,10 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
 {
     IPFlow5ID fid = IPFlow5ID(p);
 
+    if (_cache && fid == b.last_id) {
+        b.append(p);
+        return;
+    }
     auto& tab = _tables[click_current_cpu_id()];
     rte_hash* table = tab.hash;
 
@@ -184,6 +195,9 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
         fcb_stack = fcb;
         b.init();
         b.append(p);
+        b.last = ret;
+        if (_cache)
+            b.last_id = fid;
     }
 }
 
@@ -206,11 +220,19 @@ enum {h_count};
 String FlowIPManagerIMP::read_handler(Element* e, void* thunk)
 {
     FlowIPManagerIMP* fc = static_cast<FlowIPManagerIMP*>(e);
-    click_chatter("ENTERED in the read_handler function");
-    rte_hash* table = fc->_tables[click_current_cpu_id()].hash;
     switch ((intptr_t)thunk) {
     case h_count:
-        return String(rte_hash_count(table));
+	{
+	    int count = 0;
+	    for(int i=0; i< fc->_tables_count; i++)
+	    {	
+		gtable * t = (fc->_tables)+i;
+		rte_hash* table = t->hash;
+		if(table)
+		    count+=rte_hash_count(table);
+	    }
+	    return String(count);
+	}
     default:
         return "<error>";
     }
@@ -218,7 +240,7 @@ String FlowIPManagerIMP::read_handler(Element* e, void* thunk)
 
 void FlowIPManagerIMP::add_handlers()
 {
-
+    add_read_handler("count", read_handler, h_count);
 }
 
 CLICK_ENDDECLS

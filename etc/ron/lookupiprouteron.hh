@@ -77,9 +77,9 @@ public:
   LookupIPRouteRON();
   ~LookupIPRouteRON();
 
-  const char *class_name() const		{ return "LookupIPRouteRON"; }
-  const char *port_count() const		{ return "2-/="; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "LookupIPRouteRON"; }
+  const char *port_count() const override		{ return "2-/="; }
+  const char *processing() const override		{ return PUSH; }
 
   int configure(const Vector<String> &, ErrorHandler *);
   int initialize(ErrorHandler *);

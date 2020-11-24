@@ -351,7 +351,7 @@ HashTable<uint8_t, DDIOTune *> DDIOTune::dev_ddiotune;
 
 CLICK_ENDDECLS
 
-ELEMENT_REQUIRES(dpdk)
+ELEMENT_REQUIRES(dpdk dpdk18)
 ELEMENT_REQUIRES(pci)
 
 EXPORT_ELEMENT(DDIOTune)

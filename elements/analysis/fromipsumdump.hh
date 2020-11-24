@@ -160,8 +160,8 @@ class FromIPSummaryDump : public BatchElement, public IPSummaryDumpInfo { public
     FromIPSummaryDump() CLICK_COLD;
     ~FromIPSummaryDump() CLICK_COLD;
 
-    const char *class_name() const	{ return "FromIPSummaryDump"; }
-    const char *port_count() const	{ return PORTS_0_1; }
+    const char *class_name() const override	{ return "FromIPSummaryDump"; }
+    const char *port_count() const override	{ return PORTS_0_1; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

@@ -60,9 +60,9 @@ class IPFragmenter : public BatchElement { public:
   IPFragmenter() CLICK_COLD;
   ~IPFragmenter() CLICK_COLD;
 
-  const char *class_name() const		{ return "IPFragmenter"; }
-  const char *port_count() const		{ return PORTS_1_1X2; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "IPFragmenter"; }
+  const char *port_count() const override		{ return PORTS_1_1X2; }
+  const char *processing() const override		{ return PUSH; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
   uint32_t drops() const			{ return _drops; }

@@ -19,7 +19,7 @@ class SamplePackageElement : public Element { public:
     SamplePackageElement();		// SEE sample.cc FOR CONSTRUCTOR
     ~SamplePackageElement();		// SEE sample.cc FOR DESTRUCTOR
 
-    const char *class_name() const	{ return "SamplePackageElement"; }
+    const char *class_name() const override	{ return "SamplePackageElement"; }
 
     int initialize(ErrorHandler *errh);
 

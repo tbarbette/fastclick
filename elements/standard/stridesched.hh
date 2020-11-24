@@ -36,9 +36,9 @@ class StrideSched : public Element { public:
 
     StrideSched() CLICK_COLD;
 
-    const char *class_name() const		{ return "StrideSched"; }
-    const char *port_count() const		{ return "1-/1"; }
-    const char *processing() const		{ return PULL; }
+    const char *class_name() const override		{ return "StrideSched"; }
+    const char *port_count() const override		{ return "1-/1"; }
+    const char *processing() const override		{ return PULL; }
     const char *flags() const			{ return "S0"; }
 
     int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;

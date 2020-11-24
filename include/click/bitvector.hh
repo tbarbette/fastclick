@@ -430,7 +430,7 @@ inline int Bitvector::clz() const {
 #if HAVE___BUILTIN_CTZ
 			return n + __builtin_ctz(_data[i]);
 #else
-			while (!this[n])
+			while (!(*this)[n])
 				n++;
 			return n;
 #endif

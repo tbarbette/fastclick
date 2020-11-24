@@ -97,6 +97,7 @@ class ElementDistanceCastTracker : public RouterVisitor {
    private:
         bool visit(Element *e, bool isoutput, int port,
             Element *from_e, int from_port, int distance);
+
         int distance(Element *e, Element *from_e) {
             if (from_e && from_e->cast("VirtualFlowSpaceElement")) {
                 //click_chatter("Distance to VFSE %p{element}: %d",e, distance);
@@ -157,7 +158,7 @@ bool cmp(el a, el b)
 
 VirtualFlowManager::VirtualFlowManager()
 {
-    //_fcb_builded_init_future->add();
+    _fcb_builded_init_future.add();
 }
 
 void VirtualFlowManager::find_children(int verbose)
@@ -188,24 +189,58 @@ Vector<VirtualFlowManager*> VirtualFlowManager::_entries;
 CounterInitFuture VirtualFlowManager::_fcb_builded_init_future("FCBBuilder", VirtualFlowManager::build_fcb);
 
 
+class ManagerReachVisitor : public RouterVisitor { public:
+    Element* _target;
+    bool _reached;
+
+    ManagerReachVisitor(Element* t) : _target(t), _reached(false) {
+
+    }
+
+    bool visit(Element *e, bool, int,
+               Element *, int, int) {
+        FlowElement* fe = dynamic_cast<FlowElement*>(e);
+        if (fe && fe->stopClassifier())
+            return false;
+        if (e == _target) {
+            _reached = true;
+            return false;
+        }
+        return true;
+    }
+
+    bool reached() {
+        return _reached;
+    }
+};
+
+bool
+element_can_reach(Router* router, Element* a, Element* b) {
+    ManagerReachVisitor r(b);
+    router->visit(a, true, -1, &r);
+    if (!r.reached())
+        router->visit(a, false, -1, &r);
+    return r.reached();
+}
+
 /**
  * This function builds the layout of the FCB by going through the graph starting from each entry elements
  */
 void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
     typedef Pair<int,int> CountDistancePair;
     HashTable<int,CountDistancePair> common(CountDistancePair{0,INT_MAX});
-    int min_place = 0;
 
     Element* e = _entries[0];
     Router* router = e->router();
 
+    if (verbose > 1)
+        click_chatter("Building FCBs");
     // Counting elements that appear multiple times and their maximal distance
     for (int i = 0; i < _entries.size(); i++) {
         VirtualFlowManager* fc = dynamic_cast<VirtualFlowManager*>(_entries[i]);
-        if (fc->_reserve > min_place)
-            min_place = fc->_reserve;
+
         for (int j = 0; j < _entries[i]->_reachable_list.size(); j++) {
-            //click_chatter("%p{element} : %d", _entries[i]->_reachable_list[j].first, _entries[i]->_reachable_list[j].second);
+            if (verbose > 1) click_chatter("%p{element} : %d", _entries[i]->_reachable_list[j].first, _entries[i]->_reachable_list[j].second);
             auto ptr = common.find_insert(_entries[i]->_reachable_list[j].first->eindex(),CountDistancePair(0,_entries[i]->_reachable_list[j].second));
             ptr->second.first++;
             if (ptr->second.second < _entries[i]->_reachable_list[j].second) {
@@ -218,7 +253,9 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
     Vector<el> elements;
     for (auto it = common.begin(); it != common.end(); it++) {
         elements.push_back(el{it->first,it->second.first, it->second.second});
-    } // Sorting the element, so we place the most shared first, then the minimal distance first. With the current version of the algo, this is not needed anymore
+    }
+
+    // Sorting the element, so we place the most shared first, then the minimal distance first. With the current version of the algo, this is not needed anymore
     std::sort(elements.begin(), elements.end(),cmp);
 
     // We now place all elements
@@ -228,6 +265,22 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
         if (verbose > 1)
             click_chatter("Placing %p{element} : in %d sets, distance %d", e, it->count, it->distance);
         int my_place;
+        int min_place = 0;
+
+        //We need to verify the reserved space for all possible FlowManager
+        for (int i = 0; i < _entries.size(); i++) {
+            VirtualFlowManager* fc = dynamic_cast<VirtualFlowManager*>(_entries[i]);
+            //If this flow manager can reach the element, then we need to have enough reserved space
+            for (int j = 0; j < _entries[i]->_reachable_list.size(); j++) {
+                if (_entries[i]->_reachable_list[j].first->eindex() == it->id) {
+                    if (fc->_reserve > min_place)
+                        min_place = fc->_reserve;
+
+                    break;
+                }
+            }
+        }
+
         if (_ordered)
             my_place = min_place + it->distance;
         else
@@ -241,7 +294,7 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
         for (auto ai = already_placed.begin(); ai != already_placed.end(); ai++) {
             int aid = *ai;
             VirtualFlowSpaceElement* ae = dynamic_cast<VirtualFlowSpaceElement*>(router->element(aid));
-            if (router->element_can_reach(e,ae)) {
+            if (element_can_reach(router, e,ae)) {
                 if (v.size() < ae->flow_data_offset() + ae->flow_data_size())
                     v.resize(ae->flow_data_offset() + ae->flow_data_size());
                 v.set_range(ae->flow_data_offset(), ae->flow_data_size(), true);
@@ -260,12 +313,13 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
             click_chatter("Placing  %p{element} at [%d-%d]",e,my_place,my_place + e->flow_data_size() -1 );
         already_placed.insert(it->id);
         e->_flow_data_offset = my_place;
+	_fcb_builded_init_future.post(e);
     }
 
     //Set pool data size for classifiers
     for (int i = 0; i < _entries.size(); i++) {
         VirtualFlowManager* fc = _entries[i];
-        fc->_reserve = min_place;
+//        fc->_reserve = min_place;
         for (int j = 0; j < fc->_reachable_list.size(); j++) {
             VirtualFlowSpaceElement* vfe = dynamic_cast<VirtualFlowSpaceElement*>(fc->_reachable_list[j].first);
             int tot = vfe->flow_data_offset() + vfe->flow_data_size();

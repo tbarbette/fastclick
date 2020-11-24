@@ -53,10 +53,10 @@ class IP6NDSolicitor : public Element {
   IP6NDSolicitor();
   ~IP6NDSolicitor();
 
-  const char *class_name() const		{ return "IP6NDSolicitor"; }
-  const char *port_count() const		{ return "2/1-2"; }
-  const char *processing() const		{ return PUSH; }
-  const char *flow_code() const			{ return "xy/x"; }
+  const char *class_name() const override		{ return "IP6NDSolicitor"; }
+  const char *port_count() const override		{ return "2/1-2"; }
+  const char *processing() const override		{ return PUSH; }
+  const char *flow_code() const override			{ return "xy/x"; }
 
   void add_handlers() CLICK_COLD;
 

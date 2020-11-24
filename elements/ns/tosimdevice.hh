@@ -69,11 +69,11 @@ class ToSimDevice : public Element { public:
   ToSimDevice() CLICK_COLD;
   ~ToSimDevice() CLICK_COLD;
 
-  const char *class_name() const		{ return "ToSimDevice"; }
-  const char *port_count() const		{ return PORTS_1_0; }
+  const char *class_name() const override		{ return "ToSimDevice"; }
+  const char *port_count() const override		{ return PORTS_1_0; }
   //const char *flags() const			{ return "S2"; }
 
-  int configure_phase() const { return CONFIGURE_PHASE_DEFAULT; }
+  int configure_phase() const override { return CONFIGURE_PHASE_DEFAULT; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;
   void uninitialize();

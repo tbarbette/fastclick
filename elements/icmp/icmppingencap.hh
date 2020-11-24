@@ -49,8 +49,8 @@ class ICMPPingEncap : public Element { public:
     ICMPPingEncap() CLICK_COLD;
     ~ICMPPingEncap() CLICK_COLD;
 
-    const char *class_name() const		{ return "ICMPPingEncap"; }
-    const char *port_count() const		{ return PORTS_1_1; }
+    const char *class_name() const override		{ return "ICMPPingEncap"; }
+    const char *port_count() const override		{ return PORTS_1_1; }
     const char *flags() const			{ return "A"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

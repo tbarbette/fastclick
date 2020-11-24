@@ -146,8 +146,8 @@ class FromCapDump : public Element { public:
     FromCapDump() CLICK_COLD;
     ~FromCapDump() CLICK_COLD;
 
-    const char *class_name() const	{ return "FromCapDump"; }
-    const char *port_count() const	{ return PORTS_0_1; }
+    const char *class_name() const override	{ return "FromCapDump"; }
+    const char *port_count() const override	{ return PORTS_0_1; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

@@ -128,9 +128,9 @@ class ICMPPingSource : public Element { public:
     ICMPPingSource() CLICK_COLD;
     ~ICMPPingSource() CLICK_COLD;
 
-    const char *class_name() const		{ return "ICMPPingSource"; }
-    const char *port_count() const		{ return "0-1/1"; }
-    const char *processing() const		{ return "h/a"; }
+    const char *class_name() const override		{ return "ICMPPingSource"; }
+    const char *port_count() const override		{ return "0-1/1"; }
+    const char *processing() const override		{ return "h/a"; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;

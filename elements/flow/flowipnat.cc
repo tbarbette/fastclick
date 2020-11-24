@@ -62,7 +62,7 @@ int FlowIPNAT::initialize(ErrorHandler *errh)
     }
 
     /**
-     * Get passing threads, that is the threads that will call push_batch
+     * Get passing threads, that is the threads that will call push_flow
      */
     Bitvector passing = get_passing_threads(); // TODO touching false
     if (passing.weight() == 0) {

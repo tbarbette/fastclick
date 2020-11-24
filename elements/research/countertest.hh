@@ -21,9 +21,9 @@ class CounterTest : public BatchElement {
     public:
         CounterTest() CLICK_COLD;
 
-        const char *class_name() const { return "CounterTest"; }
-        const char *port_count() const { return "0-1/1"; }
-        const char *processing() const { return PUSH; }
+        const char *class_name() const override { return "CounterTest"; }
+        const char *port_count() const override { return "0-1/1"; }
+        const char *processing() const override { return PUSH; }
 
         int configure(Vector<String>&, ErrorHandler*) override;
         bool run_task(Task *) override;

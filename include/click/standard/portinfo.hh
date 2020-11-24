@@ -60,7 +60,7 @@ class PortInfo : public Element { public:
 
     PortInfo();
 
-    const char *class_name() const	{ return "PortInfo"; }
+    const char *class_name() const override	{ return "PortInfo"; }
 
     int configure_phase() const		{ return CONFIGURE_PHASE_FIRST; }
     int configure(Vector<String> &, ErrorHandler *);

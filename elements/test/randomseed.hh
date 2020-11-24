@@ -31,7 +31,7 @@ class RandomSeed : public Element { public:
 
     RandomSeed() CLICK_COLD;
 
-    const char *class_name() const	{ return "RandomSeed"; }
+    const char *class_name() const override	{ return "RandomSeed"; }
 
     int configure_phase() const		{ return CONFIGURE_PHASE_FIRST; }
     bool can_live_reconfigure() const	{ return true; }

@@ -37,9 +37,9 @@ class DecIP6HLIM : public Element {
   DecIP6HLIM();
   ~DecIP6HLIM();
 
-  const char *class_name() const		{ return "DecIP6HLIM"; }
-  const char *port_count() const		{ return PORTS_1_1X2; }
-  const char *processing() const		{ return PROCESSING_A_AH; }
+  const char *class_name() const override		{ return "DecIP6HLIM"; }
+  const char *port_count() const override		{ return PORTS_1_1X2; }
+  const char *processing() const override		{ return PROCESSING_A_AH; }
 
   int drops()					{ return _drops; }
 

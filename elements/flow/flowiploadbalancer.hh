@@ -69,9 +69,9 @@ class FlowIPLoadBalancer : public FlowStateElement<FlowIPLoadBalancer,IPLBEntry>
         FlowIPLoadBalancer() CLICK_COLD;
         ~FlowIPLoadBalancer() CLICK_COLD;
 
-        const char *class_name() const { return "FlowIPLoadBalancer"; }
-        const char *port_count() const { return "1/1"; }
-        const char *processing() const { return PUSH; }
+        const char *class_name() const override { return "FlowIPLoadBalancer"; }
+        const char *port_count() const override { return "1/1"; }
+        const char *processing() const override { return PUSH; }
 
         int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
         int initialize(ErrorHandler *errh) override CLICK_COLD;
@@ -82,10 +82,19 @@ class FlowIPLoadBalancer : public FlowStateElement<FlowIPLoadBalancer,IPLBEntry>
 
         void push_flow(int, IPLBEntry*, PacketBatch *);
 
-    private:
+        void add_handlers() override CLICK_COLD;
+private:
+
         IPAddress _vip;
         bool _accept_nonsyn;
 
+	static int handler(int op, String& s, Element* e, const Handler* h, ErrorHandler* errh);
+        static String read_handler(Element *handler, void *user_data);
+        static int write_handler(
+            const String &, Element *, void *, ErrorHandler *
+            ) CLICK_COLD;
+
+	friend class LoadBalancer;
         friend class FlowIPLoadBalancerReverse;
 };
 
@@ -129,9 +138,9 @@ class FlowIPLoadBalancerReverse : public BatchElement {
         FlowIPLoadBalancerReverse() CLICK_COLD;
         ~FlowIPLoadBalancerReverse() CLICK_COLD;
 
-        const char *class_name() const { return "FlowIPLoadBalancerReverse"; }
-        const char *port_count() const { return "1/1"; }
-        const char *processing() const { return PUSH; }
+        const char *class_name() const override { return "FlowIPLoadBalancerReverse"; }
+        const char *port_count() const override { return "1/1"; }
+        const char *processing() const override { return PUSH; }
 
         int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
         int initialize(ErrorHandler *errh) override CLICK_COLD;

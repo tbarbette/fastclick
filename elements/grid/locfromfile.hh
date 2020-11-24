@@ -34,7 +34,7 @@ public:
   LocFromFile() CLICK_COLD;
   ~LocFromFile() CLICK_COLD;
 
-  const char *class_name() const { return "LocFromFile"; }
+  const char *class_name() const override { return "LocFromFile"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const { return true; }

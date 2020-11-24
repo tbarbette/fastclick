@@ -20,7 +20,7 @@ class NotifierTest : public Element { public:
 
     NotifierTest() CLICK_COLD;
 
-    const char *class_name() const	{ return "NotifierTest"; }
+    const char *class_name() const override	{ return "NotifierTest"; }
     int initialize(ErrorHandler *errh) CLICK_COLD;
 
 };

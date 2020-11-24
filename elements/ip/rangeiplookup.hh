@@ -85,9 +85,9 @@ class RangeIPLookup : public IPRouteTable { public:
     RangeIPLookup() CLICK_COLD;
     ~RangeIPLookup() CLICK_COLD;
 
-    const char *class_name() const      { return "RangeIPLookup"; }
-    const char *port_count() const	{ return "1/-"; }
-    const char *processing() const      { return PUSH; }
+    const char *class_name() const override      { return "RangeIPLookup"; }
+    const char *port_count() const override	{ return "1/-"; }
+    const char *processing() const override      { return PUSH; }
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;

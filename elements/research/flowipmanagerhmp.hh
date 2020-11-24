@@ -30,8 +30,8 @@ class FlowIPManagerHMP: public VirtualFlowManager, Router::InitFuture {
         FlowIPManagerHMP() CLICK_COLD;
         ~FlowIPManagerHMP() CLICK_COLD;
 
-        const char *class_name() const { return "FlowIPManagerHMP"; }
-        const char *port_count() const { return "1/1"; }
+        const char *class_name() const override { return "FlowIPManagerHMP"; }
+        const char *port_count() const override { return "1/1"; }
 
         int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
         int initialize(ErrorHandler *errh) override CLICK_COLD;

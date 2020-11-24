@@ -69,7 +69,7 @@ class FullNoteQueue : public NotifierQueue { public:
 
     FullNoteQueue() CLICK_COLD;
 
-    const char *class_name() const		{ return "Queue"; }
+    const char *class_name() const override		{ return "Queue"; }
     void *cast(const char *);
 
     int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;

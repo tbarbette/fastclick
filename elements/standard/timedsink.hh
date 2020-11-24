@@ -21,9 +21,9 @@ class TimedSink : public Element { public:
 
   TimedSink() CLICK_COLD;
 
-  const char *class_name() const		{ return "TimedSink"; }
-  const char *port_count() const		{ return PORTS_1_0; }
-  const char *processing() const		{ return PULL; }
+  const char *class_name() const override		{ return "TimedSink"; }
+  const char *port_count() const override		{ return PORTS_1_0; }
+  const char *processing() const override		{ return PULL; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

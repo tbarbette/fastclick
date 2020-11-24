@@ -316,9 +316,9 @@ String FromDPDKDeviceMulti::read_handler(Element *e, void * thunk)
               else
                   return String((int) fd->_dev->port_id);
         case h_nb_rx_queues:
-            return String(fd->_dev->nbRXQueues());
+            return String(fd->_dev->nb_rx_queues());
         case h_nb_tx_queues:
-            return String(fd->_dev->nbTXQueues());
+            return String(fd->_dev->nb_tx_queues());
         case h_mtu: {
             uint16_t mtu;
             if (rte_eth_dev_get_mtu(fd->_dev->port_id, &mtu) != 0)
@@ -495,7 +495,7 @@ int FromDPDKDeviceMulti::xstats_handler(
         case h_queue_count:
             if (input == "") {
                 StringAccum acc;
-                for (uint16_t i = 0; i < fd->_dev->nbRXQueues(); i++) {
+                for (uint16_t i = 0; i < fd->_dev->nb_rx_queues(); i++) {
                     int v = rte_eth_rx_queue_count(fd->_dev->port_id, i);
                     acc << i << " = " << v << "\n";
                 }

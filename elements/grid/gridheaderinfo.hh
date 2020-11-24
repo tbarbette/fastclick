@@ -80,7 +80,7 @@ public:
   GridHeaderInfo() CLICK_COLD;
   ~GridHeaderInfo() CLICK_COLD;
 
-  const char *class_name() const { return "GridHeaderInfo"; }
+  const char *class_name() const override { return "GridHeaderInfo"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const { return true; }

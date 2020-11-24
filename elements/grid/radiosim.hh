@@ -49,9 +49,9 @@ class RadioSim : public Element {
   RadioSim() CLICK_COLD;
   ~RadioSim() CLICK_COLD;
 
-  const char *class_name() const		{ return "RadioSim"; }
-  const char *port_count() const		{ return "-/-"; }
-  const char *processing() const		{ return PULL_TO_PUSH; }
+  const char *class_name() const override		{ return "RadioSim"; }
+  const char *port_count() const override		{ return "-/-"; }
+  const char *processing() const override		{ return PULL_TO_PUSH; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *errh) CLICK_COLD;
   void add_handlers() CLICK_COLD;

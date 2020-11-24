@@ -24,7 +24,7 @@ class TokenBucketTest : public Element { public:
 
     TokenBucketTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "TokenBucketTest"; }
+    const char *class_name() const override		{ return "TokenBucketTest"; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
 

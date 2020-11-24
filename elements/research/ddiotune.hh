@@ -1,5 +1,5 @@
-#ifndef CLICK_DDIOTune_HH
-#define CLICK_DDIOTune_HH
+#ifndef CLICK_DDIOTUNE_HH
+#define CLICK_DDIOTUNE_HH
 #include <click/element.hh>
 #include <click/hashtable.hh>
 #include <rte_pci.h>
@@ -42,6 +42,8 @@ Note that every PCIe device (e.g., NIC) can only have one instance of this
 element.
 
 For more information, you can check out our paper published in ATC'20.
+
+This element requires at least DPDK 17.11 or higher.
 
 Arguments:
 
@@ -106,10 +108,10 @@ public:
   DDIOTune() CLICK_COLD;
   ~DDIOTune() CLICK_COLD;
 
-  const char *class_name() const { return "DDIOTune"; }
-  const char *port_count() const { return PORTS_0_0; }
+  const char *class_name() const override { return "DDIOTune"; }
+  const char *port_count() const override { return PORTS_0_0; }
 
-  int configure_phase() const { return CONFIGURE_PHASE_FIRST; }
+  int configure_phase() const override { return CONFIGURE_PHASE_FIRST; }
 
   int configure(Vector<String> &, ErrorHandler *) override;
   int initialize(ErrorHandler *) override;
@@ -146,4 +148,5 @@ private:
 };
 
 CLICK_ENDDECLS
-#endif
+
+#endif /* CLICK_DDIOTUNE_HH */

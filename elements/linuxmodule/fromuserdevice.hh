@@ -70,9 +70,9 @@ class FromUserDevice : public Element
     FromUserDevice() CLICK_COLD;
     ~FromUserDevice() CLICK_COLD;
 
-    const char *class_name() const      { return "FromUserDevice"; }
-    const char *port_count() const      { return PORTS_0_1; }
-    const char *processing() const      { return PULL; }
+    const char *class_name() const override      { return "FromUserDevice"; }
+    const char *port_count() const override      { return PORTS_0_1; }
+    const char *processing() const override      { return PULL; }
 
     void *cast(const char *);
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

@@ -240,8 +240,8 @@ class IPClassifier : public IPFilter { public:
   IPClassifier() CLICK_COLD;
   ~IPClassifier() CLICK_COLD;
 
-  const char *class_name() const		{ return "IPClassifier"; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "IPClassifier"; }
+  const char *processing() const override		{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   void add_handlers() CLICK_COLD;

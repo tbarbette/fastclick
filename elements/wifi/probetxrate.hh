@@ -58,10 +58,10 @@ class ProbeTXRate : public Element { public:
   ProbeTXRate() CLICK_COLD;
   ~ProbeTXRate() CLICK_COLD;
 
-  const char *class_name() const		{ return "ProbeTXRate"; }
-  const char *port_count() const		{ return "2/0-2"; }
-  const char *processing() const		{ return "ah/a"; }
-  const char *flow_code() const			{ return "#/#"; }
+  const char *class_name() const override		{ return "ProbeTXRate"; }
+  const char *port_count() const override		{ return "2/0-2"; }
+  const char *processing() const override		{ return "ah/a"; }
+  const char *flow_code() const override			{ return "#/#"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const		{ return true; }

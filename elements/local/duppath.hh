@@ -18,9 +18,9 @@ class DupPath : public Element {
   DupPath() CLICK_COLD;
   ~DupPath() CLICK_COLD;
 
-  const char *class_name() const		{ return "DupPath"; }
-  const char *port_count() const		{ return "1/2"; }
-  const char *processing() const		{ return "h/hl"; }
+  const char *class_name() const override		{ return "DupPath"; }
+  const char *port_count() const override		{ return "1/2"; }
+  const char *processing() const override		{ return "h/hl"; }
   int initialize(ErrorHandler *) CLICK_COLD;
   void cleanup(CleanupStage) CLICK_COLD;
 

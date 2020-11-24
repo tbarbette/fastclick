@@ -14,7 +14,7 @@ class SATable : public Element { public:
   SATable() CLICK_COLD;
   ~SATable() CLICK_COLD;
 
-  const char *class_name() const		{ return "SATable"; }
+  const char *class_name() const override		{ return "SATable"; }
   String print_sa_data();
   int insert(SPI this_spi , SADataTuple SA_data) ;
   int remove(unsigned int spi);

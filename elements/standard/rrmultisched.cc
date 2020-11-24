@@ -25,8 +25,6 @@ RRMultiSched::RRMultiSched()
 {
 }
 
-
-
 int RRMultiSched::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     _max = ninputs();
@@ -44,26 +42,38 @@ RRMultiSched::pull(int)
 {
     int i = _next;
     for (int j = 0; j < _max; j++) {
-	Packet *p = (_signals[i] ? input(i).pull() : 0);
-	if (p) {
-		_n_cur++;
-		if (_n_cur == _n) {
-			i++;
-			if (i == _max)
-				i = 0;
-			_n_cur = 0;
-		}
-	    _next = i;
-	    return p;
-	} else {
-		i++;
-		if (i == _max)
-			i = 0;
-		_n_cur = 0;
-	}
+        Packet *p = (_signals[i] ? input(i).pull() : 0);
+        if (p) {
+            _n_cur++;
+            if (_n_cur == _n) {
+                i++;
+                if (i >= _max) {
+                    i = 0;
+                }
+                _n_cur = 0;
+            }
+            _next = i;
+            return p;
+        } else {
+            i++;
+            if (i >= _max) {
+                i = 0;
+            }
+            _n_cur = 0;
+        }
     }
     return 0;
 }
+
+
+#if HAVE_BATCH
+PacketBatch *
+RRMultiSched::pull_batch(int port, unsigned max) {
+    PacketBatch *batch;
+    MAKE_BATCH(RRMultiSched::pull(port), batch, max);
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(RRMultiSched)

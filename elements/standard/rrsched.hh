@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_RRSCHED_HH
 #define CLICK_RRSCHED_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/notifier.hh>
 CLICK_DECLS
 
@@ -25,26 +25,28 @@ CLICK_DECLS
  * =a PrioSched, StrideSched, DRRSched, RoundRobinSwitch, SimpleRoundRobinSched
  */
 
-class RRSched : public Element { public:
+class RRSched : public BatchElement {
+    public:
+        RRSched() CLICK_COLD;
 
-    RRSched() CLICK_COLD;
+        const char *class_name() const override  { return "RoundRobinSched"; }
+        const char *port_count() const override  { return "-/1"; }
+        const char *processing() const override  { return PULL; }
+        const char *flags() const       { return "S0"; }
 
-    const char *class_name() const	{ return "RoundRobinSched"; }
-    const char *port_count() const	{ return "-/1"; }
-    const char *processing() const	{ return PULL; }
-    const char *flags() const		{ return "S0"; }
+        int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;
+        int initialize(ErrorHandler *) CLICK_COLD;
+        void cleanup(CleanupStage) CLICK_COLD;
 
-    int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *) CLICK_COLD;
-    void cleanup(CleanupStage) CLICK_COLD;
+        Packet *pull(int port);
+    #if HAVE_BATCH
+        PacketBatch *pull_batch(int port, unsigned max);
+    #endif
 
-    Packet *pull(int port);
-
-  protected:
-
-    int _next;
-    NotifierSignal *_signals;
-    int _max;
+    protected:
+        int _next;
+        NotifierSignal *_signals;
+        int _max;
 
 };
 

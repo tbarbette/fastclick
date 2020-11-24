@@ -24,7 +24,7 @@ class JsonTest : public Element { public:
 
     JsonTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "JsonTest"; }
+    const char *class_name() const override		{ return "JsonTest"; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
 

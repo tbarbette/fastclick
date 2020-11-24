@@ -97,8 +97,8 @@ class AnonymizeIPAddr : public Element { public:
     AnonymizeIPAddr() CLICK_COLD;
     ~AnonymizeIPAddr() CLICK_COLD;
 
-    const char *class_name() const	{ return "AnonymizeIPAddr"; }
-    const char *port_count() const	{ return PORTS_1_1X2; }
+    const char *class_name() const override	{ return "AnonymizeIPAddr"; }
+    const char *port_count() const override	{ return PORTS_1_1X2; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;

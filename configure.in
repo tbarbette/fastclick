@@ -150,15 +150,6 @@ else
 =========================================])
 fi
 
-if test "x$enable_flow" = xyes; then
-    if test "x$enable_batch" != xyes; then
-        enable_flow=no
-        AC_MSG_WARN([--enable-flow needs --enable-batch! Flow subsystem will be disabled.])
-    else
-        AC_DEFINE(HAVE_FLOW)
-    fi
-fi
-
 AC_ARG_ENABLE([netmap-pool],
     [AS_HELP_STRING([  --enable-netmap-pool], [use netmap buffers instead of standard Click buffers])],
     [:], [enable_netmap_pool=no])
@@ -240,6 +231,16 @@ if test "x$enable_json" = "xyes"; then
     AC_DEFINE([HAVE_JSON])
 else
     have_json=no
+fi
+
+AC_CHECK_LIB([pci], [main], [ac_have_pci=yes], [ac_have_pci=no])
+AC_CHECK_HEADERS([pci/pci.h], [ac_have_pci_h=yes], [ac_have_pci_h=no])
+if test "x$ac_have_pci$ac_have_pci_h" = "xyesyes"; then
+    have_pci=yes
+    LIBS="$LIBS -lpci"
+    AC_DEFINE([HAVE_PCI])
+else
+    have_pci=no
 fi
 
 AC_ARG_ENABLE([rand-align],
@@ -325,9 +326,14 @@ if test "x$enable_dpdk" = "xyes"; then
     fi
 
 
-    if pkg-config --exists libdpdk ; then
-      RTE_LIB=pkg-config --variable=libdir libdpdk
-      DPDKCFLAGS=pkg-config --cflags libdpdk
+    if pkg-config --exists libdpdk; then
+      RTE_LIB=$(pkg-config --variable=libdir libdpdk)
+      RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
+      rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_major=$rte_ver_year
+      AC_MSG_RESULT([yes])
     else
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
@@ -337,61 +343,51 @@ if test "x$enable_dpdk" = "xyes"; then
 Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
 Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
 or install DPDK using meson, or the system package manager.
-RTE_SDK is $RTE_SDK
-RTE_TARGET is $RTE_TARGET
-RTE_SDK_BIN is $RTE_SDK_BIN
+Note with the system package manager, you need the devel package
+version (dpdk-dev or dpdk-devel).
 
 =========================================])
       fi
 
-    AC_MSG_RESULT([yes, found at $RTE_SDK_BIN])
+      AC_MSG_RESULT([yes, found at $RTE_SDK_BIN])
 
       if test -e "$RTE_SRCDIR/VERSION"; then
         rte_ver_year=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($1)}'`
         rte_ver_month=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($2)}'`
         rte_ver_minor=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($3)}'`
+        rte_ver_major=$rte_ver_year
       else
-        if grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" &> /dev/null ; then
-            verfile=rte_version
-        else
+        if grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_config.h" &> /dev/null; then
             verfile=rte_config
+        else
+            verfile=rte_version
         fi
-        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
         rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
         rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
       fi
-      AC_SUBST(RTE_SDK)
-      AC_SUBST(RTE_TARGET)
-      AC_SUBST(RTE_SDK_BIN)
-      AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
-      AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
-      AC_SUBST(RTE_VER_YEAR, $rte_ver_year)
-      AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
-      AC_SUBST(DPDK_INCLUDES, -I${RTE_SDK_BIN}/include/)
+    fi
 
-      AC_MSG_CHECKING([whether DPDK has rte_eth_read_clock])
-      if $READELF -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null ; then
-        AC_MSG_RESULT([yes])
-        AC_DEFINE([HAVE_DPDK_READ_CLOCK])
-      else
-        AC_MSG_RESULT([no])
-      fi
-      DPDKCFLAGS=`printf 'include ${RTE_SDK}/mk/rte.vars.mk\n\$(file >dpdkcflags,${CFLAGS})' | make -f - &>/dev/null ; cat dpdkcflags`
-      rm dpdkcflags
-      DEPCFLAGS="$DEPCFLAGS $DPDKCFLAGS"
-  fi
+    AC_SUBST(RTE_SDK)
+    AC_SUBST(RTE_TARGET)
+    AC_SUBST(RTE_SDK_BIN)
+    AC_SUBST(RTE_VER_YEAR,  $rte_ver_year)
+    AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
+    AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
+    AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
+    AC_SUBST(DPDK_INCLUDES, -I${RTE_SDK_BIN}/include/)
 
     AC_DEFINE([HAVE_DPDK])
     AC_SUBST(USE_DPDK, yes)
-fi
 
-AC_ARG_ENABLE([dpdk-inside],
-    [AS_HELP_STRING([  --enable-dpdk-inside],
-                    [Click packets are inside DPDK packet])],
-    [:], [enable_dpdk_inside=no])
-if test "x$enable_dpdk_inside" = "xyes"; then
-    AC_DEFINE([CLICK_PACKET_INSIDE_DPDK])
+    AC_MSG_CHECKING([whether DPDK has rte_eth_read_clock])
+    if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null; then
+      AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_DPDK_READ_CLOCK])
+    else
+      AC_MSG_RESULT([no])
+    fi
 fi
 
 if test "x$enable_dpdk_pool" = "xyes"; then
@@ -945,6 +941,16 @@ if test "x$have_aligned_new" = xyes; then
     CXXFLAGS="$CXXFLAGS -faligned-new"
 fi
 
+if test "x$enable_flow" = xyes; then
+    if test "x$enable_batch" != xyes; then
+        AC_MSG_ERROR([--enable-flow needs --enable-batch! Flow subsystem will be disabled.])
+    else
+        AC_DEFINE(HAVE_FLOW)
+    fi
+fi
+
+
+
 dnl
 dnl check whether tools should be built for host or build
 dnl
@@ -1004,8 +1010,11 @@ if test "x$enable_dynamic_linking" = xyes; then
     if test "$HOST_TOOLS" != host -a "$enable_tools" != no; then
         CLICK_CHECK_BUILD_DYNAMIC_LINKING
     fi
+    CLICK_SHARED=1
+else
+    CLICK_SHARED=0
 fi
-
+AC_SUBST(CLICK_SHARED)
 
 dnl
 dnl sockets
@@ -1375,6 +1384,20 @@ if test "x$enable_cpu_load" = xyes; then
     AC_DEFINE(HAVE_CLICK_LOAD)
 fi
 
+
+AC_ARG_ENABLE([flow-api], [AS_HELP_STRING([--enable-flow-api], [Support for the HW flow classification API. Also needs DPDK>=20.02])], [:], [enable_flow_api=no])
+AC_CHECK_FILE($srcdir/include/click/flowruleparser.hh, [ac_have_flow_rule_parser_h=yes], [ac_have_flow_rule_parser_h=no])
+AC_CHECK_FILE($srcdir/include/click/flowrulecache.hh, [ac_have_flow_rule_cache_h=yes], [ac_have_flow_rule_cache_h=no])
+AC_CHECK_FILE($srcdir/include/click/flowrulemanager.hh, [ac_have_flow_rule_man_h=yes], [ac_have_flow_rule_man_h=no])
+if test "x$ac_have_flow_rule_parser_h$ac_have_flow_rule_cache_h$ac_have_flow_rule_man_h$enable_flow_api" = "xyesyesyesyes"; then
+    have_flow_api=yes
+    AC_DEFINE([HAVE_FLOW_API],1)
+    AC_SUBST([HAVE_FLOW_API],1)
+else
+    have_flow_api=no
+    AC_SUBST([HAVE_FLOW_API],0)
+fi
+
 dnl debugging malloc
 
 AC_ARG_ENABLE([dmalloc], [AS_HELP_STRING([--enable-dmalloc], [enable debugging malloc])], :, enable_dmalloc=no)
@@ -1433,6 +1456,13 @@ if test "$value" != 0; then
 fi
 
 
+dnl Compile for the native architecture
+AC_ARG_ENABLE(portable-binary, [AS_HELP_STRING([--enable-portable-binary], [disable compiler optimizations that would produce unportable binaries])],
+	acx_maxopt_portable=$enableval, acx_maxopt_portable=no)
+if test $acx_maxopt_portable = no; then
+    AX_CHECK_COMPILE_FLAG([-march=native], [CXXFLAGS="-march=native $CXXFLAGS";CFLAGS="-march=native $CFLAGS"])
+fi
+
 dnl use Intel-specific machine instructions
 
 AC_ARG_ENABLE([intel-cpu], [AS_HELP_STRING([--enable-intel-cpu], [enable Intel-specific machine instructions])], :, enable_intel_cpu=no)
@@ -1440,6 +1470,35 @@ if test $enable_intel_cpu = yes; then
     AC_DEFINE(HAVE_INTEL_CPU)
 fi
 
+dnl Support AVX2 instructions
+
+AC_ARG_ENABLE([avx2],
+        AS_HELP_STRING([--enable-avx2],
+                   [check whether AVX2 is enabled, default yes]),
+          [check_avx2=no],
+          [check_avx2=yes])
+
+if test "${check_avx2}" = "yes"; then
+  AX_CHECK_COMPILE_FLAG([-mavx], [CXXFLAGS="-mavx $CXXFLAGS";CFLAGS="-mavx $CFLAGS"])
+  AX_CHECK_COMPILE_FLAG([-mavx2], [CXXFLAGS="-mavx2 $CXXFLAGS";CFLAGS="-mavx2 $CFLAGS"])
+  AC_MSG_CHECKING([whether we can compile AVX2 intrinsics in C])
+  AC_COMPILE_IFELSE([AC_LANG_SOURCE([
+   #include <x86intrin.h>
+   int main(int argc, char **argv){
+   double* q;
+   __m256d a = _mm256_load_pd(q);
+   double d = _mm256_cvtsd_f64(a);
+   return 0;
+   }
+   ])],
+   [HAVE_AVX2=yes],
+   [HAVE_AVX2=no]
+  )
+  AC_MSG_RESULT([${HAVE_AVX2}])
+fi
+if test "${HAVE_AVX2}" = "yes"; then
+  AC_DEFINE(HAVE_AVX2)
+fi
 
 dnl
 dnl expand path variables
@@ -2385,6 +2444,12 @@ if test "x$enable_dpdk" = xyes; then
     if test "$rte_ver_year" -ge 19; then
         provisions="$provisions dpdk19"
     fi
+    if test "$rte_ver_year" -ge 18; then
+        provisions="$provisions dpdk18"
+    fi
+    if test "$rte_ver_year" -ge 17; then
+        provisions="$provisions dpdk17"
+    fi
 fi
 
 dnl add 'dpdk-packet' if compiled with --enable-dpdk-packet
@@ -2485,6 +2550,11 @@ else
     have_pcap=no
 fi
 
+dnl add 'pci' if libpci support is available
+if test "x$have_pci" = xyes; then
+    provisions="$provisions pci"
+fi
+
 dnl add 're2' if re2 is available
 if test "x$have_re2" = xyes; then
     provisions="$provisions re2"
@@ -2547,6 +2617,20 @@ done
 
 AC_OUTPUT
 
+feedback="no"
+
+if test "$enable_flow_api$have_flow_api" = "yesno"; then
+    feedback="To enable DPDK's Flow Rule Manager (rte_flow API), use a DPDK version >= 20.02."
+fi
+
+if test "$enable_dpdk" = yes; then
+    dpdk_info="${enable_dpdk}
+    DPDK    Target:              ${RTE_TARGET}
+    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}"
+else
+    dpdk_info=${enable_dpdk}
+fi
+
 echo "
 
 Configuration Summary:
@@ -2554,17 +2638,24 @@ Configuration Summary:
     C++   Compiler:              ${CXX}
 
           Batching:              ${enable_batch}
-              Flow:              ${enable_flow}
+    Flow Subsystem:              ${enable_flow}
+       HW Flow API:              ${have_flow_api}
 
-    DPDK   support:              ${enable_dpdk}
+    DPDK   support:              ${dpdk_info}
+
     Netmap support:              ${HAVE_NETMAP}
     PCAP   support:              ${have_pcap}
-
-       Packet mode:              ${packet_mode}
 
     RE2    support:              ${have_re2}
     HTTPD  support:              ${have_httpd}
     JSON   support:              ${have_json}
+    libpci support:              ${have_pci}
 "
 
-echo "Now type make to build FastClick..."
+if test "$feedback" != no; then
+    echo ""
+    echo $feedback
+    echo ""
+else
+    echo "Now type make to build FastClick..."
+fi

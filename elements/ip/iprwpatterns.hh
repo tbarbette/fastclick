@@ -24,7 +24,7 @@ class IPRewriterPatterns : public Element { public:
     IPRewriterPatterns() CLICK_COLD;
     ~IPRewriterPatterns() CLICK_COLD;
 
-    const char *class_name() const { return "IPRewriterPatterns"; }
+    const char *class_name() const override { return "IPRewriterPatterns"; }
 
     int configure_phase() const	{ return IPRewriterBase::CONFIGURE_PHASE_PATTERNS; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

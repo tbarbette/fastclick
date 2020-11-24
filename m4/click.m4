@@ -786,6 +786,11 @@ dnl Checks for '__builtin_clz', '__builtin_clzll', and other intrinsics.
 dnl
 
 AC_DEFUN([CLICK_CHECK_COMPILER_INTRINSICS], [
+    AC_CACHE_CHECK([for __builtin_ctz], [ac_cv_have___builtin_ctz],
+         [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[volatile int x = 11;]], [[int y = __builtin_ctz(x);]])], [ac_cv_have___builtin_ctz=yes], [ac_cv_have___builtin_ctz=no])])
+    if test $ac_cv_have___builtin_ctz = yes; then
+        AC_DEFINE([HAVE___BUILTIN_CTZ], [1], [Define if you have the __builtin_ctz function.])
+    fi
     AC_CACHE_CHECK([for __builtin_clz], [ac_cv_have___builtin_clz],
          [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[volatile int x = 11;]], [[int y = __builtin_clz(x);]])], [ac_cv_have___builtin_clz=yes], [ac_cv_have___builtin_clz=no])])
     if test $ac_cv_have___builtin_clz = yes; then
@@ -816,6 +821,12 @@ AC_DEFUN([CLICK_CHECK_COMPILER_INTRINSICS], [
          [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[volatile long long x = 11;]], [[int y = __builtin_ffsll(x);]])], [ac_cv_have___builtin_ffsll=yes], [ac_cv_have___builtin_ffsll=no])])
     if test $ac_cv_have___builtin_ffsll = yes; then
         AC_DEFINE([HAVE___BUILTIN_FFSLL], [1], [Define if you have the __builtin_ffsll function.])
+    fi
+
+    AC_CACHE_CHECK([for __builtin_popcount], [ac_cv_have___builtin_popcount],
+         [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[volatile int x = 11;]], [[int y = __builtin_popcount(x);]])], [ac_cv_have___builtin_popcount=yes], [ac_cv_have___builtin_popcount=no])])
+    if test $ac_cv_have___builtin_popcount = yes; then
+        AC_DEFINE([HAVE___BUILTIN_POPCOUNT], [1], [Define if you have the __builtin_popcount function.])
     fi
 
     AC_CACHE_CHECK([for __sync_synchronize], [ac_cv_have___sync_synchronize],

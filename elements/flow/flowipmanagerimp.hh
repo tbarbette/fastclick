@@ -10,7 +10,6 @@
 #include <click/flow/flowelement.hh>
 #include <click/batchbuilder.hh>
 #include <click/timerwheel.hh>
-#include "flowipmanager.hh"
 
 CLICK_DECLS
 
@@ -40,11 +39,11 @@ class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
         FlowIPManagerIMP() CLICK_COLD;
         ~FlowIPManagerIMP() CLICK_COLD;
 
-        const char *class_name() const { return "FlowIPManagerIMP"; }
-        const char *port_count() const { return "1/1"; }
+        const char *class_name() const override { return "FlowIPManagerIMP"; }
+        const char *port_count() const override { return "1/1"; }
 
-        const char *processing() const { return PUSH; }
-        int configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED + 1; }
+        const char *processing() const override { return PUSH; }
+        int configure_phase() const override { return CONFIGURE_PHASE_PRIVILEGED + 1; }
 
         int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
         int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
@@ -70,6 +69,7 @@ class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
 
         gtable* _tables;
 
+	int _tables_count;
         int _table_size;
         int _flow_state_size_full;
         int _verbose;
@@ -78,6 +78,7 @@ class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
         int _timeout;
         Timer _timer; //Timer to launch the wheel
         Task _task;
+        bool _cache;
 
         static String read_handler(Element* e, void* thunk);
         inline void process(Packet* p, BatchBuilder& b, const Timestamp& recent);

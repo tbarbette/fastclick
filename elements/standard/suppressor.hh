@@ -28,9 +28,9 @@ class Suppressor : public Element { public:
 
   Suppressor() CLICK_COLD;
 
-  const char *class_name() const		{ return "Suppressor"; }
-  const char *port_count() const		{ return "-/="; }
-  const char *flow_code() const			{ return "#/#"; }
+  const char *class_name() const override		{ return "Suppressor"; }
+  const char *port_count() const override		{ return "-/="; }
+  const char *flow_code() const override			{ return "#/#"; }
 
   int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
   void add_handlers() CLICK_COLD;

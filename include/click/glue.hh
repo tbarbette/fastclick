@@ -717,6 +717,7 @@ typedef uint32_t click_cycles_t;
 inline click_cycles_t
 click_get_cycles()
 {
+
 #if CLICK_LINUXMODULE && HAVE_INT64_TYPES && __i386__
     uint64_t x;
     __asm__ __volatile__ ("rdtsc" : "=A" (x));
@@ -743,8 +744,11 @@ click_get_cycles()
     uint32_t xlo, xhi;
     __asm__ __volatile__ ("rdtsc" : "=a" (xlo), "=d" (xhi));
     return xlo;
-#elif CLICK_MINIOS
-    /* FIXME: Implement click_get_cycles for MiniOS */
+#elif CLICK_USERLEVEL && HAVE_DPDK && _RTE_CYCLES_H_
+    // On other architectures we use DPDK implementation, if available
+    return rte_get_tsc_cycles();
+#elif CLICK_USERLEVEL
+    #error "click_get_cycles is not implemented for your architecture!"
     return 0;
 #else
     // add other architectures here

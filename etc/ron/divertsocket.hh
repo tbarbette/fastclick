@@ -60,9 +60,9 @@ public:
   DivertSocket();
   ~DivertSocket();
 
-  const char *class_name() const     { return "DivertSocket"; }
-  const char *port_count() const     { return "-/-"; }
-  const char *processing() const     { return PUSH;}
+  const char *class_name() const override     { return "DivertSocket"; }
+  const char *port_count() const override     { return "-/-"; }
+  const char *processing() const override     { return PUSH;}
 
   int configure(const Vector<String> &, ErrorHandler *);
   int initialize(ErrorHandler *errh);

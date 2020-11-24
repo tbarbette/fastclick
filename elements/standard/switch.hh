@@ -39,9 +39,9 @@ class Switch : public BatchElement { public:
 
   Switch() CLICK_COLD;
 
-  const char *class_name() const		{ return "Switch"; }
-  const char *port_count() const		{ return "1/-"; }
-  const char *processing() const		{ return PUSH; }
+  const char *class_name() const override		{ return "Switch"; }
+  const char *port_count() const override		{ return "1/-"; }
+  const char *processing() const override		{ return PUSH; }
   void add_handlers() CLICK_COLD;
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

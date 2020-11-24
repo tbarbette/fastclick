@@ -26,10 +26,10 @@ class Unstrip : public BatchElement {
 
   Unstrip(unsigned nbytes = 0);
 
-  const char *class_name() const	{ return "Unstrip"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+  const char *class_name() const override	{ return "Unstrip"; }
+  const char *port_count() const override	{ return PORTS_1_1; }
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+  int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
 
 #if HAVE_BATCH
   PacketBatch *simple_action_batch(PacketBatch *);

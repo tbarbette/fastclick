@@ -5,6 +5,11 @@
 #include <click/task.hh>
 #include <click/timer.hh>
 #include <click/notifier.hh>
+
+#ifdef __linux__
+# define RAWSOCKET_ALLOW_LINUX 1
+#endif
+
 CLICK_DECLS
 
 /*
@@ -60,10 +65,10 @@ class RawSocket : public Element { public:
   RawSocket() CLICK_COLD;
   ~RawSocket() CLICK_COLD;
 
-  const char *class_name() const	{ return "RawSocket"; }
-  const char *port_count() const	{ return "0-1/0-1"; }
-  const char *processing() const	{ return "l/h"; }
-  const char *flow_code() const		{ return "x/y"; }
+  const char *class_name() const override	{ return "RawSocket"; }
+  const char *port_count() const override	{ return "0-1/0-1"; }
+  const char *processing() const override	{ return "l/h"; }
+  const char *flow_code() const override		{ return "x/y"; }
   const char *flags() const		{ return "S3"; }
 
   int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;

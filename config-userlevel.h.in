@@ -50,17 +50,17 @@
 /* Define if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
-/* Define if you have the <nuda.h> header file. */
-#undef HAVE_NUMA
-
 /* Define if dynamic linking is possible. */
 #undef HAVE_DYNAMIC_LINKING
 
 /* Define if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
-/* Define if you have the flow function. */
+/* Define if you have the flow subsystem. */
 #undef HAVE_FLOW
+
+/* Define if you have the HW Flow API. */
+#undef HAVE_FLOW_API
 
 /* Define if you have the ffs function. */
 #undef HAVE_FFS
@@ -136,6 +136,9 @@
 
 /* Define if <new> exists and works. */
 #undef HAVE_NEW_HDR
+
+/* Define if you have the <numa.h> header file. */
+#undef HAVE_NUMA
 
 /* Define if you have -lpcap and pcap.h. */
 #undef HAVE_PCAP
@@ -225,6 +228,9 @@
 
 /* Define if a Click user-level driver might run multiple threads. */
 #undef HAVE_USER_MULTITHREAD
+
+/* Define if we are using builtins atomics or Click implementation. */
+#undef HAVE_ATOMIC_BUILTINS
 
 /* Define if Zero-copy is enabled. */
 #undef HAVE_ZEROCOPY
@@ -316,6 +322,21 @@ typedef unsigned long uintptr_t;
 #ifdef HAVE_USER_MULTITHREAD
 # define HAVE_MULTITHREAD HAVE_USER_MULTITHREAD
 #endif
+
+/* Define HAVE_ATOMIC_BUILTINS based on HAVE_ATOMIC_BUILTINS. */
+#ifdef HAVE_ATOMIC_BUILTINS
+#if __GNUC__ > 4 || \
+    (__GNUC__ == 4 && (__GNUC_MINOR__ > 7 || \
+    (__GNUC_MINOR__ == 7 && \
+     __GNUC_PATCHLEVEL__ > 0)))
+
+    # define HAVE_ATOMIC_BUILTINS 1
+#else
+    # error "Cannot enable atomic builtins! GCC must be >= 4.7.0"
+    # define HAVE_ATOMIC_BUILTINS 0
+#endif
+#endif
+
 
 /* Define HAVE_USE_CLOCK_GETTIME if the clock_gettime function is usable. */
 #ifndef HAVE_USE_CLOCK_GETTIME

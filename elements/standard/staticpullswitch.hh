@@ -29,9 +29,9 @@ class StaticPullSwitch : public Element {
 
   StaticPullSwitch() CLICK_COLD;
 
-  const char *class_name() const		{ return "StaticPullSwitch"; }
-  const char *port_count() const		{ return "-/1"; }
-  const char *processing() const		{ return PULL; }
+  const char *class_name() const override		{ return "StaticPullSwitch"; }
+  const char *port_count() const override		{ return "-/1"; }
+  const char *processing() const override		{ return PULL; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

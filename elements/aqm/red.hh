@@ -139,9 +139,9 @@ class RED : public Element { public:
     RED() CLICK_COLD;
     ~RED() CLICK_COLD;
 
-    const char *class_name() const		{ return "RED"; }
-    const char *port_count() const		{ return PORTS_1_1X2; }
-    const char *processing() const		{ return PROCESSING_A_AH; }
+    const char *class_name() const override		{ return "RED"; }
+    const char *port_count() const override		{ return PORTS_1_1X2; }
+    const char *processing() const override		{ return PROCESSING_A_AH; }
 
     int queue_size() const;
     const ewma_type &average_queue_size() const { return _size; }

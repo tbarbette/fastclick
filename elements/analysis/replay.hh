@@ -16,7 +16,7 @@ class ReplayBase : public BatchElement { public:
 	ReplayBase() CLICK_COLD;
     ~ReplayBase() CLICK_COLD;
 
-    const char *port_count() const	{ return "1-/="; }
+    const char *port_count() const override	{ return "1-/="; }
 
     int parse(Args*);
 
@@ -66,10 +66,10 @@ class Replay : public ReplayBase { public:
 	Replay() CLICK_COLD;
     ~Replay() CLICK_COLD;
 
-    const char *class_name() const	{ return "Replay"; }
-    const char *port_count() const  { return "1-/="; }
-    const char *flow_code() const   { return "#/#"; }
-    const char *processing() const	{ return PULL; }
+    const char *class_name() const override	{ return "Replay"; }
+    const char *port_count() const override  { return "1-/="; }
+    const char *flow_code() const override   { return "#/#"; }
+    const char *processing() const override	{ return PULL; }
 
     bool get_spawning_threads(Bitvector&, bool, int) override {
         return false;
@@ -101,9 +101,9 @@ class ReplayUnqueue : public ReplayBase { public:
 	ReplayUnqueue() CLICK_COLD;
     ~ReplayUnqueue() CLICK_COLD;
 
-    const char *class_name() const	{ return "ReplayUnqueue"; }
-    const char *flow_code() const	{ return "#/#"; }
-    const char *processing() const	{ return PULL_TO_PUSH; }
+    const char *class_name() const override	{ return "ReplayUnqueue"; }
+    const char *flow_code() const override	{ return "#/#"; }
+    const char *processing() const override	{ return PULL_TO_PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;
@@ -199,7 +199,7 @@ inline void ReplayBase::check_end_loop(Task* t, bool force_time) {
         reset_time();
         if (_stop_time == 0) {
             if (_verbose)
-                click_chatter("Replay loop");
+                click_chatter("%p{element}: Replay loop", this);
             if (_stop > 0)
                 _stop--;
         } else {

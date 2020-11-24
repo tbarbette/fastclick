@@ -87,10 +87,10 @@ public:
     ToDevice();
     ~ToDevice();
 
-    const char *class_name() const { return "ToDevice"; }
-    const char *port_count() const { return "1/0-1"; }
-    const char *processing() const { return "a/h"; }
-    int configure_phase() const { return CONFIGURE_PHASE_FIRST; }
+    const char *class_name() const override { return "ToDevice"; }
+    const char *port_count() const override { return "1/0-1"; }
+    const char *processing() const override { return "a/h"; }
+    int configure_phase() const override { return CONFIGURE_PHASE_FIRST; }
 
     int configure(Vector<String> &, ErrorHandler *);
     int initialize(ErrorHandler *);

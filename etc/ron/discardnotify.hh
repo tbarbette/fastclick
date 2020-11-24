@@ -19,7 +19,7 @@ class DiscardNotify : public Discard, public NotifiedElement { public:
   DiscardNotify();
   ~DiscardNotify();
 
-  const char *class_name() const { return "DiscardNotify";}
+  const char *class_name() const override { return "DiscardNotify";}
   int initialize(ErrorHandler *);
 
   void notify(int signal);

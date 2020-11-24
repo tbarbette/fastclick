@@ -118,9 +118,9 @@ class ToHost : public AnyDevice { public:
     static void static_initialize();
     static void static_cleanup();
 
-    const char *class_name() const	{ return "ToHost"; }
-    const char *port_count() const	{ return PORTS_1_0; }
-    const char *processing() const	{ return PUSH; }
+    const char *class_name() const override	{ return "ToHost"; }
+    const char *port_count() const override	{ return PORTS_1_0; }
+    const char *processing() const override	{ return PUSH; }
     const char *flags() const		{ return "S2"; }
 
     int configure_phase() const		{ return CONFIGURE_PHASE_TODEVICE; }

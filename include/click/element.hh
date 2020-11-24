@@ -9,8 +9,7 @@
 #include <click/handler.hh>
 #include <click/sync.hh>
 #include <functional>
-#include <random>
-#include <csignal>
+
 CLICK_DECLS
 class Router;
 class Master;
@@ -34,7 +33,6 @@ class BatchElement;
 #ifndef CLICK_ELEMENT_DEPRECATED
 # define CLICK_ELEMENT_DEPRECATED CLICK_DEPRECATED
 #endif
-
 
 class Element { public:
 
@@ -645,6 +643,8 @@ Element::Port::Port()
 {
     PORT_ASSIGN(0);
 }
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpmf-conversions"
 
 inline void
 Element::Port::assign(bool isoutput, Element *e, int port)
@@ -676,6 +676,8 @@ Element::Port::assign(bool isoutput, Element *e, int port)
     }
 #endif
 }
+
+#pragma GCC diagnostic pop
 
 inline void
 Element::Port::assign(bool isoutput, Element *owner, Element *e, int port)

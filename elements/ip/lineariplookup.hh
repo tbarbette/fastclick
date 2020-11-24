@@ -84,9 +84,9 @@ class LinearIPLookup : public IPRouteTable { public:
     LinearIPLookup() CLICK_COLD;
     ~LinearIPLookup() CLICK_COLD;
 
-    const char *class_name() const	{ return "LinearIPLookup"; }
-    const char *port_count() const	{ return "1/-"; }
-    const char *processing() const	{ return PUSH; }
+    const char *class_name() const override	{ return "LinearIPLookup"; }
+    const char *port_count() const override	{ return "1/-"; }
+    const char *processing() const override	{ return PUSH; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
 

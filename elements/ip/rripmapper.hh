@@ -24,7 +24,7 @@ class RoundRobinIPMapper : public Element, public IPMapper { public:
     RoundRobinIPMapper() CLICK_COLD;
     ~RoundRobinIPMapper() CLICK_COLD;
 
-    const char *class_name() const	{ return "RoundRobinIPMapper"; }
+    const char *class_name() const override	{ return "RoundRobinIPMapper"; }
     void *cast(const char *);
 
     int configure_phase() const		{ return IPRewriterBase::CONFIGURE_PHASE_MAPPER;}

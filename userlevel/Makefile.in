@@ -23,6 +23,8 @@ DEPCFLAGS = @DEPCFLAGS@
 AR_CREATE = @AR@ @AR_CREATEFLAGS@
 RANLIB = @RANLIB@
 INSTALL = @INSTALL@
+CLICK_SHARED = @CLICK_SHARED@
+HAVE_FLOW_API = @HAVE_FLOW_API@
 mkinstalldirs = $(conf_auxdir)/mkinstalldirs
 
 CLICK_BUILDTOOL = $(top_builddir)/bin/click-buildtool
@@ -103,20 +105,28 @@ LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
 
 USE_DPDK = @USE_DPDK@
 ifeq ($(USE_DPDK),yes)
-ifeq ($(shell pkg-config --exists libdpdk && echo 1), 1)
-LDFLAGS := $(LDFLAGS) $(shell pkg-config --libs libdpdk) -Wl,-Bstatic $(shell pkg-config --static --libs libdpdk)
-else
-RTE_SDK = @RTE_SDK@
-RTE_TARGET = @RTE_TARGET@
-RTE_SDK_BIN = @RTE_SDK_BIN@
-RTE_VER_MAJOR = @RTE_VER_MAJOR@
-RTE_VER_MINOR = @RTE_VER_MINOR@
-RTE_VER_YEAR = @RTE_VER_YEAR@
-RTE_VER_MONTH = @RTE_VER_MONTH@
-HAVE_DPDK_XCHG = @HAVE_DPDK_XCHG@
-include dpdk.mk
-endif
-EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
+	RTE_SDK = @RTE_SDK@
+	RTE_TARGET = @RTE_TARGET@
+	RTE_VER_MAJOR = @RTE_VER_MAJOR@
+	RTE_VER_MINOR = @RTE_VER_MINOR@
+	RTE_VER_YEAR = @RTE_VER_YEAR@
+	RTE_VER_MONTH = @RTE_VER_MONTH@
+	ifeq ($(shell pkg-config --exists libdpdk && echo 1), 1)
+		CFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
+		CXXFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
+		include rte_parse.mk
+		ifeq ($(CLICK_SHARED),1)
+			LIBS := $(LIBS) $(shell pkg-config --libs libdpdk)
+		else
+			LIBS := $(LIBS) $(shell pkg-config --static --libs libdpdk)
+		endif
+	else
+		include dpdk.mk
+	endif
+	EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
+	ifeq ($(shell [ ${HAVE_FLOW_API} -eq 1 ] && echo true),true)
+		EXTRA_DRIVER_OBJS := flowrulemanager.o flowrulecache.o flowruleparser.o $(EXTRA_DRIVER_OBJS)
+	endif
 endif
 
 ifndef MINDRIVER
@@ -155,10 +165,18 @@ ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
 endif
 
-$(DRIVER): libclick.a $(OBJS)
+# At of after HAVE_FLOW_API, compile against an additional library librte_parse (flow parser)
+ifeq ($(shell [ ${HAVE_FLOW_API} -eq 1 ] && echo true),true)
+ddeps: Makefile librte_parse.a libclick.a $(OBJS)
+
+$(DRIVER): ${PARSE_PATH}.sentinel ddeps
+	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a librte_parse.a $(LIBS),LINK)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+else
+$(DRIVER): Makefile libclick.a $(OBJS)
 	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a $(LIBS) $(DPDK_LIBS),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
-
+endif
 click-opt: click.ll libclick.a
 	$(call cxxlink,$(DL_LDFLAGS) click.ll libclick.a $(LIBS) $(DPDK_LIBS_IR),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
@@ -206,6 +224,9 @@ uninstall:
 
 clean:
 	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc $(ELEMENTSCONF).static.cc elements.conf elements.csmk libclick.a
+ifeq ($(shell [ ${HAVE_FLOW_API} ] && echo true),true)
+	rm -rf test-pmd/ ../lib/librte_parse_* librte_parse.*
+endif
 	@-for i in $(INSTALLPROGS); do rm -f ../bin/$$i; done
 
 clean-embed:

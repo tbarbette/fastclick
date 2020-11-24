@@ -102,11 +102,11 @@ public:
   GridRouteTable() CLICK_COLD;
   ~GridRouteTable() CLICK_COLD;
 
-  const char *class_name() const		{ return "GridRouteTable"; }
+  const char *class_name() const override		{ return "GridRouteTable"; }
   void *cast(const char *);
-  const char *port_count() const		{ return PORTS_1_1; }
-  const char *processing() const		{ return "h/h"; }
-  const char *flow_code() const                 { return "x/y"; }
+  const char *port_count() const override		{ return PORTS_1_1; }
+  const char *processing() const override		{ return "h/h"; }
+  const char *flow_code() const override                 { return "x/y"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

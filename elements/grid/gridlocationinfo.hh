@@ -82,7 +82,7 @@ public:
   GridLocationInfo() CLICK_COLD;
   ~GridLocationInfo() CLICK_COLD;
 
-  const char *class_name() const { return "GridLocationInfo"; }
+  const char *class_name() const override { return "GridLocationInfo"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const { return true; }

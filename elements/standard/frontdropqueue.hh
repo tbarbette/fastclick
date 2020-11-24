@@ -51,7 +51,7 @@ class FrontDropQueue : public NotifierQueue { public:
 
   FrontDropQueue() CLICK_COLD;
 
-  const char *class_name() const		{ return "FrontDropQueue"; }
+  const char *class_name() const override		{ return "FrontDropQueue"; }
   void *cast(const char *);
 
   int live_reconfigure(Vector<String> &, ErrorHandler *);

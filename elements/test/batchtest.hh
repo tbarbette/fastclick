@@ -19,9 +19,9 @@ class BatchTest : public BatchElement { public:
 
     BatchTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "BatchTest"; }
-    const char *port_count() const    { return PORTS_1_1; }
-    const char *processing() const    { return AGNOSTIC; }
+    const char *class_name() const override		{ return "BatchTest"; }
+    const char *port_count() const override    { return PORTS_1_1; }
+    const char *processing() const override    { return AGNOSTIC; }
 
     void push(int, Packet *) override;
     void push_batch(int, PacketBatch *) override;
@@ -44,9 +44,9 @@ class BatchElementTest : public Element { public:
 
     BatchElementTest() CLICK_COLD;
 
-    const char *class_name() const      { return "BatchElementTest"; }
-    const char *port_count() const    { return PORTS_1_1; }
-    const char *processing() const    { return AGNOSTIC; }
+    const char *class_name() const override      { return "BatchElementTest"; }
+    const char *port_count() const override    { return PORTS_1_1; }
+    const char *processing() const override    { return AGNOSTIC; }
 
     void push(int, Packet *);
     void push_batch(int, PacketBatch *);

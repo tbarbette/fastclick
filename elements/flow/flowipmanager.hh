@@ -14,10 +14,6 @@ CLICK_DECLS
 class DPDKDevice;
 struct rte_hash;
 
-const auto fim_setter = [](FlowControlBlock* prev, FlowControlBlock* next)
-{
-    *((FlowControlBlock**)&prev->data_32[2]) = next;
-};
 
 /**
  * FlowIPManager(CAPACITY [, RESERVE])
@@ -42,11 +38,11 @@ class FlowIPManager: public VirtualFlowManager, public Router::InitFuture {
         FlowIPManager() CLICK_COLD;
         ~FlowIPManager() CLICK_COLD;
 
-        const char *class_name() const { return "FlowIPManager"; }
-        const char *port_count() const { return "1/1"; }
+        const char *class_name() const override { return "FlowIPManager"; }
+        const char *port_count() const override { return "1/1"; }
 
-        const char *processing() const { return PUSH; }
-        int configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED + 1; }
+        const char *processing() const override { return PUSH; }
+        int configure_phase() const override { return CONFIGURE_PHASE_PRIVILEGED + 1; }
         bool stopClassifier() { return true; };
 
 
@@ -74,6 +70,8 @@ class FlowIPManager: public VirtualFlowManager, public Router::InitFuture {
         int _timeout;
         Timer _timer; //Timer to launch the wheel
         Task _task;
+
+        bool _cache;
 
         static String read_handler(Element* e, void* thunk);
         inline void process(Packet* p, BatchBuilder& b, const Timestamp& recent);

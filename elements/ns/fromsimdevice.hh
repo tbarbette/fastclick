@@ -63,9 +63,9 @@ class FromSimDevice : public Element {
   FromSimDevice() CLICK_COLD;
   ~FromSimDevice() CLICK_COLD;
 
-  const char *class_name() const	{ return "FromSimDevice"; }
-  const char *port_count() const	{ return PORTS_0_1; }
-  const char *processing() const	{ return PUSH; }
+  const char *class_name() const override	{ return "FromSimDevice"; }
+  const char *port_count() const override	{ return PORTS_0_1; }
+  const char *processing() const override	{ return PUSH; }
 
   int configure_phase() const		{ return CONFIGURE_PHASE_DEFAULT; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

@@ -32,10 +32,10 @@ class Idle : public BatchElement {
 
   Idle() CLICK_COLD;
 
-  const char *class_name() const	{ return "Idle"; }
-  const char *port_count() const	{ return "-/-"; }
-  const char *processing() const	{ return "a/a"; }
-  const char *flow_code() const		{ return "x/y"; }
+  const char *class_name() const override	{ return "Idle"; }
+  const char *port_count() const override	{ return "-/-"; }
+  const char *processing() const override	{ return "a/a"; }
+  const char *flow_code() const override		{ return "x/y"; }
   void *cast(const char *);
   const char *flags() const		{ return "S0"; }
 

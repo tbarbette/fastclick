@@ -92,8 +92,8 @@ class EtherVLANEncap : public BatchElement { public:
     EtherVLANEncap() CLICK_COLD;
     ~EtherVLANEncap() CLICK_COLD;
 
-    const char *class_name() const	{ return "EtherVLANEncap"; }
-    const char *port_count() const	{ return PORTS_1_1; }
+    const char *class_name() const override	{ return "EtherVLANEncap"; }
+    const char *port_count() const override	{ return PORTS_1_1; }
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     bool can_live_reconfigure() const	{ return true; }

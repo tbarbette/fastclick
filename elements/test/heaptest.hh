@@ -24,7 +24,7 @@ class HeapTest : public Element { public:
 
     HeapTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "HeapTest"; }
+    const char *class_name() const override		{ return "HeapTest"; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
 

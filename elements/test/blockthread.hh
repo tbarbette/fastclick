@@ -28,7 +28,7 @@ class BlockThread : public Element { public:
 
     BlockThread() CLICK_COLD;
 
-    const char *class_name() const	{ return "BlockThread"; }
+    const char *class_name() const override	{ return "BlockThread"; }
 
     void add_handlers() CLICK_COLD;
 

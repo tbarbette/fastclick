@@ -94,6 +94,7 @@ install-local: $(ELEMENTMAP) $(CLICK_BUILDTOOL) $(CLICK_COMPILE) \
 	$(INSTALL_IF_CHANGED) $(CLICK_COMPILE) $(DESTDIR)$(bindir)/click-compile
 	$(INSTALL_IF_CHANGED) $(srcdir)/click-mkelemmap $(DESTDIR)$(bindir)/click-mkelemmap
 	$(INSTALL_IF_CHANGED) $(top_srcdir)/test/testie $(DESTDIR)$(bindir)/testie
+	$(INSTALL_IF_CHANGED) $(top_srcdir)/test/clicktest $(DESTDIR)$(bindir)/clicktest
 	$(mkinstalldirs) $(DESTDIR)$(clickdatadir)
 	$(INSTALL) $(mkinstalldirs) $(DESTDIR)$(clickdatadir)/mkinstalldirs
 	$(INSTALL_DATA) $(ELEMENTMAP) $(DESTDIR)$(clickdatadir)/elementmap.xml
@@ -133,7 +134,7 @@ uninstall: $(ELEMENTMAP)
 	@for d in $(ALL_TARGETS) doc; do (cd $$d && $(MAKE) uninstall) || exit 1; done
 	@$(MAKE) uninstall-local uninstall-local-include
 uninstall-local:
-	/bin/rm -f $(DESTDIR)$(bindir)/click-buildtool $(DESTDIR)$(bindir)/click-compile $(DESTDIR)$(bindir)/click-mkelemmap $(DESTDIR)$(bindir)/testie $(DESTDIR)$(clickdatadir)/elementmap.xml $(DESTDIR)$(clickdatadir)/srcdir $(DESTDIR)$(clickdatadir)/src $(DESTDIR)$(clickdatadir)/config.mk $(DESTDIR)$(clickdatadir)/mkinstalldirs
+	/bin/rm -f $(DESTDIR)$(bindir)/click-buildtool $(DESTDIR)$(bindir)/click-compile $(DESTDIR)$(bindir)/click-mkelemmap $(DESTDIR)$(bindir)/testie $(DESTDIR)$(bindir)/clicktest $(DESTDIR)$(clickdatadir)/elementmap.xml $(DESTDIR)$(clickdatadir)/srcdir $(DESTDIR)$(clickdatadir)/src $(DESTDIR)$(clickdatadir)/config.mk $(DESTDIR)$(clickdatadir)/mkinstalldirs
 	/bin/rm -f $(DESTDIR)$(clickdatadir)/pkg-config.mk $(DESTDIR)$(clickdatadir)/pkg-userlevel.mk $(DESTDIR)$(clickdatadir)/pkg-linuxmodule.mk $(DESTDIR)$(clickdatadir)/pkg-linuxmodule-26.mk $(DESTDIR)$(clickdatadir)/pkg-bsdmodule.mk $(DESTDIR)$(clickdatadir)/pkg-Makefile
 uninstall-local-include:
 	cd $(srcdir)/include/click; for i in *.h *.hh *.cc; do /bin/rm -f $(DESTDIR)$(clickincludedir)/$$i; done
@@ -181,7 +182,7 @@ check-filenames:
 	@a=`find . \( -name \*.cc -or -name \*.c \) -print | sed 's/.*\/\(.*\)\.c*$$/\1.o/' | grep -v 'elements\.o' | sort | uniq -d`; \
 	if test -z $$a; then echo OK; else echo "*** warning: duplicate object file names:"; echo "$$a"; fi
 
-clean: $(CLEAN_TARGETS) clean-doc clean-local
+clean: $(CLEAN_TARGETS) clean-doc clean-local clean-cscope
 clean-doc:
 	@cd doc && $(MAKE) clean
 clean-local:
@@ -198,7 +199,7 @@ distclean:
 	-rmdir bin
 
 check: $(ALL_TARGETS) Makefile $(ELEMENTMAP)
-	$(top_srcdir)/test/testie -p $(top_builddir)/bin -p $(top_srcdir)/test \
+	$(top_srcdir)/test/clicktest -p $(top_builddir)/bin -p $(top_srcdir)/test \
 		$(if $V,-V,) CLICKPATH="`cd $(top_builddir); pwd`:" \
 		CLICKTEST_PREINSTALL=1 \
 		$(top_srcdir)/test
@@ -210,14 +211,14 @@ dist: distdir
 	tar czf $(distdir).tar.gz $(distdir)
 	-rm -rf $(distdir)
 distdir: $(srcdir)/configure
-	-rm -rf doc/click.info* doc/testie.1 $(srcdir)/doc/click.info* $(srcdir)/doc/testie.1
-	cd doc && $(MAKE) testie.1
+	-rm -rf doc/click.info* doc/clicktest.1 $(srcdir)/doc/click.info* $(srcdir)/doc/clicktest.1
+	cd doc && $(MAKE) clicktest.1
 	cd $(srcdir)/etc/samplepackage && $(AUTOCONF)
 	-rm -rf $(distdir)
 	mkdir $(distdir)
 	chmod 777 $(distdir)
 	@echo Copying library, documentation, configuration, and driver files...
-	[ "$(srcdir)" = . ] || cp doc/testie.1 $(srcdir)/doc
+	[ "$(srcdir)" = . ] || cp doc/clicktest.1 $(srcdir)/doc
 	@for file in `cat $(srcdir)/DISTFILES | grep .`; do \
 	  if expr "$$file" : '.*:$$' >/dev/null 2>&1; then \
 	    d=`echo $$file | sed 's/:$$//;s/^\.\///'`; \
@@ -254,9 +255,16 @@ distdir: $(srcdir)/configure
 	fi
 
 
+cscope: clean-cscope
+	ack -f --cpp > cscope.files
+	cscope -b -R -q -k
+
+clean-cscope:
+	rm -rf cscope.*
+
 .PHONY: all always elemlist elemlists \
 	bsdmodule linuxmodule ns userlevel minios tools \
 	install install-doc install-lib install-man install-local install-include install-local-include $(INSTALL_TARGETS) \
-	clean clean-doc clean-local $(CLEAN_TARGETS) distclean \
+	clean clean-doc clean-local $(CLEAN_TARGETS) distclean clean-cscope \
 	uninstall uninstall-local uninstall-local-include \
-	dist distdir check
+	dist distdir check cscope

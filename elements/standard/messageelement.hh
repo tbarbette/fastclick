@@ -37,7 +37,7 @@ class MessageElement : public Element { public:
 
     MessageElement() CLICK_COLD;
 
-    const char *class_name() const		{ return "Message"; }
+    const char *class_name() const override		{ return "Message"; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
 };

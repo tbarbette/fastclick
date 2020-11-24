@@ -187,7 +187,7 @@ class SourceIPHashMapper : public Element, public IPMapper { public:
   SourceIPHashMapper() CLICK_COLD;
   ~SourceIPHashMapper() CLICK_COLD;
 
-  const char *class_name() const	{ return "SourceIPHashMapper"; }
+  const char *class_name() const override	{ return "SourceIPHashMapper"; }
   void *cast(const char *);
 
   int configure_phase() const		{ return IPRewriterBase::CONFIGURE_PHASE_MAPPER;}

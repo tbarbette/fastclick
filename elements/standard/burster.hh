@@ -20,7 +20,7 @@ class Burster : public TimedUnqueue { public:
 
     Burster() CLICK_COLD;
 
-    const char *class_name() const		{ return "Burster"; }
+    const char *class_name() const override		{ return "Burster"; }
     void *cast(const char *name);
 
 };

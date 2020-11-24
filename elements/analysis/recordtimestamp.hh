@@ -64,10 +64,10 @@ public:
     RecordTimestamp() CLICK_COLD;
     ~RecordTimestamp() CLICK_COLD;
 
-    const char *class_name() const { return "RecordTimestamp"; }
-    const char *port_count() const { return PORTS_1_1; }
-    const char *processing() const { return PUSH; }
-    const char *flow_code() const { return "x/x"; }
+    const char *class_name() const override { return "RecordTimestamp"; }
+    const char *port_count() const override { return PORTS_1_1; }
+    const char *processing() const override { return PUSH; }
+    const char *flow_code() const override { return "x/x"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
@@ -100,7 +100,7 @@ const Timestamp read_timestamp = Timestamp::make_sec(1);
 
 inline Timestamp RecordTimestamp::get(uint64_t i) {
     if (i >= (unsigned)_timestamps.size()) {
-        click_chatter("Out of index !");
+        click_chatter("%p{element}: Index %d is out of range !", this, i);
         return Timestamp::uninitialized_t();
     }
     Timestamp t = _timestamps[i];

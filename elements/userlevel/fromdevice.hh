@@ -165,9 +165,9 @@ class FromDevice : public BatchElement { public:
     FromDevice() CLICK_COLD;
     ~FromDevice() CLICK_COLD;
 
-    const char *class_name() const	{ return "FromDevice"; }
-    const char *port_count() const	{ return "0/1-2"; }
-    const char *processing() const	{ return PUSH; }
+    const char *class_name() const override	{ return "FromDevice"; }
+    const char *port_count() const override	{ return "0/1-2"; }
+    const char *processing() const override	{ return PUSH; }
 
     enum { default_snaplen = 2046 };
     int configure_phase() const		{ return KernelFilter::CONFIGURE_PHASE_FROMDEVICE; }

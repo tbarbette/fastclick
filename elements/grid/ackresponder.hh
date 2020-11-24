@@ -27,9 +27,9 @@ public:
   ACKResponder() CLICK_COLD;
   ~ACKResponder() CLICK_COLD;
 
-  const char *class_name() const { return "ACKResponder"; }
-  const char *port_count() const { return "1/2"; }
-  const char *processing() const { return PROCESSING_A_AH; }
+  const char *class_name() const override { return "ACKResponder"; }
+  const char *port_count() const override { return "1/2"; }
+  const char *processing() const override { return PROCESSING_A_AH; }
   const char *flow_code()  const { return "x/xy"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

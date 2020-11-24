@@ -27,7 +27,7 @@
 
 CLICK_DECLS
 
-FlowIPManager::FlowIPManager() : _verbose(1), _flags(0), _timer(this), _task(this)
+FlowIPManager::FlowIPManager() : _verbose(1), _flags(0), _timer(this), _task(this), _cache(true)
 {
 }
 
@@ -42,11 +42,12 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (Args(conf, this, errh)
         .read_or_set_p("CAPACITY", _table_size, 65536)
-        .read_or_set("RESERVE", _reserve, 0)
+        .read_or_set("RESERVE",_reserve, 0)
         .read_or_set("TIMEOUT", _timeout, 60)
 #if RTE_VERSION > RTE_VERSION_NUM(18,8,0,0)
         .read_or_set("LF", lf, false)
 #endif
+        .read_or_set("CACHE", _cache, true)
         .read_or_set("VERBOSE", _verbose, 1)
         .complete() < 0)
         return -1;
@@ -87,8 +88,7 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
     if (_verbose)
-        errh->message("Per-flow size is %d", _reserve);
-
+     errh->message("Per-flow size is %d", _reserve);
     sprintf(buf, "%s", name().c_str());
     hash = rte_hash_create(&hash_params);
     if (!hash)
@@ -112,6 +112,11 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     return 0;
 }
 
+const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next)
+{
+    *((FlowControlBlock**)&prev->data_32[2]) = next;
+};
+
 bool FlowIPManager::run_task(Task* t)
 {
     Timestamp recent = Timestamp::recent_steady();
@@ -126,7 +131,7 @@ bool FlowIPManager::run_task(Task* t)
         } else {
             //click_chatter("Cascade %p", prev);
             //No need for lock as we'll be the only one to enqueue there
-            _timer_wheel.schedule_after(prev, _timeout - (recent - prev->lastseen).sec(),fim_setter);
+            _timer_wheel.schedule_after(prev, _timeout - (recent - prev->lastseen).sec(),setter);
         }
         return next;
     });
@@ -148,6 +153,12 @@ void FlowIPManager::cleanup(CleanupStage stage)
 void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
 {
     IPFlow5ID fid = IPFlow5ID(p);
+
+    if (_cache && fid == b.last_id) {
+        b.append(p);
+        return;
+    }
+
     rte_hash*& table = hash;
     FlowControlBlock* fcb;
     int ret = rte_hash_lookup(table, &fid);
@@ -168,9 +179,9 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
         fcb->data_32[0] = ret;
         if (_timeout) {
             if (_flags) {
-                _timer_wheel.schedule_after_mp(fcb, _timeout, fim_setter);
+                _timer_wheel.schedule_after_mp(fcb, _timeout, setter);
             } else {
-                _timer_wheel.schedule_after(fcb, _timeout, fim_setter);
+                _timer_wheel.schedule_after(fcb, _timeout, setter);
             }
         }
     } else {
@@ -191,6 +202,10 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
         fcb_stack = fcb;
         b.init();
         b.append(p);
+        b.last = ret;
+        if (_cache)
+            b.last_id = fid;
+
     }
 }
 
@@ -204,7 +219,7 @@ void FlowIPManager::push_batch(int, PacketBatch* batch)
 
     batch = b.finish();
     if (batch) {
-    fcb_stack->lastseen = recent;
+        fcb_stack->lastseen = recent;
         output_push_batch(0, batch);
     }
 }

@@ -24,7 +24,7 @@ class HashTableTest : public Element { public:
 
     HashTableTest() CLICK_COLD;
 
-    const char *class_name() const		{ return "HashTableTest"; }
+    const char *class_name() const override		{ return "HashTableTest"; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
 

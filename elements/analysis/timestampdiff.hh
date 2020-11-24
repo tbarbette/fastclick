@@ -7,7 +7,14 @@
 CLICK_DECLS
 
 class RecordTimestamp;
+    struct DiffRecord {
+        unsigned delay;
+        unsigned char tc;
 
+    };
+static inline bool operator<(const DiffRecord &a, const DiffRecord &b) {
+        return a.delay < b.delay;
+}
 /*
 =c
 
@@ -52,10 +59,10 @@ public:
     TimestampDiff() CLICK_COLD;
     ~TimestampDiff() CLICK_COLD;
 
-    const char *class_name() const { return "TimestampDiff"; }
-    const char *port_count() const { return PORTS_1_1X2; }
-    const char *processing() const { return PUSH; }
-    const char *flow_code() const { return "x/x"; }
+    const char *class_name() const override { return "TimestampDiff"; }
+    const char *port_count() const override { return PORTS_1_1X2; }
+    const char *processing() const override { return PUSH; }
+    const char *flow_code() const override { return "x/x"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
@@ -69,7 +76,8 @@ public:
 #endif
 
 private:
-    Vector<unsigned> _delays;
+
+    Vector<DiffRecord> _delays;
     int _offset;
     uint32_t _limit;
     bool _net_order;
@@ -79,6 +87,8 @@ private:
     atomic_uint32_t _nd;
     uint32_t _sample;
     bool _verbose;
+    int _tc_offset;
+    unsigned char _tc_mask;
 
     inline int smaction(Packet *p);
 
@@ -88,7 +98,9 @@ private:
         unsigned &min,
         double   &mean,
         unsigned &max,
-        uint32_t begin = 0
+        uint32_t begin = 0,
+        int tc = -1
+
     );
 
     double standard_deviation(const double mean, uint32_t begin = 0);
