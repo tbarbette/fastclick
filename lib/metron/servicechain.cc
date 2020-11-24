@@ -675,7 +675,7 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
     }
 
     if (_sriov > 0) {
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #if HAVE_FLOW_API
         int idx = 0;
         for (int i = 0; i < sc->get_nics_nb(); i++) {
             // Insert VF->PF traffic return rules

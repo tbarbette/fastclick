@@ -33,7 +33,7 @@
 
 #include <metron/servicechain.hh>
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
     #include <click/flowrulemanager.hh>
 #endif
 
@@ -1314,7 +1314,7 @@ NIC::cast()
     return dynamic_cast<FromDPDKDevice *>(get_element());
 }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
 /**
  * Returns a FlowRuleManager object associated with this NIC.
  */
@@ -1871,7 +1871,7 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
         // Get its Rx mode
         String fd_mode = fd->get_device()->get_mode_str().empty() ? "unknown" : fd->get_device()->get_mode_str();
 
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #if HAVE_FLOW_API
         // TODO: What if none of the NICs is in Metron mode?
         if ((_rx_mode == FLOW) && (fd_mode != FlowRuleManager::DISPATCHING_MODE)) {
             errh->warning(
@@ -2537,7 +2537,7 @@ Metron::to_json()
     return jroot;
 }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
 /**
  * Flushes all rules from all Metron NICs.
  */
@@ -2693,7 +2693,7 @@ Metron::setup_link_discovery()
     return jroot;
 }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
 Json
 Metron::nics_table_stats_to_json()
 {
@@ -2940,7 +2940,7 @@ Metron::read_handler(Element *e, void *user_data)
             jroot = m->controllers_to_json();
             break;
         }
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #if HAVE_FLOW_API
         case h_rules_table_stats: {
             jroot = m->nics_table_stats_to_json();
             break;
@@ -3001,7 +3001,7 @@ Metron::write_handler(
         case h_controllers_delete: {
             return m->controller_delete_from_json((const String &) data);
         }
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #if HAVE_FLOW_API
         case h_rules_add_from_file: {
             int delim = data.find_left(' ');
             // Only one argument was given
@@ -3170,7 +3170,7 @@ Metron::param_handler(
                 param = sc->_manager->command(param.substring(pos + 1));
                 return SUCCESS;
             }
-        #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        #if HAVE_FLOW_API
             case h_rules: {
                 if (param == "") {
                     click_chatter("Metron controller requested local NIC rules for all service chains");
@@ -3271,7 +3271,7 @@ Metron::param_handler(
                 param = ar.unparse();
                 return SUCCESS;
             }
-        #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        #if HAVE_FLOW_API
             case h_rules: {
                 Json jroot = Json::parse(param);
                 Json jlist = jroot.get("rules");
@@ -3315,7 +3315,7 @@ Metron::param_handler(
     }
 }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
 /**
  * Metron agent's rule statistics handlers.
  */
@@ -3459,7 +3459,7 @@ Metron::add_handlers()
     );
 
     // Rule handlers
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
     set_handler(
         "rules", Handler::f_write | Handler::f_read | Handler::f_read_param,
         param_handler, h_rules, h_rules
@@ -3979,7 +3979,7 @@ ServiceChain::stats_to_json(bool monitoring_mode)
     return jsc;
 }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
 /**
  * Decodes service chain rules from JSON and installs the rules in the respective NIC.
  *

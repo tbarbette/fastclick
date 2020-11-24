@@ -14,7 +14,7 @@
 #include "fromdpdkdevice.hh"
 #include "../json/json.hh"
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
  #include <click/flowrulemanager.hh>
 #endif
 
@@ -834,7 +834,7 @@ class NIC {
 
         FromDPDKDevice *cast();
 
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #if HAVE_FLOW_API
         FlowRuleManager *get_flow_rule_mgr(int sriov = 0);
         FlowRuleCache *get_flow_rule_cache(int sriov = 0);
     #endif
@@ -1002,7 +1002,7 @@ class ServiceChain {
         Json stats_to_json(bool monitoring_mode = false);
         void print();
 
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #if HAVE_FLOW_API
         Json rules_to_json();
         int32_t rules_from_json(Json j, Metron *m, ErrorHandler *errh);
         static int delete_rule(const uint32_t &rule_id, Metron *m, ErrorHandler *errh);
@@ -1145,7 +1145,7 @@ class Metron : public Element {
             const String &data, Element *e, void *user_data,
             ErrorHandler *errh
         ) CLICK_COLD;
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #if HAVE_FLOW_API
         static int rule_stats_handler(int operation, String &param, Element *e, const Handler *h, ErrorHandler *errh);
     #endif
 
@@ -1155,7 +1155,7 @@ class Metron : public Element {
         Json time_to_json();
         Json system_stats_to_json();
         Json setup_link_discovery();
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #if HAVE_FLOW_API
         Json nics_table_stats_to_json();
     #endif
         Json controllers_to_json();
@@ -1177,7 +1177,7 @@ class Metron : public Element {
             h_service_chains, h_service_chains_put,
             h_service_chains_stats, h_service_chains_proxy,
             h_service_chains_delete,
-        #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        #if HAVE_FLOW_API
             h_rules,
             h_rules_add_from_file,
             h_rules_table_stats,
@@ -1322,7 +1322,7 @@ class Metron : public Element {
         int try_slaves(ErrorHandler *errh);
 
         int confirm_nic_mode(ErrorHandler *errh);
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #if HAVE_FLOW_API
         int flush_nics();
     #endif
 

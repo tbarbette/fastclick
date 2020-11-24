@@ -22,7 +22,7 @@
 #include <rte_pci.h>
 #include <rte_version.h>
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
     #include <click/flowruleparser.hh>
 #endif
 
@@ -55,7 +55,11 @@
  */
 #ifndef PORTID_T_DEFINED
     #define PORTID_T_DEFINED
-    typedef uint8_t portid_t;
+    #if RTE_VERSION > RTE_VERSION_NUM(17,05,0,0)
+        typedef uint16_t portid_t;
+    #else
+        typedef uint8_t portid_t;
+    #endif
 #else
     // Already defined in <testpmd.h>
 #endif
@@ -155,7 +159,7 @@ public:
         bool jumbo;
     };
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
     void initialize_flow_rule_manager(
         const portid_t &port_id,
         ErrorHandler   *errh
@@ -209,7 +213,7 @@ public:
 
     static int get_port_numa_node(portid_t port_id);
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
     int set_mode(
         String mode, int num_pools, Vector<int> vf_vlan,
         const String &flow_rules_filename, ErrorHandler *errh
@@ -255,7 +259,7 @@ public:
 
     static unsigned int get_nb_txdesc(const portid_t &port_id);
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
     static int configure_nic(const portid_t &port_id);
 #endif
 

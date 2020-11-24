@@ -449,7 +449,7 @@ private:
     static int write_handler(
         const String &, Element *, void *, ErrorHandler *
     ) CLICK_COLD;
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if HAVE_FLOW_API
     static int flow_handler (
         const String &, Element *, void *, ErrorHandler *
     ) CLICK_COLD;
