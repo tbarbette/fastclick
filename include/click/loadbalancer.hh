@@ -13,12 +13,14 @@
 #include <click/straccum.hh>
 #include <click/args.hh>
 #include <click/timer.hh>
+#include <click/algorithm.hh>
 
 class LoadBalancer { public:
 
     LoadBalancer() : _current(0), _dsts(), _weights_helper(), _mode_case(round_robin) {
         modetrans.find_insert("rr",round_robin);
         modetrans.find_insert("hash",direct_hash);
+        modetrans.find_insert("chash",direct_chash);
         modetrans.find_insert("hash_ip",direct_hash_ip);
 #if HAVE_DPDK
         modetrans.find_insert("hash_crc",direct_hash_crc);
@@ -29,6 +31,7 @@ class LoadBalancer { public:
         modetrans.find_insert("awrr",auto_weighted_round_robin);
         modetrans.find_insert("least",least_load);
         modetrans.find_insert("pow2",pow2);
+        modetrans.find_insert("table",table);
         lsttrans.find_insert("conn",connections);
         lsttrans.find_insert("packets",packets);
         lsttrans.find_insert("bytes",bytes);
@@ -42,14 +45,17 @@ class LoadBalancer { public:
         pow2,
         constant_hash_agg,
         direct_hash,
+        direct_chash,
         direct_hash_crc,
         direct_hash_agg,
-    direct_hash_ip,
-        least_load
+        direct_hash_ip,
+        least_load,
+        table
+
     };
 
     static bool isLoadBased(LBMode mode) {
-        return mode == pow2 || mode == least_load || mode == weighted_round_robin || mode == auto_weighted_round_robin;
+        return mode == pow2 || mode == least_load || mode == weighted_round_robin || mode == auto_weighted_round_robin || mode == table;
     }
 
     // Metric to use when the LB technique is load-based
@@ -62,10 +68,11 @@ class LoadBalancer { public:
 
     typedef atomic_uint64_t load_type_t;
 
-    struct load {
-        load() {
+    struct MachineLoad {
+        MachineLoad() {
             connection_load = 0;
             cpu_load = 0;
+            raw_cpu_load = 0;
             packets_load = 0;
             bytes_load = 0;
         }
@@ -73,6 +80,7 @@ class LoadBalancer { public:
         load_type_t packets_load;
         load_type_t bytes_load;
         uint64_t cpu_load;
+        uint64_t raw_cpu_load;
     } CLICK_CACHE_ALIGN;
 
 protected:
@@ -83,7 +91,7 @@ protected:
     unprotected_rcu_singlewriter<Vector <unsigned>,2> _weights_helper;
     LBMode _mode_case;
     LSTMode _lst_case;
-    Vector <load,CLICK_CACHE_LINE_SIZE> _loads;
+    Vector <MachineLoad, CLICK_CACHE_LINE_SIZE> _loads;
     Vector <unsigned> _selector;
     Vector <unsigned> _cst_hash;
     Vector <unsigned> _spares;
@@ -95,8 +103,9 @@ protected:
     uint64_t get_load_metric(int idx) {
         return get_load_metric(idx, _lst_case);
     }
+
     uint64_t get_load_metric(int idx,LSTMode metric) {
-        load& l = _loads[idx];
+        MachineLoad& l = _loads[idx];
         switch(metric) {
             case connections: {
                 return l.connection_load;
@@ -115,20 +124,34 @@ protected:
         }
     }
 
+    int hash_4tuple(const Packet* p, int n) {
+                const unsigned char *data = p->data();
+                int o = 26, l = 12;
+                int h;
+                if ((int)p->length() < o + l)
+                    h = 0;
+                else {
+                    int d = 0;
+                    for (int i = o; i < o + l; i++)
+                        d += data[i];
+                    if (n == 2 || n == 4 || n == 8)
+                        h = (d ^ (d>>4)) & (n-1);
+                    else
+                      h = (d % n);
+                }
+                return h;
+    }
+
     inline void track_load(Packet*p, int b) {
-    if (_track_load) {
-        if (TCPHelper::isSyn(p))
-                 _loads[b].connection_load++;
-        else if (TCPHelper::isFin(p) || TCPHelper::isRst(p))
-                 _loads[b].connection_load--;
+        if (_track_load) {
+            if (TCPHelper::isSyn(p))
+                     _loads[b].connection_load++;
+            else if (TCPHelper::isFin(p) || TCPHelper::isRst(p))
+                     _loads[b].connection_load--;
 
             _loads[b].packets_load++;
             _loads[b].bytes_load += p->length();
         }
-    }
-
-    unsigned cantor(unsigned a, unsigned b) {
-        return ((a + b)  * (a + b + 1))/2 + b;
     }
 
     /* Builds the constant hashing map
@@ -190,9 +213,9 @@ protected:
         timer->reschedule_after_msec(lb->_awrr_interval);
     }
 
-    int hash_ip(const Packet* p) {
+    int hash_ip(const Packet* p, int n) {
         const unsigned char *data = p->data();
-        int o = 32, l = 8;
+        int o = 26, l = 8;
         int h;
         if ((int)p->length() < o + l)
             h = 0;
@@ -200,7 +223,6 @@ protected:
             int d = 0;
             for (int i = o; i < o + l; i++)
                 d += data[i];
-            int n = _selector.size();
             if (n == 2 || n == 4 || n == 8)
                 h = (d ^ (d>>4)) & (n-1);
             else
@@ -219,7 +241,7 @@ protected:
         bool has_cst_buckets;
         int cst_buckets;
         int nserver;
-    bool force_track_load;
+        bool force_track_load;
         int ret = Args(lb, errh).bind(conf)
             .read_or_set("LB_MODE", lb_mode,"rr")
             .read_or_set("LST_MODE",lst_mode,"conn")
@@ -233,7 +255,8 @@ protected:
             return -1;
 
         _alpha = alpha;
-    _force_track_load = force_track_load;
+        _force_track_load = force_track_load;
+
         if (has_cst_buckets) {
             _cst_hash.resize(cst_buckets, -1);
         }
@@ -243,8 +266,8 @@ protected:
         return ret;
     }
 
-   enum {
-            h_load,h_nb_total_servers,h_nb_active_servers,h_load_conn,h_load_packets,h_load_bytes,h_add_server,h_remove_server
+    enum {
+            h_load,h_load_raw,h_nb_total_servers,h_nb_active_servers,h_load_conn,h_load_packets,h_load_bytes,h_add_server,h_remove_server,h_lb_max
     };
 
 
@@ -278,6 +301,7 @@ protected:
             }
         } else {
            switch((uintptr_t)w_thunk) {
+               case h_load_raw:
                case h_load:
                {
                     String s(data);
@@ -294,7 +318,12 @@ protected:
                             click_chatter("Invalid server id %d", server_id);
                             return 1;
                         }
-                        cs->_loads[server_id].cpu_load = server_load;
+                        if ((uintptr_t)w_thunk == h_load_raw) {
+                            cs->_loads[server_id].cpu_load = server_load - cs->_loads[server_id].raw_cpu_load;
+                            cs->_loads[server_id].raw_cpu_load = server_load;
+                        } else
+                            cs->_loads[server_id].cpu_load = server_load;
+//                        click_chatter("Server %d load %d", server_id, cs->_loads[server_id].cpu_load);
                         s = s.substring(ntoken + 1);
                     }
 
@@ -359,21 +388,23 @@ protected:
 
     template <class T>
     void add_lb_handlers(Element* _e) {
-    T* e = (T*)_e;
-    e->set_handler("load", Handler::f_read | Handler::f_read_param | Handler::f_write, e->handler, h_load, h_load);
-    e->add_read_handler("nb_active_servers", e->read_handler, h_nb_active_servers);
-    e->add_read_handler("nb_total_servers", e->read_handler, h_nb_total_servers);
-    e->add_read_handler("load_conn", e->read_handler, h_load_conn);
-    e->add_read_handler("load_bytes", e->read_handler, h_load_bytes);
-    e->add_read_handler("load_packets", e->read_handler, h_load_packets);
-    //e->add_write_handler("remove_server", e->write_handler, h_remove_server);
-    //e->add_write_handler("add_server", e->write_handler, h_add_server);
+        T* e = (T*)_e;
+        e->set_handler("load", Handler::f_read | Handler::f_read_param | Handler::f_write, e->handler, h_load, h_load);
+
+        e->set_handler("load_raw",  Handler::f_write, e->handler, h_load_raw, h_load_raw);
+        e->add_read_handler("nb_active_servers", e->read_handler, h_nb_active_servers);
+        e->add_read_handler("nb_total_servers", e->read_handler, h_nb_total_servers);
+        e->add_read_handler("load_conn", e->read_handler, h_load_conn);
+        e->add_read_handler("load_bytes", e->read_handler, h_load_bytes);
+        e->add_read_handler("load_packets", e->read_handler, h_load_packets);
+        //e->add_write_handler("remove_server", e->write_handler, h_remove_server);
+        //e->add_write_handler("add_server", e->write_handler, h_add_server);
     }
 
     void set_mode(String mode, String metric="cpu", Element* owner=0,int awrr_timer_interval = -1, int nserver = 0) {
         auto item = modetrans.find(mode);
         _mode_case = item.value();
-        if (_mode_case == weighted_round_robin || _mode_case == auto_weighted_round_robin) {
+        if (_mode_case == weighted_round_robin || _mode_case == auto_weighted_round_robin || _mode_case == table) {
             auto &wh = _weights_helper.write_begin();
             wh.resize(_dsts.size());
             for(int i=0; i<_dsts.size(); i++) {
@@ -458,7 +489,7 @@ protected:
                 return _selector.unchecked_at(server_val);
             }
             case direct_hash_ip: {
-                unsigned server_val = hash_ip(p);
+                unsigned server_val = hash_ip(p, _selector.size());
                 return _selector.unchecked_at(server_val);
             }
             case direct_hash: {
@@ -487,23 +518,23 @@ protected:
             }
             case least_load: {
                 //click_chatter("Least loaded mode");
-                std::function<bool(load,load)> comp;
+                std::function<bool(MachineLoad,MachineLoad)> comp;
 
                 switch(_lst_case) {
                     case connections: {
-                        comp = [&](load m,load n)-> bool {return m.connection_load<n.connection_load;};
+                        comp = [&](MachineLoad m,MachineLoad n)-> bool {return m.connection_load<n.connection_load;};
                         break;
                     }
                     case bytes: {
-                        comp = [&](load m,load n)-> bool {return m.bytes_load<n.bytes_load;};
+                        comp = [&](MachineLoad m,MachineLoad n)-> bool {return m.bytes_load<n.bytes_load;};
                         break;
                     }
                     case packets: {
-                        comp = [&](load m,load n)-> bool {return m.packets_load<n.packets_load;};
+                        comp = [&](MachineLoad m,MachineLoad n)-> bool {return m.packets_load<n.packets_load;};
                         break;
                     }
                     case cpu: {
-                        comp = [&](load m,load n)-> bool {return m.cpu_load<n.cpu_load;};
+                        comp = [&](MachineLoad m,MachineLoad n)-> bool {return m.cpu_load<n.cpu_load;};
                         break;
                         /*Vector <uint64_t> load_dic;
                         for (int i=0;i<_dsts.size();i++){
@@ -547,6 +578,17 @@ protected:
                 }
                 return -1; //unreachable
             }
+            case direct_chash: {
+                return hash_4tuple(p, _selector.size());
+            }
+            case table: {
+
+                auto & wh = _weights_helper.read_begin();
+                int hash = hash_4tuple(p, wh.size());
+                auto r =  wh[hash];
+                _weights_helper.read_end();
+                return r;
+                        }
             default: {
                 //click_chatter("No mode set, go to bucket 0");
                 return 0;
