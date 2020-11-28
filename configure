@@ -16269,9 +16269,7 @@ fi
 if test "$enable_dpdk" = yes; then
     dpdk_info="${enable_dpdk}
     DPDK    Target:              ${RTE_TARGET}
-    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}
-    DPDK     Major:              ${RTE_VER_MAJOR}
-    DPDK     Minor:              ${RTE_VER_MINOR}"
+    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}"
 else
     dpdk_info=${enable_dpdk}
 fi
