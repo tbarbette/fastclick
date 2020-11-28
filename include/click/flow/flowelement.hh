@@ -324,7 +324,7 @@ public :
             my_fcb->previous_fnt(fcb, my_fcb->previous_thunk);
     }
 
-    void push_batch(int port,PacketBatch* head) final {
+    void push_batch(int port, PacketBatch* head) final {
          auto my_fcb = my_fcb_data();
          if (!my_fcb->seen) {
              if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
