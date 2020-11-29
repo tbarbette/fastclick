@@ -102,8 +102,6 @@ if test "x$enable_fullpush_nonatomic" = "xyes"; then
 fi
 
 
-
-
 AC_ARG_ENABLE([batch],
     [AS_HELP_STRING([  --disable-batch], [disable batching support])],
     [:], [enable_batch=$enable_userlevel])

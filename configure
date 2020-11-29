@@ -6507,8 +6507,6 @@ if test "x$enable_fullpush_nonatomic" = "xyes"; then
 fi
 
 
-
-
 # Check whether --enable-batch was given.
 if test "${enable_batch+set}" = set; then :
   enableval=$enable_batch; :
