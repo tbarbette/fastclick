@@ -54,6 +54,7 @@ CLICK_DECLS
 FromDump::FromDump()
     : _packet(0), _preload(0), _preload_head(0), _force_len(DISABLED), _end_h(0), _count(0),  _timer(this), _task(this)
 {
+    in_batch_mode = BATCH_MODE_YES;
 }
 
 FromDump::~FromDump()
@@ -93,6 +94,7 @@ FromDump::configure(Vector<String> &conf, ErrorHandler *errh)
 #endif
     _packet_filepos = 0;
     _preload = 0;
+    String timing_fnt;
 
     if (_ff.configure_keywords(conf, this, errh) < 0)
 	return -1;
@@ -115,6 +117,9 @@ FromDump::configure(Vector<String> &conf, ErrorHandler *errh)
 #endif
     .read("FILEPOS", _packet_filepos)
     .read("PRELOAD", _preload)
+    .read_or_set("ACCELERATION", _current_accel, 100)
+    .read_or_set("TIMING_FNT", timing_fnt, "")
+    .read_or_set("BURST", _burst, 32)
     .complete() < 0)
 	return -1;
 
@@ -191,6 +196,11 @@ FromDump::configure(Vector<String> &conf, ErrorHandler *errh)
             "this will likely slow down the injection rate due to frame padding/chopping operations.", _force_len
         );
     }
+
+    if (timing_fnt != "") {
+        _fnt_expr = TinyExpr::compile(timing_fnt, 1);
+    }
+
 
 #if CLICK_NS
     if (per_node) {
@@ -387,9 +397,15 @@ FromDump::prepare_times(const Timestamp &ts)
 	_last_time += ts;
     else if (_last_time_interval)
 	_last_time += _first_time;
-    if (_timing)
-	_timing_offset = Timestamp::now_steady() - ts;
-    _have_any_times = true;
+    if (_timing) {
+	    _timing_offset = ts;
+        _starttime = Timestamp::now_steady();
+        _last_real = _starttime;
+        _last_check = 0;
+        if (_fnt_expr)
+            _current_accel = _fnt_expr.eval(0);
+    }
+     _have_any_times = true;
 }
 
 bool
@@ -555,23 +571,68 @@ FromDump::read_packet(ErrorHandler *errh)
     return true;
 }
 
-bool
-FromDump::check_timing(Packet *p)
+inline bool
+FromDump::check_timing(Packet *p, Timestamp& now_s, bool& fresh)
 {
-    Timestamp now_s = Timestamp::now_steady();
-    Timestamp t = p->timestamp_anno() + _timing_offset;
-    if (now_s < t) {
-	t -= Timer::adjustment();
-	if (now_s < t) {
-	    _timer.schedule_at_steady(t);
-	    if (output_is_pull(0))
-		_notifier.sleep();
-	} else {
-	    if (output_is_push(0))
-		_task.fast_reschedule();
-	}
-	return false;
+again:
+
+    now_s = Timestamp::now_steady();
+    int64_t elapsed_real = (now_s - _last_real).usecval();
+
+    int64_t elapsed_virt = (p->timestamp_anno() - _timing_offset).usecval();
+
+    if (_current_accel != 100) {
+        elapsed_virt = ((double)elapsed_virt * 100.0f) / (double)_current_accel;
     }
+
+    if (elapsed_real < elapsed_virt) {
+        if (!fresh) {
+            now_s = Timestamp::now_steady();
+            fresh = true;
+            goto again;
+        }
+        /*ACCUMULATION NOT NEEDED
+         * if (elapsed_real > (INT_MAX / 101)) {
+            _last_real = now_s;
+            _timing_offset = _timing_offset + Timestamp::make_usec((uint64_t)elapsed_real * (uint64_t)_current_accel / 100));
+            goto again;
+        }*/
+        elapsed_virt -= Timer::adjustment().usecval();
+
+        if (elapsed_real < elapsed_virt) {
+            _timer.schedule_at_steady(_last_real + Timestamp::make_usec(elapsed_virt));
+            if (output_is_pull(0))
+            _notifier.sleep();
+        } else {
+            if (output_is_push(0))
+                _task.fast_reschedule();
+        }
+
+	    return false;
+    }
+
+    if (_fnt_expr && (elapsed_real - _last_check > 1000)) {
+        float x = (float)(now_s - _starttime).msecval() / 1000.0;
+        x = _fnt_expr.eval(x);
+
+        if ((unsigned)x != _current_accel) {
+            click_chatter("Current accel %f", x);
+            _current_accel = x;
+            if (_current_accel == 0) {
+	            set_active(false);
+
+	           router()->please_stop_driver();
+                _current_accel = 1;
+            }
+           _last_check = 0;
+           goto accum;
+        } else
+            _last_check = elapsed_real;
+    }
+    return true;
+accum:
+    _last_real = now_s;
+    _timing_offset = p->timestamp_anno();
     return true;
 }
 
@@ -589,51 +650,87 @@ FromDump::run_timer(Timer *)
 bool
 FromDump::run_task(Task *)
 {
+    Timestamp now_s = Timestamp::now_steady();
+    bool fresh = true;
+    unsigned n = 0;
+    int retry_count = 0;
+  again:
     if (!_active)
 	return false;
 
-    int retry_count = 0;
-  again:
     if (!_packet && !read_packet(0)) {
 	if (_end_h)
 	    _end_h->call_write(ErrorHandler::default_handler());
 	return false;
     }
-    if (_packet && _timing && !check_timing(_packet))
-	return false;
-    if (_packet && _force_ip && !fake_pcap_force_ip(_packet, _linktype)) {
-	checked_output_push(1, _packet);
-	_packet = 0;
+    if (_packet && _timing) {
+        if (!check_timing(_packet, now_s, fresh)) {
+		return false;
+        }
     }
-    if (!_packet && ++retry_count < 16)
-	goto again;
+    if (_packet && _force_ip && !fake_pcap_force_ip(_packet, _linktype)) {
+#if HAVE_BATCH
+        if (in_batch_mode) {
+            checked_output_push_batch(1, PacketBatch::make_from_packet(_packet));
+        } else
+#endif
+            checked_output_push(1, _packet);
+        _packet = 0;
+    }
+
+    if (!_packet && ++retry_count < 16) {
+        fresh = false;
+	    goto again;
+    }
 
     _task.fast_reschedule();
     if (_packet) {
-	output(0).push(_packet);
-	_count++;
-	_packet = 0;
-	return true;
+        #if HAVE_BATCH
+            if (in_batch_mode) {
+	            output(0).push_batch(PacketBatch::make_from_packet(_packet));
+            } else
+        #endif
+	            output(0).push(_packet);
+        _count++;
+        _packet = 0;
+        if (n++ < _burst)
+            goto again;
+        return true;
     } else
-    return false;
+        return false;
+}
+
+PacketBatch *
+FromDump::pull_batch(int port, unsigned max) {
+    PacketBatch* batch = 0;
+    MAKE_BATCH(FromDump::pull(port),batch,max);
+    return batch;
 }
 
 Packet *
 FromDump::pull(int)
 {
     if (!_active) {
-	_notifier.sleep();
-	return 0;
+	    _notifier.sleep();
+	    return 0;
     }
 
     bool more = true;
     if (!_packet)
-	more = read_packet(0);
-    if (_packet && _timing && !check_timing(_packet))
-	return 0;
+	    more = read_packet(0);
+
+    if (_packet && _timing) {
+        //TODO : take advantage of batching to avoid recomputing this
+        Timestamp now_s = Timestamp::now_steady();
+        bool fresh = true;
+        if (!check_timing(_packet, now_s, fresh)) {
+	        return 0;
+        }
+    }
+
     if (_packet && _force_ip && !fake_pcap_force_ip(_packet, _linktype)) {
 	checked_output_push(1, _packet);
-	_packet = 0;
+	    _packet = 0;
     }
 
     // notify presence/absence of more packets
