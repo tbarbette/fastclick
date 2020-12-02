@@ -792,8 +792,21 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
     if (info.init_mac != EtherAddress()) {
         struct rte_ether_addr addr;
         memcpy(&addr, info.init_mac.data(), sizeof(struct rte_ether_addr));
-        if (rte_eth_dev_default_mac_addr_set(port_id, &addr) != 0) {
-            return errh->error("Could not set default MAC address");
+    int result = rte_eth_dev_default_mac_addr_set(port_id, &addr);
+    if (result != 0) {
+        if (result == -ENOTSUP) {
+        errh->warning("The device does not support changing its MAC address!");
+        } else
+            return errh->error("Could not set default MAC address for port %u, result: %d , mac address: %02X:%02X:%02X:%02X:%02X:%02X",
+                port_id,
+                result,
+                addr.addr_bytes[0],
+                addr.addr_bytes[1],
+                addr.addr_bytes[2],
+                addr.addr_bytes[3],
+                addr.addr_bytes[4],
+                addr.addr_bytes[5]
+                );
         }
     }
 
