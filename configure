@@ -16270,6 +16270,14 @@ if test "$enable_flow_api$have_flow_api" = "yesno"; then
     feedback="To enable DPDK's Flow Rule Manager (rte_flow API), use a DPDK version >= 20.02."
 fi
 
+if test "$enable_dpdk" = yes; then
+    dpdk_info="${enable_dpdk}
+    DPDK    Target:              ${RTE_TARGET}
+    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}"
+else
+    dpdk_info=${enable_dpdk}
+fi
+
 echo "
 
 Configuration Summary:
@@ -16280,7 +16288,8 @@ Configuration Summary:
     Flow Subsystem:              ${enable_flow}
        HW Flow API:              ${have_flow_api}
 
-    DPDK   support:              ${enable_dpdk}
+    DPDK   support:              ${dpdk_info}
+
     Netmap support:              ${HAVE_NETMAP}
     PCAP   support:              ${have_pcap}
 
