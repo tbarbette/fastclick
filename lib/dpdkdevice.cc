@@ -213,16 +213,16 @@ int DPDKDevice::alloc_pktmbufs(ErrorHandler* errh)
     }
 
 #if HAVE_DPDK_PACKET_POOL
-	int total = 0;
-	for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
-		total += get_nb_mbuf(i);
-	}
+    int total = 0;
+    for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
+        total += get_nb_mbuf(i);
+    }
 
-	if (Packet::max_data_pool_size() > 0) {
-		if (Packet::max_data_pool_size() + 8192 > total) {
-			return errh->error("--enable-dpdk-pool requires more DPDK buffers than the amount of packet that can stay in the queue. Please use DPDKInfo to allocate more than %d DPDK buffers or compile without --enable-dpdk-pool", Packet::max_data_pool_size() + 8192);
-		}
-	}
+    if (Packet::max_data_pool_size() > 0) {
+        if (Packet::max_data_pool_size() + 8192 > total) {
+            return errh->error("--enable-dpdk-pool requires more DPDK buffers than the amount of packet that can stay in the queue. Please use DPDKInfo to allocate more than %d DPDK buffers or compile without --enable-dpdk-pool", Packet::max_data_pool_size() + 8192);
+        }
+    }
 #endif
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
@@ -926,17 +926,17 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir, unsigned &queue_id,
                 " be in promiscuous mode", port_id);
         info.promisc |= promisc;
 
-		if (info.rx_queues.size() > 0 && vlan_filter != info.vlan_filter)
-			return errh->error(
-					"Some elements disagree on whether or not device %u should"
-							" filter VLAN tagged packets", port_id);
-		info.vlan_filter |= vlan_filter;
+        if (info.rx_queues.size() > 0 && vlan_filter != info.vlan_filter)
+            return errh->error(
+                    "Some elements disagree on whether or not device %u should"
+                            " filter VLAN tagged packets", port_id);
+        info.vlan_filter |= vlan_filter;
 
-		if (info.rx_queues.size() > 0 && vlan_strip != info.vlan_strip)
-			return errh->error(
-					"Some elements disagree on whether or not device %u should"
-							" strip VLAN tagged packets", port_id);
-		info.vlan_strip |= vlan_strip;
+        if (info.rx_queues.size() > 0 && vlan_strip != info.vlan_strip)
+            return errh->error(
+                    "Some elements disagree on whether or not device %u should"
+                            " strip VLAN tagged packets", port_id);
+        info.vlan_strip |= vlan_strip;
 
         if (info.rx_queues.size() > 0 && vlan_extend != info.vlan_extend)
             return errh->error(
