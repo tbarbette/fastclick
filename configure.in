@@ -1500,6 +1500,13 @@ if test "${HAVE_AVX2}" = "yes"; then
   AC_DEFINE(HAVE_AVX2)
 fi
 
+AC_ARG_ENABLE([atomic-builtins],
+    [AS_HELP_STRING([--enable-atomic-builtins], [Use GCC builtins atomic functions instead of Click own implementation. It should be always used in non-x86 systems. It requires GCC >= 4.7.0])],
+    [:], [enable_atomic_builtins=no])
+if test "x${enable_atomic_builtins}" = "xyes"; then
+        AC_DEFINE([HAVE_ATOMIC_BUILTINS])
+fi
+
 dnl
 dnl expand path variables
 dnl The "click" versions are expanded versions of the final install locations.
