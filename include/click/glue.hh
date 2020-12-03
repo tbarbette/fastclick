@@ -754,17 +754,21 @@ click_get_cycles()
 #endif
 }
 
+extern click_cycles_t click_cycles_hz;
+
 inline click_cycles_t cycles_hz() {
 #if HAVE_DPDK && !CLICK_TOOL
-    if (dpdk_enabled) {
+    if (likely(dpdk_enabled)) {
         return rte_get_timer_hz();
     }
     return 0;
-#else
-    click_cycles_t tsc_freq = click_get_cycles();
-    sleep(1);
-    return click_get_cycles() - tsc_freq;
 #endif
+    if (click_cycles_hz == 0) {
+        click_cycles_t tsc_freq = click_get_cycles();
+        sleep(1);
+        click_cycles_hz = click_get_cycles() - tsc_freq;
+    }
+    return click_cycles_hz;
 }
 
 // Host to network order

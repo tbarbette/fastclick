@@ -718,6 +718,7 @@ void* click_jiffies_fct_data = 0;
 click_jiffies_fct_t click_jiffies_fct = click_timestamp_jiffies;
 #endif
 
+click_cycles_t click_cycles_hz = 0;
 
 CLICK_ENDDECLS
 #endif
