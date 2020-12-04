@@ -11,9 +11,8 @@ such as batching.
 Quick start for DPDK
 --------------------
 
- * Install DPDK's dependencies (sudo apt install libelf-dev build-essential pkg-config zlib1g-dev libnuma-dev)
- * Install DPDK (http://core.dpdk.org/doc/quick-start/), but add O=x86_64-native-linuxapp-gcc at the end of "make config T=x86_64-native-linuxapp-gcc" to allow DPDK to be linked against external apps. This is not needed if you used the DPDK menu, or meson. Do not forget to set up a few hugepages, and mount them, as explained in the guide.
- * Export RTE\_SDK (path to your checked-out DPDK) and RTE\_TARGET (probably x86_64-native-linuxapp-gcc if you followed the tutorial)
+ * Install DPDK's dependencies (`sudo apt install libelf-dev build-essential pkg-config zlib1g-dev libnuma-dev`)
+ * Install DPDK (http://core.dpdk.org/doc/quick-start/). Since 20.11 you have to use meson : `meson build && cd build && ninja && sudo ninja install`
  * Build FastClick, with support for DPDK using the following command:
 
 ```
