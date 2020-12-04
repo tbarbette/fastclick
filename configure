@@ -7165,6 +7165,7 @@ $as_echo_n "checking for DPDK library... " >&6; }
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
     else
+      RTE_INCLUDE=-I${RTE_SDK_BIN}/include/
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         as_fn_error $? "
@@ -7211,7 +7212,7 @@ $as_echo "yes, found at $RTE_SDK_BIN" >&6; }
 
     RTE_VER_MINOR=$rte_ver_minor
 
-    DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
+    DPDK_INCLUDES=$RTE_INCLUDE
 
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
