@@ -17,7 +17,9 @@ Quick start for DPDK
 
 ```
 ./configure --enable-dpdk --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --disable-cpu-load
+make
 ```
+  * Since DPDK is using Meson and pkg-config, to compile against various, or non-globally installed DPDK versions, one can prepend `PKG_CONFIG_PATH=path/to/libpdpdk.pc/../` to both configure and make.
 
 Contribution
 ------------
