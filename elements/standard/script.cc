@@ -48,6 +48,7 @@ static const StaticNameDB::Entry instruction_entries[] = {
     { "export", Script::insn_export },
     { "exportq", Script::insn_exportq },
     { "goto", Script::INSN_GOTO },
+    { "gotoa", Script::INSN_GOTOA },
     { "init", Script::insn_init },
     { "initq", Script::insn_initq },
     { "label", Script::INSN_LABEL },
@@ -254,6 +255,7 @@ Script::configure(Vector<String> &conf, ErrorHandler *errh)
         case insn_append:
 #endif
         case INSN_GOTO:
+        case INSN_GOTOA:
             add_insn(insn, 0, 0, conf[i]);
             break;
 
@@ -311,7 +313,7 @@ Script::configure(Vector<String> &conf, ErrorHandler *errh)
 
     // fix the gotos
     for (int i = 0; i < _insns.size(); i++)
-        if (_insns[i] == INSN_GOTO && _args3[i]) {
+        if ((_insns[i] == INSN_GOTO || _insns[i] == INSN_GOTOA) && _args3[i]) {
             String word = cp_shift_spacevec(_args3[i]);
             if ((_args[i] = find_label(word)) >= _insns.size())
                 errh->error("no such label %<%s%>", word.c_str());
@@ -529,7 +531,11 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
             }
             break;
         }
-
+        case INSN_GOTOA:
+            if (router()->runcount() <= 0) {
+                _insn_pos+=0;
+                return njumps;
+            }
         case INSN_GOTO: {
             // reset intervening instructions
             String cond_text = cp_expand(_args3[ipos], expander);
@@ -756,7 +762,7 @@ Script::step_handler(int op, String &str, Element *e, const Handler *h, ErrorHan
     scr->_run_op = op;
     int ret;
 
-    if (what == ST_GOTO) {
+    if (what == ST_GOTO || what == ST_GOTOA) {
         int step = scr->find_label(cp_uncomment(data));
         if (step >= scr->_insns.size() || step < 0)
             return errh->error("jump to nonexistent label");
@@ -1363,6 +1369,7 @@ Script::add_handlers()
 {
     set_handler("step", Handler::f_write, step_handler, 0, ST_STEP);
     set_handler("goto", Handler::f_write, step_handler, 0, ST_GOTO);
+    set_handler("gotoa", Handler::f_write, step_handler, 0, ST_GOTOA);
     set_handler("run", Handler::f_read | Handler::f_read_param | Handler::f_write, step_handler, 0, ST_RUN);
     set_handler("add", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_add, 0);
     set_handler("sub", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_sub, 0);

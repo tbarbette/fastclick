@@ -489,7 +489,7 @@ class Script : public Element { public:
 #if CLICK_USERLEVEL
         insn_save, insn_append,
 #endif
-        INSN_LABEL, INSN_GOTO, INSN_RETURN, insn_returnq,
+        INSN_LABEL, INSN_GOTO, INSN_GOTOA, INSN_RETURN, insn_returnq,
         INSN_WAIT_PSEUDO, INSN_LOOP_PSEUDO,
         // negative instructions are also valid label constants
         insn_exit = -1, insn_end = -2, insn_stop = -3, insn_error = -4,
@@ -535,7 +535,7 @@ class Script : public Element { public:
     };
 
     enum {
-        ST_STEP = 0, ST_RUN, ST_GOTO,
+        ST_STEP = 0, ST_RUN, ST_GOTO, ST_GOTOA,
         ar_add = 0, ar_sub, ar_min, ar_max, ar_avg, ar_count,
         ar_popcount, ar_gt_vec,
         ar_mul, ar_div, ar_idiv, ar_mod, ar_rem,
