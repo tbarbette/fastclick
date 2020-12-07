@@ -463,7 +463,7 @@ enum {
     h_mtu,
     h_device, h_isolate,
 #if HAVE_FLOW_API
-    h_rule_add, h_rules_del, h_rules_isolate, h_rules_flush,
+    h_rule_add, h_rules_del, h_rules_flush,
     h_rules_list, h_rules_list_with_hits, h_rules_ids_global, h_rules_ids_internal,
     h_rules_count, h_rules_count_with_hits, h_rule_packet_hits, h_rule_byte_count,
     h_rules_aggr_stats
@@ -613,10 +613,6 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
         case h_rules_count_with_hits: {
             portid_t port_id = fd->get_device()->get_port_id();
             return String(FlowRuleManager::get_flow_rule_mgr(port_id)->flow_rules_with_hits_count());
-        }
-        case h_rules_isolate: {
-            portid_t port_id = fd->get_device()->get_port_id();
-            return String(FlowRuleManager::isolated(port_id) ? "1" : "0");
         }
     #endif
         case h_nombufs:
@@ -768,14 +764,6 @@ int FromDPDKDevice::flow_handler(
 
             // Batch deletion
             return flow_rule_mgr->flow_rules_delete((uint32_t *) rule_ids, rules_nb);
-        }
-        case h_rules_isolate: {
-            if (input.empty()) {
-                return errh->error("DPDK Flow Rule Manager (port %u): Specify isolation mode (true/1 -> isolation, otherwise no isolation)", port_id);
-            }
-            bool status = (input.lower() == "true") || (input.lower() == "1") ? true : false;
-            FlowRuleManager::set_isolation_mode(port_id, status);
-            return 0;
         }
         case h_rules_flush: {
             return flow_rule_mgr->flow_rules_flush();
@@ -957,7 +945,6 @@ void FromDPDKDevice::add_handlers()
     add_read_handler (FlowRuleManager::FLOW_RULE_LIST_WITH_HITS,  statistics_handler, h_rules_list_with_hits);
     add_read_handler (FlowRuleManager::FLOW_RULE_COUNT,           statistics_handler, h_rules_count);
     add_read_handler (FlowRuleManager::FLOW_RULE_COUNT_WITH_HITS, statistics_handler, h_rules_count_with_hits);
-    add_read_handler (FlowRuleManager::FLOW_RULE_ISOLATE,         statistics_handler, h_rules_isolate);
 #endif
 
     add_read_handler("mtu",read_handler, h_mtu);
