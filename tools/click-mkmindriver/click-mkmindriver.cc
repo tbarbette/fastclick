@@ -698,7 +698,8 @@ particular purpose.\n");
         else if (subpackage && driver == Driver::LINUXMODULE)
             errh->message("Build %<%s.ko%> with %<make MINDRIVER=%s%>.", package_name, package_name);
 	else if (driver == Driver::USERLEVEL)
-	    errh->message("Build %<%sclick%> with %<make MINDRIVER=%s%>.", package_name, package_name);
+	    errh->message("Build %<%sclick%> with %<make %sclick MINDRIVER=%s%>.\nYou should also add STATIC=1 if you use --static pass from click-devirtualize.", 
+        package_name, package_name, package_name);
 	else
 	    errh->message("Build %<%sclick.ko%> with %<make MINDRIVER=%s%>.", package_name, package_name);
 	return 0;
