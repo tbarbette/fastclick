@@ -412,15 +412,15 @@ public:
     int configure_phase() const override {
         return CONFIGURE_PHASE_PRIVILEGED - 5;
     }
-    bool can_live_reconfigure() const { return false; }
+    bool can_live_reconfigure() const override { return false; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *) CLICK_COLD;
-    void add_handlers() CLICK_COLD;
-    void cleanup(CleanupStage) CLICK_COLD;
-    bool run_task(Task *);
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+    int initialize(ErrorHandler *) override CLICK_COLD;
+    void add_handlers() override CLICK_COLD;
+    void cleanup(CleanupStage) override CLICK_COLD;
+    bool run_task(Task *) override;
 #if HAVE_DPDK_INTERRUPT
-    void selected(int fd, int mask);
+    void selected(int fd, int mask) override;
 #endif
 
     inline DPDKDevice *get_device() {

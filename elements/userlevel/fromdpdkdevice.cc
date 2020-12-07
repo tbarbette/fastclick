@@ -99,9 +99,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     Vector<int> vf_vlan;
     int max_rss = 0;
     bool has_rss = false;
+    bool flow_isolate = false;
 #if HAVE_FLOW_API
     String flow_rules_filename;
-    bool flow_isolate = false;
 #endif
     if (Args(this, errh).bind(conf)
         .read_mp("PORT", dev)
@@ -116,9 +116,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAC", mac).read_status(has_mac)
         .read("MTU", mtu).read_status(has_mtu)
         .read("MODE", mode)
+        .read("FLOW_ISOLATE", flow_isolate)
     #if HAVE_FLOW_API
         .read("FLOW_RULES_FILE", flow_rules_filename)
-        .read("FLOW_ISOLATE", flow_isolate)
     #endif
         .read("VF_POOLS", num_pools)
         .read_all("VF_VLAN", vf_vlan)
@@ -224,7 +224,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     r = _dev->set_mode(mode, num_pools, vf_vlan, flow_rules_filename, errh);
 
-    _dev->set_flow_isolate(flow_isolate);
+    _dev->set_isolation_mode(flow_isolate);
 #else
     r = _dev->set_mode(mode, num_pools, vf_vlan, errh);
 #endif
@@ -450,7 +450,7 @@ enum {
     h_rss,
     h_mac, h_add_mac, h_remove_mac, h_vf_mac,
     h_mtu,
-    h_device,
+    h_device, h_isolate,
 #if HAVE_FLOW_API
     h_rule_add, h_rules_del, h_rules_isolate, h_rules_flush,
     h_rules_list, h_rules_list_with_hits, h_rules_ids_global, h_rules_ids_internal,
@@ -575,6 +575,9 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
+        case h_isolate: {
+            return String(fd->get_device()->isolated() ? "1" : "0");
+        }
     #if HAVE_FLOW_API
         case h_rules_list: {
             portid_t port_id = fd->get_device()->get_port_id();
@@ -677,6 +680,15 @@ int FromDPDKDevice::write_handler(
                 return errh->error("Not a valid integer");
             return fd->_dev->set_rss_max(max);
         }
+        case h_isolate: {
+            if (input.empty()) {
+                return errh->error("DPDK Flow Rule Manager (port %u): Specify isolation mode (true/1 -> isolation, otherwise no isolation)", fd->_dev->port_id);
+            }
+            bool status = (input.lower() == "true") || (input.lower() == "1") ? true : false;
+            fd->_dev->set_isolation_mode(status);
+            return 0;
+        }
+
     }
     return -1;
 }
@@ -921,10 +933,12 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
     add_read_handler("nombufs",statistics_handler, h_nombufs);
 
+    add_write_handler("flow_isolate", write_handler, h_isolate, 0);
+    add_read_handler ("flow_isolate", statistics_handler, h_isolate);
+
 #if HAVE_FLOW_API
     add_write_handler(FlowRuleManager::FLOW_RULE_ADD,     flow_handler, h_rule_add,    0);
     add_write_handler(FlowRuleManager::FLOW_RULE_DEL,     flow_handler, h_rules_del,   0);
-    add_write_handler(FlowRuleManager::FLOW_RULE_ISOLATE, flow_handler, h_rules_isolate, 0);
     add_write_handler(FlowRuleManager::FLOW_RULE_FLUSH,   flow_handler, h_rules_flush, 0);
     add_read_handler (FlowRuleManager::FLOW_RULE_IDS_GLB,         statistics_handler, h_rules_ids_global);
     add_read_handler (FlowRuleManager::FLOW_RULE_IDS_INT,         statistics_handler, h_rules_ids_internal);
