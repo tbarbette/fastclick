@@ -57,8 +57,8 @@ class AggregateFilter : public Element { public:
     const char *port_count() const override	{ return "1/1-254"; }
     const char *processing() const override	{ return PUSH; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    void cleanup(CleanupStage) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+    void cleanup(CleanupStage) override CLICK_COLD;
 
     void push(int, Packet *);
 

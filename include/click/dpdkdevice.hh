@@ -181,7 +181,19 @@ public:
     void set_init_fc_mode(FlowControlMode fc);
     void set_rx_offload(uint64_t offload);
     void set_tx_offload(uint64_t offload);
-    void set_flow_isolate(const bool &flow_isolate);
+    void set_init_flow_isolate(const bool &flow_isolate);
+
+    inline void set_isolation_mode(const bool &isolated) {
+        info.flow_isolate = isolated;
+        if (info.flow_isolate) {
+            rte_flow_isolate(port_id, 1, 0);
+        } else {
+            rte_flow_isolate(port_id, 0, 0);
+        }
+    };
+    inline bool isolated() { return info.flow_isolate; };
+
+
 
     unsigned int get_nb_rxdesc();
     unsigned int get_nb_txdesc();

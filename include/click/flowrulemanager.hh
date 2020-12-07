@@ -141,17 +141,6 @@ class FlowRuleManager {
         };
         inline String rules_filename() { return _rules_filename; };
 
-        // Flow rules' isolation mode
-        static inline void set_isolation_mode(const portid_t &port_id, const bool &isolated) {
-            _isolated.insert(port_id, isolated);
-            if (_isolated[port_id]) {
-                flow_rules_isolate(port_id, 1);
-            } else {
-                flow_rules_isolate(port_id, 0);
-            }
-        };
-        static inline bool isolated(const portid_t &port_id) { return _isolated[port_id]; };
-
         // Calibrates flow rule cache before inserting new rules
         void flow_rule_cache_calibrate(const uint32_t *int_rule_ids, const uint32_t &rules_nb);
         void flow_rule_cache_calibrate(const HashMap<uint32_t, String> &rules_map);

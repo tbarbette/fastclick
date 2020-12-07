@@ -364,7 +364,7 @@ version (dpdk-dev or dpdk-devel).
     AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
     AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
     AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
-    AC_SUBST(DPDK_INCLUDES, $RTE_INCLUDE)
+    AC_SUBST(DPDK_INCLUDES, -I$RTE_INCLUDE)
 
     AC_DEFINE([HAVE_DPDK])
     AC_SUBST(USE_DPDK, yes)
