@@ -395,7 +395,7 @@ int DPDKDevice::set_mode(
             "DPDK Flow Rule Manager (port %u): State %s - Isolation Mode %s - Source file '%s'",
             port_id,
             flow_rule_mgr->active() ? "active" : "inactive",
-            FlowRuleManager::isolated(port_id) ? "active" : "inactive",
+            isolated() ? "active" : "inactive",
             flow_rules_filename.empty() ? "None" : flow_rules_filename.c_str()
         );
     }
@@ -706,9 +706,9 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
 
 #if HAVE_FLOW_API
     if (info.flow_isolate) {
-        FlowRuleManager::set_isolation_mode(port_id, true);
+        set_isolation_mode(true);
     } else {
-        FlowRuleManager::set_isolation_mode(port_id, false);
+        set_isolation_mode(false);
     }
 #endif
 
@@ -897,7 +897,7 @@ void DPDKDevice::set_tx_offload(uint64_t offload) {
     info.tx_offload |= offload;
 }
 
-void DPDKDevice::set_flow_isolate(const bool &flow_isolate) {
+void DPDKDevice::set_init_flow_isolate(const bool &flow_isolate) {
     info.flow_isolate = flow_isolate;
 }
 

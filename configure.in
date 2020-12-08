@@ -339,6 +339,7 @@ if test "x$enable_dpdk" != "xno"; then
       rte_ver_major=$rte_ver_year
       AC_MSG_RESULT([yes])
     else
+      RTE_INCLUDE=-I${RTE_SDK_BIN}/include/
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         AC_MSG_ERROR([
@@ -380,7 +381,7 @@ version (dpdk-dev or dpdk-devel).
     AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
     AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
     AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
-    AC_SUBST(DPDK_INCLUDES, -I${RTE_SDK_BIN}/include/)
+    AC_SUBST(DPDK_INCLUDES, -I$RTE_INCLUDE)
 
     AC_DEFINE([HAVE_DPDK])
     AC_SUBST(USE_DPDK, yes)

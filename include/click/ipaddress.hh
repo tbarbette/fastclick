@@ -83,6 +83,11 @@ class IPAddress { public:
 	return IPAddress(0xFFFFFFFF);
     }
 
+    /** @brief Return the broadcast IP address, 255.255.255.255. */
+    static inline IPAddress make_random() {
+    return IPAddress(rand());
+    }
+
     /** @brief Test if the address is 0.0.0.0. */
     inline bool empty() const {
 	return !_addr;

@@ -150,9 +150,16 @@ class IPRewriterBase : public BatchElement { public:
     uint32_t **_timeouts;
 
     uint32_t _gc_interval_sec;
-    per_thread<Timer> _gc_timer;
+
+    struct IPRewriterState {
+        Timer gc_timer;
+        IPFlowID last_id;
+        IPRewriterEntry* last_entry;
+    };
+    per_thread<IPRewriterState> _state;
 
     bool _set_aggregate;
+    bool _use_cache;
 
     enum {
 	default_timeout = 300,	   // 5 minutes

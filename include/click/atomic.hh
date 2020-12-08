@@ -160,7 +160,7 @@ class atomic_uint64_t { public:
 
     inline static void add(volatile uint64_t &x, uint64_t delta);
     inline static uint64_t compare_swap(volatile uint64_t &x, uint64_t expected, uint64_t desired) CLICK_BUILTINS_DEPRECATED;
-    
+
     inline static bool use_builtins(){return CLICK_ATOMIC_BUILTINS;}
   private:
 
@@ -686,7 +686,7 @@ atomic_uint32_t::compare_swap(uint32_t expected, uint32_t desired)
 {
 #if CLICK_ATOMIC_BUILTINS
 # warning "compare_swap is not truly atomic with system builtins"
-    return __atomic_compare_exchange(&_val, &expected, &desired, 0, CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER) 
+    return __atomic_compare_exchange(&_val, &expected, &desired, 0, CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER)
 	? expected: _val;
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "cmpxchgl %2,%1"
