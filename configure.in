@@ -933,6 +933,9 @@ AC_ARG_ENABLE(bound-port-transfer,
 
 if test "$enable_bound_port_transfer" = yes; then
   AC_DEFINE([HAVE_BOUND_PORT_TRANSFER], [1], [Define if Port::push/Port::pull should use bound function pointers.])
+  if test -z "${CXX##*clang*}" ; then
+      AC_MSG_ERROR([--enable-bound-port-transfer does not work with Clang! A better solution is to use click-devirtualize in any case. Remove this option or use GCC.])
+  fi
   CXXFLAGS="$CXXFLAGS -Wno-pmf-conversions"
 fi
 

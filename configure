@@ -9631,6 +9631,9 @@ if test "$enable_bound_port_transfer" = yes; then
 
 $as_echo "#define HAVE_BOUND_PORT_TRANSFER 1" >>confdefs.h
 
+  if test -z "${CXX##*clang*}" ; then
+      as_fn_error $? "--enable-bound-port-transfer does not work with Clang! A better solution is to use click-devirtualize in any case. Remove this option or use GCC." "$LINENO" 5
+  fi
   CXXFLAGS="$CXXFLAGS -Wno-pmf-conversions"
 fi
 
