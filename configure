@@ -7246,10 +7246,14 @@ else
 fi
 
 
-if test "x$enable_dpdk" = "xyes"; then
+if test "x$enable_dpdk" != "xno"; then
 
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for DPDK library" >&5
 $as_echo_n "checking for DPDK library... " >&6; }
+
+    if test "x$enable_dpdk" != "xyes"; then
+        RTE_SDK=$enable_dpdk
+    fi
 
     if test -z "$RTE_SDK_BIN"; then
         RTE_SDK_BIN=$RTE_SDK/$RTE_TARGET
@@ -7277,7 +7281,7 @@ $as_echo_n "checking for DPDK library... " >&6; }
     fi
 
 
-    if pkg-config --exists libdpdk; then
+    if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
       rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
@@ -7355,7 +7359,7 @@ $as_echo "no" >&6; }
 fi
 
 if test "x$enable_dpdk_pool" = "xyes"; then
-    if test "x$enable_dpdk" != "xyes"; then
+    if test "x$enable_dpdk" = "xno"; then
         as_fn_error $? "
 =========================================
 
@@ -7368,7 +7372,7 @@ if test "x$enable_dpdk_pool" = "xyes"; then
 fi
 
 if test "x$enable_dpdk_xchg" = "xyes"; then
-    if test "x$enable_dpdk" != "xyes"; then
+    if test "x$enable_dpdk" = "xno"; then
         as_fn_error $? "
 =========================================
 
@@ -7383,7 +7387,7 @@ if test "x$enable_dpdk_xchg" = "xyes"; then
 fi
 
 if test "x$enable_dpdk_packet" = "xyes"; then
-    if test "x$enable_dpdk" != "xyes"; then
+    if test "x$enable_dpdk" = "xno"; then
         as_fn_error $? "
 =========================================
 
@@ -9631,7 +9635,7 @@ if test "$enable_bound_port_transfer" = yes; then
 
 $as_echo "#define HAVE_BOUND_PORT_TRANSFER 1" >>confdefs.h
 
-  if test -z "${$CXX##*clang*}" ; then
+  if test -z "${CXX##*clang*}" ; then
       as_fn_error $? "--enable-bound-port-transfer does not work with Clang! A better solution is to use click-devirtualize in any case. Remove this option or use GCC (you probably have your CXX environment variable set to clang++)." "$LINENO" 5
   fi
   CXXFLAGS="$CXXFLAGS -Wno-pmf-conversions"
@@ -14934,7 +14938,7 @@ else
     enable_batch="no"
 fi
 
-if test "x$enable_dpdk" = xyes; then
+if test "x$enable_dpdk" != "xno"; then
     provisions="$provisions dpdk"
     if test "$rte_ver_year" -ge 19; then
         provisions="$provisions dpdk19"
@@ -16430,7 +16434,7 @@ if test "$enable_flow_api$have_flow_api" = "yesno"; then
     feedback="To enable DPDK's Flow Rule Manager (rte_flow API), use a DPDK version >= 20.02."
 fi
 
-if test "$enable_dpdk" = yes; then
+if test "x$enable_dpdk" != "xno"; then
     dpdk_info="${enable_dpdk}
     DPDK    Target:              ${RTE_TARGET}
     DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}"
