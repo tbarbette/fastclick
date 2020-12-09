@@ -7296,7 +7296,7 @@ $as_echo "yes" >&6; }
     else
       RTE_USE_PKGCONFIG=0
 
-      RTE_INCLUDE=-I${RTE_SDK_BIN}/include/
+      RTE_INCLUDE=${RTE_SDK_BIN}/include/
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         as_fn_error $? "
