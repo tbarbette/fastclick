@@ -10,6 +10,10 @@
 #include <click/sync.hh>
 #include <functional>
 
+#ifdef HAVE_RAND_ALIGN
+#include <random>
+#endif
+
 CLICK_DECLS
 class Router;
 class Master;

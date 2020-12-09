@@ -42,7 +42,7 @@ static inline int rte_ring_mc_dequeue_bulk(struct rte_ring *r, void **obj_table,
 #include <rte_bitops.h>
 #define TIMESTAMP_FIELD(mbuf) \
            (*RTE_MBUF_DYNFIELD(mbuf, timestamp_dynfield_offset, uint64_t *))
-extern const struct rte_mbuf_dynflag rx_flag_desc;
+extern struct rte_mbuf_dynflag rx_flag_desc;
 extern struct rte_mbuf_dynfield timestamp_dynfield_desc;
 #define HAS_TIMESTAMP(mbuf) \
         ((mbuf)->ol_flags & timestamp_dynflag)
