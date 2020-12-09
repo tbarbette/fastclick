@@ -29,6 +29,7 @@
 #include "fromdpdkdevice.hh"
 #include "tscclock.hh"
 #include "todpdkdevice.hh"
+#include <click/dpdk_glue.hh>
 #if HAVE_JSON
 #include "../json/json.hh"
 #endif
@@ -36,29 +37,6 @@
 #if HAVE_FLOW_API
     #include <click/flowrulemanager.hh>
 #endif
-
-#if RTE_VERSION < RTE_VERSION_NUM(20,11,0,0)
-#define TIMESTAMP_FIELD(mbuf) \
-            (mbuf->timestamp)
-#define HAS_TIMESTAMP(mbuf) \
-        (mbuf->ol_flags & PKT_RX_TIMESTAMP)
-#else
-#include <rte_mbuf_dyn.h>
-#include <rte_bitops.h>
-#define TIMESTAMP_FIELD(mbuf) \
-           (*RTE_MBUF_DYNFIELD(mbuf, timestamp_dynfield_offset, uint64_t *))
-static const struct rte_mbuf_dynflag rx_flag_desc = {
-    RTE_MBUF_DYNFLAG_RX_TIMESTAMP_NAME,
-};
-struct rte_mbuf_dynfield timestamp_dynfield_desc = {
-    RTE_MBUF_DYNFIELD_TIMESTAMP_NAME,
-    sizeof(uint64_t),
-    __alignof__(uint64_t),
-};
-#define HAS_TIMESTAMP(mbuf) \
-        ((mbuf)->ol_flags & timestamp_dynflag)
-#endif
-
 
 CLICK_DECLS
 
@@ -128,7 +106,6 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("RX_INTR", _rx_intr)
 #endif
         .read("MAX_RSS", max_rss).read_status(has_rss)
-        .read("TIMESTAMP", set_timestamp)
         .read("TIMESTAMP", set_timestamp)
         .read_or_set("RSS_AGGREGATE", _set_rss_aggregate, false)
         .read_or_set("PAINT_QUEUE", _set_paint_anno, false)
@@ -218,6 +195,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (has_rss)
         _dev->set_init_rss_max(max_rss);
 
+    _dev->set_init_flow_isolate(flow_isolate);
 #if HAVE_FLOW_API
     if ((mode == FlowRuleManager::DISPATCHING_MODE) && (flow_rules_filename.empty())) {
         errh->warning(
@@ -228,8 +206,6 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
     r = _dev->set_mode(mode, num_pools, vf_vlan, flow_rules_filename, errh);
-
-    _dev->set_isolation_mode(flow_isolate);
 #else
     r = _dev->set_mode(mode, num_pools, vf_vlan, errh);
 #endif
@@ -940,6 +916,15 @@ void FromDPDKDevice::add_handlers()
 
     add_write_handler("max_rss", write_handler, h_rss, 0);
 
+    add_read_handler("hw_count",statistics_handler, h_ipackets);
+    add_read_handler("hw_bytes",statistics_handler, h_ibytes);
+    add_read_handler("hw_dropped",statistics_handler, h_imissed);
+    add_read_handler("hw_errors",statistics_handler, h_ierrors);
+    add_read_handler("nombufs",statistics_handler, h_nombufs);
+
+    add_write_handler("flow_isolate", write_handler, h_isolate, 0);
+    add_read_handler ("flow_isolate", statistics_handler, h_isolate);
+
 #if HAVE_FLOW_API
     add_write_handler(FlowRuleManager::FLOW_RULE_ADD,     flow_handler, h_rule_add,    0);
     add_write_handler(FlowRuleManager::FLOW_RULE_DEL,     flow_handler, h_rules_del,   0);
@@ -952,8 +937,8 @@ void FromDPDKDevice::add_handlers()
     add_read_handler (FlowRuleManager::FLOW_RULE_COUNT_WITH_HITS, statistics_handler, h_rules_count_with_hits);
 #endif
 
-  add_read_handler("mtu", read_handler, h_mtu);
-  add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);
+    add_read_handler("mtu",read_handler, h_mtu);
+    add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);
 }
 
 CLICK_ENDDECLS

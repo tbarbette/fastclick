@@ -1345,6 +1345,18 @@ DPDKRing::parse(Args* args) {
     return 0;
 }
 
+#if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
+const struct rte_mbuf_dynflag rx_flag_desc = {
+    RTE_MBUF_DYNFLAG_RX_TIMESTAMP_NAME,
+};
+struct rte_mbuf_dynfield timestamp_dynfield_desc = {
+    RTE_MBUF_DYNFIELD_TIMESTAMP_NAME,
+    sizeof(uint64_t),
+    __alignof__(uint64_t),
+};
+#endif
+
+
 #if HAVE_DPDK_PACKET_POOL
 /**
  * Must be able to fill the packet data pool,

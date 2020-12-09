@@ -42,6 +42,7 @@
 # include <rte_common.h>
 # include <rte_eal.h>
 # include <rte_lcore.h>
+# include <rte_version.h>
 #endif // HAVE_DPDK
 
 #include <click/lexer.hh>
@@ -788,7 +789,11 @@ particular purpose.\n");
     if (dpdk_enabled) {
         unsigned t = 1;
         unsigned lcore_id;
+#   if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
+        RTE_LCORE_FOREACH_WORKER(lcore_id) {
+#   else
         RTE_LCORE_FOREACH_SLAVE(lcore_id) {
+#   endif
             rte_eal_remote_launch(thread_driver_dpdk, click_router->master()->thread(t++),
                                   lcore_id);
         }
