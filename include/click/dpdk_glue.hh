@@ -32,4 +32,26 @@ static inline int rte_ring_mc_dequeue_bulk(struct rte_ring *r, void **obj_table,
 #define RTE_MBUF_INDIRECT(m) RTE_MBUF_CLONED(m)
 #endif
 
+#if RTE_VERSION < RTE_VERSION_NUM(20,11,0,0)
+#define TIMESTAMP_FIELD(mbuf) \
+            (mbuf->timestamp)
+#define HAS_TIMESTAMP(mbuf) \
+        (mbuf->ol_flags & PKT_RX_TIMESTAMP)
+#else
+#include <rte_mbuf_dyn.h>
+#include <rte_bitops.h>
+#define TIMESTAMP_FIELD(mbuf) \
+           (*RTE_MBUF_DYNFIELD(mbuf, timestamp_dynfield_offset, uint64_t *))
+static const struct rte_mbuf_dynflag rx_flag_desc = {
+    RTE_MBUF_DYNFLAG_RX_TIMESTAMP_NAME,
+};
+struct rte_mbuf_dynfield timestamp_dynfield_desc = {
+    RTE_MBUF_DYNFIELD_TIMESTAMP_NAME,
+    sizeof(uint64_t),
+    __alignof__(uint64_t),
+};
+#define HAS_TIMESTAMP(mbuf) \
+        ((mbuf)->ol_flags & timestamp_dynflag)
+#endif
+
 #endif
