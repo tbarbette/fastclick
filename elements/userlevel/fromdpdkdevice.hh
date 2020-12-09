@@ -431,7 +431,8 @@ public:
     static uint64_t read_clock(void* thunk);
 #endif
 
-private:
+protected:
+
     static int reset_load_handler(
         const String &, Element *, void *, ErrorHandler *
     ) CLICK_COLD;
@@ -448,8 +449,8 @@ private:
     static String statistics_handler(Element *e, void *thunk) CLICK_COLD;
     static int xstats_handler(int operation, String &input, Element *e,
                               const Handler *handler, ErrorHandler *errh);
-    DPDKDevice* _dev;
 
+    DPDKDevice* _dev;
 #if HAVE_DPDK_INTERRUPT
     int _rx_intr;
     class FDState { public:
