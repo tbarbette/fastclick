@@ -1,5 +1,5 @@
-#ifndef MIDDLEBOX_FlowCounter_HH
-#define MIDDLEBOX_FlowCounter_HH
+#ifndef CLICK_FLOWCOUNTER_HH
+#define CLICK_FLOWCOUNTER_HH
 #include <click/element.hh>
 #include <click/vector.hh>
 #include <click/multithread.hh>
@@ -49,7 +49,6 @@ public:
         _state->open++;
         return true;
     }
-
 
     void add_handlers() override CLICK_COLD;
 protected:
