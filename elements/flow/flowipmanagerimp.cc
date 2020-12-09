@@ -98,11 +98,6 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
 }
 
 
-const auto fim_setter = [](FlowControlBlock* prev, FlowControlBlock* next)
-{
-        *((FlowControlBlock**)&prev->data_32[2]) = next;
-};
-
 bool FlowIPManagerIMP::run_task(Task* t)
 {
     /*
