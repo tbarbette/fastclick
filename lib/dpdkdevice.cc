@@ -1346,7 +1346,7 @@ DPDKRing::parse(Args* args) {
 }
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
-const struct rte_mbuf_dynflag rx_flag_desc = {
+struct rte_mbuf_dynflag rx_flag_desc = {
     RTE_MBUF_DYNFLAG_RX_TIMESTAMP_NAME,
 };
 struct rte_mbuf_dynfield timestamp_dynfield_desc = {
@@ -1355,7 +1355,6 @@ struct rte_mbuf_dynfield timestamp_dynfield_desc = {
     __alignof__(uint64_t),
 };
 #endif
-
 
 #if HAVE_DPDK_PACKET_POOL
 /**
