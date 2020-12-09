@@ -446,17 +446,7 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
 
   int iqueue = queue_for_thisthread_begin();
 
-//  unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
-  
-    //unsigned n = rte_mlx5_rx_burst_stripped(_dev->port_id, iqueue, pkts, _burst);
-
-//    struct xchg** xchgs = (struct xchg**)pkts;
-
-//    unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, xchgs, _burst);
-//
-
 # if CLICK_PACKET_INSIDE_DPDK
-
   struct rte_mbuf *pkts[_burst];
   unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, pkts, _burst);
   if (n) {

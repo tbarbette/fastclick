@@ -331,6 +331,7 @@ if test "x$enable_dpdk" != "xno"; then
 
 
     if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
+      AC_SUBST(RTE_USE_PKGCONFIG, 1)
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
       rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
@@ -339,7 +340,8 @@ if test "x$enable_dpdk" != "xno"; then
       rte_ver_major=$rte_ver_year
       AC_MSG_RESULT([yes])
     else
-      RTE_INCLUDE=${RTE_SDK_BIN}/include/
+      AC_SUBST(RTE_USE_PKGCONFIG, 0)
+      RTE_INCLUDE=-I${RTE_SDK_BIN}/include/
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         AC_MSG_ERROR([

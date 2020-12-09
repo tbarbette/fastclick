@@ -717,6 +717,7 @@ RTE_VER_YEAR
 RTE_SDK_BIN
 RTE_TARGET
 RTE_SDK
+RTE_USE_PKGCONFIG
 DO_RAND_ALIGN
 PTHREAD_LIBS
 HAVE_BATCH
@@ -7282,6 +7283,8 @@ $as_echo_n "checking for DPDK library... " >&6; }
 
 
     if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
+      RTE_USE_PKGCONFIG=1
+
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
       rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
@@ -7291,7 +7294,9 @@ $as_echo_n "checking for DPDK library... " >&6; }
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
     else
-      RTE_INCLUDE=${RTE_SDK_BIN}/include/
+      RTE_USE_PKGCONFIG=0
+
+      RTE_INCLUDE=-I${RTE_SDK_BIN}/include/
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         as_fn_error $? "
