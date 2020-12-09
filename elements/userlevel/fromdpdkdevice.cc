@@ -213,6 +213,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (has_rss)
         _dev->set_init_rss_max(max_rss);
 
+    _dev->set_init_flow_isolate(flow_isolate);
 #if HAVE_FLOW_API
     if ((mode == FlowRuleManager::DISPATCHING_MODE) && (flow_rules_filename.empty())) {
         errh->warning(
@@ -223,8 +224,6 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
     r = _dev->set_mode(mode, num_pools, vf_vlan, flow_rules_filename, errh);
-
-    _dev->set_isolation_mode(flow_isolate);
 #else
     r = _dev->set_mode(mode, num_pools, vf_vlan, errh);
 #endif
