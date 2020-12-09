@@ -112,7 +112,7 @@ ifeq ($(USE_DPDK),yes)
 	RTE_VER_YEAR = @RTE_VER_YEAR@
 	RTE_VER_MONTH = @RTE_VER_MONTH@
 	RTE_USE_PKGCONFIG = @RTE_USE_PKGCONFIG@
-	ifeq ($RTE_USE_PKGCONFIG$(shell pkg-config --exists libdpdk && echo 1), 11)
+	ifeq (${RTE_USE_PKGCONFIG}$(shell pkg-config --exists libdpdk && echo 1), 11)
 		CFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
 		CXXFLAGS := $(CXXFLAGS) $(shell pkg-config --cflags libdpdk)
 		include rte_parse.mk
