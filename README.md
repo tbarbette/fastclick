@@ -8,6 +8,11 @@ multiple contributions and improvements since then.
 The [Wiki](https://github.com/tbarbette/fastclick/wiki) provides documentation about the elements and how to use some FastClick features
 such as batching.
 
+Announcements
+-------------
+Our PacketMill paper is due to appear at ASPLOS'21 ! It is a set of compiler opitmization techniques that boost performance of packet processing frameworks (it's generic, but we used FastClick as prototype) by up to 70%.
+You can get a sneak peek in the *packetmill* branch. It will eventually get merged into FastClick, with a wrapper command to simply use *packetmill* instead of click and automatically recompile a tailored pipeline.
+
 Quick start for DPDK
 --------------------
 
@@ -16,10 +21,13 @@ Quick start for DPDK
  * Build FastClick, with support for DPDK using the following command:
 
 ```
-./configure --enable-dpdk --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --disable-cpu-load
+./configure --enable-dpdk --enable-intel-cpu --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --disable-cpu-load
 make
 ```
   * Since DPDK is using Meson and pkg-config, to compile against various, or non-globally installed DPDK versions, one can prepend `PKG_CONFIG_PATH=path/to/libpdpdk.pc/../` to both configure and make.
+
+*You will find more informatio in the [High-Speed I/O wiki page](https://github.com/tbarbette/fastclick/wiki/High-speed-I-O).*
+
 
 Contribution
 ------------
@@ -31,10 +39,23 @@ The general rule of thumb to accept a pull request is to involve
 two different entities. I.e. someone for company A make a PR and
 someone from another company/research unit merges it.
 
+*You will find more information about contributions in the [Community Contributions wiki page](https://github.com/tbarbette/fastclick/wiki/Community-Contributions).*
+
 Examples
 --------
 See conf/fastclick/README.md
 The wiki provides more information about the [I/O frameworks you should use for high speed](https://github.com/tbarbette/fastclick/wiki/High-speed-I-O), such as DPDK and Netmap, and how to configure them.
+
+Differences with the mainline Click (kohler/click)
+--------------------------------------------------
+In a nutshell:
+ - Batching
+ - The DPDK version in mainline is very limited (no native multi-queue, you have to duplicate elements etc)
+ - Thread vectors, allowing easier thread management
+ - The flow subsystem that comes from MiddleClick and allow to use many classification algorithm for new improved NAT, Load Balancers, DPI engine (HyperScan, SSE4 string search), Statistics tracking, etc
+ - By defaults FastClick compiles with userlevel multithread. You still have to explicitely *--enable-dpdk* if you want fast I/O with DPDK (you do)
+
+*You will find more information about the differences with Click in the [related wiki page](https://github.com/tbarbette/fastclick/wiki/Differences-between-FastClick-and-Click)*
 
 Differences with the ANCS paper
 -------------------------------
