@@ -21,6 +21,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.7
+    - name: Install pip
+      run: |
+          python -m pip install --upgrade pip
     - name: framework
       run: |
           if [ "${{matrix.FRAMEWORK}}" = "dpdk" ] ; then
@@ -34,7 +41,7 @@ jobs:
                 wget http://fast.dpdk.org/rel/dpdk-$VERSION.tar.gz &&
                 tar -zxf dpdk-$VERSION.tar.gz &&
                 cd dpdk-$STABLE$VERSION &&
-                pip3 install --user meson ninja &&
+                pip3 install meson ninja &&
                 meson -Dprefix=$(pwd)/install/ build &&
                 cd build &&
                 ninja &&
