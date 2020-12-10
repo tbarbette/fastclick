@@ -1,3 +1,4 @@
+#This file is quite deprecated, but we keep it there in case someone has an internal GitLab CI pipeline and wants to reuse this
 variables:
     DPDK_VERSION: "17.08"
     NETMAP_VERSION: "11.1"
