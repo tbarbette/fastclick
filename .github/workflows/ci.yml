@@ -23,9 +23,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: configure
-      run:
-          - if [ $COMPILER = "clang" ] ; then export CC=clang; export CXX=clang++; fi
-          - ./configure $FLAGS
+      run: |
+          if [ $COMPILER = "clang" ] ; then export CC=clang; export CXX=clang++; fi
+          ./configure $FLAGS
     - name: make
       run: make
     - name: make check
