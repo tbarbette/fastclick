@@ -9,14 +9,16 @@ env:
     CXXFLAGS: -std=gnu++11
     FLAGS: --enable-all --disable-verbose-batch
 
-strategy:
-    matrix:
-        COMPILER: [gcc, clang]
+
 
 jobs:
   build:
 
     runs-on: ubuntu-latest
+
+    strategy:
+        matrix:
+            COMPILER: [gcc, clang]
 
     steps:
     - uses: actions/checkout@v2
