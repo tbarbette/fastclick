@@ -9,6 +9,9 @@ env:
     CXXFLAGS: -std=gnu++11
     FLAGS: --enable-all-elements --disable-verbose-batch
 
+    #Until we find a solution for the world-writable /home/runner in GitHub Actions...
+    NODPDKTEST: 1
+
 jobs:
   build:
 
