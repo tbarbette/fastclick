@@ -49,6 +49,9 @@ jobs:
                 cd .. &&
                 cd .. ;
             fi
+            echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
+            echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+            echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
           fi
     - name: configure
       run: |
