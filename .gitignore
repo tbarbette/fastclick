@@ -30,3 +30,8 @@ stamp-h
 cscope.*
 **/.nfs*
 compile_commands.json
+*.bc
+*.ll
+*.resolution.txt
+*.lto.o
+build/*
