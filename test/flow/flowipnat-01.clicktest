@@ -6,9 +6,10 @@ TCPRewriter and FTPPortMapper sequence number translation, even for SACK.
 click-buildtool provides dpdk
 click-buildtool provides flow
 click-buildtool provides FlowIPManager
+test ! $NODPDKTEST
 
 %script
-$VALGRIND click --dpdk --no-huge --no-pci -- CONFIG
+$VALGRIND click --dpdk --no-huge --no-pci -m 128MB -- CONFIG
 
 %file CONFIG
 FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
