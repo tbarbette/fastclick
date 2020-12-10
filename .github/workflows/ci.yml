@@ -5,6 +5,9 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+env:
+    CXXFLAGS: -std=gnu++11
+    FLAGS: --enable-ip6 --enable-json --disable-linuxmodule --enable-tunnel --enable-research --disable-verbose-batch
 
 jobs:
   build:
@@ -14,7 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: configure
-      run: ./configure --enable-userlevel --enable-user-multithread
+      run: ./configure $FLAGS
     - name: make
       run: make
     - name: make check
