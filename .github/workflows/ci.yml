@@ -7,9 +7,7 @@ on:
     branches: [ master ]
 env:
     CXXFLAGS: -std=gnu++11
-    FLAGS: --enable-all --disable-verbose-batch
-
-
+    FLAGS: --enable-all-elements --disable-verbose-batch
 
 jobs:
   build:
@@ -19,13 +17,36 @@ jobs:
     strategy:
         matrix:
             COMPILER: [gcc, clang]
+            FRAMEWORK: [vanilla, dpdk]
 
     steps:
     - uses: actions/checkout@v2
+    - name: framework
+      run: |
+          if [ "${{matrix.FRAMEWORK}}" = "dpdk" ] ; then
+            echo "Compiling DPDK..." ;
+            export STABLE=
+            export VERSION=20.11
+            export FRAMEWORK_FLAGS="--enable-dpdk";
+            export PKG_CONFIG_PATH=$(pwd)/dpdk-$STABLE$VERSION/install/lib/x86_64-linux-gnu/pkgconfig/ ;
+            export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(pwd)/dpdk-$STABLE$VERSION/install/lib/x86_64-linux-gnu/ ;
+            if [ ! -e "dpdk-$STABLE$VERSION" ] || ! pkg-config --exists libdpdk ; then
+                wget http://fast.dpdk.org/rel/dpdk-$VERSION.tar.gz &&
+                tar -zxf dpdk-$VERSION.tar.gz &&
+                cd dpdk-$STABLE$VERSION &&
+                pip3 install --user meson ninja &&
+                meson -Dprefix=$(pwd)/install/ build &&
+                cd build &&
+                ninja &&
+                ninja install &&
+                cd .. &&
+                cd .. ;
+            fi
+          fi
     - name: configure
       run: |
-          if [ $COMPILER = "clang" ] ; then export CC=clang; export CXX=clang++; fi
-          ./configure $FLAGS
+          if [ "${{matrix.COMPILER}}" = "clang" ] ; then export CC=clang; export CXX=clang++; fi
+          ./configure $FLAGS $FRAMEWORK_FLAGS
     - name: make
       run: make
     - name: make check
