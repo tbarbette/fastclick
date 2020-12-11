@@ -291,6 +291,14 @@ AC_ARG_ENABLE([dpdk-xchg],
     [AS_HELP_STRING([  --enable-dpdk-xchg], [use DPDK XCHG API])],
     [:], [enable_dpdk_xchg=no])
 
+AC_ARG_ENABLE([dpdk-inside],
+    [AS_HELP_STRING([  --enable-dpdk-inside],
+                    [Click packets are inside DPDK packet])],
+    [:], [enable_dpdk_inside=no])
+if test "x$enable_dpdk_inside" = "xyes"; then
+    AC_DEFINE([CLICK_PACKET_INSIDE_DPDK])
+fi
+
 AC_ARG_ENABLE([dpdk-packet],
     [AS_HELP_STRING([  --enable-dpdk-packet],
                     [Click packets are DPDK packet])],

@@ -821,6 +821,7 @@ enable_kqueue
 enable_dpdk
 enable_dpdk_pool
 enable_dpdk_xchg
+enable_dpdk_inside
 enable_dpdk_packet
 enable_zerocopy
 enable_linuxmodule
@@ -1552,6 +1553,7 @@ Optional Features:
     --enable-dpdk         use DPDK
     --enable-dpdk-pool    use DPDK buffer instead of standard Click buffer
     --enable-dpdk-xchg    use DPDK XCHG API
+    --enable-dpdk-inside  Click packets are inside DPDK packet
     --enable-dpdk-packet  Click packets are DPDK packet
     --disable-zerocopy    disable Zero Copy
   --enable-linuxmodule    disable Linux kernel driver
@@ -7238,6 +7240,18 @@ else
   enable_dpdk_xchg=no
 fi
 
+
+# Check whether --enable-dpdk-inside was given.
+if test "${enable_dpdk_inside+set}" = set; then :
+  enableval=$enable_dpdk_inside; :
+else
+  enable_dpdk_inside=no
+fi
+
+if test "x$enable_dpdk_inside" = "xyes"; then
+    $as_echo "#define CLICK_PACKET_INSIDE_DPDK 1" >>confdefs.h
+
+fi
 
 # Check whether --enable-dpdk-packet was given.
 if test "${enable_dpdk_packet+set}" = set; then :
