@@ -92,7 +92,7 @@ AC_ARG_ENABLE([userlevel],
 
 AC_ARG_ENABLE([user-multithread],
     [AS_HELP_STRING([  --enable-user-multithread], [support userlevel multithreading])],
-    [:], [enable_user_multithread=no])
+    [:], [enable_user_multithread=yes])
 
 AC_ARG_ENABLE([fullpush-nonatomic],
     [AS_HELP_STRING([  --disable-fullpush-nonatomic], [disable nonatomic access to packet when single-threaded fullpush context is detected])],
@@ -444,8 +444,8 @@ fi
 dnl linuxmodule driver and features
 
 AC_ARG_ENABLE([linuxmodule],
-    [AS_HELP_STRING([--disable-linuxmodule], [disable Linux kernel driver])],
-    [:], [enable_linuxmodule=yes; enable_linuxmodule_default=yes])
+    [AS_HELP_STRING([--enable-linuxmodule], [disable Linux kernel driver])],
+    [:], [enable_linuxmodule=no; enable_linuxmodule_default=no])
 
 AC_ARG_ENABLE([fixincludes],
     [AS_HELP_STRING([  --disable-fixincludes], [do not patch Linux kernel headers for C++])],
