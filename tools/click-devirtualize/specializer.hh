@@ -57,6 +57,7 @@ class Specializer { public:
     void output_new_elementmap(const ElementMap &, ElementMap &, const String &,
 			       const String &requirements) const;
   void do_config_replacement();
+  void verbose(bool verbose) { _verbose = verbose; };
   void should_replace(bool do_replace) { _do_replace = do_replace; };
   void should_inline(bool do_inline) { _do_inline = do_inline; };
   void make_static(bool do_static) { _do_static = do_static; };
@@ -87,6 +88,7 @@ class Specializer { public:
   bool _do_static;
   bool _do_unroll;
   bool _do_switch;
+  bool _verbose;
   int _unroll_val;
   int _switch_burst;
   int _do_jmps;
