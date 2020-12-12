@@ -31,7 +31,7 @@ CLICK_DECLS
                 Packet* p = batch;\
                 Packet* last = 0;\
                 for (;p != 0;p=efep_next,efep_next=(p==0?0:p->next())) {\
-            Packet* q = fnt(p);\
+                    Packet* q = fnt(p);\
                     if (q != p) {\
                         if (last) {\
                             last->set_next(q);\
@@ -44,9 +44,11 @@ CLICK_DECLS
                 }
 
 /**
- * Execute a function on each packets of a batch. The function may return
- * another packet to replace the current one. This version will stop when
- * a packet is dropped.
+ * Execute a function that returns a bool on each packets of a batch.
+ * The function may take the packet by reference and change the reference.
+ * If the function returns false, the loop stops and on_stop is called
+ * with the whole batch in argument, the packet causing the stop, and the next
+ * reference. This function does not kill any packet by itself.
  */
 #define EXECUTE_FOR_EACH_PACKET_UNTIL_DO(fnt,batch,on_stop) \
                 Packet* efep_next = ((batch != 0)? batch->next() : 0 );\

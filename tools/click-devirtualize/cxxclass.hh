@@ -18,7 +18,7 @@ class CxxFunction {
   String _body;
   String _clean_body;
 
-  bool find_expr(const String &, int *, int *, int[10], int[10], bool allow_call = false, bool full_symbol = false) const;
+  bool find_expr(const String &, int *, int *, int[10], int[10], bool allow_call = false, bool full_symbol = false, int start_at = 0) const;
 
  public:
 
@@ -42,8 +42,8 @@ class CxxFunction {
   void unkill()				{ _alive = true; }
 
   bool find_expr(const String &) const;
-  bool replace_expr(const String &, const String &, bool full_symbol = false, bool all = false);
-  bool replace_call(const String &, const String &, Vector<String>& args);
+  bool replace_expr(const String &, const String &, bool full_symbol = false, bool all = false, int start_at = 0);
+  int replace_call(const String &, const String &, Vector<String>& args);
 
   void set_inline();
 

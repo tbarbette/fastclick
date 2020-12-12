@@ -27,7 +27,7 @@ RatedSource(DATA "AAAA", LIMIT 1, STOP true)
 -> Print()
 -> StoreData(0, \<FF FF FF FF FF>, MASK \<01 01 01 01>)
 -> Print()
--> StoreData(4, \<18 18>, MASK \<1212>, GROW true)
+-> StoreData(4, \<18 18>, MASK \<12ff>, GROW true)
 -> Print()
 -> Discard();
 
@@ -43,4 +43,4 @@ RatedSource(DATA "AAAA", LIMIT 1, STOP true)
    5 | 00f10000 00
    5 | 00f30000 00
    5 | 01f30101 ff
-   6 | 01f30101 fd10
+   6 | 01f30101 fd18

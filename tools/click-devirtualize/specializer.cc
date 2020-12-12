@@ -34,7 +34,7 @@ Specializer::Specializer(RouterT *router, const ElementMap &em)
   : _router(router), _nelements(router->nelements()),
     _ninputs(router->nelements(), 0), _noutputs(router->nelements(), 0),
     _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1), _do_inline(false), 
-    _do_static(false), _do_unroll(false), _unroll_val(0), _do_switch(false), _switch_burst(0),
+    _do_static(false), _do_unroll(false), _unroll_val(0), _do_switch(false), _verbose(false), _switch_burst(0),
     _do_jmps(false), _jmp_burst(0), _do_align(0)
 {
   _etinfo.push_back(ElementTypeInfo());
@@ -732,13 +732,15 @@ Specializer::create_connector_methods(SpecializedClass &spc)
 }
 
 static
-bool do_replacement(CxxFunction &fnt, CxxClass *cxxc, String from, String to) {
+bool do_replacement(CxxFunction &fnt, CxxClass *cxxc, String from, String to, bool verbose) {
   if (!fnt.alive())
       return false;
   if (fnt.name() == "add_handlers" ||fnt.name() == "configure")
       return false;
   bool found = false;
-  //click_chatter("Replacing '%s' per '%s' in fnt %s",from.c_str(),to.c_str(), fnt.name().c_str());
+
+  if (verbose)
+    click_chatter("Replacing '%s' per '%s' in fnt %s",from.c_str(),to.c_str(), fnt.name().c_str());
   if (fnt.replace_expr(from, to, true, true)) {
       found = true;
       //click_chatter("CONST REPLACEMENT FOUND ! %s", fnt.body().c_str());
@@ -829,39 +831,46 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
     if (_specials[s].special())
       create_connector_methods(_specials[s]);
 
-
+  //Replace the parameters in configure() functions
   do_config_replacement();
 }
 
+
+/**
+ * Replace argument parsing by constant value validation, and replace occurences
+ * of the symbols by their constants
+ */
 void
 Specializer::do_config_replacement() {
-
   for (int s = 0; s < _specials.size(); s++) {
 
     if (!_specials[s].special())
         continue;
     CxxClass* original = _specials[s].cxxc->parent(0);
-    /*for (int j = 0; j < original->nfunctions(); j++) {
-        click_chatter("CLass %s fnt %s",original->name().c_str(), original->function(j).name().c_str());
-    }*/
-    click_chatter("Replacing in %s", _specials[s].cxxc->name().c_str());
+
+    if (_verbose)
+        click_chatter("Replacing in %s", _specials[s].cxxc->name().c_str());
+
     CxxFunction* configure = original->find("configure");
     if (configure && _do_replace) {
         bool any_replacement = false;// Replacements in configure done?
         Vector<String> args;
-        //click_chatter("Configure found  %s!",configure->body().c_str());
+
         String configline = _router->element(_specials[s].eindex)->config();
+        //For all patterns like read, read_mp, ...
         for (int p =0; p < patterns.size(); p++) {
-                while (configure->replace_call(patterns[p].first, patterns[p].second,args)) {
+                int res;
+                while ((res = configure->replace_call(patterns[p].first, patterns[p].second, args)) != -1) {
                       String value;
                       String param =  trim_quotes(args[0].trim());
                       bool has_value;
                       any_replacement = true;
                       int pos = configline.find_left(param);
-                      click_chatter("Param is %s", param.c_str());
-
-//                      click_chatter("Config is %s, found at %d", configline.c_str(), pos);
+                      int endofrep = res;
                       if (pos >= 0) {
+                          //Value given by the user
+                          if (_verbose)
+                              click_chatter("Found user value for %s", param.c_str());
                           pos += param.length();
                           while (configline[pos] == ' ')
                               pos++;
@@ -873,18 +882,23 @@ Specializer::do_config_replacement() {
                           click_chatter("Config value is %s",value.c_str());
                           has_value = true;
                       } else {
+                          //Value not given by the user
                           if (args.size() > 2 && args[2].trim()) {
                               value=args[2].trim();
-                              click_chatter("User did not overwrite %s, replacing by default value %s", param.c_str(), value.c_str());
+                              if (_verbose)
+                                  click_chatter("User did not overwrite %s, replacing by default value %s", param.c_str(), value.c_str());
+                              has_value = true;
                           } else {
-                              click_chatter("User did not overwrite %s, preventing further overwrite", param.c_str());
+                              if (_verbose)
+                                  click_chatter("User did not overwrite %s, preventing further overwrite", param.c_str());
                               has_value = false;
                           }
 
                       }
                       if (has_value) {
 
-                          click_chatter("Value %s given, primitive : %d",value.c_str(),is_primitive_val(value));
+                          if (_verbose)
+                              click_chatter("Value %s given, primitive : %d",value.c_str(),is_primitive_val(value));
                           configure->replace_expr("!TEMPVAL!", ", "+args[1].trim()+", "+ (is_primitive_val(value)?value:"\""+value+"\""), true, true);
                       } else {
                           click_chatter("No value given");
@@ -896,11 +910,10 @@ Specializer::do_config_replacement() {
                           continue;
                       }
 
-                      //click_chatter("Replacing occurences of %s", args[1].trim().c_str());
                       //Replace in specialized code
                       for (int f = 0; f < _specials[s].cxxc->nfunctions(); f++) {
                           CxxFunction &fnt = _specials[s].cxxc->function(f);
-                          do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value);
+                          do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value, _verbose);
                       }
 
                       //Replace in original class code
@@ -911,12 +924,20 @@ Specializer::do_config_replacement() {
                           CxxFunction *overriden = 0;
                           if ((overriden = _specials[s].cxxc->find(fnt.name())))
                               fnt = *overriden;
-                          do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value);
+                          do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value, _verbose);
                       }
+
+                      //Replace in the configure function itself
+                      if (configure->replace_expr(args[1].trim(), value, true, true, endofrep)) {
+
+                      }
+
                       args.clear();
                 }
-                if (any_replacement)
+                if (any_replacement) {
+
                     _specials[s].cxxc->defun(*configure);
+                }
                 //click_chatter("Configure changed  %s!",configure->body().c_str());
         }
     }

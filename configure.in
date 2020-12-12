@@ -92,7 +92,7 @@ AC_ARG_ENABLE([userlevel],
 
 AC_ARG_ENABLE([user-multithread],
     [AS_HELP_STRING([  --enable-user-multithread], [support userlevel multithreading])],
-    [:], [enable_user_multithread=no])
+    [:], [enable_user_multithread=yes])
 
 AC_ARG_ENABLE([fullpush-nonatomic],
     [AS_HELP_STRING([  --disable-fullpush-nonatomic], [disable nonatomic access to packet when single-threaded fullpush context is detected])],
@@ -291,6 +291,14 @@ AC_ARG_ENABLE([dpdk-xchg],
     [AS_HELP_STRING([  --enable-dpdk-xchg], [use DPDK XCHG API])],
     [:], [enable_dpdk_xchg=no])
 
+AC_ARG_ENABLE([dpdk-inside],
+    [AS_HELP_STRING([  --enable-dpdk-inside],
+                    [Click packets are inside DPDK packet])],
+    [:], [enable_dpdk_inside=no])
+if test "x$enable_dpdk_inside" = "xyes"; then
+    AC_DEFINE([CLICK_PACKET_INSIDE_DPDK])
+fi
+
 AC_ARG_ENABLE([dpdk-packet],
     [AS_HELP_STRING([  --enable-dpdk-packet],
                     [Click packets are DPDK packet])],
@@ -444,8 +452,8 @@ fi
 dnl linuxmodule driver and features
 
 AC_ARG_ENABLE([linuxmodule],
-    [AS_HELP_STRING([--disable-linuxmodule], [disable Linux kernel driver])],
-    [:], [enable_linuxmodule=yes; enable_linuxmodule_default=yes])
+    [AS_HELP_STRING([--enable-linuxmodule], [disable Linux kernel driver])],
+    [:], [enable_linuxmodule=no; enable_linuxmodule_default=no])
 
 AC_ARG_ENABLE([fixincludes],
     [AS_HELP_STRING([  --disable-fixincludes], [do not patch Linux kernel headers for C++])],

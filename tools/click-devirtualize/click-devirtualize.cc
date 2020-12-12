@@ -60,6 +60,7 @@
 #define SWTICH_OPT      318
 #define JMPS_OPT        319
 #define ALIGN_OPT       320
+#define VERBOSE_OPT     321
 
 static const Clp_Option options[] = {
   { "clickpath", 'C', CLICKPATH_OPT, Clp_ValString, 0 },
@@ -83,7 +84,8 @@ static const Clp_Option options[] = {
   { "reverse", 'r', REVERSE_OPT, 0, Clp_Negate },
   { "source", 's', SOURCE_OPT, 0, Clp_Negate },
   { "userlevel", 'u', USERLEVEL_OPT, 0, Clp_Negate },
-  { "version", 'v', VERSION_OPT, 0, 0 }
+  { "version", 'v', VERSION_OPT, 0, 0 },
+  { "verbose", 'V', VERBOSE_OPT, 0, 0 }
 };
 
 static const char *program_name;
@@ -230,6 +232,7 @@ Options:\n\
   -i, --instructions FILE      Read devirtualization instructions from FILE.\n\
   -C, --clickpath PATH         Use PATH for CLICKPATH.\n\
       --help                   Print this message and exit.\n\
+  -Vn --verbose                Verbose\n\
   -v, --version                Print version number and exit.\n\
 \n\
 Report bugs to <click@librelist.com>.\n", program_name);
@@ -257,6 +260,7 @@ main(int argc, char **argv)
   int compile_kernel = 0;
   int compile_user = 0;
   int reverse = 0;
+  bool verbose = false;
   int do_replace = 0;
   int do_inline = 0;
   int do_static = 0;
@@ -329,7 +333,9 @@ particular purpose.\n");
      case KERNEL_OPT:
       compile_kernel = !clp->negated;
       break;
-
+     case VERBOSE_OPT:
+      verbose = true;
+      break;
      case USERLEVEL_OPT:
       compile_user = !clp->negated;
       break;
@@ -478,6 +484,7 @@ particular purpose.\n");
   // initialize specializer
   Specializer specializer(router, full_elementmap);
 
+  specializer.verbose(verbose);
   specializer.should_replace(do_replace);
   specializer.should_inline(do_inline);
   specializer.make_static(do_static);

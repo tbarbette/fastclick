@@ -34,6 +34,10 @@ elem2=""
 default_provisions="@provisions@"
 driver_provisions="@DRIVERS@"
 
+if [ -z "$CLICK_ELEM_RAND_MAX" ] ; then
+    CLICK_ELEM_RAND_MAX=0
+fi
+
 export LC_COLLATE=C
 trap "exit 1" HUP
 
