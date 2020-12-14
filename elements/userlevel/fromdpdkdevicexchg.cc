@@ -32,109 +32,19 @@ FromDPDKDeviceXCHG::FromDPDKDeviceXCHG() {
 
 FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
 
-#ifndef NOXCHG
 
 /**
- * Free the mbufs from the linear array of pointers.
  *
- * @param pkts
- *   Pointer to array of packets to be free.
- * @param pkts_n
- *   Number of packets to be freed.
- * @param olx
- *   Configured Tx offloads mask. It is fully defined at
- *   compile time and may be used for optimization.
+ * This file implements a few buffering models. The real X-Change starts around line
+ * 250, you probably want to jump there.
  */
-static __rte_always_inline void
-mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
-		  unsigned int pkts_n,
-		  unsigned int olx __rte_unused)
-{
-	struct rte_mempool *pool = NULL;
-	struct rte_mbuf **p_free = NULL;
-	struct rte_mbuf *mbuf;
-	unsigned int n_free = 0;
 
-	/*
-	 * The implemented algorithm eliminates
-	 * copying pointers to temporary array
-	 * for rte_mempool_put_bulk() calls.
-	 */
-	for (;;) {
-		for (;;) {
-			/*
-			 * Decrement mbuf reference counter, detach
-			 * indirect and external buffers if needed.
-			 */
-			mbuf = rte_pktmbuf_prefree_seg(*pkts);
-			if (likely(mbuf != NULL)) {
-				if (likely(n_free != 0)) {
-					if (unlikely(pool != mbuf->pool))
-						/* From different pool. */
-						break;
-				} else {
-					/* Start new scan array. */
-					pool = mbuf->pool;
-					p_free = pkts;
-				}
-				++n_free;
-				++pkts;
-				--pkts_n;
-				if (unlikely(pkts_n == 0)) {
-					mbuf = NULL;
-					break;
-				}
-			} else {
-				/*
-				 * This happens if mbuf is still referenced.
-				 * We can't put it back to the pool, skip.
-				 */
-				++pkts;
-				--pkts_n;
-				if (unlikely(n_free != 0))
-					/* There is some array to free.*/
-					break;
-				if (unlikely(pkts_n == 0))
-					/* Last mbuf, nothing to free. */
-					return;
-			}
-		}
-		for (;;) {
-			/*
-			 * This loop is implemented to avoid multiple
-			 * inlining of rte_mempool_put_bulk().
-			 */
-			/*
-			 * Free the array of pre-freed mbufs
-			 * belonging to the same memory pool.
-			 */
-			rte_mempool_put_bulk(pool, (void * const*)p_free, n_free);
-			if (unlikely(mbuf != NULL)) {
-				/* There is the request to start new scan. */
-				pool = mbuf->pool;
-				p_free = pkts++;
-				n_free = 1;
-				--pkts_n;
-				if (likely(pkts_n != 0))
-					break;
-				/*
-				 * This is the last mbuf to be freed.
-				 * Do one more loop iteration to complete.
-				 * This is rare case of the last unique mbuf.
-				 */
-				mbuf = NULL;
-				continue;
-			}
-			if (likely(pkts_n == 0))
-				return;
-			n_free = 0;
-			break;
-		}
-	}
-}
+#ifndef NOXCHG
+//If NOXCHG is passed we don't compile any of this to prevent clashing wit rte_mbuf_xchg :)
 
 # if XCHG_RX_SWAPONLY
-
+/*This is an intermediate testing mode, where the application gives rte_mbuf*, and the driver (these functions) fill
+ * the metadata of the mbuf. This allows to use only a few (32) in-flight metadata space.*/
     inline struct rte_mbuf* get_buf(struct xchg* x) {
         return (struct rte_mbuf*)x;
     }
@@ -171,10 +81,6 @@ mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
     uint16_t xchg_get_outer_l3_len(struct xchg* xchg) {
         return get_buf(xchg)->outer_l3_len;
     }
-
-// int xchg_has_flag(struct xchg* xchg, uint64_t f) {
-//       return get_buf(xchg)->ol_flags & f;
-//    }
 
     void xchg_clear_flag(struct xchg* xchg, uint64_t f) {
         get_buf(xchg)->ol_flags &= f;
@@ -238,6 +144,11 @@ mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
 # else
 
 #  if CLICK_PACKET_INSIDE_DPDK
+/*
+ * This is an un-finished study to accelerate the "VPP" model, where the app buffer (in Click, the Packet object)
+ * resides just after the rte_mbuf. X-Change allows to directly use the application buffer, so practically
+ * this does not make sense. But we wanted to see how much X-Change could improve VPP.
+ */
     inline struct rte_pktmbuf* get_mbuf(struct xchg* x) {
         return (struct WritablePacket*)x;
     }
@@ -332,94 +243,125 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
     }
 
 #  else
+/**
+ *
+ * This is the real X-Change
+ *
+ * In (Fast)Click, the internal application buffer equivalent to the rte_mbuf
+ * is the WritablePacket object. Hence, struct xchg* refers to a WritablePacket.
+ * The goal of all the functions bellow is to fill the right field of WritablePacket,
+ * eg xchg_set_vlan() will set the VLAN annotation of the WritablePacket to the
+ * given value.
+ */
+
+    /**
+     * An internal helper to cast the xchg* pointer to the WritablePacket* pointer.
+     */
     inline struct WritablePacket* get_buf(struct xchg* x) {
         return (struct WritablePacket*)x;
     }
 
+    //Unused
     void xchg_set_packet_type(struct xchg* xchg, uint32_t ptype) {
         //get_buf(xchg)->packet_type = ptype; 
     }
 
+    //The RSS hash is set in the AGGREGATE_ANNP
     void xchg_set_rss_hash(struct xchg* xchg, uint32_t rss) {
         SET_AGGREGATE_ANNO(get_buf(xchg), rss);
     }
 
+    //Set the timestamp field
     void xchg_set_timestamp(struct xchg* xchg, uint64_t t) {
         get_buf(xchg)->timestamp_anno().assignlong(t);
     }
 
+    //Unused
     void xchg_set_flag(struct xchg* xchg, uint64_t f) {
 //        get_buf(xchg)->ol_flags |= f;
     }
 
+    //Unused
     void xchg_clear_flag(struct xchg* xchg, uint64_t f) {
     //    get_buf(xchg)->ol_flags &= f;
     }
 
+    //Fdir is also the aggregate, like RSS. One rarely use both (if needed, one can use another anno).
     void xchg_set_fdir_id(struct xchg* xchg, uint32_t mark) {
         SET_AGGREGATE_ANNO(get_buf(xchg), mark);
     }
 
+    //Set the VLAN anno
     void xchg_set_vlan(struct xchg* xchg, uint32_t vlan) {
         SET_VLAN_TCI_ANNO(get_buf(xchg),vlan);
     }
 
+    //Set packet length. However in our case the buffers themselves have a constant size, so no need to re-set
     void xchg_set_len(struct xchg* xchg, uint16_t len) {
         //get_buf(xchg)->set_buffer_length(len);
     }
 
+    //Set data_length (the actual packet length)
     void xchg_set_data_len(struct xchg* xchg, uint16_t len) {
         get_buf(xchg)->set_data_length(len);
     }
 
+    //Return the buffer length.
     uint16_t xchg_get_len(struct xchg* xchg) {
         return get_buf(xchg)->buffer_length();
     }
 
-
+    //This functions is called "at the end of the for loop", when the driver has finished
+    //with a packet, and will start reading the next one. It's a chance to wrap up what we
+    //need to do.
+    //In this case we prefetch the packet data, and set a few Click stuffs.
     void xchg_finish_packet(struct xchg* xchg) {
         WritablePacket* p = (WritablePacket*)xchg;
 
-        //click_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->data(), p->end_data(), p->end_buffer());
         rte_prefetch0(p->data());
         p->set_packet_type_anno(Packet::HOST);
         p->set_mac_header(p->data());
         p->set_destructor_argument(p->buffer() - RTE_PKTMBUF_HEADROOM);
-/*        if (_set_rss_aggregate)
-#if RTE_VERSION > RTE_VERSION_NUM(1, 7, 0, 0)
-          SET_AGGREGATE_ANNO(p, pkts[i]->hash.rss);
-#else
-          SET_AGGREGATE_ANNO(p, pkts[i]->pkt.hash.rss);
-#endif
-        if (_set_paint_anno) {
-          SET_PAINT_ANNO(p, iqueue);
-        }*/
 
     }
 
     /**
+     * This function is called by the driver to advance in the RX ring.
      * Set a new buffer to replace in the ring if not canceled, and return the next descriptor
      */
     struct xchg* xchg_next(struct rte_mbuf** rep, struct xchg** xchgs, rte_mempool* mp) {
-		WritablePacket* first = (WritablePacket*)*xchgs;
+		//The user (actually, that's us) passes a linked-list of WritablePacket in the struct xchg** (so it's actually not a **)
+        // moving to the next is actually taking the first packet. Note that advancing in the list is the
+        // role of xchg_davance, not next. Next is like "peek".
+        WritablePacket* first = (WritablePacket*)*xchgs;
 
+        //We'll take the address of the buffer and put that in the ring
         void* fresh_buf = (void*)first->buffer();
 
+        //While the freshly received buffer with the new packet data
         unsigned char* buffer = ((unsigned char*)*rep) + sizeof(rte_mbuf);
+
+        //We set the address in the ring
         *rep = (struct rte_mbuf*)(((unsigned char*)fresh_buf) - sizeof(struct rte_mbuf));
 
+        //We set the address of the new buffer data in the Packet object
         first->set_buffer(buffer, DPDKDevice::MBUF_DATA_SIZE);
-//        assert(buffer + RTE_PKTMBUF_HEADROOM == rte_pktmbuf_mtod(*elts, unsigned char*));
-//        click_chatter("BUF %p, ARG %p, CALC %p",fresh_buf, first->destructor_argument(), *elts);
-//        assert(*elts == first->destructor_argument());
+
         return (struct xchg*)first;
     }
 
+    /**
+     * Cancel the current receiving, this should cancel the last xchg_next.
+     * It's how XCHG works, in the hope a receive will always work. I'm sure there are reasons for this.
+     */
     void xchg_cancel(struct xchg* xchg, struct rte_mbuf* rep) {
         WritablePacket* first = (WritablePacket*)xchg;
         first->set_buffer( ((unsigned char*)rep) + sizeof(rte_mbuf), DPDKDevice::MBUF_DATA_SIZE);
     }
 
+    /**
+     * Pops the packet of the user provided buffers
+     */
     void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
         WritablePacket** xchgs = (WritablePacket**)*xchgs_p;
         WritablePacket* first = (WritablePacket*)xchg;
@@ -428,18 +370,20 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
         *(xchgs - 1) = first;
         first->set_data(first->buffer() + RTE_PKTMBUF_HEADROOM);
     }
-    
+
+    /**
+     * Gives the buffer pointer from an mbuf in the driver's ring.
+     * This implementation will not change. The idea was that one could avoid
+     * Having rte_mbufs entierly, but it needs much more work in the driver...
+     * Just for cleaniness.
+     */
     void* xchg_buffer_from_elt(struct rte_mbuf* buf) {
         return ((unsigned char*)buf) + sizeof(rte_mbuf) + RTE_PKTMBUF_HEADROOM;
     }   
 #  endif
 # endif
-
-
 #endif
-    /*    void* xchg_fill_elts() {
-        struct rte_mbuf* = DPDKDevice::allocate();
-    }*/
+
 
 bool FromDPDKDeviceXCHG::run_task(Task *t) {
   int ret = 0;
@@ -447,6 +391,7 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
   int iqueue = queue_for_thisthread_begin();
 
 # if CLICK_PACKET_INSIDE_DPDK
+  // The Packet object is just after rte_mbuf, the "VPP" mode
   struct rte_mbuf *pkts[_burst];
   unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, pkts, _burst);
   if (n) {
@@ -470,6 +415,7 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
   }
 
 #elif HAVE_VECTOR_PACKET_POOL
+  //Useless. With XCHG we can tell the driver how we advance.
   unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, WritablePacket::pool_prepare_data(_burst), _burst);
   if (n) {
     WritablePacket::pool_consumed_data(n);
@@ -480,6 +426,7 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
   vect->insert(burst, n);
   output_push_batch(0, vect);
 #else
+  //This is the real X-Change. No loop! Yeah :)
   WritablePacket* head = WritablePacket::pool_prepare_data_burst(_burst);
   WritablePacket* tail[2] = {0,head};
   unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, (struct xchg**)&(tail[1]), _burst);
