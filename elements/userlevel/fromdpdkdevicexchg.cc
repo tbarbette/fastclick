@@ -361,6 +361,7 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
 
     /**
      * Pops the packet of the user provided buffers
+     * @arg xchg is the packet being received (last call to xchg_next)
      */
     void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
         WritablePacket** xchgs = (WritablePacket**)*xchgs_p;
