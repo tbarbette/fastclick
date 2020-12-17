@@ -867,6 +867,7 @@ Specializer::do_config_replacement() {
                       any_replacement = true;
                       int pos = configline.find_left(param);
                       int endofrep = res;
+                      String symbol = args[1].trim();
                       if (pos >= 0) {
                           //Value given by the user
                           if (_verbose)
@@ -889,9 +890,14 @@ Specializer::do_config_replacement() {
                                   click_chatter("User did not overwrite %s, replacing by default value %s", param.c_str(), value.c_str());
                               has_value = true;
                           } else {
-                              if (_verbose)
-                                  click_chatter("User did not overwrite %s, preventing further overwrite", param.c_str());
-                              has_value = false;
+                              value = configure->find_assignment(symbol,res-patterns[p].second.length());
+                              if (value) {
+                                  has_value = true;
+                              } else {
+                                  if (_verbose)
+                                      click_chatter("User did not overwrite %s, preventing further overwrite", param.c_str());
+                                  has_value = false;
+                              }
                           }
 
                       }
@@ -899,7 +905,7 @@ Specializer::do_config_replacement() {
 
                           if (_verbose)
                               click_chatter("Value %s given, primitive : %d",value.c_str(),is_primitive_val(value));
-                          configure->replace_expr("!TEMPVAL!", ", "+args[1].trim()+", "+ (is_primitive_val(value)?value:"\""+value+"\""), true, true);
+                          configure->replace_expr("!TEMPVAL!", ", "+symbol+", "+ (is_primitive_val(value)?value:"\""+value+"\""), true, true);
                       } else {
                           click_chatter("No value given");
                           configure->replace_expr("!TEMPVAL!", "");
@@ -913,7 +919,7 @@ Specializer::do_config_replacement() {
                       //Replace in specialized code
                       for (int f = 0; f < _specials[s].cxxc->nfunctions(); f++) {
                           CxxFunction &fnt = _specials[s].cxxc->function(f);
-                          do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value, _verbose);
+                          do_replacement(fnt, _specials[s].cxxc, symbol, value, _verbose);
                       }
 
                       //Replace in original class code
@@ -924,11 +930,11 @@ Specializer::do_config_replacement() {
                           CxxFunction *overriden = 0;
                           if ((overriden = _specials[s].cxxc->find(fnt.name())))
                               fnt = *overriden;
-                          do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value, _verbose);
+                          do_replacement(fnt, _specials[s].cxxc, symbol, value, _verbose);
                       }
 
                       //Replace in the configure function itself
-                      if (configure->replace_expr(args[1].trim(), value, true, true, endofrep)) {
+                      if (configure->replace_expr(symbol, value, true, true, endofrep)) {
 
                       }
 

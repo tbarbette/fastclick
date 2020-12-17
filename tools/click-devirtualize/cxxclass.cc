@@ -105,7 +105,7 @@ compile_pattern(const String &pattern0)
  */
 bool
 CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
-               int match_pos[10], int match_len[10], bool allow_call, bool full_symbol, int start_at) const
+               int match_pos[10], int match_len[10], bool allow_call, bool full_symbol, int start_at, int stop_at) const
 {
   const char *ps = pattern.data();
   int plen = pattern.length();
@@ -113,23 +113,25 @@ CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
   const char *ts = _clean_body.data();
   int tpos = start_at;
   int tlen = _clean_body.length();
-  while (tpos < tlen) {
+  if (stop_at == -1)
+      stop_at = tlen;
+  while (tpos < stop_at) {
 
     // fast loop: look for occurrences of first character in pattern
-    while (tpos < tlen && ts[tpos] != ps[0])
+    while (tpos < stop_at && ts[tpos] != ps[0])
       tpos++;
 
     int tpos1 = tpos;
     tpos++;
     int ppos = 1;
 
-    while (tpos < tlen && ppos < plen) {
+    while (tpos < stop_at && ppos < plen) {
 
       if (isspace((unsigned char) ps[ppos])) {
           if (ppos > 0 && (isalnum((unsigned char) ps[ppos-1]) || ps[ppos-1] == '_')
               && (isalnum((unsigned char) ts[tpos]) || ts[tpos] == '_'))
           break;
-          while (tpos < tlen && isspace((unsigned char) ts[tpos])) {
+          while (tpos < stop_at && isspace((unsigned char) ts[tpos])) {
               tpos++;
           }
           ppos++;
@@ -139,7 +141,7 @@ CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
         int question_level = 0;
         int which = ps[ppos+1] - '0';
         match_pos[which] = tpos;
-        while (tpos < tlen) {
+        while (tpos < stop_at) {
           if (ts[tpos] == '(')
             paren_level++;
           else if (ts[tpos] == ')') {
@@ -250,6 +252,47 @@ expr_type_t expr_type(String fnt, int left, int right) {
     return EX_OTHER;
 }
 
+String
+CxxFunction::find_assignment(const String symbol, int stop_at) {
+
+    int n = 0;
+    int start_at = 0;
+    String val;
+
+    click_chatter("Searching assignment for %s...", symbol.c_str());
+again:
+    int pos1, pos2,pos3, match_pos[10], match_len[10];
+    if (!find_expr(symbol, &pos1, &pos2, match_pos, match_len, false, false, start_at, stop_at))
+        goto done;
+     pos3 = pos2;
+    if (expr_type(_clean_body, pos1, pos2) == EX_ASSIGNMENT) {
+        char c;
+        do {
+
+            c = _clean_body[pos2];
+            pos2++;
+        } while (c != '=');
+
+        int pos3 = pos2 + 1;
+        do {
+            c = _clean_body[pos3];
+            pos3++;
+        } while (c != ';' && c != '\n');
+
+        val = _body.substring(pos2, pos3 - pos2 - 1 ).trim();
+        click_chatter("Found assignment for %s : '%s'", symbol.c_str(), val.c_str());
+    }
+    start_at = pos3;
+    n++;
+    goto again;
+done:
+    if (n > 1) {
+        click_chatter("Multiple assignment found, ignoring");
+    } else if (n == 1){
+       return val;
+    }
+    return "";
+}
 
 bool
 CxxFunction::replace_expr(const String &pattern, const String &replacement, bool full_symbol, bool all, int start_at)

@@ -18,7 +18,7 @@ class CxxFunction {
   String _body;
   String _clean_body;
 
-  bool find_expr(const String &, int *, int *, int[10], int[10], bool allow_call = false, bool full_symbol = false, int start_at = 0) const;
+  bool find_expr(const String &, int *, int *, int[10], int[10], bool allow_call = false, bool full_symbol = false, int start_at = 0, int stop_at = -1) const;
 
  public:
 
@@ -40,6 +40,8 @@ class CxxFunction {
   void set_body(const String &b)	{ _body = b; _clean_body = String(); }
   void kill()				{ _alive = false; }
   void unkill()				{ _alive = true; }
+
+    String find_assignment(const String symbol, int stop_at);
 
   bool find_expr(const String &) const;
   bool replace_expr(const String &, const String &, bool full_symbol = false, bool all = false, int start_at = 0);
