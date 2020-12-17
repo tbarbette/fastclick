@@ -544,7 +544,8 @@ particular purpose.\n");
     router->add_archive(ae);
 
     ae.name = package_name + suffix + ".hh";
-    ae.data = header.take_string();
+
+    ae.data = (do_static?"/** click-compile: -w -fno-access-control */\n":"") +  header.take_string();
     router->add_archive(ae);
   }
 

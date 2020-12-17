@@ -114,18 +114,9 @@ ifeq ($(USE_DPDK),yes)
 	RTE_VER_YEAR = @RTE_VER_YEAR@
 	RTE_VER_MONTH = @RTE_VER_MONTH@
 	RTE_USE_PKGCONFIG = @RTE_USE_PKGCONFIG@
-	ifeq (${RTE_USE_PKGCONFIG}$(shell pkg-config --exists libdpdk && echo 1), 11)
-		CFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
-		CXXFLAGS := $(CXXFLAGS) $(shell pkg-config --cflags libdpdk)
-		include rte_parse.mk
-		ifeq ($(CLICK_SHARED),1)
-			LIBS := $(LIBS) $(shell pkg-config --libs libdpdk)
-		else
-			LIBS := $(LIBS) $(shell pkg-config --static --libs libdpdk)
-		endif
-	else
-		include dpdk.mk
-	endif
+	include rte_parse.mk
+	CFLAGS := $(CFLAGS) @DPDK_CFLAGS@
+	CXXFLAGS := $(CXXFLAGS) @DPDK_CFLAGS@
 	EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
 	ifeq ($(shell [ ${HAVE_FLOW_API} -eq 1 ] && echo true),true)
 		EXTRA_DRIVER_OBJS := flowrulemanager.o flowrulecache.o flowruleparser.o $(EXTRA_DRIVER_OBJS)
@@ -145,6 +136,7 @@ ELEMENTSCONF = elements_$(MINDRIVER)
 ifeq ($(STATIC),1)
 ELEM2EXPORT = elem2exportstatic
 ELEMENTSSUFFIX = .static
+CXXFLAGS := $(CXXFLAGS) -w -fno-access-control
 else
 ELEM2EXPORT = elem2export
 ELEMENTSSUFFIX =
@@ -161,9 +153,9 @@ endif
 # We should change --whole-archive to --no-whole-archive to avoid getting duplicate symbol error
 # Since LDFLAGS is extended with DPDK_LIBS in dpdk.mk, we have to use the old LDFLAGS (DPDK_OLD_LDFLAGS)
 # for relinking the IR code. To do so, we define cutomized CXXLINK and LINK for IR compilation.
-DPDK_LIBS_IR=$(subst --whole-archive,--no-whole-archive,$(DPDK_LIBS))
-CXXLINK_IR = $(CXXLD) $(CXXFLAGS) $(DPDK_OLD_LDFLAGS) -o $@
-LINK_IR = $(CCLD) $(CFLAGS) $(DPDK_OLD_LDFLAGS) -o $@
+LIBS_IR=$(subst --whole-archive,--no-whole-archive,$(LIBS))
+CXXLINK_IR = $(CXXLD) $(CXXFLAGS) -o $@
+LINK_IR = $(CCLD) $(CFLAGS) -o $@
 
 
 
@@ -186,11 +178,11 @@ $(DRIVER): Makefile libclick.a $(OBJS)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 endif
 click-opt: Makefile click.ll libclick.a
-	$(call cxxlink_ir,$(DL_LDFLAGS) click.ll libclick.a $(LIBS) $(DPDK_LIBS_IR),LINK_IR)
+	$(call cxxlink_ir,$(DL_LDFLAGS) click.ll libclick.a $(LIBS_IR),LINK_IR)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 
 embedclick-opt: Makefile embedclick.ll libclick.a
-	$(call cxxlink_ir,$(DL_LDFLAGS) embedclick.ll libclick.a $(LIBS) $(DPDK_LIBS_IR),LINK_IR)
+	$(call cxxlink_ir,$(DL_LDFLAGS) embedclick.ll libclick.a $(LIBS_IR),LINK_IR)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 
 libclick.a: Makefile $(LIBOBJS)

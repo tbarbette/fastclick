@@ -279,6 +279,21 @@ if echo "$enable_select" | grep kqueue >/dev/null 2>&1 && test "$enable_kqueue" 
     AC_DEFINE([HAVE_ALLOW_KQUEUE], [1], [Define if kqueue() may be used to wait for file descriptor events.])
 fi
 
+AC_ARG_ENABLE(dynamic-linking,
+  [AS_HELP_STRING([--disable-dynamic-linking], [disable dynamic linking])],
+  :, enable_dynamic_linking=yes)
+
+if test "x$enable_dynamic_linking" = xyes; then
+    CLICK_CHECK_DYNAMIC_LINKING
+    if test "$HOST_TOOLS" != host -a "$enable_tools" != no; then
+        CLICK_CHECK_BUILD_DYNAMIC_LINKING
+    fi
+    CLICK_SHARED=1
+else
+    CLICK_SHARED=0
+fi
+AC_SUBST(CLICK_SHARED)
+
 AC_ARG_ENABLE([dpdk],
     [AS_HELP_STRING([  --enable-dpdk], [use DPDK])],
     [:], [enable_dpdk=no])
@@ -346,6 +361,12 @@ if test "x$enable_dpdk" != "xno"; then
       rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       rte_ver_major=$rte_ver_year
+      if "$(CLICK_SHARED)" -eq 1 ; then
+          DPDK_LIBS=$(pkg-config --libs libdpdk)
+      else
+		  DPDK_LIBS=$(pkg-config --static --libs libdpdk)
+      fi
+	  DPDK_CFLAGS=$(pkg-config --cflags libdpdk)
       AC_MSG_RESULT([yes])
     else
       AC_SUBST(RTE_USE_PKGCONFIG, 0)
@@ -382,6 +403,8 @@ version (dpdk-dev or dpdk-devel).
         rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
         rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
       fi
+      dpdk_vars=$(cd userlevel/dpdk/ && make RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET RTE_VER_YEAR=$rte_ver_year RTE_VER_MONTH=$rte_ver_month RTE_VER_MAJOR=$rte_ver_major RTE_VER_MINOR=$rte_ver_minor)
+      eval $dpdk_vars
     fi
 
     AC_SUBST(RTE_SDK)
@@ -391,7 +414,9 @@ version (dpdk-dev or dpdk-devel).
     AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
     AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
     AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
-    AC_SUBST(DPDK_INCLUDES, -I$RTE_INCLUDE)
+    AC_SUBST(DPDK_INCLUDES, -I${RTE_INCLUDE})
+    AC_SUBST(DPDK_LIBS, ${DPDK_LIBS})
+    AC_SUBST(DPDK_CFLAGS, ${DPDK_CFLAGS})
 
     AC_DEFINE([HAVE_DPDK])
     AC_SUBST(USE_DPDK, yes)
@@ -428,6 +453,7 @@ if test "x$enable_dpdk_xchg" = "xyes"; then
     fi
     AC_DEFINE([HAVE_DPDK_XCHG])
     AC_SUBST(HAVE_DPDK_XCHG,y)
+    AC_SUBST(DPDK_LIBS,$(echo "$DPDK_LIBS" | sed -e "s/-lrte_xchg_mbuf//"))
 fi
 
 if test "x$enable_dpdk_packet" = "xyes"; then
@@ -1018,21 +1044,6 @@ if test "x$have_kqueue" = xyes; then
         AC_DEFINE([HAVE_EV_SET_UDATA_POINTER], [1], [Define if the last argument to EV_SET has pointer type.])
     fi
 fi
-
-AC_ARG_ENABLE(dynamic-linking,
-  [AS_HELP_STRING([--disable-dynamic-linking], [disable dynamic linking])],
-  :, enable_dynamic_linking=yes)
-
-if test "x$enable_dynamic_linking" = xyes; then
-    CLICK_CHECK_DYNAMIC_LINKING
-    if test "$HOST_TOOLS" != host -a "$enable_tools" != no; then
-        CLICK_CHECK_BUILD_DYNAMIC_LINKING
-    fi
-    CLICK_SHARED=1
-else
-    CLICK_SHARED=0
-fi
-AC_SUBST(CLICK_SHARED)
 
 dnl
 dnl sockets

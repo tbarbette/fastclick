@@ -680,13 +680,6 @@ LINUXMODULE_2_6
 EXTRA_TOOL_OBJS
 EXTRA_DRIVER_OBJS
 SOCKET_LIBS
-CLICK_SHARED
-BUILD_DL_LIBS
-BUILD_DL_LDFLAGS
-SOSUFFIX
-LDMODULEFLAGS
-DL_LDFLAGS
-DL_LIBS
 HOST_TOOLS
 BUILD_RANLIB
 BUILD_AR
@@ -709,6 +702,8 @@ INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
 HAVE_DPDK_XCHG
 USE_DPDK
+DPDK_CFLAGS
+DPDK_LIBS
 DPDK_INCLUDES
 RTE_VER_MINOR
 RTE_VER_MAJOR
@@ -718,6 +713,13 @@ RTE_SDK_BIN
 RTE_TARGET
 RTE_SDK
 RTE_USE_PKGCONFIG
+CLICK_SHARED
+BUILD_DL_LIBS
+BUILD_DL_LDFLAGS
+SOSUFFIX
+LDMODULEFLAGS
+DL_LDFLAGS
+DL_LIBS
 DO_RAND_ALIGN
 PTHREAD_LIBS
 HAVE_BATCH
@@ -818,6 +820,7 @@ enable_rand_align
 enable_select
 enable_poll
 enable_kqueue
+enable_dynamic_linking
 enable_dpdk
 enable_dpdk_pool
 enable_dpdk_xchg
@@ -872,7 +875,6 @@ enable_nanotimestamp
 enable_user_timestamp
 enable_bound_port_transfer
 enable_tools
-enable_dynamic_linking
 enable_stats
 enable_stride
 enable_task_heap
@@ -1550,6 +1552,8 @@ Optional Features:
     --disable-select      do not use select()
     --disable-poll        do not use poll()
     --disable-kqueue      do not use kqueue()
+  --disable-dynamic-linking
+                          disable dynamic linking
     --enable-dpdk         use DPDK
     --enable-dpdk-pool    use DPDK buffer instead of standard Click buffer
     --enable-dpdk-xchg    use DPDK XCHG API
@@ -1602,8 +1606,6 @@ Optional Features:
   --enable-bound-port-transfer
                           enable port transfer function ptr optimization
   --enable-tools=WHERE    enable tools (host/build/mixed/no) [[mixed]]
-  --disable-dynamic-linking
-                          disable dynamic linking
   --enable-stats[=LEVEL]  enable statistics collection
   --disable-stride        disable stride scheduler
   --enable-task-heap      use heap for task list
@@ -2184,6 +2186,73 @@ $as_echo "$ac_res" >&6; }
 
 } # ac_fn_cxx_check_decl
 
+# ac_fn_cxx_check_func LINENO FUNC VAR
+# ------------------------------------
+# Tests whether FUNC exists, setting the cache variable VAR accordingly
+ac_fn_cxx_check_func ()
+{
+  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $2" >&5
+$as_echo_n "checking for $2... " >&6; }
+if eval \${$3+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+/* Define $2 to an innocuous variant, in case <limits.h> declares $2.
+   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
+#define $2 innocuous_$2
+
+/* System header to define __stub macros and hopefully few prototypes,
+    which can conflict with char $2 (); below.
+    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
+    <limits.h> exists even on freestanding compilers.  */
+
+#ifdef __STDC__
+# include <limits.h>
+#else
+# include <assert.h>
+#endif
+
+#undef $2
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char $2 ();
+/* The GNU C library defines this for functions which it implements
+    to always fail with ENOSYS.  Some functions are actually named
+    something starting with __ and the normal name is an alias.  */
+#if defined __stub_$2 || defined __stub___$2
+choke me
+#endif
+
+int
+main ()
+{
+return $2 ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  eval "$3=yes"
+else
+  eval "$3=no"
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+fi
+eval ac_res=\$$3
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+  eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
+
+} # ac_fn_cxx_check_func
+
 # ac_fn_c_try_link LINENO
 # -----------------------
 # Try to link conftest.$ac_ext, and return whether this succeeded.
@@ -2533,73 +2602,6 @@ $as_echo "$ac_res" >&6; }
   eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
 
 } # ac_fn_cxx_check_type
-
-# ac_fn_cxx_check_func LINENO FUNC VAR
-# ------------------------------------
-# Tests whether FUNC exists, setting the cache variable VAR accordingly
-ac_fn_cxx_check_func ()
-{
-  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $2" >&5
-$as_echo_n "checking for $2... " >&6; }
-if eval \${$3+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-/* Define $2 to an innocuous variant, in case <limits.h> declares $2.
-   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
-#define $2 innocuous_$2
-
-/* System header to define __stub macros and hopefully few prototypes,
-    which can conflict with char $2 (); below.
-    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
-    <limits.h> exists even on freestanding compilers.  */
-
-#ifdef __STDC__
-# include <limits.h>
-#else
-# include <assert.h>
-#endif
-
-#undef $2
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char $2 ();
-/* The GNU C library defines this for functions which it implements
-    to always fail with ENOSYS.  Some functions are actually named
-    something starting with __ and the normal name is an alias.  */
-#if defined __stub_$2 || defined __stub___$2
-choke me
-#endif
-
-int
-main ()
-{
-return $2 ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_cxx_try_link "$LINENO"; then :
-  eval "$3=yes"
-else
-  eval "$3=no"
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-fi
-eval ac_res=\$$3
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-  eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
-
-} # ac_fn_cxx_check_func
 
 # ac_fn_c_compute_int LINENO EXPR VAR INCLUDES
 # --------------------------------------------
@@ -3202,6 +3204,7 @@ fi
 
 as_fn_append ac_header_list " sys/types.h"
 as_fn_append ac_header_list " unistd.h"
+as_fn_append ac_header_list " dlfcn.h"
 as_fn_append ac_header_list " stdint.h"
 as_fn_append ac_header_list " inttypes.h"
 as_fn_append ac_header_list " endian.h"
@@ -3216,7 +3219,6 @@ as_fn_append ac_header_list " pwd.h"
 as_fn_append ac_header_list " grp.h"
 as_fn_append ac_header_list " execinfo.h"
 as_fn_append ac_header_list " poll.h"
-as_fn_append ac_header_list " dlfcn.h"
 as_fn_append ac_header_list " sys/mman.h"
 as_fn_append ac_header_list " stdlib.h"
 as_fn_append ac_header_list " sys/param.h"
@@ -7217,6 +7219,237 @@ $as_echo "#define HAVE_ALLOW_KQUEUE 1" >>confdefs.h
 
 fi
 
+# Check whether --enable-dynamic-linking was given.
+if test "${enable_dynamic_linking+set}" = set; then :
+  enableval=$enable_dynamic_linking; :
+else
+  enable_dynamic_linking=yes
+fi
+
+
+if test "x$enable_dynamic_linking" = xyes; then
+
+
+
+    DL_LIBS=
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen in -ldl" >&5
+$as_echo_n "checking for dlopen in -ldl... " >&6; }
+if ${ac_cv_lib_dl_dlopen+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-ldl  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dlopen ();
+int
+main ()
+{
+return dlopen ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_dl_dlopen=yes
+else
+  ac_cv_lib_dl_dlopen=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_dl_dlopen" >&5
+$as_echo "$ac_cv_lib_dl_dlopen" >&6; }
+if test "x$ac_cv_lib_dl_dlopen" = xyes; then :
+  ac_have_dlopen=yes; DL_LIBS="-ldl"
+else
+  ac_fn_cxx_check_func "$LINENO" "dlopen" "ac_cv_func_dlopen"
+if test "x$ac_cv_func_dlopen" = xyes; then :
+  ac_have_dlopen=yes
+else
+  ac_have_dlopen=no
+fi
+
+fi
+
+    if test "x$ac_have_dlopen" = xyes -a "x$ac_cv_header_dlfcn_h" = xyes; then
+
+$as_echo "#define HAVE_DYNAMIC_LINKING 1" >>confdefs.h
+
+        ac_have_dynamic_linking=yes
+    fi
+
+
+    DL_LDFLAGS=
+    save_ldflags="$LDFLAGS"; LDFLAGS="$LDFLAGS -rdynamic"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether linker accepts the -rdynamic flag" >&5
+$as_echo_n "checking whether linker accepts the -rdynamic flag... " >&6; }
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+return 0;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_rdynamic=yes; DL_LDFLAGS=-rdynamic
+else
+  ac_cv_rdynamic=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_rdynamic" >&5
+$as_echo "$ac_cv_rdynamic" >&6; }
+    LDFLAGS="$save_ldflags"
+
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking compiler flags for building loadable modules" >&5
+$as_echo_n "checking compiler flags for building loadable modules... " >&6; }
+    LDMODULEFLAGS=-shared
+    SOSUFFIX=so
+    if test "x$ac_have_dynamic_linking" = xyes; then
+        if echo "$ac_cv_target" | grep apple-darwin >/dev/null 2>&1; then
+            LDMODULEFLAGS='-dynamiclib -flat_namespace -undefined suppress'
+            SOSUFFIX=dylib
+        fi
+    fi
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LDMODULEFLAGS" >&5
+$as_echo "$LDMODULEFLAGS" >&6; }
+
+
+
+    if test "$HOST_TOOLS" != host -a "$enable_tools" != no; then
+
+    saver="CXX='$CXX' CXXCPP='$CXXCPP' ac_cv_header_dlfcn_h='$ac_cv_header_dlfcn_h' ac_cv_func_dlopen='$ac_cv_func_dlopen' ac_cv_lib_dl_dlopen='$ac_cv_lib_dl_dlopen'"
+    CXX="$BUILD_CXX"; CXXCPP="$BUILD_CXX -E"
+    unset ac_cv_header_dlfcn_h ac_cv_func_dlopen ac_cv_lib_dl_dlopen
+    BUILD_DL_LIBS=
+    for ac_header in dlfcn.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "dlfcn.h" "ac_cv_header_dlfcn_h" "$ac_includes_default"
+if test "x$ac_cv_header_dlfcn_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_DLFCN_H 1
+_ACEOF
+ ac_build_have_dlfcn_h=yes
+else
+  ac_build_have_dlfcn_h=no
+fi
+
+done
+
+    ac_fn_cxx_check_func "$LINENO" "dlopen" "ac_cv_func_dlopen"
+if test "x$ac_cv_func_dlopen" = xyes; then :
+  ac_build_have_dlopen=yes
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen in -ldl" >&5
+$as_echo_n "checking for dlopen in -ldl... " >&6; }
+if ${ac_cv_lib_dl_dlopen+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-ldl  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dlopen ();
+int
+main ()
+{
+return dlopen ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_dl_dlopen=yes
+else
+  ac_cv_lib_dl_dlopen=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_dl_dlopen" >&5
+$as_echo "$ac_cv_lib_dl_dlopen" >&6; }
+if test "x$ac_cv_lib_dl_dlopen" = xyes; then :
+  ac_build_have_dlopen=yes; BUILD_DL_LIBS="-ldl"
+else
+  ac_have_dlopen=no
+fi
+
+fi
+
+    if test "x$ac_build_have_dlopen" = xyes -a "x$ac_build_have_dlfcn_h" = xyes; then
+        ac_build_have_dynamic_linking=yes
+    fi
+
+    BUILD_DL_LDFLAGS=
+    save_ldflags="$LDFLAGS"; LDFLAGS="$LDFLAGS -rdynamic"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether linker accepts the -rdynamic flag" >&5
+$as_echo_n "checking whether linker accepts the -rdynamic flag... " >&6; }
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+return 0;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_build_rdynamic=yes; BUILD_DL_LDFLAGS=-rdynamic
+else
+  ac_cv_build_rdynamic=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_build_rdynamic" >&5
+$as_echo "$ac_cv_build_rdynamic" >&6; }
+    LDFLAGS="$save_ldflags"
+
+
+    if test "x$ac_build_have_dynamic_linking" != "x$ac_have_dynamic_linking"; then
+        as_fn_error $? "
+=========================================
+
+You have configured Click with '--enable-dynamic-linking', which requires
+that both the build system and host system support dynamic linking.
+Try running 'configure' with the '--disable-dynamic-linking' option.
+
+=========================================" "$LINENO" 5
+    fi
+
+    eval "$saver"
+
+    fi
+    CLICK_SHARED=1
+else
+    CLICK_SHARED=0
+fi
+
+
 # Check whether --enable-dpdk was given.
 if test "${enable_dpdk+set}" = set; then :
   enableval=$enable_dpdk; :
@@ -7305,6 +7538,12 @@ $as_echo_n "checking for DPDK library... " >&6; }
       rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       rte_ver_major=$rte_ver_year
+      if "$(CLICK_SHARED)" -eq 1 ; then
+          DPDK_LIBS=$(pkg-config --libs libdpdk)
+      else
+		  DPDK_LIBS=$(pkg-config --static --libs libdpdk)
+      fi
+	  DPDK_CFLAGS=$(pkg-config --cflags libdpdk)
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
     else
@@ -7344,6 +7583,8 @@ $as_echo "yes, found at $RTE_SDK_BIN" >&6; }
         rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
         rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
       fi
+      dpdk_vars=$(cd userlevel/dpdk/ && make RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET RTE_VER_YEAR=$rte_ver_year RTE_VER_MONTH=$rte_ver_month RTE_VER_MAJOR=$rte_ver_major RTE_VER_MINOR=$rte_ver_minor)
+      eval $dpdk_vars
     fi
 
 
@@ -7357,7 +7598,11 @@ $as_echo "yes, found at $RTE_SDK_BIN" >&6; }
 
     RTE_VER_MINOR=$rte_ver_minor
 
-    DPDK_INCLUDES=-I$RTE_INCLUDE
+    DPDK_INCLUDES=-I${RTE_INCLUDE}
+
+    DPDK_LIBS=${DPDK_LIBS}
+
+    DPDK_CFLAGS=${DPDK_CFLAGS}
 
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
@@ -7403,6 +7648,8 @@ if test "x$enable_dpdk_xchg" = "xyes"; then
     $as_echo "#define HAVE_DPDK_XCHG 1" >>confdefs.h
 
     HAVE_DPDK_XCHG=y
+
+    DPDK_LIBS=$(echo "$DPDK_LIBS" | sed -e "s/-lrte_xchg_mbuf//")
 
 fi
 
@@ -10024,237 +10271,6 @@ $as_echo "#define HAVE_EV_SET_UDATA_POINTER 1" >>confdefs.h
 
     fi
 fi
-
-# Check whether --enable-dynamic-linking was given.
-if test "${enable_dynamic_linking+set}" = set; then :
-  enableval=$enable_dynamic_linking; :
-else
-  enable_dynamic_linking=yes
-fi
-
-
-if test "x$enable_dynamic_linking" = xyes; then
-
-
-
-    DL_LIBS=
-
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen in -ldl" >&5
-$as_echo_n "checking for dlopen in -ldl... " >&6; }
-if ${ac_cv_lib_dl_dlopen+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-ldl  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char dlopen ();
-int
-main ()
-{
-return dlopen ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_cxx_try_link "$LINENO"; then :
-  ac_cv_lib_dl_dlopen=yes
-else
-  ac_cv_lib_dl_dlopen=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_dl_dlopen" >&5
-$as_echo "$ac_cv_lib_dl_dlopen" >&6; }
-if test "x$ac_cv_lib_dl_dlopen" = xyes; then :
-  ac_have_dlopen=yes; DL_LIBS="-ldl"
-else
-  ac_fn_cxx_check_func "$LINENO" "dlopen" "ac_cv_func_dlopen"
-if test "x$ac_cv_func_dlopen" = xyes; then :
-  ac_have_dlopen=yes
-else
-  ac_have_dlopen=no
-fi
-
-fi
-
-    if test "x$ac_have_dlopen" = xyes -a "x$ac_cv_header_dlfcn_h" = xyes; then
-
-$as_echo "#define HAVE_DYNAMIC_LINKING 1" >>confdefs.h
-
-        ac_have_dynamic_linking=yes
-    fi
-
-
-    DL_LDFLAGS=
-    save_ldflags="$LDFLAGS"; LDFLAGS="$LDFLAGS -rdynamic"
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether linker accepts the -rdynamic flag" >&5
-$as_echo_n "checking whether linker accepts the -rdynamic flag... " >&6; }
-    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-return 0;
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_cxx_try_link "$LINENO"; then :
-  ac_cv_rdynamic=yes; DL_LDFLAGS=-rdynamic
-else
-  ac_cv_rdynamic=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_rdynamic" >&5
-$as_echo "$ac_cv_rdynamic" >&6; }
-    LDFLAGS="$save_ldflags"
-
-
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking compiler flags for building loadable modules" >&5
-$as_echo_n "checking compiler flags for building loadable modules... " >&6; }
-    LDMODULEFLAGS=-shared
-    SOSUFFIX=so
-    if test "x$ac_have_dynamic_linking" = xyes; then
-        if echo "$ac_cv_target" | grep apple-darwin >/dev/null 2>&1; then
-            LDMODULEFLAGS='-dynamiclib -flat_namespace -undefined suppress'
-            SOSUFFIX=dylib
-        fi
-    fi
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LDMODULEFLAGS" >&5
-$as_echo "$LDMODULEFLAGS" >&6; }
-
-
-
-    if test "$HOST_TOOLS" != host -a "$enable_tools" != no; then
-
-    saver="CXX='$CXX' CXXCPP='$CXXCPP' ac_cv_header_dlfcn_h='$ac_cv_header_dlfcn_h' ac_cv_func_dlopen='$ac_cv_func_dlopen' ac_cv_lib_dl_dlopen='$ac_cv_lib_dl_dlopen'"
-    CXX="$BUILD_CXX"; CXXCPP="$BUILD_CXX -E"
-    unset ac_cv_header_dlfcn_h ac_cv_func_dlopen ac_cv_lib_dl_dlopen
-    BUILD_DL_LIBS=
-    for ac_header in dlfcn.h
-do :
-  ac_fn_cxx_check_header_mongrel "$LINENO" "dlfcn.h" "ac_cv_header_dlfcn_h" "$ac_includes_default"
-if test "x$ac_cv_header_dlfcn_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_DLFCN_H 1
-_ACEOF
- ac_build_have_dlfcn_h=yes
-else
-  ac_build_have_dlfcn_h=no
-fi
-
-done
-
-    ac_fn_cxx_check_func "$LINENO" "dlopen" "ac_cv_func_dlopen"
-if test "x$ac_cv_func_dlopen" = xyes; then :
-  ac_build_have_dlopen=yes
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen in -ldl" >&5
-$as_echo_n "checking for dlopen in -ldl... " >&6; }
-if ${ac_cv_lib_dl_dlopen+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-ldl  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char dlopen ();
-int
-main ()
-{
-return dlopen ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_cxx_try_link "$LINENO"; then :
-  ac_cv_lib_dl_dlopen=yes
-else
-  ac_cv_lib_dl_dlopen=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_dl_dlopen" >&5
-$as_echo "$ac_cv_lib_dl_dlopen" >&6; }
-if test "x$ac_cv_lib_dl_dlopen" = xyes; then :
-  ac_build_have_dlopen=yes; BUILD_DL_LIBS="-ldl"
-else
-  ac_have_dlopen=no
-fi
-
-fi
-
-    if test "x$ac_build_have_dlopen" = xyes -a "x$ac_build_have_dlfcn_h" = xyes; then
-        ac_build_have_dynamic_linking=yes
-    fi
-
-    BUILD_DL_LDFLAGS=
-    save_ldflags="$LDFLAGS"; LDFLAGS="$LDFLAGS -rdynamic"
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether linker accepts the -rdynamic flag" >&5
-$as_echo_n "checking whether linker accepts the -rdynamic flag... " >&6; }
-    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-return 0;
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_cxx_try_link "$LINENO"; then :
-  ac_cv_build_rdynamic=yes; BUILD_DL_LDFLAGS=-rdynamic
-else
-  ac_cv_build_rdynamic=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_build_rdynamic" >&5
-$as_echo "$ac_cv_build_rdynamic" >&6; }
-    LDFLAGS="$save_ldflags"
-
-
-    if test "x$ac_build_have_dynamic_linking" != "x$ac_have_dynamic_linking"; then
-        as_fn_error $? "
-=========================================
-
-You have configured Click with '--enable-dynamic-linking', which requires
-that both the build system and host system support dynamic linking.
-Try running 'configure' with the '--disable-dynamic-linking' option.
-
-=========================================" "$LINENO" 5
-    fi
-
-    eval "$saver"
-
-    fi
-    CLICK_SHARED=1
-else
-    CLICK_SHARED=0
-fi
-
 
 
 ac_ext=c
