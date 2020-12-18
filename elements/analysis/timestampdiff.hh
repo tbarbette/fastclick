@@ -68,7 +68,7 @@ public:
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
     static int handler(int operation, String &data, Element *element,
-            const Handler *handler, ErrorHandler *errh) CLICK_COLD;
+    const Handler *handler, ErrorHandler *errh) CLICK_COLD;
 
     void push(int, Packet *);
 #if HAVE_BATCH

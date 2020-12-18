@@ -649,6 +649,7 @@ void
 AggregateIPFlows::add_handlers()
 {
     add_write_handler("clear", write_handler, H_CLEAR);
+    add_data_handlers("next", Handler::f_read, &_next);
 }
 
 ELEMENT_REQUIRES(AggregateNotifier)

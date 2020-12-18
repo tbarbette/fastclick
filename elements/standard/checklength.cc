@@ -34,6 +34,16 @@ CheckLength::configure(Vector<String> &conf, ErrorHandler *errh)
                 .complete();
 }
 
+Packet*
+CheckLength::pull(int) {
+    Packet* p = input(0).pull();
+    if (p && (p->length() + (_use_extra_length ? EXTRA_LENGTH_ANNO(p) : 0)) > _max) {
+      checked_output_push(1, p);
+      return 0;
+    } else
+      return p;
+}
+
 void
 CheckLength::push(int, Packet *p)
 {
@@ -43,16 +53,32 @@ CheckLength::push(int, Packet *p)
     output(0).push(p);
 }
 
-Packet *
-CheckLength::pull(int)
+#if HAVE_BATCH
+PacketBatch *
+CheckLength::pull_batch(int,unsigned max)
 {
-  Packet *p = input(0).pull();
-  if (p && (p->length() + (_use_extra_length ? EXTRA_LENGTH_ANNO(p) : 0)) > _max) {
-    checked_output_push(1, p);
-    return 0;
-  } else
-    return p;
+  PacketBatch *batch = input(0).pull_batch(max);
+    auto fn = [this](Packet*p){
+      if (p->length() + (_use_extra_length ? EXTRA_LENGTH_ANNO(p) : 0) > _max)
+        return 1;
+      else
+        return 0;
+    };
+  CLASSIFY_EACH_PACKET(2,fn,batch,checked_output_push);
 }
+
+void
+CheckLength::push_batch(int, PacketBatch *batch)
+{
+    auto fn = [this](Packet*p){
+      if (p->length() + (_use_extra_length ? EXTRA_LENGTH_ANNO(p) : 0) > _max)
+        return 1;
+      else
+        return 0;
+    };
+    CLASSIFY_EACH_PACKET(2,fn,batch,checked_output_push);
+}
+#endif
 
 void
 CheckLength::add_handlers()

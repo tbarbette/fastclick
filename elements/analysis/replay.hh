@@ -182,6 +182,7 @@ inline bool ReplayBase::load_packets() {
 
         click_chatter("%s : Successfully loaded %d packets. Input %d dried out.",name().c_str(),count,dry);
 
+        queue_tail->set_next(0);
         //Clean left overs
         for (int i = 0; i < ninputs(); i++) {
             if (p_input[i])
@@ -210,7 +211,7 @@ inline void ReplayBase::check_end_loop(Task* t, bool force_time) {
                 _stop = 0;
             } else {
                 if (_verbose)
-                    click_chatter("Replay continue after %d seconds",_stop_time);
+                    click_chatter("Replay continue after %d/%d seconds",diff,_stop_time);
             }
         }
         if (_stop == 0) {
