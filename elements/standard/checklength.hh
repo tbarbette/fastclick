@@ -1,6 +1,6 @@
 #ifndef CLICK_CHECKLENGTH_HH
 #define CLICK_CHECKLENGTH_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -19,7 +19,7 @@ no larger than LENGTH, it is sent to output 0; otherwise, it is sent to
 output 1 (or dropped if there is no output 1).
 */
 
-class CheckLength : public Element { public:
+class CheckLength : public BatchElement { public:
 
   CheckLength() CLICK_COLD;
 
@@ -27,10 +27,14 @@ class CheckLength : public Element { public:
   const char *port_count() const override		{ return PORTS_1_1X2; }
   const char *processing() const override		{ return PROCESSING_A_AH; }
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+  int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
 
-  void push(int, Packet *);
-  Packet *pull(int);
+  void push(int, Packet *) override;
+  Packet *pull(int) override;
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch *) override;
+  PacketBatch *pull_batch(int, unsigned) override;
+#endif
 
   void add_handlers() CLICK_COLD;
 
