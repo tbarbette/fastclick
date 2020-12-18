@@ -159,7 +159,7 @@ Specializer::read_source(ElementTypeInfo &etinfo, ErrorHandler *errh)
 
   // now, read source for the element class's parents
   CxxClass *cxxc = _cxxinfo.find_class(etinfo.cxx_name);
-  cxxc->print_function_list();
+  //cxxc->print_function_list();
   if (cxxc)
     for (int i = 0; i < cxxc->nparents(); i++) {
       const String &p = cxxc->parent(i)->name();
@@ -399,7 +399,7 @@ Specializer::do_simple_action(SpecializedClass &spc)
 #if HAVE_BATCH
   CxxFunction *simple_action_batch = spc.cxxc->find("simple_action_batch");
   if (!simple_action_batch) {
-     click_chatter("Auto-generating simple_action_batch for class %s", spc.old_click_name.c_str());
+     //click_chatter("Auto-generating simple_action_batch for class %s", spc.old_click_name.c_str());
      spc.cxxc->defun
        (CxxFunction("smactionbatch", false, "inline PacketBatch *", "(PacketBatch *batch)",
          "EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction, batch, [](Packet*){});return batch;", ""));
@@ -799,9 +799,9 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
     if (create_class(_specials[s])) {
 
       /* Unroll the for loop after rte_eth_rx_burst in FromDPDKDevice */
-      if(_do_unroll) {
-          _specials[s].cxxc->print_function_list();
-       if (_specials[s].cxxc->find("run_task")) {
+      if (_do_unroll) {
+          //_specials[s].cxxc->print_function_list();
+          if (_specials[s].cxxc->find("run_task")) {
                         if(_specials[s].cxxc->name().find_left("FromDPDKDevice")>=0) {
                           unroll_run_task(_specials[s]);
                         }

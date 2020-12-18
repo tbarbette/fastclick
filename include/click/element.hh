@@ -81,9 +81,9 @@ class Element { public:
           of = 0;
       }
     void* m = aligned_alloc(alignof(Element), sz + of);
-    click_chatter("EALLOC %d OF %d AL %d", sz, of, alignof(Element) );
+    //click_chatter("EALLOC %d OF %d AL %d", sz, of, alignof(Element) );
 
-    click_chatter("RESULT-EL%d %d", nalloc++, of );
+    //click_chatter("RESULT-EL%d %d", nalloc++, of );
 
     // Generate an interrupt
 // std::raise(SIGINT);

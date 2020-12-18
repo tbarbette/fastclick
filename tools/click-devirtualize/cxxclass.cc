@@ -259,7 +259,7 @@ CxxFunction::find_assignment(const String symbol, int stop_at) {
     int start_at = 0;
     String val;
 
-    click_chatter("Searching assignment for %s...", symbol.c_str());
+    //click_chatter("Searching assignment for %s...", symbol.c_str());
 again:
     int pos1, pos2,pos3, match_pos[10], match_len[10];
     if (!find_expr(symbol, &pos1, &pos2, match_pos, match_len, false, false, start_at, stop_at))
@@ -280,7 +280,7 @@ again:
         } while (c != ';' && c != '\n');
 
         val = _body.substring(pos2, pos3 - pos2 - 1 ).trim();
-        click_chatter("Found assignment for %s : '%s'", symbol.c_str(), val.c_str());
+        //click_chatter("Found assignment for %s : '%s'", symbol.c_str(), val.c_str());
     }
     start_at = pos3;
     n++;
@@ -360,7 +360,7 @@ CxxFunction::replace_call(const String &pattern, const String &replacement, Vect
           i++;
       }
 
-      click_chatter("Found %s pos %d pos %d match %d %d : %s",pattern.c_str(), pos1, pos2, match_pos[0], match_len[0], _body.substring(pos1, pos2 - pos1).c_str());
+      //click_chatter("Found %s pos %d pos %d match %d %d : %s",pattern.c_str(), pos1, pos2, match_pos[0], match_len[0], _body.substring(pos1, pos2 - pos1).c_str());
       //fprintf(stderr, ":::::: %s\n", _body.c_str());
 
       StringAccum sa, clean_sa;
@@ -816,7 +816,7 @@ CxxInfo::parse_function_definition(const String &text, int fn_start_p,
         p++;
   }
   if (p >= len || s[p] != '{') {
-      click_chatter("No body :(");
+      //click_chatter("No body :(");
       return p;
   }
 
@@ -844,7 +844,7 @@ CxxInfo::parse_function_definition(const String &text, int fn_start_p,
     if (p > fn_start_p && s[p] == ':') // nested class fns uninteresting
       return close_brace_p;
     class_name = original.substring(p + 1, end_class_name_p - (p + 1));
-    click_chatter("Class name %s", class_name.c_str());
+    //click_chatter("Class name %s", class_name.c_str());
   }
 
   // find return type; skip access control declarations, cut space from end
@@ -889,9 +889,9 @@ CxxInfo::parse_function_definition(const String &text, int fn_start_p,
       (CxxFunction(fn_name, !class_name, ret_type, args,
            original.substring(body_pos, body_len),
            text.substring(body_pos, body_len)));
-  } else
-      click_chatter("Not relevant:(");
-
+  } else {
+      //click_chatter("Not relevant:(");
+  }
   // done
   return close_brace_p;
 }
@@ -936,7 +936,7 @@ CxxInfo::parse_class_definition(const String &text, int p,
       p++;
     if (p > p1 && (p != p1 + 6 || strncmp(s+p1, "public", 6) != 0)) {
       // XXX private or protected inheritance?
-     click_chatter("Parent %s", original.substring(p1, p - p1).c_str());
+     //click_chatter("Parent %s", original.substring(p1, p - p1).c_str());
       CxxClass *parent = make_class(original.substring(p1, p - p1));
     //Parse template parameters
       String params = "";
@@ -956,7 +956,7 @@ CxxInfo::parse_class_definition(const String &text, int p,
 
   // parse class body
   int c = parse_class(text, p + 1, original, cxxc);
-  cxxc->print_function_list();
+  //cxxc->print_function_list();
   return c;
 }
 
@@ -967,7 +967,7 @@ CxxInfo::parse_class(const String &text, int p, const String &original,
   // parse clean_text
   const char *s = text.data();
   int len = text.length();
-    click_chatter("Parsing class at %d [%c]",p,text[p]);
+//click_chatter("Parsing class at %d [%c]",p,text[p]);
   while (1) {
 
     // find first batch
@@ -980,7 +980,6 @@ CxxInfo::parse_class(const String &text, int p, const String &original,
 
     //fprintf(stderr, "   %d %c\n", p, s[p]);
     if (p >= len) {
-        click_chatter("End");
       return len;
     }
     else if (s[p] == ';') {
@@ -997,13 +996,13 @@ CxxInfo::parse_class(const String &text, int p, const String &original,
       && (strncmp(s+p1, "class", 5) == 0
           || strncmp(s+p1, "struct", 6) == 0)) {
         // parse class definition
-            click_chatter("Parsing definition at %d of %s", p1 + 6, text.substring(p1+6, 20).c_str());
+            //click_chatter("Parsing definition at %d of %s", p1 + 6, text.substring(p1+6, 20).c_str());
         p = parse_class_definition(text, p1 + 6, original, child_cxx);
             //      click_chatter("Subclass %s", text.substring(p1+6,p-p1-6).c_str() );
       } else if (p > p1 + 8 && !cxx_class
       && (strncmp(s+p1, "template", 8) == 0)) {
 
-        click_chatter("Parsing template definition at %d of %s", p1, text.substring(p1, text.substring(p1).find_left('\n')).c_str());
+        //click_chatter("Parsing template definition at %d of %s", p1, text.substring(p1, text.substring(p1).find_left('\n')).c_str());
         int p2 = p1+8;
 
         while (p2 < len && isspace((unsigned char) s[p2])) p2++;
@@ -1014,7 +1013,7 @@ CxxInfo::parse_class(const String &text, int p, const String &original,
         while (p1 < len && isspace((unsigned char) s[p1])) p1++;
         p = parse_class_definition(s, p1 + 6, original, child_cxx);
         if (child_cxx) {
-            click_chatter("Class %s had tmpl param %s", child_cxx->name().c_str(), tmpl.c_str());
+            //click_chatter("Class %s had tmpl param %s", child_cxx->name().c_str(), tmpl.c_str());
             child_cxx->set_template(tmpl);;
         }
 
@@ -1023,7 +1022,7 @@ CxxInfo::parse_class(const String &text, int p, const String &original,
 
     p = skip_balanced_braces(text, p);
     } else if (s[p] == '(') {
-        click_chatter("Parse fun %s",text.substring(p1,p-p1).c_str());
+        //click_chatter("Parse fun %s",text.substring(p1,p-p1).c_str());
       p = parse_function_definition(text, p1, p, original, cxx_class);
     }
 
@@ -1122,8 +1121,10 @@ void CxxClass::print_function_list() {
 CxxFunction*
 CxxClass::find_in_parent(const String& name, const String& outer_class) {
     for (int i = 0; i < nparents(); i++) {
+        /*
         click_chatter("Searching %s in %s", name.c_str(), parent(i)->name().c_str());
         parent(i)->print_function_list();
+        */
         CxxFunction* f = parent(i)->find(name);
         if (!f)
             f = parent(i)->find_in_parent(name, outer_class);
@@ -1144,10 +1145,10 @@ CxxClass::find_in_parent(const String& name, const String& outer_class) {
                     arg = arg.substring(arg.find_left(' ') + 1);
                     String val = vals[i].trim();
                     if (val == this->name()) {
-                        click_chatter("CRTP detected, replacing with uttermost");
+                        //click_chatter("CRTP detected, replacing with uttermost");
                         val = outer_class;
                     }
-                    click_chatter("Replacing %s with %s",arg.c_str(),val.c_str());
+                    //click_chatter("Replacing %s with %s",arg.c_str(),val.c_str());
                     c->replace_expr(arg,val,true,true);
                 }
                 return c;
