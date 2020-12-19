@@ -124,6 +124,7 @@ bool FlowIPManagerIMP::run_task(Task* t)
         return next;
     });
     return true;*/
+    return false;
 }
 
 void FlowIPManagerIMP::run_timer(Timer* t)
