@@ -36,6 +36,7 @@ class FromFile { public:
     void take_state(FromFile &, ErrorHandler *);
 
     int seek(off_t want, ErrorHandler *);
+    int reset(off_t want, ErrorHandler *);
 
     int read(void*, uint32_t, ErrorHandler * = 0);
     const uint8_t* get_unaligned(size_t, void*, ErrorHandler* = 0);

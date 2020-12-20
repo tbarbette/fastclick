@@ -173,8 +173,9 @@ FromFile::read_buffer_mmap(ErrorHandler *errh)
 int
 FromFile::read_buffer(ErrorHandler *errh)
 {
-    if (_data_packet)
+    if (_data_packet) {
 	_data_packet->kill();
+    }
     _data_packet = 0;
 
     _file_offset += _len;
@@ -182,8 +183,10 @@ FromFile::read_buffer(ErrorHandler *errh)
 				// beyond _len
     _len = 0;
 
-    if (_fd < 0)
+    if (_fd < 0) {
+        click_chatter("Could not read fd");
 	return _fd == -1 ? -EBADF : _len;
+    }
 
 #ifdef ALLOW_MMAP
     if (_mmap) {
@@ -245,18 +248,21 @@ FromFile::read_line(String &result, ErrorHandler *errh, bool temporary)
     // first, try to read a line from the current buffer
     const unsigned char *s = _buffer + _pos;
     const unsigned char *e = _buffer + _len;
-    while (s < e && *s != '\n' && *s != '\r')
-	s++;
+
+    while (s < e && *s != '\n' && *s != '\r') {
+	    s++;
+    }
+
     if (s < e && (*s == '\n' || s + 1 < e)) {
-	s += (*s == '\r' && s[1] == '\n' ? 2 : 1);
-	int new_pos = s - _buffer;
-	if (temporary)
-	    result = String::make_stable((const char *) (_buffer + _pos), new_pos - _pos);
-	else
-	    result = String((const char *) (_buffer + _pos), new_pos - _pos);
-	_pos = new_pos;
-	_lineno++;
-	return 1;
+        s += (*s == '\r' && s[1] == '\n' ? 2 : 1);
+        int new_pos = s - _buffer;
+        if (temporary)
+            result = String::make_stable((const char *) (_buffer + _pos), new_pos - _pos);
+        else
+            result = String((const char *) (_buffer + _pos), new_pos - _pos);
+        _pos = new_pos;
+        _lineno++;
+        return 1;
     }
 
     // otherwise, build up a line
@@ -313,6 +319,20 @@ FromFile::peek_line(String &result, ErrorHandler *errh, bool temporary)
 }
 
 int
+FromFile::reset(off_t want, ErrorHandler* errh)
+{
+#ifdef ALLOW_MMAP
+    _mmap_unit = 0;
+#endif
+    _file_offset = 0;
+    _pos = _len = 0;
+    _mmap_off = 0;
+    int result = read_buffer(errh);
+    _pos = want;
+    return result;
+}
+
+int
 FromFile::seek(off_t want, ErrorHandler* errh)
 {
     if (want >= _file_offset && want < (off_t) (_file_offset + _len)) {
@@ -324,6 +344,8 @@ FromFile::seek(off_t want, ErrorHandler* errh)
     if (_mmap) {
 	_mmap_off = (want / _mmap_unit) * _mmap_unit;
 	_pos = _len + want - _mmap_off;
+	_file_offset = 0; // Is that correct?
+	// TODO: fix lineno
 	return 0;
     }
 #endif
