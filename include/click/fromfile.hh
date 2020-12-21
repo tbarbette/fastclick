@@ -57,11 +57,15 @@ class FromFile { public:
     enum { BUFFER_SIZE = 32768 };
 
     int _fd;
-    const uint8_t *_buffer;
     uint32_t _pos;
     uint32_t _len;
 
+#if !CLICK_PACKET_USE_DPDK
     WritablePacket *_data_packet;
+    const uint8_t *_buffer;
+#else
+    unsigned char _buffer[BUFFER_SIZE];
+#endif
 
 #ifdef ALLOW_MMAP
     bool _mmap;

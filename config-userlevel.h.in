@@ -352,7 +352,7 @@ typedef unsigned long uintptr_t;
 #endif
 
 /* Define if mmap is allowed. */
-#if defined(HAVE_SYS_MMAN_H) && defined(HAVE_MMAP)
+#if defined(HAVE_SYS_MMAN_H) && defined(HAVE_MMAP) && !CLICK_PACKET_USE_DPDK
 # define ALLOW_MMAP 1
 #endif
 
