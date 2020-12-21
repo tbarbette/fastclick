@@ -256,7 +256,7 @@ public:
 
     inline static rte_mbuf* get_pkt(unsigned numa_node);
     inline static rte_mbuf* get_pkt();
-    inline static struct rte_mbuf* get_mbuf(Packet* p, bool create, int node);
+    inline static struct rte_mbuf* get_mbuf(Packet* p, bool create, int node, bool reset = true);
 
     static void free_pkt(unsigned char *, size_t, void *pktmbuf);
 
@@ -432,12 +432,12 @@ template<> struct DefaultArg<FlowControlMode> : public FlowControlModeArg {};
  *     If compiled with CLICK_PACKET_USE_DPDK, it will simply return the packet
  *     casted as it's already a DPDK buffer.
  */
-inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node) {
+inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node, bool reset) {
     struct rte_mbuf* mbuf;
     #if CLICK_PACKET_USE_DPDK
     mbuf = p->mb();
     #else
-    if (likely(DPDKDevice::is_dpdk_packet(p) && (mbuf = (struct rte_mbuf *) p->destructor_argument()))
+    if (likely(DPDKDevice::is_dpdk_packet(p) && (mbuf = (struct rte_mbuf *)((unsigned char*) p->buffer() - sizeof(rte_mbuf)) ))
         || unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument()))) {
         /* If the packet is an unshared DPDK packet, we can send
          *  the mbuf as it to DPDK*/
@@ -450,7 +450,8 @@ inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node) {
             rte_mbuf_refcnt_update(mbuf, 1);
         } else {
             //Reset buffer, let DPDK free the buffer when it wants
-            p->reset_buffer();
+            if (reset)
+                p->reset_buffer();
         }
     } else {
         if (create) {

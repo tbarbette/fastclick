@@ -10,6 +10,7 @@
 #elif CLICK_PACKET_USE_DPDK
 # include <rte_debug.h>
 # include <rte_mbuf.h>
+# include <click/dpdk_glue.hh>
 #else
 # include <click/atomic.hh>
 #endif
@@ -37,6 +38,7 @@ CLICK_DECLS
 #define HAVE_BATCH_RECYCLE 1
 #endif
 
+class DPDKDevice;
 class IP6Address;
 class WritablePacket;
 class PacketBatch;
@@ -394,9 +396,11 @@ class Packet { public:
     const Anno *xanno() const		{ return (const Anno *)skb()->cb; }
     Anno *xanno()			{ return (Anno *)skb()->cb; }
 #elif CLICK_PACKET_USE_DPDK
-# define ANNO_OFFSET sizeof(struct rte_mbuf)
-    const Anno *xanno() const           { return (const Anno *) ((unsigned char*)this) + ANNO_OFFSET; }
-    Anno *xanno()			{ return (Anno *) ((unsigned char*)this) + ANNO_OFFSET; }
+    # define ANNO_OFFSET sizeof(struct rte_mbuf)
+    const Anno *xanno() const           {
+        return (const Anno *) (((unsigned char*)this) + ANNO_OFFSET); }
+    Anno *xanno()			{
+        return (Anno *) (((unsigned char*)this) + ANNO_OFFSET); }
 
 #else
     inline const Anno *xanno() const		{ return &_aa.cb; }
@@ -813,8 +817,6 @@ class Packet { public:
 	Packet *next;
 	Packet *prev;
 	AllAnno()
-#if !CLICK_PACKET_USE_DPDK
-#endif
 	{
 	}
     };
@@ -881,6 +883,7 @@ private:
 
     friend class WritablePacket;
     friend class PacketBatch;
+    friend class DPDKDevice;
 
 };
 
@@ -1492,7 +1495,7 @@ Packet::timestamp_anno() const
     return *reinterpret_cast<const Timestamp*>(&skb()->tstamp);
 # endif
 #elif CLICK_PACKET_USE_DPDK
-    return all_anno()->timestamp;
+    return *(Timestamp*)&(TIMESTAMP_FIELD(mb()));
 #else
     return *reinterpret_cast<const Timestamp*>(&_aa.timestamp);
 #endif
@@ -1508,7 +1511,7 @@ Packet::timestamp_anno()
     return *reinterpret_cast<Timestamp*>(&skb()->tstamp);
 # endif
 #elif CLICK_PACKET_USE_DPDK
-    return all_anno()->timestamp;
+    return *(Timestamp*)&(TIMESTAMP_FIELD(mb()));
 #else
     return *reinterpret_cast<Timestamp*>(&_aa.timestamp);
 #endif

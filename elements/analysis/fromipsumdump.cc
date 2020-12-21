@@ -78,6 +78,8 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
     unsigned burst = 1;
     bool timestamp = true;
 
+    if (_ff.configure_keywords(conf, this, errh) < 0)
+	return -1;
 
     if (Args(conf, this, errh)
         .read_p("FILENAME", FilenameArg(), _ff.filename())
@@ -172,7 +174,7 @@ FromIPSummaryDump::initialize(ErrorHandler *errh)
     _timer.initialize(this);
     _format_complaint = false;
     if (output_is_push(0))
-    ScheduleInfo::initialize_task(this, &_task, _active, errh);
+        ScheduleInfo::initialize_task(this, &_task, _active, errh);
 
     int e = _ff.initialize(errh, _allow_nonexistent);
     if (e == -ENOENT && _allow_nonexistent)
