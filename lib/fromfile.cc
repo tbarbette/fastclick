@@ -184,8 +184,7 @@ FromFile::read_buffer(ErrorHandler *errh)
     _len = 0;
 
     if (_fd < 0) {
-        click_chatter("Could not read fd");
-	return _fd == -1 ? -EBADF : _len;
+	    return _fd == -1 ? -EBADF : _len;
     }
 
 #ifdef ALLOW_MMAP
