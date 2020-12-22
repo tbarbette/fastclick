@@ -74,6 +74,7 @@ Pipeliner::configure(Vector<String> & conf, ErrorHandler * errh)
     .read("DIRECT_TRAVERSAL",_allow_direct_traversal)
     .read("NOUSELESS",_nouseless)
     .read("VERBOSE",_verbose)
+    .read_or_set("PREFETCH",_prefetch, true)
     .complete() < 0)
         return -1;
 
@@ -151,6 +152,7 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
     }
     int count = head->count();
     retry:
+    //CLWB did not prove helpful here
     if (storage->insert(head)) {
         stats->count += count;
         if (sleepiness >= _sleep_threshold)
@@ -221,6 +223,7 @@ Pipeliner::run_task(Task* t)
         while (!s.is_empty() && n < _burst) {
 #if HAVE_BATCH
             PacketBatch* b = static_cast<PacketBatch*>(s.extract());
+
             if (unlikely(!receives_batch)) {
                 if (out == NULL) {
                     b->set_tail(b);
@@ -238,9 +241,16 @@ Pipeliner::run_task(Task* t)
                     out->append_batch(b);
                 }
             }
+            if (_prefetch) {
+                FOR_EACH_PACKET(out,p) {
+                    __builtin_prefetch(p->data());
+                }
+            }
             //WritablePacket::pool_hint(b->count(),storage.get_mapping(i));
 #else
             Packet* p = s.extract();
+            if (_prefetch)
+                __builtin_prefetch(p->data());
             output(0).push(p);
             //WritablePacket::pool_hint(HINT_THRESHOLD,storage.get_mapping(i));
             r = true;
