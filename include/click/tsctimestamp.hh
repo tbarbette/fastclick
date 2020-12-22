@@ -76,7 +76,7 @@ class TSCTimestamp {
     }
 
     inline operator Timestamp() {
-        return Timestamp::make_nsec((double)val / ((double)cycles_hz() / 1000000000.0d));
+        return Timestamp::make_nsec((double)val / ((double)cycles_hz() / 1000000000.0));
     }
 
 
