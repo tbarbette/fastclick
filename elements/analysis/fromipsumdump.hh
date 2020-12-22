@@ -219,6 +219,7 @@ class FromIPSummaryDump : public BatchElement, public IPSummaryDumpInfo { public
     int _minor_version;
     IPFlowID _given_flowid;
 
+    per_thread<Vector<const unsigned char *>> _args;
     unsigned _burst;
 
     int read_binary(String &, ErrorHandler *);

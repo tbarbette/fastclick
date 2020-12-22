@@ -442,8 +442,8 @@ FromIPSummaryDump::read_packet(ErrorHandler *errh)
     int nfields = 0;
 
     // new code goes here
+    auto &args = *_args;
     if (_binary) {
-        Vector<const unsigned char *> args;
         int nbytes;
         for (const IPSummaryDump::FieldReader * const *fp = _fields.begin(); fp != _fields.end(); ++fp) {
             if (!(*fp)->inb)
@@ -532,6 +532,7 @@ FromIPSummaryDump::read_packet(ErrorHandler *errh)
             }
         }
     }
+    args.clear();
 
     if (!nfields) {    // bad format
     if (!_format_complaint) {
