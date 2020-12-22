@@ -72,9 +72,9 @@ RecordTimestamp::rmaction(Packet *p) {
             }
             _timestamps.resize(_timestamps.size() == 0? _timestamps.capacity():_timestamps.size() * 2, Timestamp::uninitialized_t());
         }
-        _timestamps.unchecked_at(i) = Timestamp::now_steady();
+        _timestamps.unchecked_at(i) = TimestampT::now_steady();
     } else {
-        _timestamps.push_back(Timestamp::now_steady());
+        _timestamps.push_back(TimestampT::now_steady());
     }
 }
 

@@ -241,11 +241,11 @@ void TimestampDiff::add_handlers()
 
 inline int TimestampDiff::smaction(Packet *p)
 {
-    Timestamp now = Timestamp::now_steady();
+    TimestampT now = TimestampT::now_steady();
     uint64_t i = NumberPacket::read_number_of_packet(p, _offset, _net_order);
-    Timestamp old = get_recordtimestamp_instance()->get(i);
+    TimestampT old = get_recordtimestamp_instance()->get(i);
 
-    if (old == Timestamp::uninitialized_t()) {
+    if (old == TimestampT::uninitialized_t()) {
         return 1;
     }
 
@@ -255,12 +255,13 @@ inline int TimestampDiff::smaction(Packet *p)
         }
     }
 
-    Timestamp diff = now - old;
-    if ((diff.msecval() > _max_delay_ms)) {
+    TimestampT diff = now - old;
+    uint32_t usec = diff.usecval();
+    if ((usec > _max_delay_ms * 1000)) {
         if (_verbose) {
             click_chatter(
                 "Packet %" PRIu64 " experienced delay %u ms > %u ms",
-                i, (diff.sec() * 1000000 + diff.usec())/1000, _max_delay_ms
+                i, (usec)/1000, _max_delay_ms
             );
         }
     }
@@ -271,9 +272,9 @@ inline int TimestampDiff::smaction(Packet *p)
             tc = p->data()[_tc_offset] & _tc_mask;
         }
         if (_limit) {
-            _delays[next_index] = {diff.usec(),tc};
+            _delays[next_index] = {usec,tc};
         } else {
-            _delays.push_back({diff.usec(),tc});
+            _delays.push_back({usec,tc});
         }
     }
     return 0;
