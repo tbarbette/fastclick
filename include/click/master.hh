@@ -157,11 +157,16 @@ TimerSet::next_timer_delay(bool more_tasks, Timestamp &t) const
     t = timer_expiry_steady_adjusted();
     if (!t)
         return -1;              // block forever
+#if TIMESTAMP_WARPABLE
     else if (unlikely(Timestamp::warp_jumping())) {
         Timestamp::warp_jump_steady(t);
         return 0;
-    } else if ((t -= Timestamp::now_steady(), !t.is_negative())) {
+    }
+#endif
+    else if ((t -= Timestamp::now_steady(), !t.is_negative())) {
+#if TIMESTAMP_WARPABLE
         t = t.warp_real_delay();
+#endif
         return 1;
     } else
         return 0;

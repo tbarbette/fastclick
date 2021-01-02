@@ -863,6 +863,7 @@ with_freebsd
 enable_smaller_code
 enable_int64
 enable_nanotimestamp
+enable_simtime
 enable_user_timestamp
 enable_bound_port_transfer
 enable_tools
@@ -1589,6 +1590,7 @@ Optional Features:
   --enable-smaller-code   generate smaller code (sometimes slower)
   --disable-int64         disable 64-bit integer support
   --enable-nanotimestamp  enable nanosecond timestamps
+  --enable-simtime        enable support for simulated timing
   --enable-user-timestamp enable support for user-provided clock system
   --enable-bound-port-transfer
                           enable port transfer function ptr optimization
@@ -9468,6 +9470,15 @@ if test "x$enable_nanotimestamp" = xyes; then
 $as_echo "#define HAVE_NANOTIMESTAMP_ENABLED 1" >>confdefs.h
 
 fi
+
+# Check whether --enable-simtime was given.
+if test "${enable_simtime+set}" = set; then :
+  enableval=$enable_simtime; $as_echo "#define HAVE_SIMTIME 1" >>confdefs.h
+
+else
+  enable_simtime=no
+fi
+
 
 # Check whether --enable-user_timestamp was given.
 if test "${enable_user_timestamp+set}" = set; then :
