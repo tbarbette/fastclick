@@ -40,10 +40,10 @@ finished :: Script(TYPE PASSIVE, wait 100ms, read diff.average, read diff.averag
 
 %expect stderr
 diff.average:
-1022.8
+{{1020.8|1022.8}}
 diff.average:
-1022.8
+{{1020.8|1022.8}}
 diff.average:
-1035
+{{1035|1033}}
 counter.count:
 10
