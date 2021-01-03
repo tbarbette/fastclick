@@ -104,7 +104,7 @@ const TimestampT read_timestamp = TimestampUnread;
 
 inline TimestampT RecordTimestamp::get(uint64_t i) {
     if (i >= (unsigned)_timestamps.size()) {
-        click_chatter("%p{element}: Index %d is out of range !", this, i);
+        click_chatter("%p{element}: Index %lu is out of range !", this, i);
         return TimestampT::uninitialized_t();
     }
     TimestampT t = _timestamps[i];
