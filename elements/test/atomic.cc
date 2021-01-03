@@ -64,14 +64,14 @@ static void test_32(ErrorHandler *errh)
 #else
     a=11;
     u = a.compare_swap(0,2);
-    click_chatter("[19] a=%i, u=%i -> %s", a, u,  a==11 && u==11 ? "PASS" : "FAIL");
+    click_chatter("[19] a=%u, u=%u -> %s", a, u,  a==11 && u==11 ? "PASS" : "FAIL");
     u = a.compare_swap(11,5);
-    click_chatter("[20] a=%i, u=%i -> %s", a, u,  a==5 && u==11 ? "PASS" : "FAIL");
+    click_chatter("[20] a=%u, u=%u -> %s", a, u,  a==5 && u==11 ? "PASS" : "FAIL");
     b=5;
     u = atomic_uint32_t::compare_swap(b,0,2);
-    click_chatter("[21] b=%i, u=%i -> %s", b, u,  b==5 && u==5 ? "PASS" : "FAIL");
+    click_chatter("[21] b=%u, u=%u -> %s", b, u,  b==5 && u==5 ? "PASS" : "FAIL");
     u = atomic_uint32_t::compare_swap(b,5,2);
-    click_chatter("[22] b=%i, u=%i -> %s", b, u,  b==2 && u==5 ? "PASS" : "FAIL");
+    click_chatter("[22] b=%u, u=%u -> %s", b, u,  b==2 && u==5 ? "PASS" : "FAIL");
 #endif
 }
 
