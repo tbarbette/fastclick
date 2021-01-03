@@ -765,8 +765,8 @@ inline click_cycles_t cycles_hz() {
 #endif
     if (click_cycles_hz == 0) {
         click_cycles_t tsc_freq = click_get_cycles();
-        sleep(1);
-        click_cycles_hz = click_get_cycles() - tsc_freq;
+        usleep(100000);
+        click_cycles_hz = (click_get_cycles() - tsc_freq) * 10;
     }
     return click_cycles_hz;
 }

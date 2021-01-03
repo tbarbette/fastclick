@@ -11,7 +11,7 @@ CLICK_DECLS
 
 class NumberPacket;
 #define TimestampT TSCTimestamp
-#define TimestampUnread TSCTimestamp::make_msec(1)
+#define TimestampUnread TSCTimestamp(1)
 //#define TimestampT Timestamp
 //#define TimestampUnread TSCTimestamp::make_usec(1)
 /*
