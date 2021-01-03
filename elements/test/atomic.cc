@@ -44,29 +44,33 @@ static void test_32(ErrorHandler *errh)
 #pragma GCC diagnostic pop
     uint32_t b =5;
     u = atomic_uint32_t::swap(b,7);
-    click_chatter("[13] b=%i, u=%i -> %s", b, u,  b==7 && u==5 ? "PASS" : "FAIL");
+    click_chatter("[13] b=%i, u=%i -> %s", (uint32_t)b, u,  b==7 && u==5 ? "PASS" : "FAIL");
     atomic_uint32_t::inc(b);
-    click_chatter("[14] b=%i -> %s", b,  b==8 ? "PASS" : "FAIL");
+    click_chatter("[14] b=%i -> %s", (uint32_t)b,  b==8 ? "PASS" : "FAIL");
     u=atomic_uint32_t::dec_and_test(b);
-    click_chatter("[15] b=%i, u=%i -> %s", b, u,  b==7 && u==0 ? "PASS" : "FAIL");
+    click_chatter("[15] b=%i, u=%i -> %s", (uint32_t)b, u,  b==7 && u==0 ? "PASS" : "FAIL");
     b=1;
     u=atomic_uint32_t::dec_and_test(b);
-    click_chatter("[16] b=%i, u=%i -> %s", b, u,  b==0 && u==1 ? "PASS" : "FAIL");
+    click_chatter("[16] b=%i, u=%i -> %s", (uint32_t)b, u,  b==0 && u==1 ? "PASS" : "FAIL");
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
     b=5;
     u = atomic_uint32_t::compare_and_swap(b,0,2);
     click_chatter("[17] b=%i, u=%i -> %s", b, u,  b==5 && u==0 ? "PASS" : "FAIL");
     u = atomic_uint32_t::compare_and_swap(b,5,2);
     click_chatter("[18] b=%i, u=%i -> %s", b, u,  b==2 && u==1 ? "PASS" : "FAIL");
+#pragma GCC diagnostic pop
 
 #if CLICK_ATOMIC_BUILTINS
     click_chatter("[--] Not testing compare_swap!");
 #else
     a=11;
     u = a.compare_swap(0,2);
-    click_chatter("[19] a=%u, u=%u -> %s", a, u,  a==11 && u==11 ? "PASS" : "FAIL");
+    click_chatter("[19] a=%u, u=%u -> %s", (uint32_t)a, u,  a==11 && u==11 ? "PASS" : "FAIL");
     u = a.compare_swap(11,5);
-    click_chatter("[20] a=%u, u=%u -> %s", a, u,  a==5 && u==11 ? "PASS" : "FAIL");
+    click_chatter("[20] a=%u, u=%u -> %s", (uint32_t)a, u,  a==5 && u==11 ? "PASS" : "FAIL");
     b=5;
     u = atomic_uint32_t::compare_swap(b,0,2);
     click_chatter("[21] b=%u, u=%u -> %s", b, u,  b==5 && u==5 ? "PASS" : "FAIL");
