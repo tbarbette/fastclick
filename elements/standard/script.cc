@@ -510,7 +510,6 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
             if (hc.initialize(flags, this, errh) >= 0) {
                 ContextErrorHandler c_errh(errh, "While calling %<%s%>:", hc.unparse().c_str());
                 _write_status = hc.call_write(&c_errh);
-                printf("RET %s\n",hc.value().c_str());
             }
             break;
         }
