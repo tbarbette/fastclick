@@ -84,7 +84,9 @@ class TSCClock : public BatchElement { public:
 
 protected:
   int _verbose;
+#if HAVE_USER_TIMING
   bool _install;
+#endif
   bool _nowait;
   bool _allow_offset;
   bool _convert_steady;

@@ -247,6 +247,9 @@
 /* Define if you use only DPDK buffer as data buffer. */
 #undef HAVE_DPDK_PACKET_POOL
 
+/* Define if DPDK has the read_clock function. */
+#undef HAVE_DPDK_READ_CLOCK
+
 /* Define if a Click user-level driver manages Intel DPDK packet pools. */
 #undef CLICK_PACKET_USE_DPDK
 

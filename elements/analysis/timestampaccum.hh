@@ -57,6 +57,7 @@ class TimestampAccum : public SimpleElement<TimestampAccum> { public:
     uint64_t _count;
     double _min;
     double _max;
+    bool _steady;
 
     static String read_handler(Element *, void *) CLICK_COLD;
     static int reset_handler(const String &, Element *, void *, ErrorHandler *);
