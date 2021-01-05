@@ -14,6 +14,9 @@ CLICK_DECLS
  * Statically binds elements to threads. If more than one StaticThreadSched
  * is specified, they will all run. The one that runs later may override an
  * earlier run.
+ *
+ * If Click is compiled with NUMA support (libnuma was found at configure time) one can use the format socket/core such as 1/3 which will use the 3rd core of the first NUMA socket.
+ *
  * =a
  * ThreadMonitor, BalancedThreadSched
  */

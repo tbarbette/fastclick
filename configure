@@ -716,6 +716,7 @@ RTE_VER_YEAR
 RTE_SDK_BIN
 RTE_TARGET
 RTE_SDK
+RTE_USE_PKGCONFIG
 PTHREAD_LIBS
 HAVE_BATCH
 AR_CREATEFLAGS
@@ -862,6 +863,7 @@ with_freebsd
 enable_smaller_code
 enable_int64
 enable_nanotimestamp
+enable_simtime
 enable_user_timestamp
 enable_bound_port_transfer
 enable_tools
@@ -1546,7 +1548,7 @@ Optional Features:
     --enable-dpdk-pool    use DPDK buffer instead of standard Click buffer
     --enable-dpdk-packet  Click packets are DPDK packet
     --disable-zerocopy    disable Zero Copy
-  --disable-linuxmodule   disable Linux kernel driver
+  --enable-linuxmodule    disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
     --enable-multithread  support kernel multithreading
     --enable-warp9        reduce PollDevice functionality for speed
@@ -1588,6 +1590,7 @@ Optional Features:
   --enable-smaller-code   generate smaller code (sometimes slower)
   --disable-int64         disable 64-bit integer support
   --enable-nanotimestamp  enable nanosecond timestamps
+  --enable-simtime        enable support for simulated timing
   --enable-user-timestamp enable support for user-provided clock system
   --enable-bound-port-transfer
                           enable port transfer function ptr optimization
@@ -6489,7 +6492,7 @@ fi
 if test "${enable_user_multithread+set}" = set; then :
   enableval=$enable_user_multithread; :
 else
-  enable_user_multithread=no
+  enable_user_multithread=yes
 fi
 
 
@@ -7124,10 +7127,14 @@ else
 fi
 
 
-if test "x$enable_dpdk" = "xyes"; then
+if test "x$enable_dpdk" != "xno"; then
 
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for DPDK library" >&5
 $as_echo_n "checking for DPDK library... " >&6; }
+
+    if test "x$enable_dpdk" != "xyes"; then
+        RTE_SDK=$enable_dpdk
+    fi
 
     if test -z "$RTE_SDK_BIN"; then
         RTE_SDK_BIN=$RTE_SDK/$RTE_TARGET
@@ -7155,7 +7162,9 @@ $as_echo_n "checking for DPDK library... " >&6; }
     fi
 
 
-    if pkg-config --exists libdpdk; then
+    if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
+      RTE_USE_PKGCONFIG=1
+
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
       rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
@@ -7165,7 +7174,9 @@ $as_echo_n "checking for DPDK library... " >&6; }
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
     else
-      RTE_INCLUDE=-I${RTE_SDK_BIN}/include/
+      RTE_USE_PKGCONFIG=0
+
+      RTE_INCLUDE=${RTE_SDK_BIN}/include/
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         as_fn_error $? "
@@ -7234,7 +7245,7 @@ $as_echo "no" >&6; }
 fi
 
 if test "x$enable_dpdk_pool" = "xyes"; then
-    if test "x$enable_dpdk" != "xyes"; then
+    if test "x$enable_dpdk" = "xno"; then
         as_fn_error $? "
 =========================================
 
@@ -7247,7 +7258,7 @@ if test "x$enable_dpdk_pool" = "xyes"; then
 fi
 
 if test "x$enable_dpdk_packet" = "xyes"; then
-    if test "x$enable_dpdk" != "xyes"; then
+    if test "x$enable_dpdk" = "xno"; then
         as_fn_error $? "
 =========================================
 
@@ -7276,7 +7287,7 @@ fi
 if test "${enable_linuxmodule+set}" = set; then :
   enableval=$enable_linuxmodule; :
 else
-  enable_linuxmodule=yes; enable_linuxmodule_default=yes
+  enable_linuxmodule=no; enable_linuxmodule_default=no
 fi
 
 
@@ -9460,6 +9471,15 @@ $as_echo "#define HAVE_NANOTIMESTAMP_ENABLED 1" >>confdefs.h
 
 fi
 
+# Check whether --enable-simtime was given.
+if test "${enable_simtime+set}" = set; then :
+  enableval=$enable_simtime; $as_echo "#define HAVE_SIMTIME 1" >>confdefs.h
+
+else
+  enable_simtime=no
+fi
+
+
 # Check whether --enable-user_timestamp was given.
 if test "${enable_user_timestamp+set}" = set; then :
   enableval=$enable_user_timestamp; :
@@ -9495,6 +9515,9 @@ if test "$enable_bound_port_transfer" = yes; then
 
 $as_echo "#define HAVE_BOUND_PORT_TRANSFER 1" >>confdefs.h
 
+  if test -z "${CXX##*clang*}" ; then
+      as_fn_error $? "--enable-bound-port-transfer does not work with Clang! A better solution is to use click-devirtualize in any case. Remove this option or use GCC (you probably have your CXX environment variable set to clang++)." "$LINENO" 5
+  fi
   CXXFLAGS="$CXXFLAGS -Wno-pmf-conversions"
 fi
 
@@ -14795,7 +14818,7 @@ else
     enable_batch="no"
 fi
 
-if test "x$enable_dpdk" = xyes; then
+if test "x$enable_dpdk" != "xno"; then
     provisions="$provisions dpdk"
     if test "$rte_ver_year" -ge 19; then
         provisions="$provisions dpdk19"
@@ -16276,7 +16299,7 @@ if test "$enable_flow_api$have_flow_api" = "yesno"; then
     feedback="To enable DPDK's Flow Rule Manager (rte_flow API), use a DPDK version >= 20.02."
 fi
 
-if test "$enable_dpdk" = yes; then
+if test "x$enable_dpdk" != "xno"; then
     dpdk_info="${enable_dpdk}
     DPDK    Target:              ${RTE_TARGET}
     DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}"

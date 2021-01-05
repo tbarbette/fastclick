@@ -4,6 +4,7 @@ Test that Click launches with DPDK and works using a virtual ring-based dev
 %require
 click-buildtool provides dpdk
 test ! $TRAVIS
+test ! $NODPDKTEST
 
 %script
 click --dpdk --no-huge -m 128MB -c 0x3 -n 1 --vdev=eth_ring0 -- CONFIG

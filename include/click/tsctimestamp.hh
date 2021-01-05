@@ -19,6 +19,14 @@ class TSCTimestamp {
         val = v;
     }
 
+    static inline click_cycles_t cycles_hz_warp() {
+#if TIMESTAMP_WARPABLE
+        if (Timestamp::warp_class() == Timestamp::warp_simulation) {
+            return 3000000000;
+        }
+#endif
+        return cycles_hz();
+    }
 
     /** @brief Construct an uninitialized timestamp. */
     inline TSCTimestamp(const uninitialized_t &unused) {
@@ -26,6 +34,11 @@ class TSCTimestamp {
     }
 
     static inline TSCTimestamp now() {
+#if TIMESTAMP_WARPABLE
+        if (Timestamp::warp_class() == Timestamp::warp_simulation) {
+            return TSCTimestamp((cycles_t)Timestamp::now_steady().nsecval() * 3);
+        }
+#endif
         return TSCTimestamp(click_get_cycles());
     }
 
@@ -44,7 +57,7 @@ class TSCTimestamp {
 
 
     inline String unparse() const {
-        double t = (double)(val) / (double)cycles_hz();
+        double t = (double)(val) / (double)cycles_hz_warp();
         return String(t);
     }
 
@@ -53,14 +66,14 @@ class TSCTimestamp {
      * @brief returns the total number of msecs represented by this timestamp
      */
     inline int64_t msecval() {
-        return val / (cycles_hz() / 1000);
+        return val / (cycles_hz_warp() / 1000);
     }
 
     /**
      * @brief returns the total number of usecs represented by this timestamp
      */
     inline int64_t usecval() {
-        return val / (cycles_hz() / 1000000);
+        return val / (cycles_hz_warp() / 1000000);
     }
 
     inline int64_t tsc_val() {
@@ -68,15 +81,15 @@ class TSCTimestamp {
     }
 
     static inline TSCTimestamp make_msec(unsigned n) {
-        return TSCTimestamp((n * cycles_hz()) / 1000);
+        return TSCTimestamp((n * cycles_hz_warp()) / 1000);
     }
 
     static inline TSCTimestamp make_usec(unsigned n) {
-        return TSCTimestamp((n * cycles_hz()) / 1000000);
+        return TSCTimestamp((n * cycles_hz_warp()) / 1000000);
     }
 
     inline operator Timestamp() {
-        return Timestamp::make_nsec((double)val / ((double)cycles_hz() / 1000000000.0d));
+        return Timestamp::make_nsec((double)val / ((double)cycles_hz_warp() / 1000000000.0));
     }
 
 

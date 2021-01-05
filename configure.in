@@ -91,7 +91,7 @@ AC_ARG_ENABLE([userlevel],
 
 AC_ARG_ENABLE([user-multithread],
     [AS_HELP_STRING([  --enable-user-multithread], [support userlevel multithreading])],
-    [:], [enable_user_multithread=no])
+    [:], [enable_user_multithread=yes])
 
 AC_ARG_ENABLE([fullpush-nonatomic],
     [AS_HELP_STRING([  --disable-fullpush-nonatomic], [disable nonatomic access to packet when single-threaded fullpush context is detected])],
@@ -283,9 +283,13 @@ AC_ARG_ENABLE([dpdk-packet],
                     [Click packets are DPDK packet])],
     [:], [enable_dpdk_packet=no])
 
-if test "x$enable_dpdk" = "xyes"; then
+if test "x$enable_dpdk" != "xno"; then
 
     AC_MSG_CHECKING([for DPDK library])
+
+    if test "x$enable_dpdk" != "xyes"; then
+        RTE_SDK=$enable_dpdk
+    fi
 
     if test -z "$RTE_SDK_BIN"; then
         RTE_SDK_BIN=$RTE_SDK/$RTE_TARGET
@@ -313,7 +317,8 @@ if test "x$enable_dpdk" = "xyes"; then
     fi
 
 
-    if pkg-config --exists libdpdk; then
+    if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
+      AC_SUBST(RTE_USE_PKGCONFIG, 1)
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
       rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
@@ -322,7 +327,8 @@ if test "x$enable_dpdk" = "xyes"; then
       rte_ver_major=$rte_ver_year
       AC_MSG_RESULT([yes])
     else
-      RTE_INCLUDE=-I${RTE_SDK_BIN}/include/
+      AC_SUBST(RTE_USE_PKGCONFIG, 0)
+      RTE_INCLUDE=${RTE_SDK_BIN}/include/
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         AC_MSG_ERROR([
@@ -379,7 +385,7 @@ version (dpdk-dev or dpdk-devel).
 fi
 
 if test "x$enable_dpdk_pool" = "xyes"; then
-    if test "x$enable_dpdk" != "xyes"; then
+    if test "x$enable_dpdk" = "xno"; then
         AC_MSG_ERROR([
 =========================================
 
@@ -391,7 +397,7 @@ if test "x$enable_dpdk_pool" = "xyes"; then
 fi
 
 if test "x$enable_dpdk_packet" = "xyes"; then
-    if test "x$enable_dpdk" != "xyes"; then
+    if test "x$enable_dpdk" = "xno"; then
         AC_MSG_ERROR([
 =========================================
 
@@ -412,8 +418,8 @@ fi
 dnl linuxmodule driver and features
 
 AC_ARG_ENABLE([linuxmodule],
-    [AS_HELP_STRING([--disable-linuxmodule], [disable Linux kernel driver])],
-    [:], [enable_linuxmodule=yes; enable_linuxmodule_default=yes])
+    [AS_HELP_STRING([--enable-linuxmodule], [disable Linux kernel driver])],
+    [:], [enable_linuxmodule=no; enable_linuxmodule_default=no])
 
 AC_ARG_ENABLE([fixincludes],
     [AS_HELP_STRING([  --disable-fixincludes], [do not patch Linux kernel headers for C++])],
@@ -882,6 +888,10 @@ if test "x$enable_nanotimestamp" = xyes; then
     AC_DEFINE([HAVE_NANOTIMESTAMP_ENABLED], [1], [Define if nanosecond-granularity timestamps are enabled.])
 fi
 
+AC_ARG_ENABLE([simtime],
+    [AS_HELP_STRING([--enable-simtime], [enable support for simulated timing])],
+    [AC_DEFINE([HAVE_SIMTIME])], [enable_simtime=no])
+
 AC_ARG_ENABLE([user_timestamp],
     [AS_HELP_STRING([--enable-user-timestamp], [enable support for user-provided clock system])],
     [:], [enable_user_timestamp=no])
@@ -908,6 +918,9 @@ AC_ARG_ENABLE(bound-port-transfer,
 
 if test "$enable_bound_port_transfer" = yes; then
   AC_DEFINE([HAVE_BOUND_PORT_TRANSFER], [1], [Define if Port::push/Port::pull should use bound function pointers.])
+  if test -z "${CXX##*clang*}" ; then
+      AC_MSG_ERROR([--enable-bound-port-transfer does not work with Clang! A better solution is to use click-devirtualize in any case. Remove this option or use GCC (you probably have your CXX environment variable set to clang++).])
+  fi
   CXXFLAGS="$CXXFLAGS -Wno-pmf-conversions"
 fi
 
@@ -2421,7 +2434,7 @@ else
 fi
 
 dnl add 'dpdk' if compiled with --enable-dpdk
-if test "x$enable_dpdk" = xyes; then
+if test "x$enable_dpdk" != "xno"; then
     provisions="$provisions dpdk"
     if test "$rte_ver_year" -ge 19; then
         provisions="$provisions dpdk19"
@@ -2588,7 +2601,7 @@ if test "$enable_flow_api$have_flow_api" = "yesno"; then
     feedback="To enable DPDK's Flow Rule Manager (rte_flow API), use a DPDK version >= 20.02."
 fi
 
-if test "$enable_dpdk" = yes; then
+if test "x$enable_dpdk" != "xno"; then
     dpdk_info="${enable_dpdk}
     DPDK    Target:              ${RTE_TARGET}
     DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}"

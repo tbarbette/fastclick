@@ -184,6 +184,9 @@
 /* Define if you have the sigaction function. */
 #undef HAVE_SIGACTION
 
+/* Define if you have simulated timing enabled. */
+#undef HAVE_SIMTIME
+
 /* Define if you have the snprintf function. */
 #undef HAVE_SNPRINTF
 
@@ -355,7 +358,7 @@ typedef unsigned long uintptr_t;
 #endif
 
 /* Define if mmap is allowed. */
-#if defined(HAVE_SYS_MMAN_H) && defined(HAVE_MMAP)
+#if defined(HAVE_SYS_MMAN_H) && defined(HAVE_MMAP) && !CLICK_PACKET_USE_DPDK
 # define ALLOW_MMAP 1
 #endif
 

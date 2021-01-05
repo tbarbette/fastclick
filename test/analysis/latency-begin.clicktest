@@ -21,16 +21,16 @@ click -j 1 CONFIG --simtime --simtick 1000
 30 60 4
 
 %file CONFIG
-FromIPSummaryDump(IN1, STOP false)
+FromIPSummaryDump(IN1, STOP false, TIMING false)
 -> SetTimestamp
 -> MarkMACHeader
 -> NumberPacket
 -> record:: RecordTimestamp()
 -> Queue
--> DelayUnqueue(1)
+-> DelayUnqueue(0.001)
 -> counter :: AverageCounter()
 -> CheckNumberPacket(OFFSET 40, COUNT 10)
--> diff :: TimestampDiff(RECORDER record)
+-> diff :: TimestampDiff(RECORDER record, MAXDELAY 2000)
 -> Counter(COUNT_CALL 5 double.run)
 -> Counter(COUNT_CALL 10 finished.run)
 -> Discard;
@@ -40,10 +40,10 @@ finished :: Script(TYPE PASSIVE, wait 100ms, read diff.average, read diff.averag
 
 %expect stderr
 diff.average:
-{{22.8|20.8}}
+{{1020.8|1022.8}}
 diff.average:
-{{22.8|20.8}}
+{{1020.8|1022.8}}
 diff.average:
-{{35|33}}
+{{1035|1033}}
 counter.count:
 10

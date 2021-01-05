@@ -4,12 +4,16 @@
 #include <click/vector.hh>
 #include <click/batchelement.hh>
 #include <click/timestamp.hh>
+#include <click/tsctimestamp.hh>
 #include "numberpacket.hh"
 
 CLICK_DECLS
 
 class NumberPacket;
-
+#define TimestampT TSCTimestamp
+#define TimestampUnread TSCTimestamp(1)
+//#define TimestampT Timestamp
+//#define TimestampUnread TSCTimestamp::make_usec(1)
 /*
 =c
 
@@ -77,7 +81,7 @@ public:
     void push_batch(int, PacketBatch *);
 #endif
 
-    inline Timestamp get(uint64_t i);
+    inline TimestampT get(uint64_t i);
 
     inline bool has_net_order() {
         return _net_order;
@@ -92,21 +96,21 @@ private:
     int _offset;
     bool _dynamic;
     bool _net_order;
-    Vector<Timestamp> _timestamps;
+    Vector<TimestampT> _timestamps;
     NumberPacket *_np;
 };
 
-const Timestamp read_timestamp = Timestamp::make_sec(1);
+const TimestampT read_timestamp = TimestampUnread;
 
-inline Timestamp RecordTimestamp::get(uint64_t i) {
+inline TimestampT RecordTimestamp::get(uint64_t i) {
     if (i >= (unsigned)_timestamps.size()) {
-        click_chatter("%p{element}: Index %d is out of range !", this, i);
-        return Timestamp::uninitialized_t();
+        click_chatter("%p{element}: Index %lu is out of range !", this, i);
+        return TimestampT::uninitialized_t();
     }
-    Timestamp t = _timestamps[i];
+    TimestampT t = _timestamps[i];
     if (t == read_timestamp) {
         click_chatter("Timestamp read multiple times !");
-        return Timestamp::uninitialized_t();
+        return TimestampT::uninitialized_t();
     }
     _timestamps[i] = read_timestamp;
     return t;

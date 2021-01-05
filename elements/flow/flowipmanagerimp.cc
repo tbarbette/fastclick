@@ -12,6 +12,7 @@
 #include <rte_hash.h>
 #include <click/dpdk_glue.hh>
 #include <rte_ethdev.h>
+#include <rte_errno.h>
 
 CLICK_DECLS
 
@@ -53,7 +54,7 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
 int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
 {
     struct rte_hash_parameters hash_params = {0};
-    char buf[32];
+    char buf[64];
     hash_params.name = buf;
     auto passing = get_passing_threads();
     _tables_count = passing.size();
@@ -73,10 +74,10 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
     for (int i = 0; i < _tables_count; i++) {
         if (!passing[i])
             continue;
-        sprintf(buf, "%s-%d",name().c_str(), i);
+        sprintf(buf, "%d-%s",i,name().c_str());
         _tables[i].hash = rte_hash_create(&hash_params);
         if (!_tables[i].hash)
-            return errh->error("Could not init flow table %d!", i);
+            return errh->error("Could not init flow table %d : error %d (%s)!", i, rte_errno, rte_strerror(rte_errno));
 
         _tables[i].fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _table_size);
         CLICK_ASSERT_ALIGNED(_tables[i].fcbs);
@@ -123,6 +124,7 @@ bool FlowIPManagerIMP::run_task(Task* t)
         return next;
     });
     return true;*/
+    return false;
 }
 
 void FlowIPManagerIMP::run_timer(Timer* t)

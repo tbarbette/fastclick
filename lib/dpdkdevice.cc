@@ -25,6 +25,13 @@
 #include <click/dpdkdevice.hh>
 #include <click/userutils.hh>
 #include <rte_errno.h>
+#include <click/dpdk_glue.hh>
+
+#if CLICK_PACKET_USE_DPDK
+#define DPDK_ANNO_SIZE sizeof(Packet::AllAnno)
+#else
+#define DPDK_ANNO_SIZE 0
+#endif
 
 #if HAVE_FLOW_API
     #include <click/flowrulemanager.hh>
@@ -234,7 +241,7 @@ int DPDKDevice::alloc_pktmbufs(ErrorHandler* errh)
                         _pktmbuf_pools[i] =
 #if RTE_VERSION >= RTE_VERSION_NUM(2,2,0,0)
                         rte_pktmbuf_pool_create(name, get_nb_mbuf(i),
-                                                MBUF_CACHE_SIZE, 0, MBUF_DATA_SIZE, i);
+                                                MBUF_CACHE_SIZE, DPDK_ANNO_SIZE, MBUF_DATA_SIZE, i);
 #else
                         rte_mempool_create(
                                         name, get_nb_mbuf(i), MBUF_SIZE, MBUF_CACHE_SIZE,
@@ -1020,6 +1027,19 @@ int DPDKDevice::static_initialize(ErrorHandler* errh) {
         }
         return -1;
     }
+#if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
+        rte_mbuf_dyn_rx_timestamp_register(&timestamp_dynfield_offset, &timestamp_dynflag);
+        if (timestamp_dynfield_offset < 0) {
+            rte_exit(EXIT_FAILURE, "Cannot register mbuf field\n");
+        }
+        if (timestamp_dynflag < 0) {
+            RTE_ETHDEV_LOG(ERR,
+                    "Failed to register mbuf flag for Rx timestamp\n");
+            return -rte_errno;
+        }
+        //timestamp_dynflag = RTE_BIT64(offset);
+#endif
+
     return 0;
 }
 
@@ -1335,6 +1355,11 @@ DPDKRing::parse(Args* args) {
     return 0;
 }
 
+#if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
+    int timestamp_dynfield_offset;
+    uint64_t timestamp_dynflag;
+#endif
+
 #if HAVE_DPDK_PACKET_POOL
 /**
  * Must be able to fill the packet data pool,
@@ -1346,9 +1371,9 @@ int DPDKDevice::DEFAULT_NB_MBUF = 65536 - 1;
 #endif
 Vector<int> DPDKDevice::NB_MBUF;
 #ifdef RTE_MBUF_DEFAULT_BUF_SIZE
-int DPDKDevice::MBUF_DATA_SIZE = RTE_MBUF_DEFAULT_BUF_SIZE;
+int DPDKDevice::MBUF_DATA_SIZE = RTE_MBUF_DEFAULT_BUF_SIZE + DPDK_ANNO_SIZE;
 #else
-int DPDKDevice::MBUF_DATA_SIZE = 2048 + RTE_PKTMBUF_HEADROOM;
+int DPDKDevice::MBUF_DATA_SIZE = 2048 + RTE_PKTMBUF_HEADROOM + DPDK_ANNO_SIZE;
 #endif
 int DPDKDevice::MBUF_SIZE = MBUF_DATA_SIZE
                           + sizeof (struct rte_mbuf);

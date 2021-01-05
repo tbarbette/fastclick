@@ -22,6 +22,10 @@
 #include <click/router.hh>
 #include <click/error.hh>
 #include <click/args.hh>
+#if HAVE_NUMA
+#include <click/numa.hh>
+#endif
+
 CLICK_DECLS
 
 StaticThreadSched::StaticThreadSched()
@@ -44,13 +48,55 @@ int
 StaticThreadSched::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String ename;
-    int preference;
+    String c_preference;
     for (int i = 0; i < conf.size(); i++) {
         if (Args(this, errh).push_back_words(conf[i])
             .read_mp("ELEMENT", ename)
-            .read_mp("THREAD", preference)
+            .read_mp("THREAD", c_preference)
             .complete() < 0)
             return -1;
+        Vector<String> pref = c_preference.split('/');
+        int preference;
+        if (pref.size() > 1) {
+            int socket;
+            if (!IntArg().parse(pref[0],socket,errh))
+                return -1;
+            if (!IntArg().parse(pref[1],preference,errh))
+                return -1;
+#if HAVE_NUMA
+            Bitvector b(36);
+            auto bc = Numa::node_to_cpus(socket);
+            bc.toBitvector(b);
+            int idx = 0;
+            if (b[idx] && preference == 0) {
+
+            } else {
+
+                while (true) {
+                    if (b[idx])
+                        if (preference == 0)
+                            break;
+                    else
+                        preference--;
+
+                    idx++;
+                    if (idx >= b.size()) {
+                        errh->warning("Socket %d has no usable core %s",socket,pref[1].c_str());
+                        break;
+                    }
+                }
+            }
+            preference =idx;
+
+#else
+            return errh->error("Syntax SOCKET/CORE is only allowed when Click is compiled with NUMA support");
+
+#endif
+        }
+        else {
+            if (!IntArg().parse(pref[0],preference,errh))
+                return -1;
+        }
         if (preference < -1 || preference >= master()->nthreads()) {
             errh->warning("thread preference %d out of range", preference);
             preference = (preference < 0 ? -1 : 0);

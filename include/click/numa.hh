@@ -18,17 +18,18 @@ class NumaCpuBitmask {
 	};
 
 public:
-
-	bool isBitSet(unsigned int n) {
-		return numa_bitmask_isbitset(b,n);
-	}
-	~NumaCpuBitmask() {
+    ~NumaCpuBitmask() {
 		numa_free_cpumask(b);
 	}
 
 	struct bitmask* bitmask() {
 		return b;
 	}
+
+	bool isBitSet(unsigned int n) {
+		return numa_bitmask_isbitset(b,n);
+	}
+
 
 	static NumaCpuBitmask allocate() {
 		numa_available();

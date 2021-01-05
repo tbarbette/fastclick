@@ -4,7 +4,7 @@ RecordTimestamp ecosystem
 Test the RecordTimestamp ecosystem (TimestampDiff, NumberPacket, ...)
 
 %script
-click -j 1 CONFIG
+click -j 1 CONFIG --simtime
 
 %file CONFIG
 

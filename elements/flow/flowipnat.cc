@@ -37,8 +37,8 @@ FlowIPNAT::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
        .read_mp("SIP",_sip)
-       .read("ACCEPT_NONSYN", _accept_nonsyn)
-       .read("STATE", _own_state)
+       .read_or_set("ACCEPT_NONSYN", _accept_nonsyn, true)
+       .read_or_set("STATE", _own_state, false)
        .complete() < 0)
         return -1;
 
@@ -169,14 +169,15 @@ void FlowIPNAT::push_flow(int port, NATEntryIN* flowdata, PacketBatch* batch)
         release_ref(flowdata->ref, _own_state);
         new_flow(flowdata, batch->first());
     }
-    auto fnt = [this,flowdata](Packet* p) -> bool {
+    auto fnt = [this,flowdata](Packet* &p) -> bool {
         if (!flowdata->ref) {
             return false;
         }
 
         WritablePacket* q=p->uniqueify();
         //click_chatter("Rewrite to %s %d",_sip.unparse().c_str(),htons(flowdata->ref->port));
-        q->rewrite_ipport(_sip, flowdata->ref->port, 0, true);
+        q->rewrite_ipport(_sip, flowdata->ref->port, 0, isTCP(q));
+        p = q;
 
         if (!_own_state || update_state<NATState>(flowdata,q)) {
             return true;
@@ -252,14 +253,15 @@ void FlowIPNATReverse::push_flow(int port, NATEntryOUT* flowdata, PacketBatch* b
     }
 
     //_state->port_epoch[*flowdata] = epoch;
-    auto fnt = [this,flowdata](Packet*p) -> bool {
+    auto fnt = [this,flowdata](Packet* &p) -> bool {
         //click_chatter("Rewrite to %s %d",flowdata->map.ip.unparse().c_str(),ntohs(flowdata->map.port));
         if (!flowdata->ref) {
             click_chatter("Return flow without ref?");
             return false;
         }
         WritablePacket* q=p->uniqueify();
-        q->rewrite_ipport(flowdata->map.ip, flowdata->map.port, 1, true);
+        p = q;
+        q->rewrite_ipport(flowdata->map.ip, flowdata->map.port, 1, isTCP(q));
         q->set_dst_ip_anno(flowdata->map.ip);
 
         if (!_in->_own_state || update_state<NATState>(flowdata, q)) {

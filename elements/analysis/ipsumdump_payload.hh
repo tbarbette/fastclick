@@ -4,6 +4,9 @@
 CLICK_DECLS
 
 class IPSummaryDump_Payload { public:
+
+    const char *class_name() const		{ return "IPSummaryDump_Payload"; }
+
     static void static_initialize();
     static void static_cleanup();
 };

@@ -42,6 +42,7 @@
 # include <rte_common.h>
 # include <rte_eal.h>
 # include <rte_lcore.h>
+# include <rte_version.h>
 #endif // HAVE_DPDK
 
 #include <click/lexer.hh>
@@ -96,8 +97,10 @@ static const Clp_Option options[] = {
     { "socket", 0, SOCKET_OPT, Clp_ValInt, 0 },
     { "port", 'p', PORT_OPT, Clp_ValString, 0 },
     { "quit", 'q', QUIT_OPT, 0, 0 },
+#ifdef TIMESTAMP_WARPABLE
     { "simtime", 0, SIMTIME_OPT, Clp_ValDouble, Clp_Optional },
     { "simulation-time", 0, SIMTIME_OPT, Clp_ValDouble, Clp_Optional },
+#endif
     { "simtick", 0, SIMTICK_OPT, Clp_ValUnsignedLong, Clp_Mandatory },
     { "threads", 'j', THREADS_OPT, Clp_ValInt, 0 },
     { "cpu", 0, THREADS_AFF_OPT, Clp_ValInt, Clp_Optional | Clp_Negate },
@@ -433,6 +436,7 @@ hotconfig_handler(const String &text, Element *, void *, ErrorHandler *errh)
 }
 
 
+#ifdef TIMESTAMP_WARPABLE
 // timewarping
 
 static String
@@ -461,7 +465,7 @@ timewarp_write_handler(const String &text, Element *, void *, ErrorHandler *errh
     }
     return 0;
 }
-
+#endif
 
 // main
 
@@ -663,17 +667,20 @@ main(int argc, char **argv)
       errh->warning("CPU affinity is not supported on this platform");
 #endif
       break;
-
+#if TIMESTAMP_WARPABLE
     case SIMTIME_OPT: {
         Timestamp::warp_set_class(Timestamp::warp_simulation);
         Timestamp simbegin(clp->have_val ? clp->val.d : 1000000000);
         Timestamp::warp_set_now(simbegin, simbegin);
+
         break;
     }
     case SIMTICK_OPT: {
         Timestamp::set_warp_tick(clp->val.ul);
         break;
     }
+
+#endif
      case CLICKPATH_OPT:
       set_clickpath(clp->vstr);
       break;
@@ -727,9 +734,12 @@ particular purpose.\n");
   // provide hotconfig handler if asked
   if (allow_reconfigure)
       Router::add_write_handler(0, "hotconfig", hotconfig_handler, 0, Handler::f_raw | Handler::f_nonexclusive);
+
+#ifdef TIMESTAMP_WARPABLE
   Router::add_read_handler(0, "timewarp", timewarp_read_handler, 0);
   if (Timestamp::warp_class() != Timestamp::warp_simulation)
       Router::add_write_handler(0, "timewarp", timewarp_write_handler, 0);
+#endif
 
   // parse configuration
   click_master = new Master(click_nthreads);
@@ -767,7 +777,12 @@ particular purpose.\n");
 
   struct rusage before, after;
   getrusage(RUSAGE_SELF, &before);
+
+#ifdef TIMESTAMP_WARPABLE
   Timestamp before_time = Timestamp::now_unwarped();
+#else
+  Timestamp before_time = Timestamp::now();
+#endif
   Timestamp after_time = Timestamp::uninitialized_t();
 
   // run driver
@@ -788,7 +803,11 @@ particular purpose.\n");
     if (dpdk_enabled) {
         unsigned t = 1;
         unsigned lcore_id;
+#   if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
+        RTE_LCORE_FOREACH_WORKER(lcore_id) {
+#   else
         RTE_LCORE_FOREACH_SLAVE(lcore_id) {
+#   endif
             rte_eal_remote_launch(thread_driver_dpdk, click_router->master()->thread(t++),
                                   lcore_id);
         }
@@ -814,7 +833,11 @@ particular purpose.\n");
   } else if (!quit_immediately && warnings)
     errh->warning("%s: configuration has no elements, exiting", filename_landmark(router_file, file_is_expr));
 
+#ifdef TIMESTAMP_WARPABLE
   after_time.assign_now_unwarped();
+#else
+  after_time.assign_now();
+#endif
   getrusage(RUSAGE_SELF, &after);
   // report time
   if (report_time) {

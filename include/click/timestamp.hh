@@ -114,7 +114,7 @@ Timestamp operator+(Timestamp, const Timestamp &);
 // TIMESTAMP_WARPABLE is defined if this Timestamp implementation supports
 // timewarping.
 
-#if !CLICK_LINUXMODULE && !CLICK_BSDMODULE && !CLICK_NS
+#if !CLICK_LINUXMODULE && !CLICK_BSDMODULE && !CLICK_NS && HAVE_SIMTIME
 # define TIMESTAMP_WARPABLE 1
 #endif
 
@@ -941,7 +941,7 @@ Timestamp::assign_now(bool recent, bool steady, bool unwarped, bool nouser)
 #undef TIMESTAMP_RESOLVE_TVP
 
     }
-#if TIMESTAMP_WARPABLE
+#ifdef TIMESTAMP_WARPABLE
     // timewarping
     if (!unwarped && TimestampWarp::kind)
         warp(steady, true);
