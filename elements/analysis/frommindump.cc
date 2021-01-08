@@ -339,8 +339,9 @@ bool FromMinDump::run_task(Task *) {
   if (likely(head))
     output_push_batch(0, head->make_tail(last, _burst));
 #else
+  Packet *p = 0;
   for (int i = 0; i < _burst; i++) {
-    Packet *p = get_packet(1);
+    p = get_packet(1);
     output(0).push(p);
   }
 #endif
