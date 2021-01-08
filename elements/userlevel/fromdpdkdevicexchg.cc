@@ -49,76 +49,76 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
         return (struct rte_mbuf*)x;
     }
 
-    void xchg_set_buffer(struct xchg* xchg, void* buf) {
+    CLICK_ALWAYS_INLINE void xchg_set_buffer(struct xchg* xchg, void* buf) {
         (void)xchg;
         (void)buf;
     }
 
-    void xchg_set_packet_type(struct xchg* xchg, uint32_t ptype) {
+    CLICK_ALWAYS_INLINE void xchg_set_packet_type(struct xchg* xchg, uint32_t ptype) {
         get_buf(xchg)->packet_type = ptype;
     }
 
-    void xchg_set_rss_hash(struct xchg* xchg, uint32_t rss) {
+    CLICK_ALWAYS_INLINE void xchg_set_rss_hash(struct xchg* xchg, uint32_t rss) {
         get_buf(xchg)->hash.rss = rss;
     }
 
-    void xchg_set_timestamp(struct xchg* xchg, uint64_t t) {
+    CLICK_ALWAYS_INLINE void xchg_set_timestamp(struct xchg* xchg, uint64_t t) {
         get_buf(xchg)->timestamp = t;
     }
 
-    void xchg_set_flag(struct xchg* xchg, uint64_t f) {
+    CLICK_ALWAYS_INLINE void xchg_set_flag(struct xchg* xchg, uint64_t f) {
         get_buf(xchg)->ol_flags |= f;
     }
 
-    uint64_t xchg_get_flags(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE uint64_t xchg_get_flags(struct xchg* xchg) {
         return get_buf(xchg)->ol_flags;
     }
 
-    uint16_t xchg_get_outer_l2_len(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE uint16_t xchg_get_outer_l2_len(struct xchg* xchg) {
         return get_buf(xchg)->outer_l2_len;
     }
 
-    uint16_t xchg_get_outer_l3_len(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE uint16_t xchg_get_outer_l3_len(struct xchg* xchg) {
         return get_buf(xchg)->outer_l3_len;
     }
 
-    void xchg_clear_flag(struct xchg* xchg, uint64_t f) {
+    CLICK_ALWAYS_INLINE void xchg_clear_flag(struct xchg* xchg, uint64_t f) {
         get_buf(xchg)->ol_flags &= f;
     }
 
-    void xchg_set_fdir_id(struct xchg* xchg, uint32_t mark) {
+    CLICK_ALWAYS_INLINE void xchg_set_fdir_id(struct xchg* xchg, uint32_t mark) {
         get_buf(xchg)->hash.fdir.hi = mark;
     }
 
-    void xchg_set_vlan(struct xchg* xchg, uint32_t vlan) {
+    CLICK_ALWAYS_INLINE void xchg_set_vlan(struct xchg* xchg, uint32_t vlan) {
         get_buf(xchg)->vlan_tci = vlan;
     }
 
-    uint32_t xchg_get_vlan(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE uint32_t xchg_get_vlan(struct xchg* xchg) {
         return get_buf(xchg)->vlan_tci;
     }
 
 
-    void xchg_set_len(struct xchg* xchg, uint16_t len) {
+    CLICK_ALWAYS_INLINE void xchg_set_len(struct xchg* xchg, uint16_t len) {
         rte_pktmbuf_pkt_len(get_buf(xchg)) = len;
     }
-    void xchg_set_data_len(struct xchg* xchg, uint16_t len) {
+    CLICK_ALWAYS_INLINE void xchg_set_data_len(struct xchg* xchg, uint16_t len) {
        rte_pktmbuf_data_len(get_buf(xchg)) = len;
 
     }
 
-    uint16_t xchg_get_len(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE uint16_t xchg_get_len(struct xchg* xchg) {
         return rte_pktmbuf_pkt_len(get_buf(xchg));
     }
 
-    void xchg_finish_packet(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void xchg_finish_packet(struct xchg* xchg) {
         (void)xchg;
     }
 
     /**
      * Take a packet from the ring and replace it by a new one
      */
-    struct xchg* xchg_next(struct rte_mbuf** pkt, struct xchg** xchgs, struct rte_mempool* mp) {
+    CLICK_ALWAYS_INLINE struct xchg* xchg_next(struct rte_mbuf** pkt, struct xchg** xchgs, struct rte_mempool* mp) {
         (void) xchgs; //Mbuf is set on advance
         struct rte_mbuf* xchg = *pkt; //Buffer in the ring
 		rte_prefetch0(xchg);
@@ -126,18 +126,18 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
         return (struct xchg*)xchg;
     }
 
-    void xchg_cancel(struct xchg* xchg, struct rte_mbuf* pkt) {
+    CLICK_ALWAYS_INLINE void xchg_cancel(struct xchg* xchg, struct rte_mbuf* pkt) {
         (void)xchg;
         rte_mbuf_raw_free(pkt);
     }
 
-    void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
+    CLICK_ALWAYS_INLINE void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
         struct xchg** xchgs = *xchgs_p;
         *(xchgs++) = xchg; //Set in the user pointer the buffer from the ring
         *xchgs_p = xchgs;
     }
 
-    void* xchg_buffer_from_elt(struct rte_mbuf* elt) {
+    CLICK_ALWAYS_INLINE void* xchg_buffer_from_elt(struct rte_mbuf* elt) {
         return rte_pktmbuf_mtod(elt, void*);
     }
 
@@ -157,48 +157,48 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
         return (struct WritablePacket*)(get_mbuf(x) + 1);
     }
 
-    void xchg_set_packet_type(struct xchg* xchg, uint32_t ptype) {
+    CLICK_ALWAYS_INLINE void xchg_set_packet_type(struct xchg* xchg, uint32_t ptype) {
         //get_buf(xchg)->packet_type = ptype;
     }
 
-    void xchg_set_rss_hash(struct xchg* xchg, uint32_t rss) {
+    CLICK_ALWAYS_INLINE void xchg_set_rss_hash(struct xchg* xchg, uint32_t rss) {
         SET_AGGREGATE_ANNO(get_pkt(xchg), rss);
     }
 
-    void xchg_set_timestamp(struct xchg* xchg, uint64_t t) {
+    CLICK_ALWAYS_INLINE void xchg_set_timestamp(struct xchg* xchg, uint64_t t) {
         get_pkt(xchg)->timestamp_anno().assignlong(t);
     }
 
-    void xchg_set_flag(struct xchg* xchg, uint64_t f) {
+    CLICK_ALWAYS_INLINE void xchg_set_flag(struct xchg* xchg, uint64_t f) {
 //        get_buf(xchg)->ol_flags |= f;
     }
 
-    void xchg_clear_flag(struct xchg* xchg, uint64_t f) {
+    CLICK_ALWAYS_INLINE void xchg_clear_flag(struct xchg* xchg, uint64_t f) {
     //    get_buf(xchg)->ol_flags &= f;
     }
 
-    void xchg_set_fdir_id(struct xchg* xchg, uint32_t mark) {
+    CLICK_ALWAYS_INLINE void xchg_set_fdir_id(struct xchg* xchg, uint32_t mark) {
         SET_AGGREGATE_ANNO(get_pkt(xchg), mark);
     }
 
-    void xchg_set_vlan(struct xchg* xchg, uint32_t vlan) {
+    CLICK_ALWAYS_INLINE void xchg_set_vlan(struct xchg* xchg, uint32_t vlan) {
         SET_VLAN_TCI_ANNO(get_pkt(xchg),vlan);
     }
 
-    void xchg_set_len(struct xchg* xchg, uint16_t len) {
+    CLICK_ALWAYS_INLINE void xchg_set_len(struct xchg* xchg, uint16_t len) {
         //get_buf(xchg)->set_buffer_length(len);
     }
 
-    void xchg_set_data_len(struct xchg* xchg, uint16_t len) {
+    CLICK_ALWAYS_INLINE void xchg_set_data_len(struct xchg* xchg, uint16_t len) {
         get_pkt(xchg)->set_data_length(len);
     }
 
-    uint16_t xchg_get_len(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE uint16_t xchg_get_len(struct xchg* xchg) {
         return get_pkt(xchg)->buffer_length();
     }
 
 
-    void xchg_finish_packet(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void xchg_finish_packet(struct xchg* xchg) {
 i//        WritablePacket* p = get_pkt(xchg);
 ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->data(), p->end_data(), p->end_buffer());
 //        p->set_destructor_argument(p->buffer() - RTE_PKTMBUF_HEADROOM);
@@ -220,7 +220,7 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
 /**
      * Take a packet from the ring and replace it by a new one
      */
-    struct xchg* xchg_next(struct rte_mbuf** pkt, struct xchg** xchgs, struct rte_mempool* mp) {
+    CLICK_ALWAYS_INLINE struct xchg* xchg_next(struct rte_mbuf** pkt, struct xchg** xchgs, struct rte_mempool* mp) {
         (void) xchgs; //Mbuf is set on advance
         struct rte_mbuf* xchg = *pkt; //Buffer in the ring
                 rte_prefetch0(get_pkt(xchg));
@@ -228,17 +228,17 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
         return (struct xchg*)xchg;
     }
 
-    void xchg_cancel(struct xchg* xchg, struct rte_mbuf* pkt) {
+    CLICK_ALWAYS_INLINE void xchg_cancel(struct xchg* xchg, struct rte_mbuf* pkt) {
         (void)xchg;
         rte_mbuf_raw_free(pkt);
     }
 
-    void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
+    CLICK_ALWAYS_INLINE void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
         struct xchg** xchgs = *xchgs_p;
         *(xchgs++) = xchg; //Set in the user pointer the buffer from the ring
         *xchgs_p = xchgs;
     }
-    void* xchg_buffer_from_elt(struct rte_mbuf* elt) {
+    CLICK_ALWAYS_INLINE void* xchg_buffer_from_elt(struct rte_mbuf* elt) {
         return rte_pktmbuf_mtod(elt, void*);
     }
 
@@ -262,52 +262,52 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
     }
 
     //Unused
-    void xchg_set_packet_type(struct xchg* xchg, uint32_t ptype) {
+    CLICK_ALWAYS_INLINE void xchg_set_packet_type(struct xchg* xchg, uint32_t ptype) {
         //get_buf(xchg)->packet_type = ptype; 
     }
 
     //The RSS hash is set in the AGGREGATE_ANNP
-    void xchg_set_rss_hash(struct xchg* xchg, uint32_t rss) {
+    CLICK_ALWAYS_INLINE void xchg_set_rss_hash(struct xchg* xchg, uint32_t rss) {
         SET_AGGREGATE_ANNO(get_buf(xchg), rss);
     }
 
     //Set the timestamp field
-    void xchg_set_timestamp(struct xchg* xchg, uint64_t t) {
+    CLICK_ALWAYS_INLINE void xchg_set_timestamp(struct xchg* xchg, uint64_t t) {
         get_buf(xchg)->timestamp_anno().assignlong(t);
     }
 
     //Unused
-    void xchg_set_flag(struct xchg* xchg, uint64_t f) {
+    CLICK_ALWAYS_INLINE void xchg_set_flag(struct xchg* xchg, uint64_t f) {
 //        get_buf(xchg)->ol_flags |= f;
     }
 
     //Unused
-    void xchg_clear_flag(struct xchg* xchg, uint64_t f) {
+    CLICK_ALWAYS_INLINE void xchg_clear_flag(struct xchg* xchg, uint64_t f) {
     //    get_buf(xchg)->ol_flags &= f;
     }
 
     //Fdir is also the aggregate, like RSS. One rarely use both (if needed, one can use another anno).
-    void xchg_set_fdir_id(struct xchg* xchg, uint32_t mark) {
+    CLICK_ALWAYS_INLINE void xchg_set_fdir_id(struct xchg* xchg, uint32_t mark) {
         SET_AGGREGATE_ANNO(get_buf(xchg), mark);
     }
 
     //Set the VLAN anno
-    void xchg_set_vlan(struct xchg* xchg, uint32_t vlan) {
+    CLICK_ALWAYS_INLINE void xchg_set_vlan(struct xchg* xchg, uint32_t vlan) {
         SET_VLAN_TCI_ANNO(get_buf(xchg),vlan);
     }
 
     //Set packet length. However in our case the buffers themselves have a constant size, so no need to re-set
-    void xchg_set_len(struct xchg* xchg, uint16_t len) {
+    CLICK_ALWAYS_INLINE void xchg_set_len(struct xchg* xchg, uint16_t len) {
         //get_buf(xchg)->set_buffer_length(len);
     }
 
     //Set data_length (the actual packet length)
-    void xchg_set_data_len(struct xchg* xchg, uint16_t len) {
+    CLICK_ALWAYS_INLINE void xchg_set_data_len(struct xchg* xchg, uint16_t len) {
         get_buf(xchg)->set_data_length(len);
     }
 
     //Return the buffer length.
-    uint16_t xchg_get_len(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE uint16_t xchg_get_len(struct xchg* xchg) {
         return get_buf(xchg)->buffer_length();
     }
 
@@ -315,7 +315,7 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
     //with a packet, and will start reading the next one. It's a chance to wrap up what we
     //need to do.
     //In this case we prefetch the packet data, and set a few Click stuffs.
-    void xchg_finish_packet(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void xchg_finish_packet(struct xchg* xchg) {
         WritablePacket* p = (WritablePacket*)xchg;
 
         rte_prefetch0(p->data());
@@ -329,7 +329,7 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
      * This function is called by the driver to advance in the RX ring.
      * Set a new buffer to replace in the ring if not canceled, and return the next descriptor
      */
-    struct xchg* xchg_next(struct rte_mbuf** rep, struct xchg** xchgs, rte_mempool* mp) {
+    CLICK_ALWAYS_INLINE struct xchg* xchg_next(struct rte_mbuf** rep, struct xchg** xchgs, rte_mempool* mp) {
 		//The user (actually, that's us) passes a linked-list of WritablePacket in the struct xchg** (so it's actually not a **)
         // moving to the next is actually taking the first packet. Note that advancing in the list is the
         // role of xchg_davance, not next. Next is like "peek".
@@ -354,7 +354,7 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
      * Cancel the current receiving, this should cancel the last xchg_next.
      * It's how XCHG works, in the hope a receive will always work. I'm sure there are reasons for this.
      */
-    void xchg_cancel(struct xchg* xchg, struct rte_mbuf* rep) {
+    CLICK_ALWAYS_INLINE void xchg_cancel(struct xchg* xchg, struct rte_mbuf* rep) {
         WritablePacket* first = (WritablePacket*)xchg;
         first->set_buffer( ((unsigned char*)rep) + sizeof(rte_mbuf), DPDKDevice::MBUF_DATA_SIZE);
     }
@@ -363,7 +363,7 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
      * Pops the packet of the user provided buffers
      * @arg xchg is the packet being received (last call to xchg_next)
      */
-    void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
+    CLICK_ALWAYS_INLINE void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
         WritablePacket** xchgs = (WritablePacket**)*xchgs_p;
         WritablePacket* first = (WritablePacket*)xchg;
 	    WritablePacket* next = (WritablePacket*)first->next();
@@ -378,7 +378,7 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
      * Having rte_mbufs entierly, but it needs much more work in the driver...
      * Just for cleaniness.
      */
-    void* xchg_buffer_from_elt(struct rte_mbuf* buf) {
+    CLICK_ALWAYS_INLINE void* xchg_buffer_from_elt(struct rte_mbuf* buf) {
         return ((unsigned char*)buf) + sizeof(rte_mbuf) + RTE_PKTMBUF_HEADROOM;
     }   
 #  endif

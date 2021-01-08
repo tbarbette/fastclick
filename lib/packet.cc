@@ -280,7 +280,7 @@ static PacketPool global_packet_pool = {0,0,0,0};
 
 /** @brief Return the local packet pool for this thread.
     @pre initialize_local_packet_pool() has succeeded on this thread. */
-static inline PacketPool& local_packet_pool() {
+static CLICK_ALWAYS_INLINE inline PacketPool& local_packet_pool() {
 #  if HAVE_MULTITHREAD
     return *thread_packet_pool;
 #  else
@@ -349,7 +349,7 @@ WritablePacket::pool_batch_allocate(uint16_t count)
 /**
  * Allocate a batch of packets with buffer
  */
-WritablePacket *
+CLICK_ALWAYS_INLINE WritablePacket *
 WritablePacket::pool_prepare_data_burst(uint16_t count)
 {
         PacketPool& packet_pool = local_packet_pool();
@@ -372,7 +372,7 @@ WritablePacket::pool_prepare_data_burst(uint16_t count)
         return packet_pool.pd;
 }
 
-void
+CLICK_ALWAYS_INLINE void
 WritablePacket::pool_consumed_data_burst(uint16_t n, WritablePacket* tail) {
         PacketPool& packet_pool = local_packet_pool();
         packet_pool.pdcount -= n;

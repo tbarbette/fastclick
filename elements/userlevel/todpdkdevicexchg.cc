@@ -177,36 +177,36 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
         return (struct WritablePacket*)(get_mbuf(x) + 1);
     }
 
-    uint16_t xchg_get_data_len(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE uint16_t xchg_get_data_len(struct xchg* xchg) {
         return get_tx_pkt(xchg)->length();
     }
 
-    void xchg_tx_completed(struct rte_mbuf** elts, unsigned int part, unsigned int olx) {
+    CLICK_ALWAYS_INLINE void xchg_tx_completed(struct rte_mbuf** elts, unsigned int part, unsigned int olx) {
         //mlx5_tx_free_mbuf(elts, part, olx);
     }
 
 
 
-    int xchg_nb_segs(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE int xchg_nb_segs(struct xchg* xchg) {
         //struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
         return 1; //NB_SEGS(pkt);
     }
 
 
-    void* xchg_get_buffer_addr(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void* xchg_get_buffer_addr(struct xchg* xchg) {
         WritablePacket* p = get_tx_pkt(xchg);
         return p->buffer();
     }
 
-    void* xchg_get_buffer(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void* xchg_get_buffer(struct xchg* xchg) {
         return get_tx_pkt(xchg)->data();
     }
 
 
-    bool xchg_do_tx_free = true;
+    CLICK_ALWAYS_INLINE bool xchg_do_tx_free = true;
 
 
-    void xchg_tx_advance(struct xchg*** xchgs_p) {
+    CLICK_ALWAYS_INLINE void xchg_tx_advance(struct xchg*** xchgs_p) {
         struct rte_mbuf** pkts = (struct rte_mbuf**)(*xchgs_p);
         //printf("Advance : %p -> %p = %p\n", pkts, pkts+1, *(pkts+1));
         pkts += 1;
@@ -214,40 +214,40 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
 
     }
 
-	void xchg_tx_sent_inline(struct xchg* xchg) {
+	CLICK_ALWAYS_INLINE void xchg_tx_sent_inline(struct xchg* xchg) {
         struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
 
         //printf("INLINED %p\n", xchg);
         rte_pktmbuf_free_seg(pkt);
     }
 
-    void xchg_tx_sent(struct rte_mbuf** elts, struct xchg** xchg) {
+    CLICK_ALWAYS_INLINE void xchg_tx_sent(struct rte_mbuf** elts, struct xchg** xchg) {
         //printf("SENT %p\n", *xchg);
         *elts= (struct rte_mbuf*)*xchg;
     }
 
-    void xchg_tx_sent_vec(struct rte_mbuf** elts, struct xchg** xchg, unsigned n) {
+    CLICK_ALWAYS_INLINE void xchg_tx_sent_vec(struct rte_mbuf** elts, struct xchg** xchg, unsigned n) {
 //        for (unsigned i = 0; i < n; i++)
             //printf("SENTV %p\n", ((struct rte_mbuf**)xchg)[i]);
         rte_memcpy((void *)elts, (void*) xchg, n * sizeof(struct rte_mbuf*));
     }
 
-    bool xchg_elts_vec = true;
+    CLICK_ALWAYS_INLINE bool xchg_elts_vec = true;
 
 #elif !defined(XCHG_TX_SWAPONLY)
-    inline struct WritablePacket* get_tx_buf(struct xchg* x) {
+    CLICK_ALWAYS_INLINE struct WritablePacket* get_tx_buf(struct xchg* x) {
         return (struct WritablePacket*)x;
     }
 
-    uint16_t xchg_get_data_len(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE uint16_t xchg_get_data_len(struct xchg* xchg) {
         return get_tx_buf(xchg)->length();
     }
 
-    void xchg_tx_completed(struct rte_mbuf** elts, unsigned int part, unsigned int olx) {
+    CLICK_ALWAYS_INLINE void xchg_tx_completed(struct rte_mbuf** elts, unsigned int part, unsigned int olx) {
         //mlx5_tx_free_mbuf(elts, part, olx);
     }
 
-    bool xchg_do_tx_free = false;
+    CLICK_ALWAYS_INLINE bool xchg_do_tx_free = false;
     struct xchg* xchg_tx_next(struct xchg** xchgs) {
         WritablePacket** p = (WritablePacket**)xchgs;
         WritablePacket* pkt = *p;
@@ -273,14 +273,14 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
 
 
 
-    int xchg_nb_segs(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE int xchg_nb_segs(struct xchg* xchg) {
         //struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
         return 1; //NB_SEGS(pkt);
     }
 
     /* Advance in the list of packets, that is now permanently moved by one.
      * Returns the packet that was on top.*/
-    void xchg_tx_advance(struct xchg*** xchgs_p) {
+    CLICK_ALWAYS_INLINE void xchg_tx_advance(struct xchg*** xchgs_p) {
         struct WritablePacket** pkts = (WritablePacket**)(*xchgs_p);
         //printf("Advance : %p -> %p\n", *pkts, (*pkts)->next());
         *pkts = (WritablePacket*)(*pkts)->next();
@@ -288,27 +288,27 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
 
     }
 
-    void* xchg_get_buffer_addr(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void* xchg_get_buffer_addr(struct xchg* xchg) {
         //assert(DPDKDevice::is_dpdk_buffer(get_tx_buf(xchg)));
         //click_chatter("ADDR is %p", get_tx_buf(xchg)->buffer());
         WritablePacket* p = get_tx_buf(xchg);
         return p->buffer();
     }
 
-    void* xchg_get_buffer(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void* xchg_get_buffer(struct xchg* xchg) {
         return get_tx_buf(xchg)->data();
     }
 
-    struct rte_mbuf* xchg_get_mbuf(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE struct rte_mbuf* xchg_get_mbuf(struct xchg* xchg) {
         return (rte_mbuf*)((uint8_t*)xchg_get_buffer_addr(xchg) - sizeof(rte_mbuf));
     }
 
-    void xchg_tx_sent_inline(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void xchg_tx_sent_inline(struct xchg* xchg) {
         //printf("INLINED %p\n", xchg);
         //rte_pktmbuf_free_seg(pkt);
     }
 
-    void xchg_tx_sent(struct rte_mbuf** elts, struct xchg** xchgs) {
+    CLICK_ALWAYS_INLINE void xchg_tx_sent(struct rte_mbuf** elts, struct xchg** xchgs) {
         //printf("SENT %p\n", *xchg);
         struct rte_mbuf* tmp = *elts;
         if (tmp == 0)
@@ -327,7 +327,7 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
 
     bool xchg_elts_vec = false;
 
-    void xchg_tx_sent_vec(struct rte_mbuf** elts, struct xchg** xchg, unsigned n) {
+    CLICK_ALWAYS_INLINE void xchg_tx_sent_vec(struct rte_mbuf** elts, struct xchg** xchg, unsigned n) {
     }
 #elif !defined(NOXCHG)
 /*
@@ -338,29 +338,29 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
         return (struct rte_mbuf*)x;
     }
 
-    uint16_t xchg_get_data_len(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE uint16_t xchg_get_data_len(struct xchg* xchg) {
         return rte_pktmbuf_data_len(get_tx_buf(xchg));
     }
 
-    void xchg_tx_completed(struct rte_mbuf** elts, unsigned int part, unsigned int olx) {
+    CLICK_ALWAYS_INLINE void xchg_tx_completed(struct rte_mbuf** elts, unsigned int part, unsigned int olx) {
         //mlx5_tx_free_mbuf(elts, part, olx);
     }
 
     bool xchg_do_tx_free = false;
 
-    struct xchg* xchg_tx_next(struct xchg** xchgs) {
+    CLICK_ALWAYS_INLINE struct xchg* xchg_tx_next(struct xchg** xchgs) {
         struct rte_mbuf** pkts = (struct rte_mbuf**)xchgs;
         struct rte_mbuf* pkt = *(pkts);
         rte_prefetch0(pkt);
         return (struct xchg*)pkt;
     }
 
-    int xchg_nb_segs(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE int xchg_nb_segs(struct xchg* xchg) {
         struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
         return 1; //NB_SEGS(pkt);
     }
 
-    void xchg_tx_advance(struct xchg*** xchgs_p) {
+    CLICK_ALWAYS_INLINE void xchg_tx_advance(struct xchg*** xchgs_p) {
         struct rte_mbuf** pkts = (struct rte_mbuf**)(*xchgs_p);
 //        printf("Advance : %p -> %p = %p\n", pkts, pkts+1, *(pkts+1));
 //        assert(*pkts == (struct rte_mbuf*)0x87);
@@ -369,28 +369,28 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
        // struct rte_mbuf* pkt = *(pkts);
     }
 
-    void* xchg_get_buffer_addr(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void* xchg_get_buffer_addr(struct xchg* xchg) {
         struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
         return pkt->buf_addr;
     }
 
-    void* xchg_get_buffer(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void* xchg_get_buffer(struct xchg* xchg) {
         struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
         return rte_pktmbuf_mtod(pkt, void *);
     }
 
-    struct rte_mbuf* xchg_get_mbuf(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE struct rte_mbuf* xchg_get_mbuf(struct xchg* xchg) {
         return get_tx_buf(xchg);
     }
 
-    void xchg_tx_sent_inline(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void xchg_tx_sent_inline(struct xchg* xchg) {
         struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
         
         //printf("INLINED %p\n", xchg);
         //rte_pktmbuf_free_seg(pkt);
     }
 
-    void xchg_tx_sent(struct rte_mbuf** elts, struct xchg** xchg) {
+    CLICK_ALWAYS_INLINE void xchg_tx_sent(struct rte_mbuf** elts, struct xchg** xchg) {
         //printf("SENT %p\n", *xchg);
         struct rte_mbuf* tmp = *elts;
         *elts = (struct rte_mbuf*)*xchg;
@@ -400,7 +400,7 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
 
     bool xchg_elts_vec = false;
 
-    void xchg_tx_sent_vec(struct rte_mbuf** elts, struct xchg** xchg, unsigned n) {
+    CLICK_ALWAYS_INLINE void xchg_tx_sent_vec(struct rte_mbuf** elts, struct xchg** xchg, unsigned n) {
     }
 #endif
 
