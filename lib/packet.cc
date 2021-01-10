@@ -375,8 +375,8 @@ WritablePacket::pool_allocate()
 
         WritablePacket *p = packet_pool.p;
         if (p) {
-        packet_pool.p = static_cast<WritablePacket*>(p->next());
-        --packet_pool.pcount;
+            packet_pool.p = static_cast<WritablePacket*>(p->next());
+            --packet_pool.pcount;
         } else {
         p = new WritablePacket;
         }

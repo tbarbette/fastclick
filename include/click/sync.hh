@@ -76,6 +76,9 @@ public:
     explicit per_thread() {
         _size = click_max_cpu_ids();
         storage = CLICK_ALIGNED_NEW(AT,_size);
+        for (unsigned i = 0; i < _size; i++) {
+            new (&storage[i].v) T;
+        }
     }
 
     explicit per_thread(T v) {
