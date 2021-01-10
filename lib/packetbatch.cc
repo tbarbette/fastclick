@@ -82,7 +82,7 @@ void PacketBatch::fast_kill_nonatomic() {
  **/
 PacketBatch *
 PacketBatch::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
-        buffer_destructor_type destructor, void* argument )
+        buffer_destructor_type destructor, void* argument, bool clean )
 {
 #if CLICK_PACKET_USE_DPDK
     click_chatter("UNIMPLEMENTED");
@@ -98,7 +98,7 @@ PacketBatch::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
     WritablePacket *last = p;
     uint16_t i = 0;
     while(p) {
-        p->initialize();
+        p->initialize(clean);
         p->_head = p->_data = data;
         p->_tail = p->_end = data + length[i];
         data += length[i] & 63 ? (length[i] & ~63) + 64 : length[i];
