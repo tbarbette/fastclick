@@ -419,7 +419,7 @@ WritablePacket::pool_data_allocate()
  */
 inline  WritablePacket *
 WritablePacket::pool_allocate(uint32_t headroom, uint32_t length,
-			      uint32_t tailroom)
+			      uint32_t tailroom, bool clear)
 {
     uint32_t n = headroom + length + tailroom;
 
@@ -432,14 +432,14 @@ WritablePacket::pool_allocate(uint32_t headroom, uint32_t length,
 #if HAVE_DPDK_PACKET_POOL
        buffer_destructor_type type = p->_destructor;
 #endif
-        p->initialize();
+        p->initialize(clear);
 #if HAVE_DPDK_PACKET_POOL
         p->_destructor = type;
 #endif
     } else {
         p = pool_allocate();
         p->alloc_data(headroom,length,tailroom);
-        p->initialize();
+        p->initialize(clear);
     }
 
 	return p;
@@ -696,7 +696,7 @@ void WritablePacket::pool_transfer(int from, int to) {
  * null. */
 WritablePacket *
 Packet::make(uint32_t headroom, const void *data,
-	     uint32_t length, uint32_t tailroom)
+	     uint32_t length, uint32_t tailroom, bool clear)
 {
 
 	#if CLICK_LINUXMODULE
@@ -713,6 +713,7 @@ Packet::make(uint32_t headroom, const void *data,
 			skb->pkt_type = HOST;
 		# endif
 		WritablePacket *q = reinterpret_cast<WritablePacket *>(skb);
+        if (clear)
 		q->clear_annotations();
 		return q;
 		} else
@@ -776,7 +777,7 @@ Packet::make(uint32_t headroom, const void *data,
  * null. */
 WritablePacket *
 Packet::make(unsigned char *data, uint32_t length,
-	     buffer_destructor_type destructor, void* argument, int headroom, int tailroom)
+	     buffer_destructor_type destructor, void* argument, int headroom, int tailroom, bool clear)
 {
 #if CLICK_PACKET_USE_DPDK
 assert(false); //TODO
@@ -787,7 +788,7 @@ assert(false); //TODO
     WritablePacket *p = new WritablePacket;
 # endif
     if (p) {
-	p->initialize();
+	p->initialize(clear);
 	p->_head = data - headroom;
 	p->_data = data;
 	p->_tail = data + length;

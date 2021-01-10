@@ -107,6 +107,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 #endif
         .read("MAX_RSS", max_rss).read_status(has_rss)
         .read("TIMESTAMP", set_timestamp)
+        .read_or_set("CLEAR", _clear, false)
         .read("PAUSE", fc_mode)
 #if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
         .read("IPCO", _ipco)
@@ -221,7 +222,6 @@ void* FromDPDKDevice::cast(const char* name) {
     return RXQueueDevice::cast(name);
 }
 
-
 int FromDPDKDevice::initialize(ErrorHandler *errh)
 {
     int ret;
@@ -308,18 +308,19 @@ bool FromDPDKDevice::run_task(Task *t)
             unsigned char* data = rte_pktmbuf_mtod(pkts[i], unsigned char *);
             rte_prefetch0(data);
 #if CLICK_PACKET_USE_DPDK
-            WritablePacket *p = static_cast<WritablePacket*>(Packet::make(pkts[i]));
+    WritablePacket *p = static_cast<WritablePacket *>(Packet::make(pkts[i], _clear));
 #elif HAVE_ZEROCOPY
             WritablePacket *p = Packet::make(data,
                      rte_pktmbuf_data_len(pkts[i]),
                      DPDKDevice::free_pkt,
                      pkts[i],
                      rte_pktmbuf_headroom(pkts[i]),
-                     rte_pktmbuf_tailroom(pkts[i])
+                     rte_pktmbuf_tailroom(pkts[i]),
+                     _clear
                      );
 #else
             WritablePacket *p = Packet::make(data,
-                                     (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));
+                                     (uint32_t)rte_pktmbuf_pkt_len(pkts[i]), _clear);
             rte_pktmbuf_free(pkts[i]);
             data = p->data();
 #endif

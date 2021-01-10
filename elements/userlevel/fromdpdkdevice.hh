@@ -462,6 +462,7 @@ private:
     bool _tco;
     bool _uco;
     bool _ipco;
+    bool _clear;
 };
 
 CLICK_ENDDECLS

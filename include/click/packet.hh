@@ -64,13 +64,13 @@ class Packet { public:
     };
 
     static WritablePacket *make(uint32_t headroom, const void *data,
-				uint32_t length, uint32_t tailroom) CLICK_WARN_UNUSED_RESULT;
+				uint32_t length, uint32_t tailroom, bool clear = true) CLICK_WARN_UNUSED_RESULT;
     static inline WritablePacket *make(const void *data, uint32_t length) CLICK_WARN_UNUSED_RESULT;
     static inline WritablePacket *make(uint32_t length) CLICK_WARN_UNUSED_RESULT;
 #if CLICK_LINUXMODULE
     static Packet *make(struct sk_buff *skb) CLICK_WARN_UNUSED_RESULT;
 #elif CLICK_PACKET_USE_DPDK
-    static Packet *make(struct rte_mbuf *mb) CLICK_WARN_UNUSED_RESULT;
+    static Packet *make(struct rte_mbuf *mb, bool clear = true) CLICK_WARN_UNUSED_RESULT;
 #endif
 #if CLICK_BSDMODULE
     // Packet::make(mbuf *) wraps a Packet around an existing mbuf.
@@ -89,7 +89,7 @@ class Packet { public:
 
     static WritablePacket* make(unsigned char* data, uint32_t length,
 				buffer_destructor_type buffer_destructor,
-                                void* argument = (void*) 0, int headroom = 0, int tailroom = 0) CLICK_WARN_UNUSED_RESULT;
+                                void* argument = (void*) 0, int headroom = 0, int tailroom = 0, bool clear = true) CLICK_WARN_UNUSED_RESULT;
 #endif //CLICK_USERLEVEL || CLICK_MINIOS
 
 
@@ -140,6 +140,7 @@ class Packet { public:
         assert(false);
         return NULL;
     }
+
     void set_buffer_destructor(buffer_destructor_type) {
         click_chatter("ILLEGAL CALL TO set_buffer_destructor");
         assert(false);
@@ -157,15 +158,18 @@ class Packet { public:
     void set_buffer_destructor(buffer_destructor_type destructor) {
     	_destructor = destructor;
     }
+
     buffer_destructor_type buffer_destructor() const {
 	return _destructor;
     }
+
     void* destructor_argument() const {
     	return _destructor_argument;
     }
+
     void reset_buffer() {
-	_head = _data = _tail = _end = 0;
-	_destructor = 0;
+	    _head = _data = _tail = _end = 0;
+	    _destructor = 0;
     }
 #endif
 
@@ -959,7 +963,7 @@ class WritablePacket : public Packet { public:
     }
 
     #if !CLICK_LINUXMODULE || CLICK_PACKET_USE_DPDK
-        inline void initialize();
+        inline void initialize(bool clear);
         inline void initialize_data();
     #endif
         WritablePacket(const Packet &x);
@@ -976,7 +980,7 @@ class WritablePacket : public Packet { public:
     static WritablePacket *pool_allocate();
     static WritablePacket *pool_data_allocate();
     static WritablePacket *pool_allocate(uint32_t headroom, uint32_t length,
-					 uint32_t tailroom);
+					 uint32_t tailroom, bool clear =true);
 
     static void check_data_pool_size(PacketPool &packet_pool);
     static void check_packet_pool_size(PacketPool &packet_pool);
@@ -990,6 +994,7 @@ class WritablePacket : public Packet { public:
     friend class Packet;
     friend class PacketBatch;
     friend class NetmapDevice;
+    friend class FromDPDKDevice;
 
 };
 
@@ -1050,7 +1055,7 @@ Packet::copy_annotations(const Packet *p, bool)
 
 #if !CLICK_LINUXMODULE
 inline void
-WritablePacket::initialize()
+WritablePacket::initialize(bool clear)
 {
 #if CLICK_PACKET_USE_DPDK
     click_chatter("UNIMPLEMENTED");
@@ -1064,7 +1069,8 @@ WritablePacket::initialize()
     _m = 0;
 # endif
 #endif
-    clear_annotations();
+    if (clear)
+        clear_annotations();
 }
 inline void
 WritablePacket::initialize_data()
@@ -1671,7 +1677,7 @@ Packet::make(struct sk_buff *skb)
  * The returned packet's annotations and header pointers <em>are not
  * set</em>. */
 inline Packet *
-Packet::make(struct rte_mbuf *mb)
+Packet::make(struct rte_mbuf *mb, bool clear)
 {
   /*  if (unlikely(mb->type != RTE_MBUF_PKT)) {
         click_chatter("cannot convert ctrlmbuf to Packet");
@@ -1686,7 +1692,8 @@ Packet::make(struct rte_mbuf *mb)
         return 0;
     }*/
     Packet *p = reinterpret_cast<Packet *>(mb);
-    p->clear_annotations();
+    if (clear)
+        p->clear_annotations();
     return p;
 }
 #endif
