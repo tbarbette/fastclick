@@ -1,6 +1,7 @@
 #ifndef CLICK_TODPDKDEVICE_USERLEVEL_HH
 #define CLICK_TODPDKDEVICE_USERLEVEL_HH
 
+#include <click/config.h>
 #include <click/batchelement.hh>
 #include <click/sync.hh>
 #include <click/dpdkdevice.hh>
@@ -140,7 +141,9 @@ public:
         h_opackets,h_obytes,h_oerrors
     };
 
+#if HAVE_IQUEUE
     void run_timer(Timer *);
+#endif
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch *head);
 #endif
@@ -151,10 +154,11 @@ private:
 
     inline void enqueue(rte_mbuf* &q, rte_mbuf* mbuf, const Packet* p);
 
+#if HAVE_IQUEUE
     inline void set_flush_timer(DPDKDevice::TXInternalQueue &iqueue);
     void flush_internal_tx_queue(DPDKDevice::TXInternalQueue &);
-
     per_thread<DPDKDevice::TXInternalQueue> _iqueues;
+#endif
 
     DPDKDevice* _dev;
     int _timeout;
