@@ -52,7 +52,13 @@ EtherMirror::simple_action(Packet *p)
 PacketBatch *
 EtherMirror::simple_action_batch(PacketBatch *batch)
 {
+#ifdef CLICK_NOINDIRECT
+    FOR_EACH_PACKET(batch, p)   {
+        EtherMirror::simple_action(p);
+    }
+#else
     EXECUTE_FOR_EACH_PACKET_DROPPABLE(EtherMirror::simple_action, batch, [](Packet*){});
+#endif
     return batch;
 }
 #endif

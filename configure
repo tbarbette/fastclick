@@ -818,6 +818,7 @@ enable_dpdk
 enable_dpdk_pool
 enable_dpdk_packet
 enable_zerocopy
+enable_clone
 enable_linuxmodule
 enable_fixincludes
 enable_multithread
@@ -1548,6 +1549,7 @@ Optional Features:
     --enable-dpdk-pool    use DPDK buffer instead of standard Click buffer
     --enable-dpdk-packet  Click packets are DPDK packet
     --disable-zerocopy    disable Zero Copy
+    --disable-clone       disable packet cloning
   --enable-linuxmodule    disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
     --enable-multithread  support kernel multithreading
@@ -7281,6 +7283,17 @@ if test "x$enable_zerocopy" = xyes; then
     $as_echo "#define HAVE_ZEROCOPY 1" >>confdefs.h
 
 fi
+
+# Check whether --enable-clone was given.
+if test "${enable_clone+set}" = set; then :
+  enableval=$enable_clone; $as_echo "#define CLICK_NOINDIRECT 1" >>confdefs.h
+
+else
+  :
+fi
+
+
+
 
 
 # Check whether --enable-linuxmodule was given.

@@ -221,8 +221,14 @@ Packet::~Packet()
 #elif CLICK_PACKET_USE_DPDK
     rte_panic("Packet destructor");
 #else
+#ifndef CLICK_NOINDIRECT
     if (_data_packet)
 	_data_packet->kill();
+#else
+    if (false)  {
+        while(0){};
+    }
+#endif
 # if CLICK_USERLEVEL || CLICK_MINIOS
     else if (_head && _destructor) {
         if (_destructor != empty_destructor)
@@ -511,7 +517,11 @@ inline bool WritablePacket::is_from_data_pool(WritablePacket *p) {
 	return likely(!p->_data_packet && p->_head
 			&& (p->_destructor == DPDKDevice::free_pkt));
 #else
-    if (likely(!p->_data_packet && p->_head && !p->_destructor)) {
+    if (likely(
+#ifndef CLICK_NOINDIRECT
+                !p->_data_packet &&
+#endif
+                p->_head && !p->_destructor)) {
 # if HAVE_NETMAP_PACKET_POOL
         return NetmapBufQ::is_valid_netmap_packet(p);
 # else
@@ -895,7 +905,10 @@ Packet::clone(bool fast)
     if (!p)
 	return 0;
     if (unlikely(fast)) {
+
+#ifndef CLICK_NOINDIRECT
         p->_use_count = 1;
+#endif
         p->_head = _head;
         p->_data = _data;
         p->_tail = _tail;
@@ -908,17 +921,29 @@ Packet::clone(bool fast)
           p->_destructor = DPDKDevice::free_pkt;
           p->_destructor_argument = destructor_argument();
           rte_mbuf_refcnt_update((rte_mbuf*)p->_destructor_argument, 1);
-        } else if (data_packet() && DPDKDevice::is_dpdk_packet(data_packet())) {
+        }
+
+#ifndef CLICK_NOINDIRECT
+        else if (
+                data_packet() && DPDKDevice::is_dpdk_packet(data_packet())) {
            p->_destructor = DPDKDevice::free_pkt;
            p->_destructor_argument = data_packet()->destructor_argument();
            rte_mbuf_refcnt_update((rte_mbuf*)p->_destructor_argument, 1);
-        } else
+        }
+#endif
+        else
 #endif
         {
         p->_destructor = empty_destructor;
         }
+
+#ifndef CLICK_NOINDIRECT
         p->_data_packet = 0;
+#endif
     } else {
+
+#ifndef CLICK_NOINDIRECT
+
         Packet* origin = this;
         if (origin->_data_packet)
             origin = origin->_data_packet;
@@ -932,6 +957,9 @@ Packet::clone(bool fast)
 	# endif
 		// increment our reference count because of _data_packet reference
 		origin->_use_count++;
+#else
+        assert(false);
+#endif
     }
     return p;
 
@@ -1014,6 +1042,8 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     buffer_destructor_type desc = p->_destructor;
     void* arg = p->_destructor_argument;
 #endif
+
+#ifndef CLICK_NOINDIRECT
     if (_use_count > 1) {
         memcpy(p, this, sizeof(Packet));
 
@@ -1022,9 +1052,14 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
         # else
             p->_m = m;
         # endif
-    } else {
+    } else
+#endif
+    {
         p->_head = NULL;
+
+#ifndef CLICK_NOINDIRECT
         p->_data_packet = NULL; //packet from pool_data_allocate can be dirty
+#endif
         WritablePacket::recycle(p);
         p = (WritablePacket*)this;
     }
@@ -1043,9 +1078,14 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     memcpy(p->_head + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
 
     // free old data
+#ifndef CLICK_NOINDIRECT
     if (_data_packet) {
       _data_packet->kill();
     }
+#else
+    if (false) {
+    }
+#endif
 # if CLICK_USERLEVEL || CLICK_MINIOS
     else if (_destructor) {
       _destructor(old_head, old_end - old_head, _destructor_argument);
@@ -1070,8 +1110,10 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     m_freem(old_m); // alloc_data() created a new mbuf, so free the old one
 # endif
 
+#ifndef CLICK_NOINDIRECT
     p->_use_count = 1;
     p->_data_packet = 0;
+#endif
     p->shift_header_annotations(old_head, extra_headroom);
     return p;
 
