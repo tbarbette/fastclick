@@ -374,7 +374,7 @@ RequireLexerExtra::require(String type, String value, ErrorHandler *errh)
 }
 
 
-static Lexer *_click_lexer;
+static Lexer *_click_lexer = 0;
 
 Lexer *
 click_lexer()
