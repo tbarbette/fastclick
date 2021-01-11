@@ -987,7 +987,7 @@ CxxInfo::parse_class(const String &text, int p, const String &original,
       p++;
       continue;
     } else if (s[p] == '}') {
-      fprintf(stderr, " end of class at %d !!!!!!/\n",p+1);
+      //fprintf(stderr, " end of class at %d !!!!!!/\n",p+1);
       return p + 1;
     } else if (s[p] == '{') {
 
@@ -1155,9 +1155,6 @@ CxxClass::find_in_parent(const String& name, const String& outer_class) {
             }
 
             return f;
-        } else {
-
-                click_chatter("Parent has no push batch");
         }
     }
     return 0;

@@ -647,9 +647,10 @@ Element::Port::Port()
 {
     PORT_ASSIGN(0);
 }
+#ifndef __clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpmf-conversions"
-
+#endif
 inline void
 Element::Port::assign(bool isoutput, Element *e, int port)
 {
@@ -680,9 +681,9 @@ Element::Port::assign(bool isoutput, Element *e, int port)
     }
 #endif
 }
-
+#ifndef __clang__
 #pragma GCC diagnostic pop
-
+#endif
 inline void
 Element::Port::assign(bool isoutput, Element *owner, Element *e, int port)
 {
