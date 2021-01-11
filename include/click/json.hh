@@ -23,6 +23,8 @@ class Json { public:
 	j_null = 0, j_array, j_object, j_int, j_double, j_bool, j_string
     };
 
+    const char *class_name() const       { return "Json"; }
+
     typedef int size_type;
 
     typedef Pair<const String, Json> object_value_type;
