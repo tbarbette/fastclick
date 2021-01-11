@@ -409,7 +409,7 @@ MonitoringReportSocket::run_timer(Timer *t)
             if (_verbose) {            
                 click_chatter(
                     "Handler %s.%s: Timestamp %" PRId64 " - Value: %" PRId64
-                    " - Name %s - Message length %d bytes",
+                    " - Name %s - Message length %zu bytes",
                     e->name().c_str(), h->name().c_str(),
                     ts, value, handler_name.c_str(), sizeof(buffer)
                 );

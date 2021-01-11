@@ -939,6 +939,10 @@ if test "x$enable_nanotimestamp" = xyes; then
     AC_DEFINE([HAVE_NANOTIMESTAMP_ENABLED], [1], [Define if nanosecond-granularity timestamps are enabled.])
 fi
 
+AC_ARG_ENABLE([simtime],
+    [AS_HELP_STRING([--enable-simtime], [enable support for simulated timing])],
+    [AC_DEFINE([HAVE_SIMTIME])], [enable_simtime=no])
+
 AC_ARG_ENABLE([user_timestamp],
     [AS_HELP_STRING([--enable-user-timestamp], [enable support for user-provided clock system])],
     [:], [enable_user_timestamp=no])

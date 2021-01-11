@@ -76,6 +76,10 @@ class AverageCounterBase : public BatchElement { public:
 
 template <typename T>
 struct AverageCounterStats {
+    AverageCounterStats() {
+        reset();
+    }
+
     T _count;
     T _byte_count;
     T _first;

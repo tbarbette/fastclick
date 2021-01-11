@@ -25,6 +25,7 @@
 #include <click/dpdkdevice.hh>
 #include <click/userutils.hh>
 #include <rte_errno.h>
+#include <click/dpdk_glue.hh>
 
 #if CLICK_PACKET_USE_DPDK
 #define DPDK_ANNO_SIZE sizeof(Packet::AllAnno)
@@ -1030,6 +1031,19 @@ int DPDKDevice::static_initialize(ErrorHandler* errh) {
         }
         return -1;
     }
+#if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
+        rte_mbuf_dyn_rx_timestamp_register(&timestamp_dynfield_offset, &timestamp_dynflag);
+        if (timestamp_dynfield_offset < 0) {
+            rte_exit(EXIT_FAILURE, "Cannot register mbuf field\n");
+        }
+        if (timestamp_dynflag < 0) {
+            RTE_ETHDEV_LOG(ERR,
+                    "Failed to register mbuf flag for Rx timestamp\n");
+            return -rte_errno;
+        }
+        //timestamp_dynflag = RTE_BIT64(offset);
+#endif
+
     return 0;
 }
 
@@ -1346,14 +1360,8 @@ DPDKRing::parse(Args* args) {
 }
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
-struct rte_mbuf_dynflag rx_flag_desc = {
-    RTE_MBUF_DYNFLAG_RX_TIMESTAMP_NAME,
-};
-struct rte_mbuf_dynfield timestamp_dynfield_desc = {
-    RTE_MBUF_DYNFIELD_TIMESTAMP_NAME,
-    sizeof(uint64_t),
-    __alignof__(uint64_t),
-};
+    int timestamp_dynfield_offset;
+    uint64_t timestamp_dynflag;
 #endif
 
 #if HAVE_DPDK_PACKET_POOL

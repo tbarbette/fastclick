@@ -334,6 +334,7 @@ hotconfig_handler(const String &text, Element *, void *args, ErrorHandler *errh)
 }
 
 
+#ifdef TIMESTAMP_WARPABLE
 // timewarping
 
 static String
@@ -362,7 +363,7 @@ timewarp_write_handler(const String &text, Element *, void *, ErrorHandler *errh
     }
     return 0;
 }
-
+#endif
 
 // main
 
@@ -439,10 +440,12 @@ main(int argc, char **argv)
   // provide hotconfig handler if asked
   if (args.allow_reconfigure)
       Router::add_write_handler(0, "hotconfig", hotconfig_handler, &args, Handler::f_raw | Handler::f_nonexclusive);
+
+#ifdef TIMESTAMP_WARPABLE
   Router::add_read_handler(0, "timewarp", timewarp_read_handler, 0);
   if (Timestamp::warp_class() != Timestamp::warp_simulation)
       Router::add_write_handler(0, "timewarp", timewarp_write_handler, 0);
-
+#endif
   // parse configuration
   click_master = new Master(click_nthreads);
   click_router = parse_configuration(args.router_file, args.file_is_expr, false, args, errh);
@@ -479,7 +482,12 @@ main(int argc, char **argv)
 
   struct rusage before, after;
   getrusage(RUSAGE_SELF, &before);
+
+#ifdef TIMESTAMP_WARPABLE
   Timestamp before_time = Timestamp::now_unwarped();
+#else
+  Timestamp before_time = Timestamp::now();
+#endif
   Timestamp after_time = Timestamp::uninitialized_t();
 
   // run driver
@@ -530,7 +538,11 @@ main(int argc, char **argv)
   } else if (!args.quit_immediately && args.warnings)
     errh->warning("%s: configuration has no elements, exiting", filename_landmark(args.router_file, args.file_is_expr));
 
+#ifdef TIMESTAMP_WARPABLE
   after_time.assign_now_unwarped();
+#else
+  after_time.assign_now();
+#endif
   getrusage(RUSAGE_SELF, &after);
   // report time
   if (args.report_time) {

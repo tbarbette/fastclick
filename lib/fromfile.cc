@@ -34,7 +34,11 @@
 CLICK_DECLS
 
 FromFile::FromFile()
-    : _fd(-1), _buffer(0), _data_packet(0),
+    : _fd(-1),
+#if !CLICK_PACKET_USE_DPDK
+     _buffer(0),
+    _data_packet(0),
+#endif
 #ifdef ALLOW_MMAP
       _mmap(true),
 #endif
@@ -173,17 +177,21 @@ FromFile::read_buffer_mmap(ErrorHandler *errh)
 int
 FromFile::read_buffer(ErrorHandler *errh)
 {
-    if (_data_packet)
+#if !CLICK_PACKET_USE_DPDK
+    if (_data_packet) {
 	_data_packet->kill();
+    }
     _data_packet = 0;
+#endif
 
     _file_offset += _len;
     _pos -= _len;		// adjust _pos by _len: it might validly point
 				// beyond _len
     _len = 0;
 
-    if (_fd < 0)
-	return _fd == -1 ? -EBADF : _len;
+    if (_fd < 0) {
+	    return _fd == -1 ? -EBADF : _len;
+    }
 
 #ifdef ALLOW_MMAP
     if (_mmap) {
@@ -197,12 +205,18 @@ FromFile::read_buffer(ErrorHandler *errh)
     }
 #endif
 
+#if !CLICK_PACKET_USE_DPDK
     _data_packet = Packet::make(0, 0, BUFFER_SIZE, 0);
     if (!_data_packet)
 	return error(errh, strerror(ENOMEM));
     _buffer = _data_packet->data();
     unsigned char *data = _data_packet->data();
-    assert(_data_packet->headroom() == 0);
+#else
+
+    unsigned char *data = _buffer;
+#endif
+
+//    assert(_data_packet->headroom() == 0);
 
     while (_len < BUFFER_SIZE) {
 	ssize_t got = ::read(_fd, data + _len, BUFFER_SIZE - _len);
@@ -245,18 +259,21 @@ FromFile::read_line(String &result, ErrorHandler *errh, bool temporary)
     // first, try to read a line from the current buffer
     const unsigned char *s = _buffer + _pos;
     const unsigned char *e = _buffer + _len;
-    while (s < e && *s != '\n' && *s != '\r')
-	s++;
+
+    while (s < e && *s != '\n' && *s != '\r') {
+	    s++;
+    }
+
     if (s < e && (*s == '\n' || s + 1 < e)) {
-	s += (*s == '\r' && s[1] == '\n' ? 2 : 1);
-	int new_pos = s - _buffer;
-	if (temporary)
-	    result = String::make_stable((const char *) (_buffer + _pos), new_pos - _pos);
-	else
-	    result = String((const char *) (_buffer + _pos), new_pos - _pos);
-	_pos = new_pos;
-	_lineno++;
-	return 1;
+        s += (*s == '\r' && s[1] == '\n' ? 2 : 1);
+        int new_pos = s - _buffer;
+        if (temporary)
+            result = String::make_stable((const char *) (_buffer + _pos), new_pos - _pos);
+        else
+            result = String((const char *) (_buffer + _pos), new_pos - _pos);
+        _pos = new_pos;
+        _lineno++;
+        return 1;
     }
 
     // otherwise, build up a line
@@ -313,6 +330,22 @@ FromFile::peek_line(String &result, ErrorHandler *errh, bool temporary)
 }
 
 int
+FromFile::reset(off_t want, ErrorHandler* errh)
+{
+#ifdef ALLOW_MMAP
+    _mmap_unit = 0;
+    _mmap_off = 0;
+#else
+    lseek(_fd, 0, SEEK_SET);
+#endif
+    _file_offset = 0;
+    _pos = _len = 0;
+    int result = read_buffer(errh);
+    _pos = want;
+    return result;
+}
+
+int
 FromFile::seek(off_t want, ErrorHandler* errh)
 {
     if (want >= _file_offset && want < (off_t) (_file_offset + _len)) {
@@ -324,6 +357,8 @@ FromFile::seek(off_t want, ErrorHandler* errh)
     if (_mmap) {
 	_mmap_off = (want / _mmap_unit) * _mmap_unit;
 	_pos = _len + want - _mmap_off;
+	_file_offset = 0; // Is that correct?
+	// TODO: fix lineno
 	return 0;
     }
 #endif
@@ -356,6 +391,9 @@ FromFile::seek(off_t want, ErrorHandler* errh)
 int
 FromFile::set_data(const String& data, ErrorHandler* errh)
 {
+#if CLICK_PACKET_USE_DPDK
+    assert(false);
+#else
     assert(_fd == -1 && !_data_packet);
     _data_packet = Packet::make(0, data.data(), data.length(), 0);
     if (!_data_packet)
@@ -366,6 +404,7 @@ FromFile::set_data(const String& data, ErrorHandler* errh)
     _len = data.length();
     _filename = "<data>";
     _fd = -2;
+#endif
     return 0;
 }
 
@@ -422,11 +461,14 @@ FromFile::initialize(ErrorHandler *errh, bool allow_nonexistent)
 void
 FromFile::take_state(FromFile &o, ErrorHandler *errh)
 {
+#if CLICK_PACKET_USE_DPDK
+    assert(false);
+#else
+
     _fd = o._fd;
     o._fd = -1;
     _pipe = o._pipe;
     o._pipe = 0;
-
     _buffer = o._buffer;
     _pos = o._pos;
     _len = o._len;
@@ -445,6 +487,9 @@ FromFile::take_state(FromFile &o, ErrorHandler *errh)
 #endif
 
     _file_offset = o._file_offset;
+
+#endif
+
 }
 
 void
@@ -456,9 +501,12 @@ FromFile::cleanup()
 	close(_fd);
     _pipe = 0;
     _fd = -1;
+#if CLICK_PACKET_USE_DPDK
+#else
     if (_data_packet)
 	_data_packet->kill();
     _data_packet = 0;
+#endif
 }
 
 const uint8_t *
@@ -519,23 +567,28 @@ FromFile::get_string(size_t size, ErrorHandler *errh)
 Packet *
 FromFile::get_packet(size_t size, uint32_t sec, uint32_t subsec, ErrorHandler *errh)
 {
+#if CLICK_PACKET_USE_DPDK
+#else
     if (_pos + size <= _len) {
-	if (Packet *p = _data_packet->clone()) {
-	    p->shrink_data(_buffer + _pos, size);
-	    p->timestamp_anno().assign(sec, subsec);
-	    _pos += size;
-	    return p;
-	}
-    } else {
+
+        if (Packet *p = _data_packet->clone()) {
+            p->shrink_data(_buffer + _pos, size);
+            p->timestamp_anno().assign(sec, subsec);
+            _pos += size;
+            return p;
+        }
+    } else
+#endif
+    {
 	if (WritablePacket *p = Packet::make(0, 0, size, 0)) {
 	    if (read(p->data(), size, errh) < (int)size) {
-		p->kill();
+		    p->kill();
 		return 0;
 	    } else {
 		p->timestamp_anno().assign(sec, subsec);
 		return p;
 	    }
-	}
+    }
     }
     error(errh, strerror(ENOMEM));
     return 0;
@@ -545,13 +598,16 @@ Packet *
 FromFile::get_packet_from_data(const void *data_void, size_t data_size, size_t size, uint32_t sec, uint32_t subsec, ErrorHandler *errh)
 {
     const uint8_t *data = reinterpret_cast<const uint8_t *>(data_void);
+#if !CLICK_PACKET_USE_DPDK
     if (data >= _buffer && data + size <= _buffer + _len) {
 	if (Packet *p = _data_packet->clone()) {
 	    p->shrink_data(data, size);
 	    p->timestamp_anno().assign(sec, subsec);
 	    return p;
 	}
-    } else {
+    } else
+#endif
+    {
 	if (WritablePacket *p = Packet::make(0, 0, size, 0)) {
 	    memcpy(p->data(), data, data_size);
 	    if (data_size < size

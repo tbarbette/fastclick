@@ -25,6 +25,7 @@
 #include <click/standard/scheduleinfo.hh>
 #include <click/etheraddress.hh>
 #include <click/straccum.hh>
+#include <click/dpdk_glue.hh>
 
 #include "fromdpdkdevice.hh"
 #include "tscclock.hh"

@@ -38,7 +38,9 @@ static inline int rte_ring_mc_dequeue_bulk(struct rte_ring *r, void **obj_table,
 #define HAS_TIMESTAMP(mbuf) \
         (mbuf->ol_flags & PKT_RX_TIMESTAMP)
 #else
+extern "C" {
 #include <rte_mbuf_dyn.h>
+}
 #include <rte_bitops.h>
 #define TIMESTAMP_FIELD(mbuf) \
            (*RTE_MBUF_DYNFIELD(mbuf, timestamp_dynfield_offset, uint64_t *))

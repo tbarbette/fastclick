@@ -7,7 +7,7 @@ the same record timestamp. With OFFSET set, RecordTimestamp should
 loop in its internal array reading the timestamp number instead of growing.
 
 %script
-click -j 1 CONFIG
+click -j 1 CONFIG --simtime
 
 %file CONFIG
 define($STOP 100)

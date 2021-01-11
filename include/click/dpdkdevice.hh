@@ -312,7 +312,7 @@ public:
     */
     class TXInternalQueue {
         public:
-            TXInternalQueue() : pkts(0), index(0), nr_pending(0) { }
+            TXInternalQueue() : pkts(0), index(0), nr_pending(0), timeout() { }
 
             // Array of DPDK Buffers
             struct rte_mbuf **pkts;

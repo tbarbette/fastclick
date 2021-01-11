@@ -65,7 +65,7 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
 #if RTE_VERSION > RTE_VERSION_NUM(18,8,0,0)
     if (lf) {
         _flags &= ~RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY;
-        _flags |= ~RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY_LF;
+        _flags |= RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY_LF | RTE_HASH_EXTRA_FLAGS_MULTI_WRITER_ADD;
     }
 #endif
 

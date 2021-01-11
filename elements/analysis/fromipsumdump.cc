@@ -49,7 +49,7 @@ CLICK_DECLS
 #define GET1(p)        ((p)[0])
 
 FromIPSummaryDump::FromIPSummaryDump()
-    : _work_packet(0), _task(this), _timer(this)
+    : _work_packet(0), _task(this), _timer(this), _first_packet_pos(0)
 {
     _ff.set_landmark_pattern("%f:%l");
     in_batch_mode = BATCH_MODE_YES;
@@ -76,6 +76,10 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
     _sampling_prob = (1 << SAMPLING_SHIFT);
     String default_contents, default_flowid, data;
     unsigned burst = 1;
+    bool timestamp = true;
+
+    if (_ff.configure_keywords(conf, this, errh) < 0)
+	return -1;
 
     if (Args(conf, this, errh)
         .read_p("FILENAME", FilenameArg(), _ff.filename())
@@ -96,6 +100,8 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("ALLOW_NONEXISTENT", allow_nonexistent)
         .read("DATA", data)
         .read("BURST", burst)
+        .read("TIMESTAMP", timestamp)
+	    .read_or_set("TIMES", _times, 1)
     .complete() < 0)
     return -1;
     if (_sampling_prob > (1 << SAMPLING_SHIFT)) {
@@ -115,6 +121,10 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
     _multipacket = multipacket;
     _have_flowid = _have_aggregate = _binary = false;
     _burst = burst;
+    _set_timestamp = timestamp;
+
+    _times--; // It's like a do...while
+
     if (default_contents)
     bang_data(default_contents, errh);
     if (default_flowid)
@@ -164,7 +174,7 @@ FromIPSummaryDump::initialize(ErrorHandler *errh)
     _timer.initialize(this);
     _format_complaint = false;
     if (output_is_push(0))
-    ScheduleInfo::initialize_task(this, &_task, _active, errh);
+        ScheduleInfo::initialize_task(this, &_task, _active, errh);
 
     int e = _ff.initialize(errh, _allow_nonexistent);
     if (e == -ENOENT && _allow_nonexistent)
@@ -250,7 +260,7 @@ FromIPSummaryDump::bang_data(const String &line, ErrorHandler *errh)
     }
 
     if (_fields.size() == 0)
-    _ff.error(errh, "no contents specified");
+        _ff.error(errh, "no contents specified");
 
     click_qsort(_field_order.begin(), _fields.size(), sizeof(int),
         sort_fields_compare, this);
@@ -265,7 +275,7 @@ FromIPSummaryDump::bang_proto(const String &line, const char *type,
     int32_t proto;
 
     if (words.size() != 2)
-    _ff.error(errh, "bad %s", type);
+        _ff.error(errh, "bad %s", type);
     else if (NameInfo::query_int(NameInfo::T_IP_PROTO, this, words[1], &proto)
          && proto < 256)
     _default_proto = proto;
@@ -276,7 +286,7 @@ FromIPSummaryDump::bang_proto(const String &line, const char *type,
     else if (words[1] == "I")
     _default_proto = IP_PROTO_ICMP;
     else
-    _ff.error(errh, "bad protocol in %s", type);
+        _ff.error(errh, "bad protocol in %s", type);
 }
 
 void
@@ -374,6 +384,14 @@ FromIPSummaryDump::read_packet(ErrorHandler *errh)
         binary = (result == 1);
     } else if (_ff.read_line(line, errh, true) <= 0) {
       eof:
+        if(_times)
+        {
+            if (_times>0)
+                _times--;
+            _ff.reset(binary?_first_packet_pos-4:_first_packet_pos, errh);
+            continue;
+        }
+
         _ff.cleanup();
         return 0;
     }
@@ -384,9 +402,14 @@ FromIPSummaryDump::read_packet(ErrorHandler *errh)
     if (data == end)
         /* do nothing */;
     else if (binary || (data[0] != '!' && data[0] != '#'))
+    {
         /* real packet */
-        break;
-
+	if( unlikely(_first_packet_pos == 0))
+	{
+	    _first_packet_pos = _ff.file_pos() - line.length();
+	}
+	break;
+    }
     // parse bang lines
     if (data[0] == '!') {
         if (data + 6 <= end && memcmp(data, "!data", 5) == 0 && isspace((unsigned char) data[5]))
@@ -407,11 +430,11 @@ FromIPSummaryDump::read_packet(ErrorHandler *errh)
     // read packet data
     WritablePacket *q = Packet::make(16, (const unsigned char *) 0, 0, 1000);
     if (!q) {
-    _ff.error(errh, strerror(ENOMEM));
-    return 0;
+        _ff.error(errh, strerror(ENOMEM));
+        return 0;
     }
     if (_zero)
-    memset(q->buffer(), 0, q->buffer_length());
+        memset(q->buffer(), 0, q->buffer_length());
 
     // prepare packet data
     StringAccum sa;
@@ -419,96 +442,97 @@ FromIPSummaryDump::read_packet(ErrorHandler *errh)
     int nfields = 0;
 
     // new code goes here
+    auto &args = *_args;
     if (_binary) {
-    Vector<const unsigned char *> args;
-    int nbytes;
-    for (const IPSummaryDump::FieldReader * const *fp = _fields.begin(); fp != _fields.end(); ++fp) {
-        if (!(*fp)->inb)
-        goto bad_field;
-        switch ((*fp)->type) {
-          case IPSummaryDump::B_0:
-        nbytes = 0;
-        goto got_nbytes;
-          case IPSummaryDump::B_1:
-        nbytes = 1;
-        goto got_nbytes;
-          case IPSummaryDump::B_2:
-        nbytes = 2;
-        goto got_nbytes;
-          case IPSummaryDump::B_4:
-          case IPSummaryDump::B_4NET:
-        nbytes = 4;
-        goto got_nbytes;
-          case IPSummaryDump::B_6PTR:
-        nbytes = 6;
-        goto got_nbytes;
-          case IPSummaryDump::B_8:
-        nbytes = 8;
-        goto got_nbytes;
-          case IPSummaryDump::B_16:
-        nbytes = 16;
-        goto got_nbytes;
-          got_nbytes:
-        if (data + nbytes <= end) {
-            args.push_back((const unsigned char *) data);
-            data += nbytes;
-        } else
+        int nbytes;
+        for (const IPSummaryDump::FieldReader * const *fp = _fields.begin(); fp != _fields.end(); ++fp) {
+            if (!(*fp)->inb)
             goto bad_field;
-        break;
-          case IPSummaryDump::B_SPECIAL:
-        args.push_back((const unsigned char *) data);
-        data = (const char *) (*fp)->inb(d, (const uint8_t *) data, (const uint8_t *) end, *fp);
-        break;
-          bad_field:
-          default:
-        args.push_back(0);
-        data = end;
-        break;
+            switch ((*fp)->type) {
+              case IPSummaryDump::B_0:
+            nbytes = 0;
+            goto got_nbytes;
+              case IPSummaryDump::B_1:
+            nbytes = 1;
+            goto got_nbytes;
+              case IPSummaryDump::B_2:
+            nbytes = 2;
+            goto got_nbytes;
+              case IPSummaryDump::B_4:
+              case IPSummaryDump::B_4NET:
+            nbytes = 4;
+            goto got_nbytes;
+              case IPSummaryDump::B_6PTR:
+            nbytes = 6;
+            goto got_nbytes;
+              case IPSummaryDump::B_8:
+            nbytes = 8;
+            goto got_nbytes;
+              case IPSummaryDump::B_16:
+            nbytes = 16;
+            goto got_nbytes;
+              got_nbytes:
+            if (data + nbytes <= end) {
+                args.push_back((const unsigned char *) data);
+                data += nbytes;
+            } else
+                goto bad_field;
+            break;
+              case IPSummaryDump::B_SPECIAL:
+            args.push_back((const unsigned char *) data);
+            data = (const char *) (*fp)->inb(d, (const uint8_t *) data, (const uint8_t *) end, *fp);
+            break;
+              bad_field:
+              default:
+            args.push_back(0);
+            data = end;
+            break;
+            }
         }
-    }
 
-    for (int *fip = _field_order.begin();
-         fip != _field_order.end() && d.p;
-         ++fip) {
-        const IPSummaryDump::FieldReader *f = _fields[*fip];
-        if (!args[*fip] || !f->inject)
-        continue;
-        d.clear_values();
-        if (f->inb(d, args[*fip], (const uint8_t *) end, f)) {
-        f->inject(d, f);
-        nfields++;
+        for (int *fip = _field_order.begin();
+             fip != _field_order.end() && d.p;
+             ++fip) {
+            const IPSummaryDump::FieldReader *f = _fields[*fip];
+            if (!args[*fip] || !f->inject)
+            continue;
+            d.clear_values();
+            if (f->inb(d, args[*fip], (const uint8_t *) end, f)) {
+            f->inject(d, f);
+            nfields++;
+            }
         }
-    }
 
     } else {
-    Vector<String> args;
-    while (args.size() < _fields.size()) {
-        const char *original_data = data;
-        while (data < end)
-        if (isspace((unsigned char) *data))
-            break;
-        else if (*data == '\"')
-            data = cp_skip_double_quote(data, end);
-        else
+        Vector<String> args;
+        while (args.size() < _fields.size()) {
+            const char *original_data = data;
+            while (data < end)
+            if (isspace((unsigned char) *data))
+                break;
+            else if (*data == '\"')
+                data = cp_skip_double_quote(data, end);
+            else
+                ++data;
+            args.push_back(line.substring(original_data, data));
+            while (data < end && isspace((unsigned char) *data))
             ++data;
-        args.push_back(line.substring(original_data, data));
-        while (data < end && isspace((unsigned char) *data))
-        ++data;
-    }
+        }
 
-    for (int *fip = _field_order.begin();
-         fip != _field_order.end() && d.p;
-         ++fip) {
-        const IPSummaryDump::FieldReader *f = _fields[*fip];
-        if (!args[*fip] || args[*fip].equals("-", 1) || !f->inject)
-        continue;
-        d.clear_values();
-        if (f->ina(d, args[*fip], f)) {
-        f->inject(d, f);
-        nfields++;
+        for (int *fip = _field_order.begin();
+             fip != _field_order.end() && d.p;
+             ++fip) {
+            const IPSummaryDump::FieldReader *f = _fields[*fip];
+            if (!args[*fip] || args[*fip].equals("-", 1) || !f->inject)
+            continue;
+            d.clear_values();
+            if (f->ina(d, args[*fip], f)) {
+            f->inject(d, f);
+            nfields++;
+            }
         }
     }
-    }
+    args.clear();
 
     if (!nfields) {    // bad format
     if (!_format_complaint) {
@@ -523,7 +547,7 @@ FromIPSummaryDump::read_packet(ErrorHandler *errh)
     }
     if (d.p)
         d.p->kill();
-    d.p = 0;
+        d.p = 0;
     }
 
     // set source and destination ports even if no transport info on packet
@@ -620,12 +644,14 @@ FromIPSummaryDump::handle_multipacket(Packet *p)
         SET_EXTRA_LENGTH_ANNO(p, _multipacket_length * (count - 1));
     }
     // set timestamps
-    _multipacket_end_timestamp = p->timestamp_anno();
-    if (FIRST_TIMESTAMP_ANNO(p)) {
-        _multipacket_timestamp_delta = (p->timestamp_anno() - FIRST_TIMESTAMP_ANNO(p)) / (count - 1);
-        p->timestamp_anno() = FIRST_TIMESTAMP_ANNO(p);
-    } else
-        _multipacket_timestamp_delta = Timestamp();
+    if (_set_timestamp) {
+        _multipacket_end_timestamp = p->timestamp_anno();
+        if (FIRST_TIMESTAMP_ANNO(p)) {
+            _multipacket_timestamp_delta = (p->timestamp_anno() - FIRST_TIMESTAMP_ANNO(p)) / (count - 1);
+            p->timestamp_anno() = FIRST_TIMESTAMP_ANNO(p);
+        } else
+            _multipacket_timestamp_delta = Timestamp();
+    }
     // prepare IP lengths for _multipacket_extra_length
     _work_packet = set_packet_lengths(p, _multipacket_length - p->length());
     if (!_work_packet)
@@ -642,10 +668,10 @@ FromIPSummaryDump::handle_multipacket(Packet *p)
     SET_EXTRA_PACKETS_ANNO(_work_packet, count - 2);
     SET_EXTRA_LENGTH_ANNO(_work_packet, EXTRA_LENGTH_ANNO(_work_packet) - _multipacket_length);
     if (count == 2) {
-    _work_packet->timestamp_anno() = _multipacket_end_timestamp;
-    _work_packet = set_packet_lengths(_work_packet, EXTRA_LENGTH_ANNO(_work_packet));
+        _work_packet->timestamp_anno() = _multipacket_end_timestamp;
+        _work_packet = set_packet_lengths(_work_packet, EXTRA_LENGTH_ANNO(_work_packet));
     } else
-    _work_packet->timestamp_anno() += _multipacket_timestamp_delta;
+        _work_packet->timestamp_anno() += _multipacket_timestamp_delta;
 
     return p;
 }

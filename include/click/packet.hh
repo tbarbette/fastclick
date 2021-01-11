@@ -1531,7 +1531,7 @@ Packet::timestamp_anno() const
     return *reinterpret_cast<const Timestamp*>(&skb()->tstamp);
 # endif
 #elif CLICK_PACKET_USE_DPDK
-    return *(Timestamp*)&(mb()->timestamp);
+    return *(Timestamp*)&(TIMESTAMP_FIELD(mb()));
 #else
     return *reinterpret_cast<const Timestamp*>(&_aa.timestamp);
 #endif
@@ -1547,7 +1547,7 @@ Packet::timestamp_anno()
     return *reinterpret_cast<Timestamp*>(&skb()->tstamp);
 # endif
 #elif CLICK_PACKET_USE_DPDK
-    return *(Timestamp*)&(mb()->timestamp);
+    return *(Timestamp*)&(TIMESTAMP_FIELD(mb()));
 #else
     return *reinterpret_cast<Timestamp*>(&_aa.timestamp);
 #endif

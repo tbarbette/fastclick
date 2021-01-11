@@ -42,7 +42,6 @@ ResetIPChecksum::configure(Vector<String> &conf, ErrorHandler *errh)
             .complete() < 0)
 		return -1;
 
-
     return 0;
 }
 
@@ -52,13 +51,16 @@ ResetIPChecksum::simple_action(Packet *p_in)
     if (WritablePacket *p = p_in->uniqueify()) {
         click_ip *iph = p->ip_header();
 
-
         iph->ip_sum = 0;
         if (!DPDKDevice::is_dpdk_buffer(p))
         {
             click_chatter("Not a DPDK buffer. For max performance, arrange TCP element to always work on DPDK buffers");
         } else {
+#if CLICK_PACKET_USE_DPDK
+            rte_mbuf* mbuf = (struct rte_mbuf *) p;
+#else
             rte_mbuf* mbuf = (struct rte_mbuf *) p->destructor_argument();
+#endif
             mbuf->l2_len = p->mac_header_length();
             mbuf->l3_len = p->network_header_length();
 

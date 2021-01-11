@@ -101,10 +101,12 @@ Options:\n\
   -o, --output FILE             Write flat configuration to FILE.\n\
   -q, --quit                    Do not run driver.\n\
   -t, --time                    Print information on how long driver took.\n\
-  -w, --no-warnings             Do not print warnings.\n\
-      --simtime                 Run in simulation time.\n\
-      --simtick                 Amount of subseconds to add in warp time.\n\
-  -C, --clickpath PATH          Use PATH for CLICKPATH.\n\
+  -w, --no-warnings             Do not print warnings.\n"
+#ifdef TIMESTAMP_WARPABLE
+"      --simtime                 Run in simulation time.\n\
+      --simtick                 Amount of subseconds to add in warp time.\n"
+#endif
+"  -C, --clickpath PATH          Use PATH for CLICKPATH.\n\
       --help                    Print this message and exit.\n\
   -v, --version                 Print version number and exit.\n\
 \n\
@@ -263,6 +265,7 @@ int parse(int argc, char** argv, click_args_t &click_args) {
 #endif
       break;
 
+#ifdef TIMESTAMP_WARPABLE
     case SIMTIME_OPT: {
         Timestamp::warp_set_class(Timestamp::warp_simulation);
         Timestamp simbegin(clp->have_val ? clp->val.d : 1000000000);
@@ -273,6 +276,7 @@ int parse(int argc, char** argv, click_args_t &click_args) {
         Timestamp::set_warp_tick(clp->val.ul);
         break;
     }
+#endif
      case CLICKPATH_OPT:
       set_clickpath(clp->vstr);
       break;

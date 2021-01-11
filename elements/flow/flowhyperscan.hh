@@ -15,6 +15,7 @@ struct FlowHyperScanState {
 	FlowHyperScanState() {
 	}
 	hs_stream_t* stream;
+    bool found;
 };
 
 /**
@@ -58,6 +59,7 @@ class FlowHyperScan : public FlowSpaceElement<FlowHyperScanState> {
         bool _payload_only;
         unsigned _flags;
         bool _verbose;
+        bool _kill;
         struct FlowHyperScanThreadState {
             FlowHyperScanThreadState() : scratch(0), matches(0) {
             }

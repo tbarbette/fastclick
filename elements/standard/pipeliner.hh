@@ -95,6 +95,7 @@ public:
     bool _always_up;
     bool _allow_direct_traversal;
     bool _verbose;
+    bool _prefetch;
     typedef DynamicRing<Packet*> PacketRing;
 
     per_thread_oread<PacketRing> storage;
