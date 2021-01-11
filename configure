@@ -622,6 +622,7 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 provisions
+clickbuild_clickdir
 clickbuild_sbindir
 clickbuild_libdir
 clickbuild_includedir
@@ -815,7 +816,6 @@ enable_batch
 enable_verbose_batch
 enable_auto_batch
 enable_netmap_pool
-enable_json
 enable_rand_align
 enable_select
 enable_poll
@@ -1545,7 +1545,6 @@ Optional Features:
     --enable-auto-batch=[list|jump|port]
                           make vanilla elements batch-compatible automatically
     --enable-netmap-pool  use netmap buffers instead of standard Click buffers
-    --enable-json         enable JSON support
     --enable-rand-align   enable random alignment of element
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
@@ -1585,7 +1584,6 @@ Optional Features:
   --disable-ip            do not include IP elements
   --enable-ip6            include IPv6 elements
   --enable-ipsec          include IP security elements
-  --enable-json           include JSON helpers
   --enable-local          include local elements
   --enable-radio          include radio elements
   --enable-research       include research elements
@@ -7085,20 +7083,8 @@ else
     have_hyperscan=no
 fi
 
-# Check whether --enable-json was given.
-if test "${enable_json+set}" = set; then :
-  enableval=$enable_json; :
-else
-  enable_json=no
-fi
+$as_echo "#define HAVE_JSON 1" >>confdefs.h
 
-if test "x$enable_json" = "xyes"; then
-    have_json=yes
-    $as_echo "#define HAVE_JSON 1" >>confdefs.h
-
-else
-    have_json=no
-fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lpci" >&5
 $as_echo_n "checking for main in -lpci... " >&6; }
@@ -7612,7 +7598,7 @@ $as_echo "yes, found at $RTE_SDK_BIN" >&6; }
 
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether DPDK has rte_eth_read_clock" >&5
 $as_echo_n "checking whether DPDK has rte_eth_read_clock... " >&6; }
-    if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null; then
+    if ${READELF} -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null; then
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
       $as_echo "#define HAVE_DPDK_READ_CLOCK 1" >>confdefs.h
@@ -8163,18 +8149,6 @@ test "x$enable_all_elements" = xyes -a \( "x$enable_ipsec" = xNO -o "x$enable_ip
 if test "x$enable_ipsec" = xyes; then
     :
     $as_echo "#define HAVE_IPSEC 1" >>confdefs.h
-
-fi
-# Check whether --enable-json was given.
-if test "${enable_json+set}" = set; then :
-  enableval=$enable_json;
-else
-  enable_json=NO
-fi
-test "x$enable_all_elements" = xyes -a \( "x$enable_json" = xNO -o "x$enable_json" = x \) && enable_json=yes
-if test "x$enable_json" = xyes; then
-    :
-    $as_echo "#define HAVE_JSON 1" >>confdefs.h
 
 fi
 # Check whether --enable-local was given.
@@ -11701,6 +11675,8 @@ shell_mkbuild () {
 test "x$prefix" = xNONE && prefix=$ac_default_prefix
 test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
 
+DIR="$( cd "$( dirname "${BASH_SOURCE0}" )" >/dev/null 2>&1 && pwd )"
+clickdir="$DIR"
 clickdatadir="$datadir/click"
 
 for i in bin clickdata data dataroot include lib sbin; do
@@ -14940,6 +14916,13 @@ _ACEOF
 
 
 
+cat >>confdefs.h <<_ACEOF
+#define CLICK_DIR "$clickdir"
+_ACEOF
+
+
+
+
 
 
 
@@ -16495,7 +16478,6 @@ Configuration Summary:
 
     RE2    support:              ${have_re2}
     HTTPD  support:              ${have_httpd}
-    JSON   support:              ${have_json}
     libpci support:              ${have_pci}
 "
 

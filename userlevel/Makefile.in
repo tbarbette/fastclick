@@ -142,7 +142,7 @@ ELEM2EXPORT = elem2export
 ELEMENTSSUFFIX =
 endif
 endif
-INSTALLPROGS = $(DRIVER)
+INSTALLPROGS = $(DRIVER) packetmill
 
 ifneq ($(ELEMENT_CHECKSUM),)
 ifneq ($(shell $(ELEMENT_CHECKSUMCOMMAND)),$(ELEMENT_CHECKSUM))
@@ -192,6 +192,11 @@ libclick.a: Makefile $(LIBOBJS)
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 
+
+packetmill: packetmill.cc $(DRIVER)
+	$(CXXCOMPILE) $(LIBS) $(subst click.o,,$(OBJS)) $(LDFLAGS) libclick.a packetmill.cc -o $@
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+
 elemlist:
 	@rm -f elements.conf elements.csmk
 	@$(MAKE) elements.conf
@@ -238,4 +243,4 @@ distclean: clean
 	-rm -f Makefile
 
 .PHONY: all clean clean-lib distclean elemlist \
-	install install-include install-lib install-man uninstall
+	install install-include install-lib install-man install-packetmill uninstall
