@@ -414,7 +414,7 @@ version (dpdk-dev or dpdk-devel).
     AC_SUBST(USE_DPDK, yes)
 
     AC_MSG_CHECKING([whether DPDK has rte_eth_read_clock])
-    if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null; then
+    if ${READELF} -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null; then
       AC_MSG_RESULT([yes])
       AC_DEFINE([HAVE_DPDK_READ_CLOCK])
     else
