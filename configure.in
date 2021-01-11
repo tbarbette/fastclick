@@ -1573,6 +1573,8 @@ dnl Preset $prefix and $exec_prefix.
 test "x$prefix" = xNONE && prefix=$ac_default_prefix
 test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
 
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+clickdir="$DIR"
 clickdatadir="$datadir/click"
 
 for i in bin clickdata data dataroot include lib sbin; do
@@ -2431,6 +2433,8 @@ AC_DEFINE_UNQUOTED([CLICK_BINDIR], ["$bindir"], [Install directory for Click exe
 AC_DEFINE_UNQUOTED([CLICK_LIBDIR], ["$libdir"], [Install directory for Click libraries and packages.])
 AC_DEFINE_UNQUOTED([CLICK_DATADIR], ["$clickdatadir"], [Install directory for Click shared data.])
 
+AC_DEFINE_UNQUOTED([CLICK_DIR], ["$clickdir"], [Source directory of Click.])
+
 AC_SUBST(clickdatadir)
 AC_SUBST(clickbuild_bindir)
 AC_SUBST(clickbuild_clickdatadir)
@@ -2438,6 +2442,7 @@ AC_SUBST(clickbuild_datadir)
 AC_SUBST(clickbuild_includedir)
 AC_SUBST(clickbuild_libdir)
 AC_SUBST(clickbuild_sbindir)
+AC_SUBST(clickbuild_clickdir)
 
 
 dnl
