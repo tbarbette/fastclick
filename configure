@@ -817,6 +817,7 @@ enable_kqueue
 enable_dpdk
 enable_dpdk_pool
 enable_dpdk_packet
+enable_dpdk_softqueue
 enable_zerocopy
 enable_clone
 enable_linuxmodule
@@ -1548,6 +1549,9 @@ Optional Features:
     --enable-dpdk         use DPDK
     --enable-dpdk-pool    use DPDK buffer instead of standard Click buffer
     --enable-dpdk-packet  Click packets are DPDK packet
+    --disable-dpdk-softqueue
+                          Do not use internal software queue in TX to buffer
+                          packets before flushing.
     --disable-zerocopy    disable Zero Copy
     --disable-clone       disable packet cloning
   --enable-linuxmodule    disable Linux kernel driver
@@ -7126,6 +7130,15 @@ if test "${enable_dpdk_packet+set}" = set; then :
   enableval=$enable_dpdk_packet; :
 else
   enable_dpdk_packet=no
+fi
+
+
+# Check whether --enable-dpdk-softqueue was given.
+if test "${enable_dpdk_softqueue+set}" = set; then :
+  enableval=$enable_dpdk_softqueue; :
+else
+  $as_echo "#define HAVE_IQUEUE 1" >>confdefs.h
+
 fi
 
 
