@@ -415,6 +415,12 @@ if test "x$enable_zerocopy" = xyes; then
     AC_DEFINE(HAVE_ZEROCOPY)
 fi
 
+AC_ARG_ENABLE([clone],
+    [AS_HELP_STRING([  --disable-clone], [disable packet cloning])],
+    [AC_DEFINE(CLICK_NOINDIRECT)],[:])
+
+
+
 dnl linuxmodule driver and features
 
 AC_ARG_ENABLE([linuxmodule],

@@ -731,9 +731,15 @@ inline void PacketBatch::kill() {
 		BATCH_RECYCLE_ADD_DATA_PACKET(p);\
 	} else {\
 		BATCH_RECYCLE_ADD_PACKET(p);}}
-#else
+#elif !defined(CLICK_NOINDIRECT)
 #define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
 	if (p->data_packet() == 0 && p->buffer_destructor() == 0 && p->buffer() != 0) {\
+		BATCH_RECYCLE_ADD_DATA_PACKET(p);\
+	} else {\
+	    BATCH_RECYCLE_ADD_PACKET(p);}}
+#else
+#define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
+	if (p->buffer_destructor() == 0 && p->buffer() != 0) {\
 		BATCH_RECYCLE_ADD_DATA_PACKET(p);\
 	} else {\
 	    BATCH_RECYCLE_ADD_PACKET(p);}}

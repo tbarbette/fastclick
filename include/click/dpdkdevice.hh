@@ -250,7 +250,11 @@ public:
     }
 
     inline static bool is_dpdk_buffer(Packet* p) {
-        return is_dpdk_packet(p) || (p->data_packet() && is_dpdk_packet(p->data_packet()));
+        return is_dpdk_packet(p)
+#ifndef CLICK_NOINDIRECT
+            || (p->data_packet() && is_dpdk_packet(p->data_packet()))
+#endif
+        ;
     }
 #endif
 
@@ -435,20 +439,26 @@ template<> struct DefaultArg<FlowControlMode> : public FlowControlModeArg {};
 inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node, bool reset) {
     struct rte_mbuf* mbuf;
     #if CLICK_PACKET_USE_DPDK
-    mbuf = p->mb();
+        mbuf = p->mb();
     #else
     if (likely(DPDKDevice::is_dpdk_packet(p) && (mbuf = (struct rte_mbuf *)((unsigned char*) p->buffer() - sizeof(rte_mbuf)) ))
-        || unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument()))) {
+#ifndef CLICK_NOINDIRECT
+        || unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument()))
+#endif
+            ) {
         /* If the packet is an unshared DPDK packet, we can send
          *  the mbuf as it to DPDK*/
         rte_pktmbuf_pkt_len(mbuf) = p->length();
         rte_pktmbuf_data_len(mbuf) = p->length();
         mbuf->data_off = p->headroom();
+#ifndef CLICK_NOINDIRECT
         if (p->shared()) {
             /*Prevent DPDK from freeing the buffer. When all shared packet
              * are freed, DPDKDevice::free_pkt will effectively destroy it.*/
             rte_mbuf_refcnt_update(mbuf, 1);
-        } else {
+        } else
+#endif
+        {
             //Reset buffer, let DPDK free the buffer when it wants
             if (reset)
                 p->reset_buffer();
