@@ -394,7 +394,7 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
 # if CLICK_PACKET_INSIDE_DPDK
   // The Packet object is just after rte_mbuf, the "VPP" mode
   struct rte_mbuf *pkts[_burst];
-  unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, pkts, _burst);
+  unsigned n = rte_eth_rx_burst_xchg(_dev->port_id, iqueue, pkts, _burst);
   if (n) {
     WritablePacket::pool_consumed_data_burst(n,tail[1]);
     add_count(n);
@@ -417,7 +417,7 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
 
 #elif HAVE_VECTOR_PACKET_POOL
   //Useless. With XCHG we can tell the driver how we advance.
-  unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, WritablePacket::pool_prepare_data(_burst), _burst);
+  unsigned n = rte_eth_rx_burst_xchg(_dev->port_id, iqueue, WritablePacket::pool_prepare_data(_burst), _burst);
   if (n) {
     WritablePacket::pool_consumed_data(n);
     add_count(n);
@@ -430,7 +430,7 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
   //This is the real X-Change. No loop! Yeah :)
   WritablePacket* head = WritablePacket::pool_prepare_data_burst(_burst);
   WritablePacket* tail[2] = {0,head};
-  unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, (struct xchg**)&(tail[1]), _burst);
+  unsigned n = rte_eth_rx_burst_xchg(_dev->port_id, iqueue, (struct xchg**)&(tail[1]), _burst);
   if (n) {
     WritablePacket::pool_consumed_data_burst(n,tail[1]);
     add_count(n);

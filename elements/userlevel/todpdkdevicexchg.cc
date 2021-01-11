@@ -429,7 +429,7 @@ void ToDPDKDeviceXCHG::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &ique
         //Todo : if there is multiple queue assigned to this thread, send on all of them
 
 
-        r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**) &iqueue.pkts[iqueue.index], sub_burst);
+        r = rte_eth_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**) &iqueue.pkts[iqueue.index], sub_burst);
 
         iqueue.nr_pending -= r;
         iqueue.index += r;
@@ -592,7 +592,7 @@ void ToDPDKDeviceXCHG::push_batch(int, PacketBatch *head)
     rte_mbuf** pkts = pkts_s;
 send:
 
-    unsigned r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**) pkts, count);
+    unsigned r = rte_eth_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**) pkts, count);
     //click_chatter("SENT %d/%d", r, count);
     for (int i = 0; i < r; i++) {
         if (pkts[i] == 0) 
@@ -620,7 +620,7 @@ send:
         p = p->next();
     }
 send:
-    unsigned r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**)pkts, count);
+    unsigned r = rte_eth_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**)pkts, count);
     if (unlikely(r != count)) {
         warn_congestion();
         if (_blocking) {
@@ -637,7 +637,7 @@ send:
     Packet* sent = head->first();
 send:
     //click_chatter("SEND %d, %p, buffer %p", count, sent, sent->buffer());
-    unsigned r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**)&sent, count);
+    unsigned r = rte_eth_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**)&sent, count);
     //click_chatter("SENT %d, %p", r, sent);
     if (unlikely(r != count)) {
         warn_congestion();
