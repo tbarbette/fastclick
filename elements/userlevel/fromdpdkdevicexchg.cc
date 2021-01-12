@@ -111,14 +111,19 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
         return rte_pktmbuf_pkt_len(get_buf(xchg));
     }
 
-    CLICK_ALWAYS_INLINE void xchg_finish_packet(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void xchg_rx_finish_packet(struct xchg* xchg) {
         (void)xchg;
+    }
+
+    CLICK_ALWAYS_INLINE void xchg_rx_last_packet(struct xchg* xchg, struct xchg** xchgs) {
+        (void)xchg;
+        (void)xchgs;
     }
 
     /**
      * Take a packet from the ring and replace it by a new one
      */
-    CLICK_ALWAYS_INLINE struct xchg* xchg_next(struct rte_mbuf** pkt, struct xchg** xchgs, struct rte_mempool* mp) {
+    CLICK_ALWAYS_INLINE struct xchg* xchg_rx_next(struct rte_mbuf** pkt, struct xchg** xchgs, struct rte_mempool* mp) {
         (void) xchgs; //Mbuf is set on advance
         struct rte_mbuf* xchg = *pkt; //Buffer in the ring
 		rte_prefetch0(xchg);
@@ -126,12 +131,12 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
         return (struct xchg*)xchg;
     }
 
-    CLICK_ALWAYS_INLINE void xchg_cancel(struct xchg* xchg, struct rte_mbuf* pkt) {
+    CLICK_ALWAYS_INLINE void xchg_rx_cancel(struct xchg* xchg, struct rte_mbuf* pkt) {
         (void)xchg;
         rte_mbuf_raw_free(pkt);
     }
 
-    CLICK_ALWAYS_INLINE void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
+    CLICK_ALWAYS_INLINE void xchg_rx_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
         struct xchg** xchgs = *xchgs_p;
         *(xchgs++) = xchg; //Set in the user pointer the buffer from the ring
         *xchgs_p = xchgs;
@@ -198,29 +203,19 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
     }
 
 
-    CLICK_ALWAYS_INLINE void xchg_finish_packet(struct xchg* xchg) {
-i//        WritablePacket* p = get_pkt(xchg);
-ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->data(), p->end_data(), p->end_buffer());
-//        p->set_destructor_argument(p->buffer() - RTE_PKTMBUF_HEADROOM);
-/*        if (_set_rss_aggregate)
-#if RTE_VERSION > RTE_VERSION_NUM(1, 7, 0, 0)
-          SET_AGGREGATE_ANNO(p, pkts[i]->hash.rss);
-#else
-          SET_AGGREGATE_ANNO(p, pkts[i]->pkt.hash.rss);
-#endif
-        if (_set_paint_anno) {
-          SET_PAINT_ANNO(p, iqueue);
-        }*/
+    CLICK_ALWAYS_INLINE void xchg_rx_finish_packet(struct xchg* xchg) {
+        (void)xchg;
+    }
 
+    CLICK_ALWAYS_INLINE void xchg_rx_last_packet(struct xchg* xchg, struct xchg** xchgs) {
+        (void)xchg;
+        (void)xchgs;
     }
 
     /**
-     * Set a new buffer to replace in the ring if not canceled, and return the next descriptor
-     */
-/**
      * Take a packet from the ring and replace it by a new one
      */
-    CLICK_ALWAYS_INLINE struct xchg* xchg_next(struct rte_mbuf** pkt, struct xchg** xchgs, struct rte_mempool* mp) {
+    CLICK_ALWAYS_INLINE struct xchg* xchg_rx_next(struct rte_mbuf** pkt, struct xchg** xchgs, struct rte_mempool* mp) {
         (void) xchgs; //Mbuf is set on advance
         struct rte_mbuf* xchg = *pkt; //Buffer in the ring
                 rte_prefetch0(get_pkt(xchg));
@@ -228,12 +223,12 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
         return (struct xchg*)xchg;
     }
 
-    CLICK_ALWAYS_INLINE void xchg_cancel(struct xchg* xchg, struct rte_mbuf* pkt) {
+    CLICK_ALWAYS_INLINE void xchg_rx_cancel(struct xchg* xchg, struct rte_mbuf* pkt) {
         (void)xchg;
         rte_mbuf_raw_free(pkt);
     }
 
-    CLICK_ALWAYS_INLINE void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
+    CLICK_ALWAYS_INLINE void xchg_rx_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
         struct xchg** xchgs = *xchgs_p;
         *(xchgs++) = xchg; //Set in the user pointer the buffer from the ring
         *xchgs_p = xchgs;
@@ -315,25 +310,29 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
     //with a packet, and will start reading the next one. It's a chance to wrap up what we
     //need to do.
     //In this case we prefetch the packet data, and set a few Click stuffs.
-    CLICK_ALWAYS_INLINE void xchg_finish_packet(struct xchg* xchg) {
+    CLICK_ALWAYS_INLINE void xchg_rx_finish_packet(struct xchg* xchg) {
         WritablePacket* p = (WritablePacket*)xchg;
 
         rte_prefetch0(p->data());
         p->set_packet_type_anno(Packet::HOST);
         p->set_mac_header(p->data());
-        p->set_destructor_argument(p->buffer() - RTE_PKTMBUF_HEADROOM);
+        p->set_destructor_argument(p->buffer() - sizeof(rte_mbuf));
+    }
 
+    CLICK_ALWAYS_INLINE void xchg_rx_last_packet(struct xchg* xchg, struct xchg** xchgs) {
+        *(((WritablePacket**)xchgs) - 1) = (WritablePacket*)xchg;
     }
 
     /**
      * This function is called by the driver to advance in the RX ring.
      * Set a new buffer to replace in the ring if not canceled, and return the next descriptor
      */
-    CLICK_ALWAYS_INLINE struct xchg* xchg_next(struct rte_mbuf** rep, struct xchg** xchgs, rte_mempool* mp) {
+    CLICK_ALWAYS_INLINE struct xchg* xchg_rx_next(struct rte_mbuf** rep, struct xchg** xchgs, rte_mempool* mp) {
 		//The user (actually, that's us) passes a linked-list of WritablePacket in the struct xchg** (so it's actually not a **)
         // moving to the next is actually taking the first packet. Note that advancing in the list is the
         // role of xchg_davance, not next. Next is like "peek".
         WritablePacket* first = (WritablePacket*)*xchgs;
+        WritablePacket* p = first;
 
         //We'll take the address of the buffer and put that in the ring
         void* fresh_buf = (void*)first->buffer();
@@ -351,10 +350,10 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
     }
 
     /**
-     * Cancel the current receiving, this should cancel the last xchg_next.
+     * Cancel the current receiving, this should cancel the last xchg_rx_next.
      * It's how XCHG works, in the hope a receive will always work. I'm sure there are reasons for this.
      */
-    CLICK_ALWAYS_INLINE void xchg_cancel(struct xchg* xchg, struct rte_mbuf* rep) {
+    CLICK_ALWAYS_INLINE void xchg_rx_cancel(struct xchg* xchg, struct rte_mbuf* rep) {
         WritablePacket* first = (WritablePacket*)xchg;
         first->set_buffer( ((unsigned char*)rep) + sizeof(rte_mbuf), DPDKDevice::MBUF_DATA_SIZE);
     }
@@ -363,12 +362,11 @@ ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->da
      * Pops the packet of the user provided buffers
      * @arg xchg is the packet being received (last call to xchg_next)
      */
-    CLICK_ALWAYS_INLINE void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
+    CLICK_ALWAYS_INLINE void xchg_rx_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
         WritablePacket** xchgs = (WritablePacket**)*xchgs_p;
         WritablePacket* first = (WritablePacket*)xchg;
 	    WritablePacket* next = (WritablePacket*)first->next();
     	*xchgs = next;
-        *(xchgs - 1) = first;
         first->set_data(first->buffer() + RTE_PKTMBUF_HEADROOM);
     }
 
@@ -416,7 +414,7 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
   }
 
 #elif HAVE_VECTOR_PACKET_POOL
-  //Useless. With XCHG we can tell the driver how we advance.
+  //Useless. With XCHG we can tell the driver how we advance, linked list, vector, or whatever.
   unsigned n = rte_eth_rx_burst_xchg(_dev->port_id, iqueue, WritablePacket::pool_prepare_data(_burst), _burst);
   if (n) {
     WritablePacket::pool_consumed_data(n);
@@ -432,7 +430,7 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
   WritablePacket* tail[2] = {0,head};
   unsigned n = rte_eth_rx_burst_xchg(_dev->port_id, iqueue, (struct xchg**)&(tail[1]), _burst);
   if (n) {
-    WritablePacket::pool_consumed_data_burst(n,tail[1]);
+    WritablePacket::pool_consumed_data_burst(n,(WritablePacket*)(tail[0]->next()));
     add_count(n);
     ret = 1;
     PacketBatch* batch = PacketBatch::make_from_simple_list(head,tail[0],n);

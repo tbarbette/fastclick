@@ -633,6 +633,7 @@ send:
 
     }
 # else //No SWAPONLY
+    //This is the real X-Change
     unsigned count = head->count();
     Packet* sent = head->first();
 send:
@@ -647,7 +648,6 @@ send:
         } else {
             //Nothing to do : packets are still in the batch, others have been swapped!
         }
-
     }
 # endif
    head->recycle_batch(true);

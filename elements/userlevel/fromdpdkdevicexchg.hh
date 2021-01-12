@@ -163,7 +163,7 @@ public:
     FromDPDKDeviceXCHG() CLICK_COLD;
     ~FromDPDKDeviceXCHG() CLICK_COLD;
 
-    const char *class_name() const { return "FromDPDKDeviceXCHG"; }
+    const char *class_name() const override { return "FromDPDKDeviceXCHG"; }
 
     bool run_task(Task*) override;
 

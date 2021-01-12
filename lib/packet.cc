@@ -657,6 +657,7 @@ WritablePacket::recycle_data_batch(WritablePacket *head, Packet* tail, unsigned 
     check_data_pool_size(packet_pool, count);
     packet_pool.pdcount += count;
     tail->set_next(packet_pool.pd);
+
     packet_pool.pd = head;
 #endif
 }
