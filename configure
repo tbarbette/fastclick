@@ -826,7 +826,9 @@ enable_dpdk_pool
 enable_dpdk_xchg
 enable_dpdk_inside
 enable_dpdk_packet
+enable_dpdk_softqueue
 enable_zerocopy
+enable_clone
 enable_linuxmodule
 enable_fixincludes
 enable_multithread
@@ -1559,7 +1561,11 @@ Optional Features:
     --enable-dpdk-xchg    use DPDK XCHG API
     --enable-dpdk-inside  Click packets are inside DPDK packet
     --enable-dpdk-packet  Click packets are DPDK packet
+    --disable-dpdk-softqueue
+                          Do not use internal software queue in TX to buffer
+                          packets before flushing.
     --disable-zerocopy    disable Zero Copy
+    --disable-clone       disable packet cloning
   --enable-linuxmodule    disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
     --enable-multithread  support kernel multithreading
@@ -7482,6 +7488,15 @@ else
 fi
 
 
+# Check whether --enable-dpdk-softqueue was given.
+if test "${enable_dpdk_softqueue+set}" = set; then :
+  enableval=$enable_dpdk_softqueue; :
+else
+  $as_echo "#define HAVE_IQUEUE 1" >>confdefs.h
+
+fi
+
+
 if test "x$enable_dpdk" != "xno"; then
 
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for DPDK library" >&5
@@ -7665,6 +7680,17 @@ if test "x$enable_zerocopy" = xyes; then
     $as_echo "#define HAVE_ZEROCOPY 1" >>confdefs.h
 
 fi
+
+# Check whether --enable-clone was given.
+if test "${enable_clone+set}" = set; then :
+  enableval=$enable_clone; $as_echo "#define CLICK_NOINDIRECT 1" >>confdefs.h
+
+else
+  :
+fi
+
+
+
 
 
 # Check whether --enable-linuxmodule was given.

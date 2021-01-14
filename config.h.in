@@ -26,6 +26,9 @@
 /* Define for forcing expensive packet operations. */
 #undef CLICK_FORCE_EXPENSIVE
 
+/* Define if indirect packets are not allowed. */
+#undef CLICK_NOINDIRECT
+
 /* Define to generate smaller object files. */
 #undef CLICK_OPTIMIZE_SIZE
 

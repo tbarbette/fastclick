@@ -125,14 +125,14 @@ int ToDPDKDeviceXCHG::initialize(ErrorHandler *errh)
     ret = initialize_tasks(false,errh);
     if (ret != 0)
         return ret;
-
+#if HAVE_IQUEUE
     for (unsigned i = 0; i < _iqueues.weight(); i++) {
         _iqueues.get_value(i).pkts = new struct rte_mbuf *[_internal_tx_queue_size];
         _iqueues.get_value(i).timeout.assign(this);
         _iqueues.get_value(i).timeout.initialize(this);
         _iqueues.get_value(i).timeout.move_thread(i);
     }
-
+#endif
     _this_node = DPDKDevice::get_port_numa_node(_dev->port_id);
 
     //To set is_fullpush, we need to compute passing threads
@@ -145,6 +145,7 @@ int ToDPDKDeviceXCHG::initialize(ErrorHandler *errh)
     return 0;
 }
 
+#if HAVE_IQUEUE
 inline void ToDPDKDeviceXCHG::set_flush_timer(DPDKDevice::TXInternalQueue &iqueue) {
     if (_timeout >= 0 || iqueue.nr_pending) {
         if (iqueue.timeout.scheduled()) {
@@ -162,11 +163,11 @@ inline void ToDPDKDeviceXCHG::set_flush_timer(DPDKDevice::TXInternalQueue &iqueu
         }
     }
 }
-
 void ToDPDKDeviceXCHG::run_timer(Timer *)
 {
     flush_internal_tx_queue(_iqueues.get());
 }
+#endif
 
 #ifdef CLICK_PACKET_INSIDE_DPDK
     inline struct rte_mbuf* get_mbuf(struct xchg* x) {
@@ -444,6 +445,7 @@ void ToDPDKDeviceXCHG::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &ique
     add_count(sent);
 }
 
+#if HAVE_IQUEUE
 void ToDPDKDeviceXCHG::push(int, Packet *p)
 {
     // Get the thread-local internal queue
@@ -493,7 +495,12 @@ void ToDPDKDeviceXCHG::push(int, Packet *p)
         p->kill();
 #endif
 }
+#else
 
+void ToDPDKDeviceXCHG::push(int, Packet *p) {
+    assert(false);
+}
+#endif
 
 inline void
 ToDPDKDeviceXCHG::enqueue(rte_mbuf* &q, rte_mbuf* mbuf, WritablePacket* p) {

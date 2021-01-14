@@ -25,11 +25,16 @@
 CLICK_DECLS
 
 ToDPDKDevice::ToDPDKDevice() :
-    _iqueues(), _dev(0),
+
+#if HAVE_IQUEUE
+    _iqueues(),
+#endif
+    _dev(0),
     _timeout(0), _congestion_warning_printed(false), _create(true),
     _tso(0), _tco(false), _uco(false), _ipco(false)
 {
      _blocking = false;
+     _burst = -1;
      _internal_tx_queue_size = 1024;
      ndesc = 0;
 }
@@ -46,7 +51,6 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
             .read_mp("PORT", dev)
             .consume() < 0)
         return -1;
-
 
     if (parse(conf, errh) != 0)
         return -1;
@@ -71,6 +75,12 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
             return errh->error("%s : Unknown or invalid PORT", dev.c_str());
     }
 
+
+#if HAVE_IQUEUE
+    if (_timeout > 0) {
+        return errh->error("Timeout parameter does not make sense without the IQUEUE feature.");
+    }
+#endif
     //TODO : If user put multiple ToDPDKDevice with the same port and without the QUEUE parameter, try to share the available queues among them
     if (firstqueue == -1)
        firstqueue = 0;
@@ -125,14 +135,14 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     ret = initialize_tasks(false,errh);
     if (ret != 0)
         return ret;
-
+#if HAVE_IQUEUE
     for (unsigned i = 0; i < _iqueues.weight(); i++) {
         _iqueues.get_value(i).pkts = new struct rte_mbuf *[_internal_tx_queue_size];
         _iqueues.get_value(i).timeout.assign(this);
         _iqueues.get_value(i).timeout.initialize(this);
         _iqueues.get_value(i).timeout.move_thread(i);
     }
-
+#endif
     _this_node = DPDKDevice::get_port_numa_node(_dev->port_id);
 
     //To set is_fullpush, we need to compute passing threads
@@ -148,9 +158,11 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 void ToDPDKDevice::cleanup(CleanupStage)
 {
     cleanup_tasks();
+#if HAVE_IQUEUE
     for (unsigned i = 0; i < _iqueues.weight(); i++) {
         delete[] _iqueues.get_value(i).pkts;
     }
+#endif
 }
 
 String ToDPDKDevice::statistics_handler(Element *e, void * thunk)
@@ -186,6 +198,15 @@ void ToDPDKDevice::add_handlers()
     add_read_handler("hw_errors",statistics_handler, h_oerrors);
 }
 
+
+inline void
+ToDPDKDevice::enqueue(rte_mbuf* &q, rte_mbuf* mbuf, const Packet* p) {
+    q = mbuf;
+}
+
+
+#if HAVE_IQUEUE
+
 inline void ToDPDKDevice::set_flush_timer(DPDKDevice::TXInternalQueue &iqueue) {
     if (_timeout >= 0 || iqueue.nr_pending) {
         if (iqueue.timeout.scheduled()) {
@@ -209,11 +230,12 @@ void ToDPDKDevice::run_timer(Timer *)
     flush_internal_tx_queue(_iqueues.get());
 }
 
-#ifdef DPDK_USE_XCHG
+# ifdef DPDK_USE_XCHG
 extern "C" {
-#include <mlx5_xchg.h>
+#  include <mlx5_xchg.h>
 }
-#endif
+# endif
+
 
 /* Flush as much as possible packets from a given internal queue to the DPDK
  * device. */
@@ -239,12 +261,12 @@ void ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) 
         //Todo : if there is multiple queue assigned to this thread, send on all of them
 
 
-#ifdef DPDK_USE_XCHG
+# ifdef DPDK_USE_XCHG
         r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**) &iqueue.pkts[iqueue.index], sub_burst);
-#else
+# else
         r = rte_eth_tx_burst(_dev->port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index],
                             sub_burst);
-#endif
+# endif
 
         iqueue.nr_pending -= r;
         iqueue.index += r;
@@ -284,7 +306,7 @@ void ToDPDKDevice::push(int, Packet *p)
             }
         } else { // If there is space in the iqueue
             struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, _create, _this_node);
-            if (mbuf != NULL) {
+            if (likely(mbuf != NULL)) {
                 enqueue(iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_tx_queue_size], mbuf, p);
                 iqueue.nr_pending++;
             } else {
@@ -301,20 +323,13 @@ void ToDPDKDevice::push(int, Packet *p)
         // If we're in blocking mode, we loop until we can put p in the iqueue
     } while (unlikely(_blocking && congestioned));
 
-#if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
+# if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
     if (likely(is_fullpush()))
         p->kill_nonatomic();
     else
         p->kill();
-#endif
+# endif
 }
-
-
-inline void
-ToDPDKDevice::enqueue(rte_mbuf* &q, rte_mbuf* mbuf, const Packet* p) {
-    q = mbuf;
-}
-
 
 /**
  * push_batch seems more complex than in tonetmapdevice, but it's only because
@@ -323,7 +338,7 @@ ToDPDKDevice::enqueue(rte_mbuf* &q, rte_mbuf* mbuf, const Packet* p) {
  *  array, and packets in the list, it would be a mess). So we use an array as
  *  a ring.
  */
-#if HAVE_BATCH
+# if HAVE_BATCH
 void ToDPDKDevice::push_batch(int, PacketBatch *head)
 {
     // Get the thread-local internal queue
@@ -334,16 +349,16 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 
     //No recycling through click if we have DPDK-backed packets
     bool congestioned;
-#if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
+#  if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
     BATCH_RECYCLE_START();
-#endif
+#  endif
     do {
         congestioned = false;
         //First, place the packets in the queue
         while (iqueue.nr_pending < (unsigned)_internal_tx_queue_size && p) { // Internal queue is full
             // While there is still place in the iqueue
             struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, _create, _this_node);
-            if (mbuf != NULL) {
+            if (likely(mbuf != NULL)) {
                 enqueue(iqueue.pkts[(iqueue.index + iqueue.nr_pending) & (_internal_tx_queue_size - 1)], mbuf, p);
                 iqueue.nr_pending++;
             } else {
@@ -351,22 +366,22 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
                 abort();
             }
             next = p->next();
-#if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
+#  if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
             BATCH_RECYCLE_PACKET_CONTEXT(p);
-#endif
+#  endif
             p = next;
         }
 
         if (unlikely(p != 0)) {
             congestioned = true;
             warn_congestion();
-#if CLICK_PACKET_USE_DPDK
+#  if CLICK_PACKET_USE_DPDK
             while (p) {
                 next = p->next();
                 p->kill();
                 p = next;
             }
-#endif
+#  endif
         }
 
         //Flush the queue if we have pending packets
@@ -378,7 +393,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
         // If we're in blocking mode, we loop until we can put p in the iqueue
     } while (unlikely(_blocking && congestioned));
 
-#if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
+#  if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
     //If non-blocking, drop all packets that could not be sent
     while (p) {
         next = p->next();
@@ -386,14 +401,102 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
         p = next;
         add_dropped(1);
     }
-#endif
+#  endif
 
-#if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
+#  if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
     BATCH_RECYCLE_END();
-#endif
-
+#  endif
 }
-#endif
+# endif //HAVE_BATCH
+
+#else //HAVE_IQUEUE
+
+void ToDPDKDevice::push(int, Packet *p)
+{
+    click_chatter("ERROR : You must enable IQUEUE to push single-packets.");
+}
+
+# if HAVE_BATCH
+void ToDPDKDevice::push_batch(int, PacketBatch *head)
+{
+    Packet* p = head;
+    Packet* next;
+#  define TX_MAX_BURST 32
+#  if !CLICK_PACKET_USE_DPDK
+    BATCH_RECYCLE_START();
+#  endif
+    sendagain:
+        struct rte_mbuf* pkts[TX_MAX_BURST];
+        int count = head->count() > 32 ? 32: head->count();
+        //First, place the packets in the queue
+        for (int i = 0; i < count; i ++) {
+            struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, _create, _this_node);
+            if (likely(mbuf != NULL)) {
+                enqueue(pkts[i], mbuf, p);
+            } else {
+                click_chatter("No more DPDK buffer");
+                abort();
+            }
+            next = p->next();
+#  if !CLICK_PACKET_USE_DPDK
+            BATCH_RECYCLE_PACKET_CONTEXT(p);
+#  endif
+            p = next;
+        }
+
+
+        unsigned sent = 0;
+
+        lock(); // ! This is a queue lock, not a thread lock.
+
+        sent = rte_eth_tx_burst(_dev->port_id, queue_for_thisthread_begin(), pkts, count);
+
+        unlock();
+
+        add_count(sent);
+
+        if (unlikely(sent != count)) { //We could not send all packets
+                if (!_congestion_warning_printed) {
+                    if (!_blocking)
+                        click_chatter("%s: packet dropped", name().c_str());
+                    else
+                        click_chatter("%s: congestion warning", name().c_str());
+                    _congestion_warning_printed = true;
+                }
+                if (_blocking) {
+                    int base = sent;
+
+                    do {
+                        lock(); // ! This is a queue lock, not a thread lock.
+
+                        sent = rte_eth_tx_burst(_dev->port_id, queue_for_thisthread_begin(), pkts + base, count);
+
+                        unlock();
+
+                        add_count(sent);
+                        count-=sent;
+                        base+=sent;
+                    } while (count > 0);
+
+                } else {
+                    add_dropped(count - sent);
+                    while (sent < count) {
+                        rte_pktmbuf_free(pkts[sent]);
+                        sent++;
+                    }
+                }
+        }
+        if (unlikely(p != 0)) //There are still packets to try sending
+            goto sendagain;
+
+#  if !CLICK_PACKET_USE_DPDK
+    BATCH_RECYCLE_END();
+#  endif
+}
+# endif //HAVE_BATCH
+
+#endif //!HAVE_IQUEUE
+
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel dpdk)

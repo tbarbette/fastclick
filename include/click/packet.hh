@@ -111,12 +111,14 @@ class Packet { public:
     inline bool shared_nonatomic() const;
     Packet *clone(bool fast = false) CLICK_WARN_UNUSED_RESULT;
     inline WritablePacket *uniqueify() CLICK_WARN_UNUSED_RESULT;
-#if CLICK_LINUXMODULE
+#ifndef CLICK_NOINDIRECT
+# if CLICK_LINUXMODULE
     inline void get() {skb_get(skb());};
-#elif CLICK_PACKET_USE_DPDK
+# elif CLICK_PACKET_USE_DPDK
     inline void get() {rte_mbuf_refcnt_update(mb(), 1);};
-#else
+# else
     inline void get() {_use_count++;};
+# endif
 #endif
 
     inline const unsigned char *data() const;
@@ -743,9 +745,13 @@ class Packet { public:
 	*reinterpret_cast<click_aliasable_void_pointer_t *>(xanno()->c + i) = const_cast<void *>(x);
     }
 
-#if !CLICK_PACKET_USE_DPDK && !CLICK_LINUXMODULE
+#if !CLICK_PACKET_USE_DPDK && !CLICK_LINUXMODULE && !defined(CLICK_NOINDIRECT)
     inline Packet* data_packet() {
     	return _data_packet;
+    }
+#else
+    inline Packet* data_packet() {
+        return 0;
     }
 #endif
 
@@ -855,8 +861,10 @@ class Packet { public:
 #if !(CLICK_LINUXMODULE || CLICK_PACKET_USE_DPDK)
     // User-space and BSD kernel module implementations.
 protected:
+#ifndef CLICK_NOINDIRECT
     atomic_uint32_t _use_count;
     Packet *_data_packet;
+#endif
 private:
     /* mimic Linux sk_buff */
     unsigned char *_head; /* start of allocated buffer */
@@ -1097,8 +1105,10 @@ WritablePacket::initialize(bool clear)
     click_chatter("UNIMPLEMENTED");
     assert(false); //Should be initialized by DPDK
 #else
+#if !CLICK_NOINDIRECT
     _use_count = 1;
     _data_packet = 0;
+#endif
 # if CLICK_USERLEVEL || CLICK_MINIOS
     _destructor = 0;
 # elif CLICK_BSDMODULE
@@ -1116,8 +1126,10 @@ WritablePacket::initialize_data()
     click_chatter("UNIMPLEMENTED");
     assert(false); //This may not illegal but I need to check what to be done
 #else
+# if !CLICK_NOINDIRECT
     _use_count = 1;
     _data_packet = 0;
+# endif
 #endif
     clear_annotations(false);
 }
@@ -1753,7 +1765,10 @@ Packet::kill()
 		//Dpdk takes care of indirect and related things
 		rte_pktmbuf_free(mb());
 	#elif HAVE_CLICK_PACKET_POOL && !defined(CLICK_FORCE_EXPENSIVE)
-		if (_use_count.dec_and_test()) {
+#ifndef CLICK_NOINDIRECT
+		if (_use_count.dec_and_test())
+#endif
+        {
 			WritablePacket::recycle(static_cast<WritablePacket *>(this));
 		}
 	#else
@@ -1783,7 +1798,11 @@ Packet::kill_nonatomic()
 #elif CLICK_PACKET_USE_DPDK
         rte_pktmbuf_free(mb());
 #elif HAVE_CLICK_PACKET_POOL
-        if (_use_count.nonatomic_dec_and_test()) {
+
+#ifndef CLICK_NOINDIRECT
+        if (_use_count.nonatomic_dec_and_test())
+#endif
+        {
             WritablePacket::recycle(static_cast<WritablePacket *>(this));
 
     }
@@ -1832,9 +1851,10 @@ Packet::make(struct mbuf *m)
     m_freem(m);
     return 0;
   }
+#ifndef CLICK_NOINDIRECT
   p->_use_count = 1;
   p->_data_packet = NULL;
-
+#endif
   if (m->m_pkthdr.len != m->m_len) {
     struct mbuf *m2;
     /* click needs contiguous data */
@@ -1883,12 +1903,16 @@ Packet::make(struct mbuf *m)
 inline bool
 Packet::shared() const
 {
-#if CLICK_LINUXMODULE
-    return skb_cloned(const_cast<struct sk_buff *>(skb()));
-#elif CLICK_PACKET_USE_DPDK
-    return rte_mbuf_refcnt_read(mb()) > 1 || RTE_MBUF_INDIRECT(mb());
+#ifdef CLICK_NOINDIRECT
+    return false;
 #else
+# if CLICK_LINUXMODULE
+    return skb_cloned(const_cast<struct sk_buff *>(skb()));
+# elif CLICK_PACKET_USE_DPDK
+    return rte_mbuf_refcnt_read(mb()) > 1 || RTE_MBUF_INDIRECT(mb());
+# else
     return (_data_packet || _use_count > 1);
+# endif
 #endif
 }
 
@@ -1899,12 +1923,16 @@ Packet::shared() const
 inline bool
 Packet::shared_nonatomic() const
 {
-#if CLICK_LINUXMODULE
-    return skb_cloned(const_cast<struct sk_buff *>(skb()));
-#elif CLICK_PACKET_USE_DPDK
-    return rte_mbuf_refcnt_read(mb()) > 1 || RTE_MBUF_INDIRECT(mb());
+#ifdef CLICK_NOINDIRECT
+    return false;
 #else
+# if CLICK_LINUXMODULE
+    return skb_cloned(const_cast<struct sk_buff *>(skb()));
+# elif CLICK_PACKET_USE_DPDK
+    return rte_mbuf_refcnt_read(mb()) > 1 || RTE_MBUF_INDIRECT(mb());
+# else
     return (_data_packet || _use_count.nonatomic_value() > 1);
+# endif
 #endif
 }
 
@@ -1948,13 +1976,17 @@ private:
 inline WritablePacket *
 Packet::uniqueify()
 {
-#ifdef CLICK_FORCE_EXPENSIVE
+#ifdef CLICK_NOINDIRECT
+    return static_cast<WritablePacket *>(this);
+#else
+#  ifdef CLICK_FORCE_EXPENSIVE
     PacketRef r(this);
-#endif
+#  endif
     if (!shared())
 	return static_cast<WritablePacket *>(this);
     else
-	return expensive_uniqueify(0, 0, true);
+	    return expensive_uniqueify(0, 0, true);
+#endif
 }
 
 inline WritablePacket *
@@ -2126,7 +2158,10 @@ Packet::shrink_data(const unsigned char *data, uint32_t length)
     (void) data;
     (void) length;
 # else
+
+#ifndef CLICK_NOINDIRECT
     assert(_data_packet);
+#endif
     if (data >= _head && data + length >= data && data + length <= _end) {
 	_head = _data = const_cast<unsigned char *>(data);
 	_tail = _end = const_cast<unsigned char *>(data + length);
@@ -3085,8 +3120,13 @@ WritablePacket::rewrite_ip(IPAddress ip, const int shift, bool is_tcp) {
 #if !CLICK_PACKET_USE_DPDK
 inline void
 Packet::delete_buffer(unsigned char* head, unsigned char* end) {
-    if (_data_packet)
+# ifndef CLICK_NOINDIRECT
+    if (_data_packet) {
 	_data_packet->kill();
+    }
+# else
+  if (false) {}
+# endif
 # if CLICK_USERLEVEL || CLICK_MINIOS
     else if (_head && _destructor) {
         if (_destructor != empty_destructor)
@@ -3102,7 +3142,7 @@ Packet::delete_buffer(unsigned char* head, unsigned char* end) {
     }
 # elif CLICK_BSDMODULE
     if (_m)
-	m_freem(_m);
+	    m_freem(_m);
 # endif
 }
 #endif

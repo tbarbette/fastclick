@@ -306,7 +306,6 @@ void WritablePacket::initialize_local_packet_pool() {
 #  endif
 }
 
-
 /**
  * Allocate a batch of packets without buffer
  * The returned list is a simple linked list, not a standard PacketBatch
@@ -408,7 +407,6 @@ WritablePacket::pool_allocate()
 #endif
 
 }
-
 
 /**
  * Allocate a packet with a buffer
@@ -565,10 +563,18 @@ WritablePacket::check_data_pool_size(PacketPool &packet_pool, unsigned n) {
 
 inline bool WritablePacket::is_from_data_pool(WritablePacket *p) {
 #if HAVE_DPDK_PACKET_POOL
-	return likely(!p->_data_packet && p->_head
+	return likely(
+# ifndef CLICK_NOINDIRECT
+            !p->_data_packet &&
+# endif
+            p->_head
 			&& (p->_destructor == DPDKDevice::free_pkt));
 #else
-    if (likely(!p->_data_packet && p->_head && !p->_destructor)) {
+    if (likely(
+# ifndef CLICK_NOINDIRECT
+                !p->_data_packet &&
+# endif
+                p->_head && !p->_destructor)) {
 # if HAVE_NETMAP_PACKET_POOL
         return NetmapBufQ::is_valid_netmap_packet(p);
 # else
@@ -977,7 +983,10 @@ Packet::clone(bool fast)
     if (!p)
 	return 0;
     if (unlikely(fast)) {
+
+#ifndef CLICK_NOINDIRECT
         p->_use_count = 1;
+#endif
         p->_head = _head;
         p->_data = _data;
         p->_tail = _tail;
@@ -990,17 +999,29 @@ Packet::clone(bool fast)
           p->_destructor = DPDKDevice::free_pkt;
           p->_destructor_argument = destructor_argument();
           rte_mbuf_refcnt_update((rte_mbuf*)p->_destructor_argument, 1);
-        } else if (data_packet() && DPDKDevice::is_dpdk_packet(data_packet())) {
+        }
+
+#ifndef CLICK_NOINDIRECT
+        else if (
+                data_packet() && DPDKDevice::is_dpdk_packet(data_packet())) {
            p->_destructor = DPDKDevice::free_pkt;
            p->_destructor_argument = data_packet()->destructor_argument();
            rte_mbuf_refcnt_update((rte_mbuf*)p->_destructor_argument, 1);
-        } else
+        }
+#endif
+        else
 #endif
         {
         p->_destructor = empty_destructor;
         }
+
+#ifndef CLICK_NOINDIRECT
         p->_data_packet = 0;
+#endif
     } else {
+
+#ifndef CLICK_NOINDIRECT
+
         Packet* origin = this;
         if (origin->_data_packet)
             origin = origin->_data_packet;
@@ -1014,6 +1035,9 @@ Packet::clone(bool fast)
 	# endif
 		// increment our reference count because of _data_packet reference
 		origin->_use_count++;
+#else
+        assert(false);
+#endif
     }
     return p;
 
@@ -1092,10 +1116,12 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     int length = this->length();
     uint8_t* new_head = p->_head;
     uint8_t* new_end = p->_end;
-#if HAVE_DPDK_PACKET_POOL
+# if HAVE_DPDK_PACKET_POOL
     buffer_destructor_type desc = p->_destructor;
     void* arg = p->_destructor_argument;
-#endif
+# endif
+
+# ifndef CLICK_NOINDIRECT
     if (_use_count > 1) {
         memcpy(p, this, sizeof(Packet));
 
@@ -1104,9 +1130,14 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
         # else
             p->_m = m;
         # endif
-    } else {
+    } else
+# endif
+    {
         p->_head = NULL;
+
+# ifndef CLICK_NOINDIRECT
         p->_data_packet = NULL; //packet from pool_data_allocate can be dirty
+# endif
         WritablePacket::recycle(p);
         p = (WritablePacket*)this;
     }
@@ -1116,9 +1147,9 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     p->_tail = p->_data + length;
     p->_end = new_end;
 
-	# if CLICK_BSDMODULE
-		struct mbuf *old_m = _m;
-	# endif
+#if CLICK_BSDMODULE
+    struct mbuf *old_m = _m;
+# endif
 
     unsigned char *start_copy = old_head + (extra_headroom >= 0 ? 0 : -extra_headroom);
     unsigned char *end_copy = old_end + (extra_tailroom >= 0 ? 0 : extra_tailroom);
@@ -1132,12 +1163,14 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     _destructor = 0;
 # endif
 
+# ifndef CLICK_NOINDIRECT
     p->_use_count = 1;
     p->_data_packet = 0;
+# endif
     p->shift_header_annotations(old_head, extra_headroom);
     return p;
 
-#endif /* CLICK_LINUXMODULE */
+#endif /* !CLICK_LINUXMODULE */
 }
 
 
@@ -1393,7 +1426,6 @@ Packet::static_cleanup()
 	# else
 		cleanup_pool(&global_packet_pool, 0);
 	# endif
-
 #endif
 }
 

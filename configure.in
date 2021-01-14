@@ -311,6 +311,11 @@ AC_ARG_ENABLE([dpdk-packet],
                     [Click packets are DPDK packet])],
     [:], [enable_dpdk_packet=no])
 
+AC_ARG_ENABLE([dpdk-softqueue],
+    [AS_HELP_STRING([  --disable-dpdk-softqueue],
+                    [Do not use internal software queue in TX to buffer packets before flushing.])],
+    [:], [AC_DEFINE(HAVE_IQUEUE)])
+
 if test "x$enable_dpdk" != "xno"; then
 
     AC_MSG_CHECKING([for DPDK library])
@@ -466,6 +471,12 @@ AC_ARG_ENABLE([zerocopy],
 if test "x$enable_zerocopy" = xyes; then
     AC_DEFINE(HAVE_ZEROCOPY)
 fi
+
+AC_ARG_ENABLE([clone],
+    [AS_HELP_STRING([  --disable-clone], [disable packet cloning])],
+    [AC_DEFINE(CLICK_NOINDIRECT)],[:])
+
+
 
 dnl linuxmodule driver and features
 
