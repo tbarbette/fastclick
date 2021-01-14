@@ -198,14 +198,8 @@ void ToDPDKDevice::add_handlers()
     add_read_handler("hw_errors",statistics_handler, h_oerrors);
 }
 
-
-inline void
-ToDPDKDevice::enqueue(rte_mbuf* &q, rte_mbuf* mbuf, const Packet* p) {
-    q = mbuf;
-}
-
-
 #if HAVE_IQUEUE
+
 inline void ToDPDKDevice::set_flush_timer(DPDKDevice::TXInternalQueue &iqueue) {
     if (_timeout >= 0 || iqueue.nr_pending) {
         if (iqueue.timeout.scheduled()) {
@@ -292,7 +286,7 @@ void ToDPDKDevice::push(int, Packet *p)
         } else { // If there is space in the iqueue
             struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, _create, _this_node);
             if (likely(mbuf != NULL)) {
-                enqueue(iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_tx_queue_size], mbuf, p);
+                iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_tx_queue_size] =  mbuf;
                 iqueue.nr_pending++;
             } else {
                 click_chatter("No more DPDK buffer");
@@ -397,6 +391,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 void ToDPDKDevice::push(int, Packet *p)
 {
     click_chatter("ERROR : You must enable IQUEUE to push single-packets.");
+    abort();
 }
 
 # if HAVE_BATCH
@@ -410,21 +405,23 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 #  endif
     sendagain:
         struct rte_mbuf* pkts[TX_MAX_BURST];
-        int count = head->count() > 32 ? 32: head->count();
+
         //First, place the packets in the queue
-        for (int i = 0; i < count; i ++) {
+        int count = 0;
+        while (p && count < TX_MAX_BURST) {
+            next = p->next();
             struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, _create, _this_node);
             if (likely(mbuf != NULL)) {
-                enqueue(pkts[i], mbuf, p);
+                pkts[count] = mbuf;
             } else {
                 click_chatter("No more DPDK buffer");
                 abort();
             }
-            next = p->next();
 #  if !CLICK_PACKET_USE_DPDK
             BATCH_RECYCLE_PACKET_CONTEXT(p);
 #  endif
             p = next;
+            count ++;
         }
 
 
@@ -448,17 +445,16 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
                 }
                 if (_blocking) {
                     int base = sent;
-
+                    count-=sent;
                     do {
+
                         lock(); // ! This is a queue lock, not a thread lock.
-
                         sent = rte_eth_tx_burst(_dev->port_id, queue_for_thisthread_begin(), pkts + base, count);
-
                         unlock();
 
                         add_count(sent);
-                        count-=sent;
                         base+=sent;
+                        count -=sent;
                     } while (count > 0);
 
                 } else {
@@ -475,7 +471,6 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 #  if !CLICK_PACKET_USE_DPDK
     BATCH_RECYCLE_END();
 #  endif
-
 }
 # endif //HAVE_BATCH
 

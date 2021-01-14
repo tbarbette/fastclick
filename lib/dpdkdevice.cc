@@ -530,6 +530,8 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
             dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_TCP_TSO;
         }
     }
+    //Click does not use multi-segs
+    dev_conf.txmode.offloads &= ~DEV_TX_OFFLOAD_MULTI_SEGS;
 #endif
 
 #if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)

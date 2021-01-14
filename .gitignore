@@ -8,6 +8,7 @@
 Makefile
 autom4te*
 bin
+build
 click-buildtool
 click-compile
 config.cache

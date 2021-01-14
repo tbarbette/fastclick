@@ -1068,6 +1068,10 @@ class IntArg : public NumArg { public:
     }
 
     template<typename V>
+    String unparse(const V &v) {
+        return String(v);
+    }
+    template<typename V>
     bool parse(const String &str, V &result, const ArgContext &args = blank_args) {
         V x;
         if (!parse_saturating(str, x, args)

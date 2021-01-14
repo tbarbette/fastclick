@@ -33,7 +33,7 @@ CLICK_DECLS
  *
  * @precond No packet are shared
  */
-void PacketBatch::recycle_batch(bool is_data) {
+CLICK_ALWAYS_INLINE void PacketBatch::recycle_batch(bool is_data) {
     if (is_data) {
         WritablePacket::recycle_data_batch(this,tail(),count());
     } else {

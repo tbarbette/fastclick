@@ -73,10 +73,10 @@ StaticThreadSched::configure(Vector<String> &conf, ErrorHandler *errh)
             } else {
 
                 while (true) {
-                    if (b[idx])
+                    if (b[idx]) {
                         if (preference == 0)
                             break;
-                    else
+                    } else
                         preference--;
 
                     idx++;

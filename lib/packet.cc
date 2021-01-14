@@ -514,7 +514,11 @@ WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
 
 inline bool WritablePacket::is_from_data_pool(WritablePacket *p) {
 #if HAVE_DPDK_PACKET_POOL
-	return likely(!p->_data_packet && p->_head
+	return likely(
+# ifndef CLICK_NOINDIRECT
+            !p->_data_packet &&
+# endif
+            p->_head
 			&& (p->_destructor == DPDKDevice::free_pkt));
 #else
     if (likely(
