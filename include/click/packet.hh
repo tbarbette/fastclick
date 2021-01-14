@@ -736,6 +736,10 @@ class Packet { public:
     inline Packet* data_packet() {
     	return _data_packet;
     }
+#else
+    inline Packet* data_packet() {
+        return 0;
+    }
 #endif
 
     inline void clear_annotations(bool all = true);
