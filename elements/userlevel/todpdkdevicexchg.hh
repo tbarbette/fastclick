@@ -125,20 +125,22 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
     int initialize(ErrorHandler *) override CLICK_COLD;
-
-    void run_timer(Timer *);
-#if HAVE_BATCH
-    void push_batch(int port, PacketBatch *head);
+#if HAVE_IQUEUE
+    void run_timer(Timer *) override;
 #endif
-    void push(int port, Packet *p);
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *head) override;
+#endif
+    void push(int port, Packet *p) override;
 
 private:
 
     inline void enqueue(rte_mbuf* &q, rte_mbuf* mbuf, WritablePacket* p);
 
+#if HAVE_IQUEUE
     inline void set_flush_timer(DPDKDevice::TXInternalQueue &iqueue);
     void flush_internal_tx_queue(DPDKDevice::TXInternalQueue &);
-
+#endif
 
 };
 

@@ -405,7 +405,7 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
     }
 #endif
 
-
+#if HAVE_IQUEUE
 /* Flush as much as possible packets from a given internal queue to the DPDK
  * device. */
 void ToDPDKDeviceXCHG::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) {
@@ -445,7 +445,6 @@ void ToDPDKDeviceXCHG::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &ique
     add_count(sent);
 }
 
-#if HAVE_IQUEUE
 void ToDPDKDeviceXCHG::push(int, Packet *p)
 {
     // Get the thread-local internal queue
@@ -522,12 +521,12 @@ ToDPDKDeviceXCHG::enqueue(rte_mbuf* &q, rte_mbuf* mbuf, WritablePacket* p) {
 void ToDPDKDeviceXCHG::push_batch(int, PacketBatch *head)
 {
     // Get the thread-local internal queue
-#if TD_HAS_IQUEUE
+#if HAVE_IQUEUE
     DPDKDevice::TXInternalQueue &iqueue = _iqueues.get();
 #endif
 
 
-#if TD_HAS_IQUEUE
+#if HAVE_IQUEUE
 #if !defined(XCHG_TX_SWAPONLY)
     assert(false);
 #endif
