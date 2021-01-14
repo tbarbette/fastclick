@@ -34,11 +34,18 @@ int main(int argc, char** argv) {
     perfalert("PacketMill was NOT compiled with XCHG");
 #endif
 
+    char pwd[256];
+
+    char cpath[256];
+        getcwd(pwd, 256);
     chdir(CLICK_DIR "/userlevel/" );
-    sprintf(cmd, "../bin/click-devirtualize --inline --static %s > package.uo", args.router_file);
+    sprintf(cpath,"%s/%s", args.router_file[0] == '/' ? "." : pwd, args.router_file);
+    sprintf(cmd, "../bin/click-devirtualize --inline --replace --static %s > package.uo", cpath );
     exec(cmd);
-    exec("ar x package.uo config");
-    exec("../bin/click-mkmindriver -V -C $(pwd)/../ -p embed --ship -u");
+    sprintf(cmd, "ar x package.uo config");
+    exec(cmd);
+    sprintf(cmd, "../bin/click-mkmindriver -V -C $(pwd)/../ -p embed --ship -u package.uo");
+    exec(cmd);
     exec("make embedclick MINDRIVER=embed STATIC=1");
     exec("cat config | tail -n +2 > config_stripped");
     for (int i = 0; i < argc; i++) {
