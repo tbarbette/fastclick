@@ -44,7 +44,10 @@ CLICK_DECLS
 class IP6Address;
 class WritablePacket;
 class PacketBatch;
+#if HAVE_DPDK
 class FromDPDKDevice;
+class DPDKDevice;
+#endif
 
 class Packet { public:
 
@@ -899,6 +902,9 @@ private:
 
     friend class WritablePacket;
     friend class PacketBatch;
+#if HAVE_DPDK
+    friend class DPDKDevice;
+#endif
 
 };
 
