@@ -29,7 +29,7 @@ CLICK_CXX_UNPROTECT
 // dependency.
 CLICK_DECLS
 
-class RouterThread { public:
+class alignas(CLICK_CACHE_LINE_SIZE) RouterThread { public:
 
     enum { THREAD_QUIESCENT = -1, THREAD_UNKNOWN = -1000 };
 
@@ -156,9 +156,9 @@ class RouterThread { public:
 
 #if HAVE_CLICK_LOAD
     struct LoadState {
-	LoadState() : load(), useful(0),useless(0), all_useful_kcycles(0), last_update(0) {
+        LoadState() : load(), useful(0),useless(0), all_useful_kcycles(0), last_update(0) {
 
-	}
+        }
 		EXPSMOOTH<512,10> load;
 		uint64_t useful;
 		uint64_t useless;
