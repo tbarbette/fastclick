@@ -6584,6 +6584,8 @@ conf_auxdir='$(top_srcdir)'
 test -z "$AR_CREATEFLAGS" && AR_CREATEFLAGS=cru
 
 
+EXTRA_DRIVER_OBJS=
+EXTRA_TOOL_OBJS=
 
 
 
@@ -7654,6 +7656,7 @@ if test "x$enable_dpdk_xchg" = "xyes"; then
 
     DPDK_LIBS=$(echo "$DPDK_LIBS" | sed -e "s/-lrte_xchg_mbuf//")
 
+    EXTRA_DRIVER_OBJS="$EXTRA_DRIVER_OBJS fromdpdkdevicexchg.o todpdkdevicexchg.o"
 fi
 
 if test "x$enable_dpdk_packet" = "xyes"; then
@@ -10768,8 +10771,6 @@ _ACEOF
 
 
 
-EXTRA_DRIVER_OBJS=
-EXTRA_TOOL_OBJS=
 if test "x$enable_ip6" = xyes; then
     EXTRA_DRIVER_OBJS="ip6address.o ip6flowid.o ip6table.o $EXTRA_DRIVER_OBJS"
     EXTRA_TOOL_OBJS="ip6address.o $EXTRA_TOOL_OBJS"

@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
     perfalert("PacketMill was NOT compiled with XCHG");
 #endif
 
-    exec("cd " CLICK_DIR );
+    chdir(CLICK_DIR "/userlevel/" );
     sprintf(cmd, "../bin/click-devirtualize --inline --static %s > package.uo", args.router_file);
     exec(cmd);
     exec("ar x package.uo config");

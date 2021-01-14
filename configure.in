@@ -79,6 +79,8 @@ AC_SUBST(conf_auxdir)
 test -z "$AR_CREATEFLAGS" && AR_CREATEFLAGS=cru
 AC_SUBST(AR_CREATEFLAGS)
 
+EXTRA_DRIVER_OBJS=
+EXTRA_TOOL_OBJS=
 
 dnl
 dnl drivers
@@ -451,6 +453,7 @@ if test "x$enable_dpdk_xchg" = "xyes"; then
     AC_DEFINE([HAVE_DPDK_XCHG])
     AC_SUBST(HAVE_DPDK_XCHG,y)
     AC_SUBST(DPDK_LIBS,$(echo "$DPDK_LIBS" | sed -e "s/-lrte_xchg_mbuf//"))
+    EXTRA_DRIVER_OBJS="$EXTRA_DRIVER_OBJS fromdpdkdevicexchg.o todpdkdevicexchg.o"
 fi
 
 if test "x$enable_dpdk_packet" = "xyes"; then
@@ -1102,8 +1105,6 @@ dnl
 dnl objects required by element collections
 dnl
 
-EXTRA_DRIVER_OBJS=
-EXTRA_TOOL_OBJS=
 if test "x$enable_ip6" = xyes; then
     EXTRA_DRIVER_OBJS="ip6address.o ip6flowid.o ip6table.o $EXTRA_DRIVER_OBJS"
     EXTRA_TOOL_OBJS="ip6address.o $EXTRA_TOOL_OBJS"
