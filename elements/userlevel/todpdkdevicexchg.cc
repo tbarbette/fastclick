@@ -253,6 +253,7 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
         WritablePacket** p = (WritablePacket**)xchgs;
         WritablePacket* pkt = *p;
 #if !HAVE_DPDK_PACKET_POOL
+        //if the packet is not a DPDK packet, we have to copy it to a DPDK buffer
         if (!DPDKDevice::is_dpdk_buffer(pkt)) {
             struct rte_mbuf* mbuf = DPDKDevice::get_pkt();
             if (mbuf == 0) {
@@ -312,8 +313,10 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
     CLICK_ALWAYS_INLINE void xchg_tx_sent(struct rte_mbuf** elts, struct xchg** xchgs) {
         //printf("SENT %p\n", *xchg);
         struct rte_mbuf* tmp = *elts;
-        if (tmp == 0)
+        if (tmp == 0) {
+
             tmp = DPDKDevice::get_pkt();
+        }
         //assert(tmp);
 
         //struct rte_mbuf* mbuf = DPDKDevice::get_mbuf((WritablePacket*)*xchgs, false, -1, false);
@@ -329,6 +332,7 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
     bool xchg_elts_vec = false;
 
     CLICK_ALWAYS_INLINE void xchg_tx_sent_vec(struct rte_mbuf** elts, struct xchg** xchg, unsigned n) {
+        abort();
     }
 #elif !defined(NOXCHG)
 /*

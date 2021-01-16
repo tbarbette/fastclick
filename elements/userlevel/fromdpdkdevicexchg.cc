@@ -298,6 +298,7 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
 
     //Set data_length (the actual packet length)
     CLICK_ALWAYS_INLINE void xchg_set_data_len(struct xchg* xchg, uint16_t len) {
+        get_buf(xchg)->set_data(get_buf(xchg)->buffer() + RTE_PKTMBUF_HEADROOM);
         get_buf(xchg)->set_data_length(len);
     }
 
@@ -314,6 +315,7 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
         WritablePacket* p = (WritablePacket*)xchg;
 
         rte_prefetch0(p->data());
+
         p->set_packet_type_anno(Packet::HOST);
         p->set_mac_header(p->data());
         p->set_destructor_argument(p->buffer() - sizeof(rte_mbuf));
@@ -356,6 +358,7 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
     CLICK_ALWAYS_INLINE void xchg_rx_cancel(struct xchg* xchg, struct rte_mbuf* rep) {
         WritablePacket* first = (WritablePacket*)xchg;
         first->set_buffer( ((unsigned char*)rep) + sizeof(rte_mbuf), DPDKDevice::MBUF_DATA_SIZE);
+        first->set_data(((unsigned char*)rep) + sizeof(rte_mbuf) + RTE_PKTMBUF_HEADROOM);
     }
 
     /**
@@ -367,7 +370,6 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
         WritablePacket* first = (WritablePacket*)xchg;
 	    WritablePacket* next = (WritablePacket*)first->next();
     	*xchgs = next;
-        first->set_data(first->buffer() + RTE_PKTMBUF_HEADROOM);
     }
 
     /**
