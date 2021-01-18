@@ -45,6 +45,10 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
 # if XCHG_RX_SWAPONLY
 /*This is an intermediate testing mode, where the application gives rte_mbuf*, and the driver (these functions) fill
  * the metadata of the mbuf. This allows to use only a few (32) in-flight metadata space.*/
+
+
+    bool xchg_is_vec = true;
+
     inline struct rte_mbuf* get_buf(struct xchg* x) {
         return (struct rte_mbuf*)x;
     }
@@ -152,8 +156,11 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
 /*
  * This is an un-finished study to accelerate the "VPP" model, where the app buffer (in Click, the Packet object)
  * resides just after the rte_mbuf. X-Change allows to directly use the application buffer, so practically
- * this does not make sense. But we wanted to see how much X-Change could improve VPP.
+ * X-Change is better. But we wanted to see how much X-Change could improve VPP.
  */
+
+    bool xchg_is_vec = true;
+
     inline struct rte_pktmbuf* get_mbuf(struct xchg* x) {
         return (struct WritablePacket*)x;
     }
@@ -248,6 +255,9 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
  * eg xchg_set_vlan() will set the VLAN annotation of the WritablePacket to the
  * given value.
  */
+
+    //In Click, we use LL and not vectors
+    bool xchg_is_vec = false;
 
     /**
      * An internal helper to cast the xchg* pointer to the WritablePacket* pointer.
