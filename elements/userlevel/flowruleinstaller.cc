@@ -311,7 +311,7 @@ FlowRuleInstaller::flow_add_redirect(portid_t port_id, int from, int to, bool va
 }
 
 Vector<String>
-FlowRuleInstaller::rule_list_generate(const int &rules_nb, bool do_port, String mask)
+FlowRuleInstaller::rule_list_generate(const int &rules_nb, bool do_port, String mask, String proto)
 {
     Vector<String> rules;
 
@@ -323,7 +323,7 @@ FlowRuleInstaller::rule_list_generate(const int &rules_nb, bool do_port, String 
         int sport = 0;
 
         int dport = 0;
-        acc << "udp " << src.unparse() << "%" << mask << " ";
+        acc << proto <<  " " << src.unparse() << "%" << mask << " ";
         if (do_port) {
             sport = rand() % 0xfff0;
             acc << String(sport) << " ";
@@ -429,7 +429,8 @@ int FlowRuleInstaller::flow_handler(
             }
 
             rte_flow *rule = (rte_flow *)(uintptr_t)atoll(words[0].c_str());
-            click_chatter("Deleting rule with ID: %ld", atoll(words[0].c_str()));
+            if (fr->_verbose)
+                click_chatter("Deleting rule with ID: %ld", atoll(words[0].c_str()));
 
             int res = rte_flow_destroy(port_id, rule, 0);
             if (res != 0) {
@@ -517,8 +518,7 @@ int FlowRuleInstaller::flow_handler(
 
             struct rte_flow_error error;
             click_chatter("Updating rule %p\n", rule);
-            int res = 0;
-            // int res = rte_flow_update(port_id, rule, pattern.data(), 0, &error);
+            int res = rte_flow_update(port_id, rule, pattern.data(), 0, &error);
             if (res != 0) {
                 input = "Failed to update rule " + String(rule);
                 return -1;
@@ -534,6 +534,9 @@ int FlowRuleInstaller::flow_handler(
                 input = "Usage: tcp|udp ip_src port_src ip_dst port_dst [table]";
                 return -1;
             }
+            int table = words.size()>5?atoi(words[5].c_str()) : 1;
+
+            int prio = words.size()>6?atoi(words[6].c_str()) : 1;
             bool is_tcp;
             if (words[0] == "tcp") {
                 is_tcp = true;
@@ -544,9 +547,9 @@ int FlowRuleInstaller::flow_handler(
                 return -1;
             }
 
-            Vector<rte_flow_item> pattern = parse_5t(words);
+            Vector<rte_flow_item> pattern = parse_5t(words, is_tcp);
 
-            struct rte_flow *flow = flow_generate(port_id, pattern, words.size()>3?atoi(words[3].c_str()) : 1, 1, 0);
+            struct rte_flow *flow = flow_generate(port_id, pattern, table, prio, 0);
             if (!flow) {
                 input = "Failed to insert rule: " + input;
                 return -1;
@@ -574,8 +577,11 @@ int FlowRuleInstaller::flow_handler(
             int table = words.size() > 1? atoi(words[1].c_str()) : 1;
 
             String mask = words.size() > 2? words[2] : "255.255.255.255";
+
+
+            String proto = words.size() > 3? words[3] : "udp";
             int i = 0;
-            Vector<String> rules = rule_list_generate(rules_nb, true, mask);
+            Vector<String> rules = rule_list_generate(rules_nb, true, mask, proto);
             for (String rule : rules) {
                 Vector<String> words = rule.split(' ');
                 bool is_tcp = false;
@@ -613,9 +619,7 @@ int FlowRuleInstaller::flow_handler(
             Vector<rte_flow_item> pattern = parse_5t(words);
 
             struct rte_flow_error error;
-            click_chatter("Updating port %p\n", rule);
-            // int res = rte_flow_update(port_id, rule, pattern.data(), 0, &error);
-            int res = 0;
+            int res = rte_flow_update(port_id, rule, pattern.data(), 0, &error);
             if (res == 0) {
                 if (fr->_verbose) {
                     click_chatter("Update success");

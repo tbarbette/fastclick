@@ -197,6 +197,7 @@ AverageCounterBase<Stats>::add_handlers()
   add_read_handler("link_rate", averagecounter_read_rate_handler, 3);
   add_read_handler("time", averagecounter_read_rate_handler, 4);
   add_write_handler("reset", averagecounter_reset_write_handler<Stats>, 0, Handler::BUTTON);
+  add_write_handler("reset_now", averagecounter_reset_write_handler<Stats>, 1, Handler::BUTTON);
 }
 
 AverageCounter::AverageCounter()
