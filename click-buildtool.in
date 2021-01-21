@@ -1798,7 +1798,7 @@ Usage: click-buildtool elem2make [-V] [-p PREFIX] < [ELEMENTS]
    or: click-buildtool ksyms OBJS > KSYMSFILE
    or: click-buildtool shortensyms OBJS
    or: click-buildtool compile-shortensyms [BUILD COMMAND]
-   or: click-buildtool [--cflags | --otherlibs | --toolcflags | --toollibs]
+   or: click-buildtool [--cflags | --irlibs | --otherlibs | --toolcflags | --toollibs]
 
 Options:
   -V, --verbose            Print more information.
@@ -1843,6 +1843,9 @@ EOF
      shift 1; compile_shortensyms "$@"; exit 0;;
   --cf|--cfl|--cfla|--cflag|--cflags|--d|--de|--def|--defs)
      echo @PROPER_INCLUDES@ @PCAP_INCLUDES@ @DPDK_INCLUDES@ @DPDK_CFLAGS@ @NETMAP_INCLUDES@ -I@includedir@; exit 0;;
+  --ir|--irl|--irli|--irlib|--irlibs)
+     echo @PROPER_LIBS@ @PCAP_LIBS@ @DL_LIBS@ @SOCKET_LIBS@ @DPDK_LIBS@ @PTHREAD_LIBS@ @POSIX_CLOCK_LIBS@ | sed -e "s/--whole-archive/--no-whole-archive/";
+     exit 0;;
   --o|--ot|--oth|--othe|--other|--otherl|--otherli|--otherlib|--otherlibs)
      echo @PROPER_LIBS@ @PCAP_LIBS@ @DL_LIBS@ @SOCKET_LIBS@ @DPDK_LIBS@ @PTHREAD_LIBS@ @POSIX_CLOCK_LIBS@;
      exit 0;;

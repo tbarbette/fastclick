@@ -35,7 +35,6 @@ ccompile_nodep = $(COMPILE) $(1)
 cxxcompile = $(CXXCOMPILE) $(DEPCFLAGS) $(1)
 cxxcompile_nodep = $(CXXCOMPILE) $(1)
 cxxlink = $(CXXLINK) $(1)
-cxxlink_ir = $(CXXLINK_IR) $(1)
 x_verbose_cmd = $(1) $(3)
 verbose_cmd = $(1) $(3)
 else
@@ -44,7 +43,6 @@ ccompile_nodep = @/bin/echo ' ' $(2) $< && $(COMPILE) $(1)
 cxxcompile = @/bin/echo ' ' $(2) $< && $(CXXCOMPILE) $(DEPCFLAGS) $(1)
 cxxcompile_nodep = @/bin/echo ' ' $(2) $< && $(CXXCOMPILE) $(1)
 cxxlink = @/bin/echo ' ' $(2) $@ && $(CXXLINK) $(1)
-cxxlink_ir = @/bin/echo ' ' $(2) $@ && $(CXXLINK_IR) $(1)
 x_verbose_cmd = $(if $(2),/bin/echo ' ' $(2) $(3) &&,) $(1) $(3)
 verbose_cmd = @$(x_verbose_cmd)
 endif
@@ -96,6 +94,7 @@ INCLUDES = -I$(top_builddir)/include -I$(top_builddir)/vendor -I$(top_srcdir)/in
 	@PROPER_INCLUDES@ @PCAP_INCLUDES@ @DPDK_INCLUDES@ @NETMAP_INCLUDES@ @NUMA_INCLUDES@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@ `$(CLICK_BUILDTOOL) --otherlibs` $(ELEMENT_LIBS)
+LIBS_IR = @LIBS@ `$(CLICK_BUILDTOOL) --irlibs` $(ELEMENT_LIBS)
 DL_LDFLAGS = @DL_LDFLAGS@
 
 CXXCOMPILE = $(CXX) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CXXFLAGS)
@@ -150,14 +149,6 @@ $(shell rm -f $(ELEMENTSCONF).conf $(ELEMENTSCONF).csmk)
 endif
 endif
 
-# We should change --whole-archive to --no-whole-archive to avoid getting duplicate symbol error
-# Since LDFLAGS is extended with DPDK_LIBS in dpdk.mk, we have to use the old LDFLAGS (DPDK_OLD_LDFLAGS)
-# for relinking the IR code. To do so, we define cutomized CXXLINK and LINK for IR compilation.
-LIBS_IR=$(subst --whole-archive,--no-whole-archive,$(LIBS))
-CXXLINK_IR = $(CXXLD) $(CXXFLAGS) -o $@
-LINK_IR = $(CCLD) $(CFLAGS) -o $@
-
-
 
 all: $(INSTALLPROGS) $(INSTALLLIBS)
 
@@ -178,11 +169,11 @@ $(DRIVER): Makefile libclick.a $(OBJS)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 endif
 click-opt: Makefile click.ll libclick.a
-	$(call cxxlink_ir,$(DL_LDFLAGS) click.ll libclick.a $(LIBS_IR),LINK_IR)
+	$(call cxxlink,$(DL_LDFLAGS) click.ll libclick.a $(LIBS_IR),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 
 embedclick-opt: Makefile embedclick.ll libclick.a
-	$(call cxxlink_ir,$(DL_LDFLAGS) embedclick.ll libclick.a $(LIBS_IR),LINK_IR)
+	$(call cxxlink,$(DL_LDFLAGS) embedclick.ll libclick.a $(LIBS_IR),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 
 libclick.a: Makefile $(LIBOBJS)
