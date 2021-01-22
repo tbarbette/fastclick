@@ -1,3 +1,10 @@
+NICBench
+========
+
+This repository contains modifications to FastClick to benchmark the NICs and the new rte_flow_update API.
+
+We aim to merge everything to FastClick, but this remain to be done.
+
 FastClick
 =========
 This is an extended version of the Click Modular Router featuring an
