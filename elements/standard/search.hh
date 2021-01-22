@@ -1,22 +1,34 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
-#ifndef CLICK_Search_HH
-#define CLICK_Search_HH
-#include <click/element.hh>
+#ifndef CLICK_SEARCH_HH
+#define CLICK_SEARCH_HH
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
  * =c
  * Search()
  * =s basicmod
- * Strip the TCP header from front of packets
+ * Strip the head of the packet up to pattern to be found in the packet content.
  * =d
- * Removes all bytes from the beginning of the packet up to the end of the TCP header.
- * It will also increase an annotation (by default Paint2) by the number of bytes poped
- * to remember how long was the header and allow to revert the operation later. This is
- * intended to be used with UnstripAnno
+ *
+ * =item PATTERN
+ *
+ * The string to search. The packet "data" pointer will be placed after
+ *
+ * =item STRIP_AFTER
+ *
+ * Go after the pattern instead of before
+ *
+ * =item ANNO
+ *
+ * An annotation where to place the number of skipped bytes
+ *
+ * =item SET_ANNO
+ *
+ * Set the above annotation or not.
+ *
  * =e
- * Use this to get rid of all headers up to the end of the TCP layer, print the HTTP request payload, and
- * go back to the previous pointer:
+ * Use this to get rid of all headers up to some pattern, like a HTTP \n\r:
  *
  *   s :: Search("\n\r\n\r") //Strips to the end of the pattern
  *   -> Print("HTTP REQUEST PAYLOAD") //So Print will show the content
@@ -28,7 +40,7 @@ CLICK_DECLS
  * =a UnstripAnno
  */
 
-class Search : public Element { public:
+class Search : public BatchElement { public:
 
     Search() CLICK_COLD;
 
@@ -39,6 +51,9 @@ class Search : public Element { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     void push(int, Packet *) override;
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *) override;
+#endif
 
   private:
 

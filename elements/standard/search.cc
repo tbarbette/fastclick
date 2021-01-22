@@ -43,8 +43,9 @@ Search::configure(Vector<String> &conf, ErrorHandler *errh)
 			.read("SET_ANNO", _set_anno)
 			.complete() < 0)
 				return -1;
+
     if (pattern.length() == 0) {
-	return errh->error("Cannot search for an empty string!");
+	    return errh->error("Cannot search for an empty string!");
     }
     _anno = anno;
     _set_anno = set_anno;
@@ -71,6 +72,17 @@ Search::push(int, Packet *p) {
 		p->set_anno_u16(_anno, p->anno_u16(_anno) + n);
 	output(0).push(p);
 }
+
+#if HAVE_BATCH
+void
+Search::push_batch(int port, PacketBatch *batch) {
+   FOR_EACH_PACKET(batch, p) {
+       Search::push(port,p);
+   }
+   output(0).push_batch(batch);
+}
+#endif
+
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(Search)
