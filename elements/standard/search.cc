@@ -55,13 +55,12 @@ Search::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-void
-Search::push(int, Packet *p) {
 
+int
+Search::action(Packet* p) {
 	const char* f = String::make_stable((const char*)p->data(), p->length()).search(_pattern);
 	if (f == 0) {
-		output(1).push(p);
-		return;
+		return 1;
 	}
 
 	unsigned n = (f - (const char*)p->data());
@@ -70,16 +69,20 @@ Search::push(int, Packet *p) {
 	p->pull(n);
 	if (_set_anno)
 		p->set_anno_u16(_anno, p->anno_u16(_anno) + n);
-	output(0).push(p);
+    return 0;
+}
+
+void
+Search::push(int, Packet *p) {
+
+    int o = action(p);
+	output(o).push(p);
 }
 
 #if HAVE_BATCH
 void
 Search::push_batch(int port, PacketBatch *batch) {
-   FOR_EACH_PACKET(batch, p) {
-       Search::push(port,p);
-   }
-   output(0).push_batch(batch);
+    CLASSIFY_EACH_PACKET(2, action, batch, checked_output_push_batch);
 }
 #endif
 

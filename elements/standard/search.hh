@@ -55,6 +55,8 @@ class Search : public BatchElement { public:
     void push_batch(int, PacketBatch *) override;
 #endif
 
+    int action(Packet* p);
+
   private:
 
     int _anno;
