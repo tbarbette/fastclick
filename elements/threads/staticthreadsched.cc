@@ -64,7 +64,7 @@ StaticThreadSched::configure(Vector<String> &conf, ErrorHandler *errh)
             if (!IntArg().parse(pref[1],preference,errh))
                 return -1;
 #if HAVE_NUMA
-            Bitvector b(36);
+            Bitvector b((int)click_max_cpu_ids());
             auto bc = Numa::node_to_cpus(socket);
             bc.toBitvector(b);
             int idx = 0;
@@ -82,6 +82,7 @@ StaticThreadSched::configure(Vector<String> &conf, ErrorHandler *errh)
                     idx++;
                     if (idx >= b.size()) {
                         errh->warning("Socket %d has no usable core %s",socket,pref[1].c_str());
+                        idx = 0;
                         break;
                     }
                 }
