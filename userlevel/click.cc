@@ -726,7 +726,7 @@ particular purpose.\n");
         if (n_eal_args < 0)
             rte_exit(EXIT_FAILURE,
                      "Click was built with DPDK support but there was an\n"
-                     "          error parsing the EAL arguments.\n");
+                     "          error parsing the EAL arguments or launching DPDK EAL.\n");
         click_nthreads = rte_lcore_count();
     }
 #endif
