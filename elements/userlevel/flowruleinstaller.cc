@@ -346,16 +346,10 @@ FlowRuleInstaller::rule_list_generate(const int &rules_nb, bool do_port, String 
 }
 
 struct rte_flow *
-FlowRuleInstaller::flow_generate(portid_t port_id, Vector<rte_flow_item> &pattern, int table, int priority, int index)
+FlowRuleInstaller::flow_generate(portid_t port_id, Vector<rte_flow_item> &pattern, int table, int priority, int queue_index, struct rte_flow* flow)
 {
-    struct rte_flow_attr attr;
-    memset(&attr, 0, sizeof(struct rte_flow_attr));
-    attr.ingress = 1;
-    attr.group = table;
-    attr.priority = priority;
-
     struct rte_flow_action action[2];
-    struct rte_flow_action_queue queue = {.index = (uint16_t)index};
+    struct rte_flow_action_queue queue = {.index = (uint16_t)queue_index};
 
     memset(action, 0, sizeof(struct rte_flow_action) * 2);
     action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
@@ -366,12 +360,24 @@ FlowRuleInstaller::flow_generate(portid_t port_id, Vector<rte_flow_item> &patter
     struct rte_flow_error error;
     int res = 0;
 
-    res = rte_flow_validate(port_id, &attr, pattern.data(), action, &error);
-    if (res == 0) {
+    /*res = rte_flow_validate(port_id, &attr, pattern.data(), action, &error);
+    if (res == 0) {*/
+    if (flow) {
+
+        rte_flow_update(port_id, flow, pattern.data(), action, &error);
+        return flow;
+    } else {
+        struct rte_flow_attr attr;
+        memset(&attr, 0, sizeof(struct rte_flow_attr));
+        attr.ingress = 1;
+        attr.group = table;
+        attr.priority = priority;
+
         return rte_flow_create(port_id, &attr, pattern.data(), action, &error);
-    } else  {
-        click_chatter("Rule did not validate");
     }
+    /*} else  {
+        click_chatter("Rule did not validate");
+    }*/
 
     return NULL;
 }
@@ -382,6 +388,8 @@ FlowRuleInstaller::flow_generate(portid_t port_id, Vector<rte_flow_item> &patter
 enum {
     h_flow_create_5t, h_flow_create_5t_list, h_flow_create_pair, h_flow_create_pair_list,
     h_flow_create_ether, h_flow_update_ether,
+    h_flow_update_5t_list,
+    h_flow_update_seq_5t_list,
     h_flow_update_5t, h_flow_jump, h_flow_flush, h_flow_count, h_flow_destroy
 };
 
@@ -397,8 +405,8 @@ int FlowRuleInstaller::flow_handler(
     portid_t port_id = fr->_fd->get_device()->get_port_id();
 
     String args = input.trim_space_left();
-
-    switch((uintptr_t)handler->read_user_data()) {
+    unsigned op = (uintptr_t)handler->read_user_data();
+    switch(op) {
 
         // Rule-agnostic operations
         case h_flow_count: {
@@ -567,6 +575,9 @@ int FlowRuleInstaller::flow_handler(
             input = String((uintptr_t) flow);
             return 0;
         }
+
+        case h_flow_update_seq_5t_list:
+        case h_flow_update_5t_list:
         case h_flow_create_5t_list: {
             Vector<String> words = args.split(' ');
             int rules_nb = atoi(words[0].c_str());
@@ -586,20 +597,39 @@ int FlowRuleInstaller::flow_handler(
                 Vector<String> words = rule.split(' ');
                 bool is_tcp = false;
                 Vector<rte_flow_item> pattern = parse_5t(words, false, true);
-                struct rte_flow *flow = flow_generate(port_id, pattern, table, 0, 0);
-                if (!flow) {
-                    click_chatter("Failed to insert rule %d", i);
-                    return -1;
+                if (op ==  h_flow_update_5t_list) {
+                    struct rte_flow* flow = fr->_rules[click_random(fr->_rules.size())];
+
+                    flow_generate(port_id, pattern, table, 0, 0, flow);
+                } else {
+                    int idx;
+                    if (op == h_flow_update_seq_5t_list) {
+                        idx = click_random(fr->_rules.size());
+                        rte_flow_destroy(port_id, fr->_rules[idx], 0);
+                    }
+                    struct rte_flow *flow = flow_generate(port_id, pattern, table, 0, 0);
+                    if (!flow) {
+                        click_chatter("Failed to insert rule %d", i);
+                        return -1;
+                    }
+
+                    if (op == h_flow_update_seq_5t_list) {
+                        fr->_rules[idx] = flow;
+                    } else {
+
+
+                        if (fr->store_rule_local(flow) != 0) {
+                            click_chatter("Failed to insert rule %d", i);
+                            return -1;
+                        }
+                    }
+
+                    if (fr->_verbose) {
+                        click_chatter("[Rule %d]: Inserted at %p", i, flow);
+                    }
                 }
 
-                if (fr->store_rule_local(flow) != 0) {
-                    click_chatter("Failed to insert rule %d", i);
-                    return -1;
-                }
 
-                if (fr->_verbose) {
-                    click_chatter("[Rule %d]: Inserted at %p", i, flow);
-                }
                 i++;
             }
 
@@ -716,11 +746,16 @@ void FlowRuleInstaller::add_handlers()
 {
     set_handler("flow_create_5t_list", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_create_5t_list);
 
+
     set_handler("flow_create_pair_list", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_create_pair_list);
     set_handler("flow_create_5t", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_create_5t);
 
     set_handler("flow_create_pair", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_create_pair);
     set_handler("flow_update_5t", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_update_5t);
+
+    set_handler("flow_update_5t_list", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_update_5t_list);
+
+    set_handler("flow_update_seq_5t_list", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_update_seq_5t_list);
     set_handler("flow_jump", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_jump);
 
     set_handler("flow_create_ether", Handler::f_read | Handler::f_read_param, flow_handler, h_flow_create_ether);

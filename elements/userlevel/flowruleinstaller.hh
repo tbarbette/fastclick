@@ -50,7 +50,7 @@ class FlowRuleInstaller : public Element {
         static Vector<rte_flow_item> parse_5t(Vector<String> words,bool is_tcp = true, bool have_ports = true);
         static struct rte_flow *flow_add_redirect(portid_t port_id, int from, int to, bool validate, int priority = 0);
         static Vector<String> rule_list_generate(const int &rules_nb, bool with_ports = true, String mask = "255.255.255.255", String proto = "udp");
-        static struct rte_flow *flow_generate(portid_t port_id, Vector<rte_flow_item> &pattern, int table, int priority = 0, int index = 1);
+        static struct rte_flow *flow_generate(portid_t port_id, Vector<rte_flow_item> &pattern, int table, int priority = 0, int index = 1, struct rte_flow* = 0);
 
         static int flow_handler(int operation, String &input, Element *e, const Handler *handler, ErrorHandler *errh);
 };
