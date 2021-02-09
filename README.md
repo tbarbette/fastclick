@@ -10,8 +10,7 @@ such as batching.
 
 Announcements
 -------------
-Our PacketMill paper is due to appear at ASPLOS'21 ! It is a set of compiler opitmization techniques that boost performance of packet processing frameworks (it's generic, but we used FastClick as prototype) by up to 70%.
-You can get a sneak peek in the *packetmill* branch. It will eventually get merged into FastClick, with a wrapper command to simply use *packetmill* instead of click and automatically recompile a tailored pipeline.
+Be sure to watch the repository and check out the [GitHub Discussions](https://github.com/tbarbette/fastclick/discussions) to stay up to date!
 
 Quick start for DPDK
 --------------------
