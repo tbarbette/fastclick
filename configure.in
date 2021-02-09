@@ -52,6 +52,8 @@ AC_C_INLINE
 CLICK_PROG_CXX
 AC_PROG_CXXCPP
 
+AX_CHECK_X86_FEATURES
+
 AC_TRY_RUN([#include <new>
 
 int main() {
@@ -1472,31 +1474,17 @@ fi
 dnl Support AVX2 instructions
 
 AC_ARG_ENABLE([avx2],
-        AS_HELP_STRING([--enable-avx2],
-                   [check whether AVX2 is enabled, default yes]),
+        AS_HELP_STRING([--disable-avx2],
+                   [Do not check whether AVX2 is enabled]),
           [check_avx2=no],
           [check_avx2=yes])
 
-if test "${check_avx2}" = "yes"; then
-  AX_CHECK_COMPILE_FLAG([-mavx], [CXXFLAGS="-mavx $CXXFLAGS";CFLAGS="-mavx $CFLAGS"])
-  AX_CHECK_COMPILE_FLAG([-mavx2], [CXXFLAGS="-mavx2 $CXXFLAGS";CFLAGS="-mavx2 $CFLAGS"])
-  AC_MSG_CHECKING([whether we can compile AVX2 intrinsics in C])
-  AC_COMPILE_IFELSE([AC_LANG_SOURCE([
-   #include <x86intrin.h>
-   int main(int argc, char **argv){
-   double* q;
-   __m256d a = _mm256_load_pd(q);
-   double d = _mm256_cvtsd_f64(a);
-   return 0;
-   }
-   ])],
-   [HAVE_AVX2=yes],
-   [HAVE_AVX2=no]
-  )
-  AC_MSG_RESULT([${HAVE_AVX2}])
-fi
-if test "${HAVE_AVX2}" = "yes"; then
-  AC_DEFINE(HAVE_AVX2)
+AC_MSG_CHECKING([if AVX2 should be used])
+if test "x$ax_cv_gcc_x86_cpu_supports_avx2$check_avx2" = "xyesyes"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([HAVE_AVX2],1)
+else
+    AC_MSG_RESULT([no])
 fi
 
 AC_ARG_ENABLE([atomic-builtins],
