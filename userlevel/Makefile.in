@@ -219,7 +219,7 @@ uninstall:
 	for i in $(INSTALLPROGS); do rm -f $(DESTDIR)$(bindir)/$$i; done
 
 clean:
-	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc $(ELEMENTSCONF).static.cc elements.conf elements.csmk libclick.a
+	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc $(ELEMENTSCONF).static.cc elements.conf elements.csmk libclick.a click-opt
 ifeq ($(shell [ ${HAVE_FLOW_API} ] && echo true),true)
 	rm -rf test-pmd/ ../lib/librte_parse_* librte_parse.*
 endif
