@@ -64,7 +64,7 @@ StaticThreadSched::configure(Vector<String> &conf, ErrorHandler *errh)
             if (!IntArg().parse(pref[1],preference,errh))
                 return -1;
 #if HAVE_NUMA
-            Bitvector b(36);
+            Bitvector b((int)click_max_cpu_ids());
             auto bc = Numa::node_to_cpus(socket);
             bc.toBitvector(b);
             int idx = 0;
@@ -76,12 +76,13 @@ StaticThreadSched::configure(Vector<String> &conf, ErrorHandler *errh)
                     if (b[idx]) {
                         if (preference == 0)
                             break;
-                    } else
                         preference--;
+                    }
 
                     idx++;
                     if (idx >= b.size()) {
                         errh->warning("Socket %d has no usable core %s",socket,pref[1].c_str());
+                        idx = 0;
                         break;
                     }
                 }
@@ -97,11 +98,13 @@ StaticThreadSched::configure(Vector<String> &conf, ErrorHandler *errh)
             if (!IntArg().parse(pref[0],preference,errh))
                 return -1;
         }
-        if (preference < -1 || preference >= master()->nthreads()) {
+        if (preference <= -master()->nthreads() || preference >= master()->nthreads()) {
             errh->warning("thread preference %d out of range", preference);
             preference = (preference < 0 ? -1 : 0);
         }
         bool set = false;
+        if (preference < 0)
+            preference = master()->nthreads() + preference;
         if (Element* e = router()->find(ename, this))
             set = set_preference(e->eindex(), preference);
         else if (ename) {

@@ -359,6 +359,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
                 abort();
             }
             next = p->next();
+
 #  if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
             BATCH_RECYCLE_PACKET_CONTEXT(p);
 #  endif

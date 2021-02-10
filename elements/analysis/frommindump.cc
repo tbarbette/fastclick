@@ -288,8 +288,9 @@ inline Packet *FromMinDump::get_packet(bool push) {
       ret = read_binary_line(data);
       if (ret < LINE_LEN)
         return 0;
-    } else
+    } else {
       return 0;
+    }
 
   Packet *p = read_packet(0, data);
 

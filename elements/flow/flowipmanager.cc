@@ -164,9 +164,8 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
     int ret = rte_hash_lookup(table, &fid);
 
     if (ret < 0) { // new flow
-
         ret = rte_hash_add_key(table, &fid);
-        if (ret < 0) {
+        if (unlikely(ret < 0)) {
             if (unlikely(_verbose > 0)) {
                 click_chatter("Cannot add key (have %d items. Error %d)!", rte_hash_count(table), ret);
             }
@@ -176,6 +175,7 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
         if (unlikely(_verbose > 1))
             click_chatter("New flow %d", ret);
         fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
+        //Remember ID for deletion
         fcb->data_32[0] = ret;
         if (_timeout) {
             if (_flags) {
@@ -184,7 +184,7 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
                 _timer_wheel.schedule_after(fcb, _timeout, setter);
             }
         }
-    } else {
+    } else { //existing flow
         if (unlikely(_verbose > 1))
             click_chatter("Existing flow %d", ret);
         fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));

@@ -248,7 +248,8 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
         //mlx5_tx_free_mbuf(elts, part, olx);
     }
 
-    CLICK_ALWAYS_INLINE bool xchg_do_tx_free = false;
+    bool xchg_do_tx_free = false;
+
     struct xchg* xchg_tx_next(struct xchg** xchgs) {
         WritablePacket** p = (WritablePacket**)xchgs;
         WritablePacket* pkt = *p;
@@ -520,20 +521,27 @@ ToDPDKDeviceXCHG::enqueue(rte_mbuf* &q, rte_mbuf* mbuf, WritablePacket* p) {
  *  list plus an array (we could end up with packets which were not sent in the
  *  array, and packets in the list, it would be a mess). So we use an array as
  *  a ring.
+ * This state of affairs is fixed by X-Change, see below.
  */
 #if HAVE_BATCH
 void ToDPDKDeviceXCHG::push_batch(int, PacketBatch *head)
 {
     // Get the thread-local internal queue
-#if HAVE_IQUEUE
+# if HAVE_IQUEUE
     DPDKDevice::TXInternalQueue &iqueue = _iqueues.get();
-#endif
+# endif
+
+# if HAVE_IQUEUE
+
+#  if !CLICK_PACKET_USE_DPDK
+    BATCH_RECYCLE_START();
+#  endif
 
 
-#if HAVE_IQUEUE
-#if !defined(XCHG_TX_SWAPONLY)
+    bool congestioned;
+#  if !defined(XCHG_TX_SWAPONLY)
     assert(false);
-#endif
+#  endif
     Packet* p = head;
     Packet* next;
     do {
@@ -552,6 +560,9 @@ void ToDPDKDeviceXCHG::push_batch(int, PacketBatch *head)
                 abort();
             }
             next = p->next();
+#  if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
+            BATCH_RECYCLE_PACKET_CONTEXT(p);
+#  endif
             p = next;
         }
 
@@ -568,7 +579,7 @@ void ToDPDKDeviceXCHG::push_batch(int, PacketBatch *head)
         // If we're in blocking mode, we loop until we can put p in the iqueue
     } while (unlikely(_blocking && congestioned));
 
-# if !CLICK_PACKET_USE_DPDK
+#  if !CLICK_PACKET_USE_DPDK
     //If non-blocking, drop all packets that could not be sent
     while (p) {
         next = p->next();
@@ -576,12 +587,12 @@ void ToDPDKDeviceXCHG::push_batch(int, PacketBatch *head)
         p = next;
         add_dropped(1);
     }
-# endif
-# if !CLICK_PACKET_USE_DPDK
+#  endif
+#  if !CLICK_PACKET_USE_DPDK
     BATCH_RECYCLE_END();
-# endif
+#  endif
 
-#else //No iqueue
+# else //No iqueue
     
     //The batch will always get a new buffer (or sent inline), so we can
     // recycle the whole batch in the end as a packet-data batch

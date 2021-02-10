@@ -160,14 +160,15 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
     int ret = rte_hash_lookup(table, &fid);
     if (ret < 0) { //new flow
         ret = rte_hash_add_key(table, &fid);
-        if (ret < 0) {
-                    if (unlikely(_verbose > 0)) {
-                        click_chatter("Cannot add key (have %d items. Error %d)!", rte_hash_count(table), ret);
+        if (unlikely(ret < 0)) {
+            if (unlikely(_verbose > 0)) {
+                click_chatter("Cannot add key (have %d items. Error %d)!", rte_hash_count(table), ret);
             }
             p->kill();
             return;
         }
         fcb = (FlowControlBlock*)((unsigned char*)tab.fcbs + (_flow_state_size_full * ret));
+        //We remember the index in the first 4 reserved bytes
         fcb->data_32[0] = ret;
         if (_timeout > 0) {
             if (_flags) {
@@ -176,7 +177,7 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
                 _timer_wheel.schedule_after(fcb, _timeout, fim_setter);
             }
         }
-    } else {
+    } else { //existing flow
         fcb = (FlowControlBlock*)((unsigned char*)tab.fcbs + (_flow_state_size_full * ret));
     }
 
@@ -219,17 +220,17 @@ String FlowIPManagerIMP::read_handler(Element* e, void* thunk)
     FlowIPManagerIMP* fc = static_cast<FlowIPManagerIMP*>(e);
     switch ((intptr_t)thunk) {
     case h_count:
-	{
-	    int count = 0;
-	    for(int i=0; i< fc->_tables_count; i++)
-	    {	
-		gtable * t = (fc->_tables)+i;
-		rte_hash* table = t->hash;
-		if(table)
-		    count+=rte_hash_count(table);
-	    }
-	    return String(count);
-	}
+    {
+        int count = 0;
+        for(int i=0; i< fc->_tables_count; i++)
+        {
+        gtable * t = (fc->_tables)+i;
+        rte_hash* table = t->hash;
+        if(table)
+            count+=rte_hash_count(table);
+        }
+        return String(count);
+    }
     default:
         return "<error>";
     }
