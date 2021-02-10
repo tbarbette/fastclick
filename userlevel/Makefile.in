@@ -185,7 +185,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 
 
 packetmill: packetmill.cc $(DRIVER)
-	$(CXXCOMPILE) $(LIBS) $(subst click.o,,$(OBJS)) $(LDFLAGS) libclick.a packetmill.cc -o $@
+	$(CXXCOMPILE) -o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS)) libclick.a packetmill.cc $(LIBS) $(LDFLAGS)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 
 elemlist:

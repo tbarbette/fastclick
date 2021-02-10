@@ -460,14 +460,10 @@ protected:
     per_thread<FDState> _fdstate;
 #endif
     bool _set_timestamp;
-    bool _clear;
-#if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
-    int timestamp_dynfield_offset;
-    int timestamp_dynflag;
-#endif
     bool _tco;
     bool _uco;
     bool _ipco;
+    bool _clear;
 };
 
 CLICK_ENDDECLS

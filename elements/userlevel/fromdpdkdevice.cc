@@ -167,20 +167,6 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         _dev->set_rx_offload(DEV_RX_OFFLOAD_UDP_CKSUM);
 
     if (set_timestamp) {
-#if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
-        timestamp_dynfield_offset =
-            rte_mbuf_dynfield_register(&timestamp_dynfield_desc);
-        if (timestamp_dynfield_offset < 0) {
-            rte_exit(EXIT_FAILURE, "Cannot register mbuf field\n");
-        }
-        int offset = rte_mbuf_dynflag_register(&rx_flag_desc);
-        if (offset < 0) {
-            RTE_ETHDEV_LOG(ERR,
-                    "Failed to register mbuf flag for Rx timestamp\n");
-            return -rte_errno;
-        }
-        timestamp_dynflag = RTE_BIT64(offset);
-#endif
 #if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
         _dev->set_rx_offload(DEV_RX_OFFLOAD_TIMESTAMP);
         _set_timestamp = true;

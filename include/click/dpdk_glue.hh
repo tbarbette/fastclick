@@ -44,10 +44,12 @@ extern "C" {
 #include <rte_bitops.h>
 #define TIMESTAMP_FIELD(mbuf) \
            (*RTE_MBUF_DYNFIELD(mbuf, timestamp_dynfield_offset, uint64_t *))
-extern struct rte_mbuf_dynflag rx_flag_desc;
-extern struct rte_mbuf_dynfield timestamp_dynfield_desc;
 #define HAS_TIMESTAMP(mbuf) \
         ((mbuf)->ol_flags & timestamp_dynflag)
+
+extern int timestamp_dynfield_offset;
+extern uint64_t timestamp_dynflag;
 #endif
+
 
 #endif
