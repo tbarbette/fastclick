@@ -98,9 +98,12 @@ EtherEncap::add_handlers()
     add_write_handler("src", reconfigure_keyword_handler, "1 SRC");
     add_data_handlers("dst", Handler::h_read, reinterpret_cast<EtherAddress *>(&_ethh.ether_dhost));
     add_write_handler("dst", reconfigure_keyword_handler, "2 DST");
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
     add_net_order_data_handlers("ethertype", Handler::h_read, &_ethh.ether_type);
     add_write_handler("ethertype", reconfigure_keyword_handler, "0 ETHERTYPE");
     add_net_order_data_handlers("etht", Handler::h_read | Handler::h_deprecated, &_ethh.ether_type);
+#pragma GCC diagnostic pop
     add_write_handler("etht", reconfigure_keyword_handler, "0 ETHERTYPE");
 }
 
