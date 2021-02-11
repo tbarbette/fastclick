@@ -174,6 +174,10 @@ class Packet { public:
 	    _destructor = 0;
     }
 
+    void set_destructor_argument(void* arg) {
+        _destructor_argument = arg;
+    }
+
     void delete_buffer(unsigned char* head, unsigned char* end);
 #endif
 
@@ -939,7 +943,7 @@ class WritablePacket : public Packet { public:
 #endif
 
 # if HAVE_CLICK_PACKET_POOL
-    static PacketPool* make_local_packet_pool();
+    static void initialize_local_packet_pool();
 # endif
 
     static void pool_transfer(int from, int to);
