@@ -36,6 +36,8 @@ class ElementMap { public:
     const String& source_directory(const Traits&) const;
     const String& package(const Traits&) const;
     const String& package(const String&) const;
+    const String& archive(const Traits&) const;
+    const String& archive(const String&) const;
     String documentation_url(const Traits&) const;
 
     class TraitsIterator;
@@ -45,8 +47,8 @@ class ElementMap { public:
     void remove_at(int i);
 
     void parse(const String& data, ErrorHandler* = 0);
-    void parse(const String& data, const String& package_name, ErrorHandler* = 0);
-    void parse_xml(const String& data, const String& package_name, ErrorHandler*);
+    void parse(const String& data, const String& package_name, ErrorHandler* = 0, String archive = "");
+    void parse_xml(const String& data, const String& package_name, ErrorHandler*, String archive = "");
     bool parse_default_file(const String& default_path, ErrorHandler* errh, bool verbose = false);
     bool parse_package_file(const String& package_name, const RouterT* router, const String& default_path, ErrorHandler* errh, bool verbose = false);
     bool parse_requirement_files(RouterT*, const String& default_path, ErrorHandler* errh, bool verbose = false);
@@ -71,6 +73,7 @@ class ElementMap { public:
 	String srcdir;
 	String compile_flags;
 	String package;
+    String archive;
 	String dochref;
 	int driver_mask;
     };
@@ -157,6 +160,20 @@ ElementMap::package(const String& name) const
 {
     return package(traits(name));
 }
+
+inline const String&
+ElementMap::archive(const ElementTraits& t) const
+{
+    return _def[t.def_index].archive;
+}
+
+inline const String&
+ElementMap::archive(const String& name) const
+{
+    return archive(traits(name));
+}
+
+
 
 inline void
 ElementMap::incr_version() const

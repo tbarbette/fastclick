@@ -58,6 +58,8 @@
 # include "../elements/ns/fromsimdevice.hh"
 #endif
 
+extern void click_delete_element(Element*);
+
 CLICK_DECLS
 
 /** @file router.hh
@@ -132,10 +134,10 @@ Router::~Router()
     // Delete elements in reverse configuration order
     if (_element_configure_order.size())
         for (int ord = _elements.size() - 1; ord >= 0; ord--)
-            delete _elements[ _element_configure_order[ord] ];
+            click_delete_element(_elements[ _element_configure_order[ord] ]);
     else
         for (int i = 0; i < _elements.size(); i++)
-            delete _elements[i];
+            click_delete_element(_elements[i]);
 
     delete _root_element;
 

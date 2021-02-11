@@ -25,6 +25,7 @@
 #include <click/error.hh>
 #include <click/confparse.hh>
 #include <click/straccum.hh>
+#include <click/archive.hh>
 #include <click/driver.hh>
 #include "lexert.hh"
 #include "routert.hh"

@@ -3,6 +3,7 @@
 #define CLICK_ARCHIVE_HH
 #include <click/string.hh>
 #include <click/vector.hh>
+#include <click/error.hh>
 CLICK_DECLS
 class ErrorHandler;
 
@@ -68,6 +69,19 @@ struct ArchiveElement {
 	    if (ae->name == name)
 		return ae;
 	return 0;
+    }
+
+    static const int extract(const Vector<ArchiveElement> &ar, const String &name, const String &dest, ErrorHandler* errh = 0) {
+        const ArchiveElement *ae = find(ar, name);
+		FILE *f = fopen(dest.c_str(), "wb");
+		if (!f) {
+		  if (errh)
+			errh->error("%s: %s", name.c_str(), strerror(errno));
+		  return -1;
+		}
+        int r = fwrite(ae->data.c_str(), 1, ae->data.length(), f);
+        fclose(f);
+        return r >= 0;
     }
 
 };

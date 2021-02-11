@@ -1428,6 +1428,7 @@ LexerT::finish(const VariableEnvironment &global_scope)
 {
     RouterT *r = _router;
     _router = 0;
+    r->set_filename(_file._filename.c_str());
     r->redefine(global_scope);
     // resolve anonymous element names
     r->assign_element_names();
