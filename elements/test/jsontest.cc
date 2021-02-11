@@ -19,7 +19,8 @@
 #include <click/config.h>
 #include "jsontest.hh"
 #include <click/error.hh>
-#include "elements/json/json.hh"
+#include <click/json.hh>
+
 CLICK_DECLS
 
 JsonTest::JsonTest()

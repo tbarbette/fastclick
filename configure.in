@@ -227,16 +227,7 @@ else
     have_hyperscan=no
 fi
 
-AC_ARG_ENABLE([json],
-    [AS_HELP_STRING([  --enable-json], [enable JSON support])],
-    [:], [enable_json=no])
-if test "x$enable_json" = "xyes"; then
-    have_json=yes
-    AC_DEFINE([HAVE_JSON])
-else
-    have_json=no
-fi
-
+AC_DEFINE([HAVE_JSON])
 
 AC_CHECK_LIB([pci], [main], [ac_have_pci=yes], [ac_have_pci=no])
 AC_CHECK_HEADERS([pci/pci.h], [ac_have_pci_h=yes], [ac_have_pci_h=no])
@@ -620,7 +611,6 @@ ELEMENTS_ARG_ENABLE(icmp, [include ICMP elements], yes)
 ELEMENTS_ARG_ENABLE(ip, [include IP elements], yes)
 ELEMENTS_ARG_ENABLE(ip6, [include IPv6 elements], NO, AC_DEFINE(HAVE_IP6))
 ELEMENTS_ARG_ENABLE(ipsec, [include IP security elements], NO, AC_DEFINE(HAVE_IPSEC))
-ELEMENTS_ARG_ENABLE(json, [include JSON helpers], NO, AC_DEFINE(HAVE_JSON))
 ELEMENTS_ARG_ENABLE(local, [include local elements], NO)
 ELEMENTS_ARG_ENABLE(radio, [include radio elements], NO)
 ELEMENTS_ARG_ENABLE(research, [include research elements], NO)
@@ -2657,7 +2647,6 @@ Configuration Summary:
 
     RE2    support:              ${have_re2}
     HTTPD  support:              ${have_httpd}
-    JSON   support:              ${have_json}
     libpci support:              ${have_pci}
 "
 
