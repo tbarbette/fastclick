@@ -112,7 +112,7 @@ MixedQueue::push_batch(int port, PacketBatch *batch)
 		_empty_note.wake();
 
 		if (oldp)
-		checked_output_push(1, PacketBatch::make_from_packet(oldp));
+		checked_output_push_batch(1, PacketBatch::make_from_packet(oldp));
 	}
 }
 #endif

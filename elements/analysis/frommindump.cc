@@ -329,7 +329,7 @@ bool FromMinDump::run_task(Task *) {
     if (likely(p)) {
       if (unlikely(head == NULL)) {
         head = PacketBatch::start_head(p);
-        last = head;
+        last = p;
       } else {
         last->set_next(p);
         last = last->next();
