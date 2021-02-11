@@ -85,5 +85,10 @@ class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
         TimerWheel<FlowControlBlock> _timer_wheel;
 };
 
+const auto fim_setter = [](FlowControlBlock* prev, FlowControlBlock* next)
+{
+    *((FlowControlBlock**)&prev->data_32[2]) = next;
+};
+
 CLICK_ENDDECLS
 #endif
