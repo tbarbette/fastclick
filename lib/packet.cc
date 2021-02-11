@@ -221,31 +221,11 @@ Packet::~Packet()
 #elif CLICK_PACKET_USE_DPDK
     rte_panic("Packet destructor");
 #else
-#ifndef CLICK_NOINDIRECT
-    if (_data_packet)
-	_data_packet->kill();
-#else
-    if (false)  {
-        while(0){};
-    }
+    delete_buffer(_head, _end
+#if CLICK_BSDMODULE
+            , _m
 #endif
-# if CLICK_USERLEVEL || CLICK_MINIOS
-    else if (_head && _destructor) {
-        if (_destructor != empty_destructor)
-            _destructor(_head, _end - _head, _destructor_argument);
-    } else
-#  if HAVE_NETMAP_PACKET_POOL
-    if (_head && NetmapBufQ::is_valid_netmap_packet(this)) {
-        NetmapBufQ::local_pool()->insert_p(_head);
-    } else
-#  endif
-    if (_head) {
-            delete[] _head;
-    }
-# elif CLICK_BSDMODULE
-    if (_m)
-	m_freem(_m);
-# endif
+            );
     _head = _data = 0;
 #endif
 }
@@ -1073,55 +1053,34 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     p->_tail = p->_data + length;
     p->_end = new_end;
 
-	# if CLICK_BSDMODULE
-		struct mbuf *old_m = _m;
-	# endif
+#if CLICK_BSDMODULE
+    struct mbuf *old_m = _m;
+# endif
 
     unsigned char *start_copy = old_head + (extra_headroom >= 0 ? 0 : -extra_headroom);
     unsigned char *end_copy = old_end + (extra_tailroom >= 0 ? 0 : extra_tailroom);
     memcpy(p->_head + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
 
-    // free old data
-#ifndef CLICK_NOINDIRECT
-    if (_data_packet) {
-      _data_packet->kill();
-    }
-#else
-    if (false) {
-    }
+    delete_buffer(old_head, old_end
+#if CLICK_BSDMODULE
+    , old_m
 #endif
-# if CLICK_USERLEVEL || CLICK_MINIOS
-    else if (_destructor) {
-      _destructor(old_head, old_end - old_head, _destructor_argument);
-    } else {
-#  if HAVE_NETMAP_PACKET_POOL
-      if (NetmapBufQ::is_valid_netmap_buffer(old_head)) {
-        NetmapBufQ::local_pool()->insert_p(old_head);
-      } else
-#  endif
-      {
-        delete[] old_head;
-      }
-    }
+            );
 # if HAVE_DPDK_PACKET_POOL
     p->_destructor = desc;
     p->_destructor_argument = arg;
-#  else
+# else
     _destructor = 0;
 # endif
 
-# elif CLICK_BSDMODULE
-    m_freem(old_m); // alloc_data() created a new mbuf, so free the old one
-# endif
-
-#ifndef CLICK_NOINDIRECT
+# ifndef CLICK_NOINDIRECT
     p->_use_count = 1;
     p->_data_packet = 0;
-#endif
+# endif
     p->shift_header_annotations(old_head, extra_headroom);
     return p;
 
-#endif /* CLICK_LINUXMODULE */
+#endif /* !CLICK_LINUXMODULE */
 }
 
 
