@@ -815,7 +815,6 @@ enable_batch
 enable_verbose_batch
 enable_auto_batch
 enable_netmap_pool
-enable_json
 enable_select
 enable_poll
 enable_kqueue
@@ -1586,7 +1585,6 @@ Optional Features:
   --disable-ip            do not include IP elements
   --enable-ip6            include IPv6 elements
   --enable-ipsec          include IP security elements
-  --enable-json           include JSON helpers
   --enable-local          include local elements
   --enable-radio          include radio elements
   --enable-research       include research elements
@@ -8085,20 +8083,7 @@ else
     have_hyperscan=no
 fi
 
-# Check whether --enable-json was given.
-if test "${enable_json+set}" = set; then :
-  enableval=$enable_json; :
-else
-  enable_json=no
-fi
-
-if test "x$enable_json" = "xyes"; then
-    have_json=yes
-    $as_echo "#define HAVE_JSON 1" >>confdefs.h
-
-else
-    have_json=no
-fi
+$as_echo "#define HAVE_JSON 1" >>confdefs.h
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lpci" >&5
@@ -17376,7 +17361,6 @@ Configuration Summary:
 
     RE2    support:              ${have_re2}
     HTTPD  support:              ${have_httpd}
-    JSON   support:              ${have_json}
     libpci support:              ${have_pci}
 "
 

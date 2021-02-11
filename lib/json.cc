@@ -18,7 +18,7 @@
  */
 
 #include <click/config.h>
-#include "json.hh"
+#include <click/json.hh>
 #include <click/confparse.hh>
 CLICK_DECLS
 
