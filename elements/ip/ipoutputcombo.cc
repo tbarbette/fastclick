@@ -217,7 +217,7 @@ void IPOutputCombo::push_batch(int, PacketBatch * head) {
         }
         output_push_batch(n,batch);
     };
-    CLASSIFY_EACH_PACKET(6,action,head,on_finish);
+    CLASSIFY_EACH_PACKET(6, [this](Packet* p){return action(p,true);} ,head,on_finish);
 }
 #endif
 inline void
