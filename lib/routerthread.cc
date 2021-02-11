@@ -638,7 +638,9 @@ RouterThread::driver()
 #  endif
 # endif
 #endif
-
+# if HAVE_CLICK_PACKET_POOL
+    WritablePacket::initialize_local_packet_pool();
+# endif
 #if HAVE_CLICK_LOAD
     //Initialize the load update time
     LoadState &ls = _load_state.write_begin();

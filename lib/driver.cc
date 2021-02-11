@@ -444,6 +444,11 @@ click_static_initialize()
 
     ErrorHandler::static_initialize(new FileErrorHandler(stderr, ""));
 
+# if HAVE_CLICK_PACKET_POOL
+    //We need to initialize a thread pool for the master thread, as initialization phase may start allocating packets
+    WritablePacket::initialize_local_packet_pool();
+# endif
+
     Router::static_initialize();
     NotifierSignal::static_initialize();
     CLICK_DEFAULT_PROVIDES;
