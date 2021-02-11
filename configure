@@ -622,6 +622,7 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 provisions
+clickbuild_clickdir
 clickbuild_sbindir
 clickbuild_libdir
 clickbuild_includedir
@@ -666,6 +667,18 @@ NETMAP_INCLUDES
 NUMA_INCLUDES
 PCAP_LIBS
 PCAP_INCLUDES
+USE_DPDK
+DPDK_CFLAGS
+DPDK_LIBS
+DPDK_INCLUDES
+RTE_VER_MINOR
+RTE_VER_MAJOR
+RTE_VER_MONTH
+RTE_VER_YEAR
+RTE_SDK_BIN
+RTE_TARGET
+RTE_SDK
+RTE_USE_PKGCONFIG
 TOOL_TARGETS
 TOOLDIRS
 OTHER_TARGETS
@@ -707,20 +720,11 @@ minios_dir
 xen_dir
 INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
-USE_DPDK
-DPDK_INCLUDES
-RTE_VER_MINOR
-RTE_VER_MAJOR
-RTE_VER_MONTH
-RTE_VER_YEAR
-RTE_SDK_BIN
-RTE_TARGET
-RTE_SDK
-RTE_USE_PKGCONFIG
 PTHREAD_LIBS
 HAVE_BATCH
 AR_CREATEFLAGS
 STRIP
+READELF
 RANLIB
 OBJCOPY
 NM
@@ -819,6 +823,7 @@ enable_dpdk
 enable_dpdk_pool
 enable_dpdk_packet
 enable_dpdk_softqueue
+enable_flow_api
 enable_zerocopy
 enable_clone
 enable_linuxmodule
@@ -876,7 +881,6 @@ enable_stride
 enable_task_heap
 enable_task_stats
 enable_cpu_load
-enable_flow_api
 enable_dmalloc
 enable_hash_iterator_epochs
 enable_force_expensive
@@ -1541,18 +1545,20 @@ Optional Features:
     --enable-auto-batch=[list|jump|port]
                           make vanilla elements batch-compatible automatically
     --enable-netmap-pool  use netmap buffers instead of standard Click buffers
-    --enable-json         enable JSON support
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
     --disable-select      do not use select()
     --disable-poll        do not use poll()
     --disable-kqueue      do not use kqueue()
     --enable-dpdk         use DPDK
-    --enable-dpdk-pool    use DPDK buffer instead of standard Click buffer
-    --enable-dpdk-packet  Click packets are DPDK packet
-    --disable-dpdk-softqueue
+      --enable-dpdk-pool  use DPDK buffer instead of standard Click buffer
+      --enable-dpdk-packet
+                          Click packets are DPDK packet
+      --disable-dpdk-softqueue
                           Do not use internal software queue in TX to buffer
                           packets before flushing.
+      --enable-flow-api   Support for the HW flow classification API. Also
+                          needs DPDK>=20.02
     --disable-zerocopy    disable Zero Copy
     --disable-clone       disable packet cloning
   --enable-linuxmodule    disable Linux kernel driver
@@ -1596,7 +1602,8 @@ Optional Features:
                           disable comma-separated elements
   --enable-smaller-code   generate smaller code (sometimes slower)
   --disable-int64         disable 64-bit integer support
-  --enable-nanotimestamp  enable nanosecond timestamps
+  --enable-nanotimestamp  enable nanosecond timestamps (default if
+                          clock_gettime is available)
   --enable-simtime        enable support for simulated timing
   --enable-user-timestamp enable support for user-provided clock system
   --enable-bound-port-transfer
@@ -1611,8 +1618,6 @@ Optional Features:
                           balancing of tasks among threads
   --enable-cpu-load       Keep track of CPU usage using an approximation.
                           Useful when using polling keeping the CPU at 100%
-  --enable-flow-api       Support for the HW flow classification API. Also
-                          needs DPDK>=20.02
   --enable-dmalloc        enable debugging malloc
   --enable-hash-iterator-epochs
                           hash iterator epochs
@@ -3209,6 +3214,7 @@ as_fn_append ac_header_list " machine/endian.h"
 as_fn_append ac_header_list " byteswap.h"
 as_fn_append ac_header_list " strings.h"
 as_fn_append ac_header_list " time.h"
+as_fn_append ac_header_list " dlfcn.h"
 as_fn_append ac_header_list " termio.h"
 as_fn_append ac_header_list " netdb.h"
 as_fn_append ac_header_list " sys/event.h"
@@ -3216,7 +3222,6 @@ as_fn_append ac_header_list " pwd.h"
 as_fn_append ac_header_list " grp.h"
 as_fn_append ac_header_list " execinfo.h"
 as_fn_append ac_header_list " poll.h"
-as_fn_append ac_header_list " dlfcn.h"
 as_fn_append ac_header_list " sys/mman.h"
 as_fn_append ac_header_list " stdlib.h"
 as_fn_append ac_header_list " sys/param.h"
@@ -7382,6 +7387,98 @@ else
 fi
 
 if test -n "$ac_tool_prefix"; then
+  # Extract the first word of "${ac_tool_prefix}readelf", so it can be a program name with args.
+set dummy ${ac_tool_prefix}readelf; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_READELF+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$READELF"; then
+  ac_cv_prog_READELF="$READELF" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_READELF="${ac_tool_prefix}readelf"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+READELF=$ac_cv_prog_READELF
+if test -n "$READELF"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $READELF" >&5
+$as_echo "$READELF" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+fi
+if test -z "$ac_cv_prog_READELF"; then
+  ac_ct_READELF=$READELF
+  # Extract the first word of "readelf", so it can be a program name with args.
+set dummy readelf; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_ac_ct_READELF+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$ac_ct_READELF"; then
+  ac_cv_prog_ac_ct_READELF="$ac_ct_READELF" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_ac_ct_READELF="readelf"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+ac_ct_READELF=$ac_cv_prog_ac_ct_READELF
+if test -n "$ac_ct_READELF"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_ct_READELF" >&5
+$as_echo "$ac_ct_READELF" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+  if test "x$ac_ct_READELF" = x; then
+    READELF=":"
+  else
+    case $cross_compiling:$ac_tool_warned in
+yes:)
+{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
+$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
+ac_tool_warned=yes ;;
+esac
+    READELF=$ac_ct_READELF
+  fi
+else
+  READELF="$ac_cv_prog_READELF"
+fi
+
+if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
 set dummy ${ac_tool_prefix}strip; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -7480,6 +7577,8 @@ conf_auxdir='$(top_srcdir)'
 test -z "$AR_CREATEFLAGS" && AR_CREATEFLAGS=cru
 
 
+EXTRA_DRIVER_OBJS=
+EXTRA_TOOL_OBJS=
 
 
 
@@ -8105,6 +8204,8 @@ $as_echo "#define HAVE_ALLOW_KQUEUE 1" >>confdefs.h
 
 fi
 
+
+
 # Check whether --enable-dpdk was given.
 if test "${enable_dpdk+set}" = set; then :
   enableval=$enable_dpdk; :
@@ -8138,148 +8239,13 @@ else
 fi
 
 
-if test "x$enable_dpdk" != "xno"; then
-
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for DPDK library" >&5
-$as_echo_n "checking for DPDK library... " >&6; }
-
-    if test "x$enable_dpdk" != "xyes"; then
-        RTE_SDK=$enable_dpdk
-    fi
-
-    if test -z "$RTE_SDK_BIN"; then
-        RTE_SDK_BIN=$RTE_SDK/$RTE_TARGET
-    fi
-
-    if test ! -d "$RTE_SDK_BIN"; then
-        RTE_SDK_BIN=$RTE_SDK/build/
-    fi
-
-    if test -z "$RTE_LIBNAME"; then
-        RTE_LIBNAME=dpdk
-    fi
-
-    if test -z "$RTE_SRCDIR"; then
-        RTE_SRCDIR=$RTE_SDK
-    fi
-
-    if test "x$enable_user_multithread" != "xyes"; then
-        as_fn_error $? "
-=========================================
-
---enable-dpdk requires --enable-user-multithread which was not provided.
-
-=========================================" "$LINENO" 5
-    fi
-
-
-    if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
-      RTE_USE_PKGCONFIG=1
-
-      RTE_LIB=$(pkg-config --variable=libdir libdpdk)
-      RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
-      rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
-      rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
-      rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
-      rte_ver_major=$rte_ver_year
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-    else
-      RTE_USE_PKGCONFIG=0
-
-      RTE_INCLUDE=${RTE_SDK_BIN}/include/
-      RTE_LIB="$RTE_SDK_BIN/lib"
-      if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
-        as_fn_error $? "
-=========================================
-
-Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
-Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
-or install DPDK using meson, or the system package manager.
-Note with the system package manager, you need the devel package
-version (dpdk-dev or dpdk-devel).
-
-=========================================" "$LINENO" 5
-      fi
-
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes, found at $RTE_SDK_BIN" >&5
-$as_echo "yes, found at $RTE_SDK_BIN" >&6; }
-
-      if test -e "$RTE_SRCDIR/VERSION"; then
-        rte_ver_year=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($1)}'`
-        rte_ver_month=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($2)}'`
-        rte_ver_minor=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($3)}'`
-        rte_ver_major=$rte_ver_year
-      else
-        if grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_config.h" &> /dev/null; then
-            verfile=rte_config
-        else
-            verfile=rte_version
-        fi
-        rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
-      fi
-    fi
-
-
-
-
-    RTE_VER_YEAR=$rte_ver_year
-
-    RTE_VER_MONTH=$rte_ver_month
-
-    RTE_VER_MAJOR=$rte_ver_major
-
-    RTE_VER_MINOR=$rte_ver_minor
-
-    DPDK_INCLUDES=-I$RTE_INCLUDE
-
-
-    $as_echo "#define HAVE_DPDK 1" >>confdefs.h
-
-    USE_DPDK=yes
-
-
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether DPDK has rte_eth_read_clock" >&5
-$as_echo_n "checking whether DPDK has rte_eth_read_clock... " >&6; }
-    if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null; then
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-      $as_echo "#define HAVE_DPDK_READ_CLOCK 1" >>confdefs.h
-
-    else
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-    fi
+# Check whether --enable-flow-api was given.
+if test "${enable_flow_api+set}" = set; then :
+  enableval=$enable_flow_api; :
+else
+  enable_flow_api=no
 fi
 
-if test "x$enable_dpdk_pool" = "xyes"; then
-    if test "x$enable_dpdk" = "xno"; then
-        as_fn_error $? "
-=========================================
-
---enable-dpdk-pool requires --enable-dpdk which was not provided.
-
-=========================================" "$LINENO" 5
-    fi
-    $as_echo "#define HAVE_DPDK_PACKET_POOL 1" >>confdefs.h
-
-fi
-
-if test "x$enable_dpdk_packet" = "xyes"; then
-    if test "x$enable_dpdk" = "xno"; then
-        as_fn_error $? "
-=========================================
-
---enable-dpdk-packet requires --enable-dpdk which was not provided.
-
-=========================================" "$LINENO" 5
-    fi
-    $as_echo "#define CLICK_PACKET_USE_DPDK 1" >>confdefs.h
-
-fi
 
 # Check whether --enable-zerocopy was given.
 if test "${enable_zerocopy+set}" = set; then :
@@ -8789,18 +8755,6 @@ test "x$enable_all_elements" = xyes -a \( "x$enable_ipsec" = xNO -o "x$enable_ip
 if test "x$enable_ipsec" = xyes; then
     :
     $as_echo "#define HAVE_IPSEC 1" >>confdefs.h
-
-fi
-# Check whether --enable-json was given.
-if test "${enable_json+set}" = set; then :
-  enableval=$enable_json;
-else
-  enable_json=NO
-fi
-test "x$enable_all_elements" = xyes -a \( "x$enable_json" = xNO -o "x$enable_json" = x \) && enable_json=yes
-if test "x$enable_json" = xyes; then
-    :
-    $as_echo "#define HAVE_JSON 1" >>confdefs.h
 
 fi
 # Check whether --enable-local was given.
@@ -10592,9 +10546,6 @@ if test "x$enable_flow" = xyes; then
     fi
 fi
 
-
-
-
 # Check whether --enable-tools was given.
 if test "${enable_tools+set}" = set; then :
   enableval=$enable_tools; :
@@ -10795,126 +10746,12 @@ fi
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    if test x"$ac_cv_header_poll_h" = xyes; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether <poll.h> is emulated" >&5
-$as_echo_n "checking whether <poll.h> is emulated... " >&6; }
-if ${ac_cv_emulated_poll_h+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include <poll.h>
-#ifdef _POLL_EMUL_H_
-# error "error"
-#endif
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_cxx_try_compile "$LINENO"; then :
-  ac_cv_emulated_poll_h=no
-else
-  ac_cv_emulated_poll_h=yes
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_emulated_poll_h" >&5
-$as_echo "$ac_cv_emulated_poll_h" >&6; }
-        if test "x$ac_cv_emulated_poll_h" = xno; then
-
-$as_echo "#define HAVE_POLL_H 1" >>confdefs.h
-
-        fi
-    fi
-
-for ac_func in pselect sigaction
-do :
-  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
-ac_fn_cxx_check_func "$LINENO" "$ac_func" "$as_ac_var"
-if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
-_ACEOF
-
-fi
-done
-
-
-for ac_func in kqueue
-do :
-  ac_fn_cxx_check_func "$LINENO" "kqueue" "ac_cv_func_kqueue"
-if test "x$ac_cv_func_kqueue" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_KQUEUE 1
-_ACEOF
- have_kqueue=yes
-fi
-done
-
-if test "x$have_kqueue" = xyes; then
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether EV_SET last argument is void *" >&5
-$as_echo_n "checking whether EV_SET last argument is void *... " >&6; }
-if ${ac_cv_ev_set_udata_pointer+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include <sys/types.h>
-#include <sys/event.h>
-#include <sys/time.h>
-int
-main ()
-{
-struct kevent kev; EV_SET(&kev, 1, EVFILT_WRITE, EV_ADD, 0, 0, (void *) &kev);
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_cxx_try_compile "$LINENO"; then :
-  ac_cv_ev_set_udata_pointer=yes
-else
-  ac_cv_ev_set_udata_pointer=no
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_ev_set_udata_pointer" >&5
-$as_echo "$ac_cv_ev_set_udata_pointer" >&6; }
-    if test $ac_cv_ev_set_udata_pointer = yes; then
-
-$as_echo "#define HAVE_EV_SET_UDATA_POINTER 1" >>confdefs.h
-
-    fi
-fi
-
 # Check whether --enable-dynamic-linking was given.
 if test "${enable_dynamic_linking+set}" = set; then :
   enableval=$enable_dynamic_linking; :
 else
   enable_dynamic_linking=yes
 fi
-
 
 if test "x$enable_dynamic_linking" = xyes; then
 
@@ -11138,6 +10975,119 @@ else
     CLICK_SHARED=0
 fi
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    if test x"$ac_cv_header_poll_h" = xyes; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether <poll.h> is emulated" >&5
+$as_echo_n "checking whether <poll.h> is emulated... " >&6; }
+if ${ac_cv_emulated_poll_h+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <poll.h>
+#ifdef _POLL_EMUL_H_
+# error "error"
+#endif
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ac_cv_emulated_poll_h=no
+else
+  ac_cv_emulated_poll_h=yes
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_emulated_poll_h" >&5
+$as_echo "$ac_cv_emulated_poll_h" >&6; }
+        if test "x$ac_cv_emulated_poll_h" = xno; then
+
+$as_echo "#define HAVE_POLL_H 1" >>confdefs.h
+
+        fi
+    fi
+
+for ac_func in pselect sigaction
+do :
+  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
+ac_fn_cxx_check_func "$LINENO" "$ac_func" "$as_ac_var"
+if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+done
+
+
+for ac_func in kqueue
+do :
+  ac_fn_cxx_check_func "$LINENO" "kqueue" "ac_cv_func_kqueue"
+if test "x$ac_cv_func_kqueue" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_KQUEUE 1
+_ACEOF
+ have_kqueue=yes
+fi
+done
+
+if test "x$have_kqueue" = xyes; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether EV_SET last argument is void *" >&5
+$as_echo_n "checking whether EV_SET last argument is void *... " >&6; }
+if ${ac_cv_ev_set_udata_pointer+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <sys/types.h>
+#include <sys/event.h>
+#include <sys/time.h>
+int
+main ()
+{
+struct kevent kev; EV_SET(&kev, 1, EVFILT_WRITE, EV_ADD, 0, 0, (void *) &kev);
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ac_cv_ev_set_udata_pointer=yes
+else
+  ac_cv_ev_set_udata_pointer=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_ev_set_udata_pointer" >&5
+$as_echo "$ac_cv_ev_set_udata_pointer" >&6; }
+    if test $ac_cv_ev_set_udata_pointer = yes; then
+
+$as_echo "#define HAVE_EV_SET_UDATA_POINTER 1" >>confdefs.h
+
+    fi
+fi
 
 
 ac_ext=c
@@ -11624,8 +11574,6 @@ _ACEOF
 
 
 
-EXTRA_DRIVER_OBJS=
-EXTRA_TOOL_OBJS=
 if test "x$enable_ip6" = xyes; then
     EXTRA_DRIVER_OBJS="ip6address.o ip6flowid.o ip6table.o $EXTRA_DRIVER_OBJS"
     EXTRA_TOOL_OBJS="ip6address.o $EXTRA_TOOL_OBJS"
@@ -12166,14 +12114,6 @@ if test "x$enable_cpu_load" = xyes; then
 
 fi
 
-
-# Check whether --enable-flow-api was given.
-if test "${enable_flow_api+set}" = set; then :
-  enableval=$enable_flow_api; :
-else
-  enable_flow_api=no
-fi
-
 as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowruleparser.hh" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowruleparser.hh" >&5
 $as_echo_n "checking for $srcdir/include/click/flowruleparser.hh... " >&6; }
@@ -12480,6 +12420,8 @@ shell_mkbuild () {
 test "x$prefix" = xNONE && prefix=$ac_default_prefix
 test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
 
+DIR="$( cd "$( dirname "${BASH_SOURCE0}" )" >/dev/null 2>&1 && pwd )"
+clickdir="$DIR"
 clickdatadir="$datadir/click"
 
 for i in bin clickdata data dataroot include lib sbin; do
@@ -12541,6 +12483,162 @@ for i in click-install; do
 done
 
 
+
+
+if test "x$enable_dpdk" != "xno"; then
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for DPDK library" >&5
+$as_echo_n "checking for DPDK library... " >&6; }
+
+    if test "x$enable_dpdk" != "xyes"; then
+        RTE_SDK=$enable_dpdk
+    fi
+
+    if test -z "$RTE_SDK_BIN"; then
+        RTE_SDK_BIN=$RTE_SDK/$RTE_TARGET
+    fi
+
+    if test ! -d "$RTE_SDK_BIN"; then
+        RTE_SDK_BIN=$RTE_SDK/build/
+    fi
+
+    if test -z "$RTE_LIBNAME"; then
+        RTE_LIBNAME=dpdk
+    fi
+
+    if test -z "$RTE_SRCDIR"; then
+        RTE_SRCDIR=$RTE_SDK
+    fi
+
+    if test "x$enable_user_multithread" != "xyes"; then
+        as_fn_error $? "
+=========================================
+
+--enable-dpdk requires --enable-user-multithread which was not provided.
+
+=========================================" "$LINENO" 5
+    fi
+
+
+    if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
+      RTE_USE_PKGCONFIG=1
+
+      RTE_LIB=$(pkg-config --variable=libdir libdpdk)
+      RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
+      rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_major=$rte_ver_year
+      if test "x${CLICK_SHARED}" = "x1" ; then
+          DPDK_LIBS=$(pkg-config --libs libdpdk)
+      else
+		  DPDK_LIBS=$(pkg-config --static --libs libdpdk)
+      fi
+	  DPDK_CFLAGS=$(pkg-config --cflags libdpdk)
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+    else
+      RTE_USE_PKGCONFIG=0
+
+      RTE_INCLUDE=${RTE_SDK_BIN}/include/
+      RTE_LIB="$RTE_SDK_BIN/lib"
+      if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
+        as_fn_error $? "
+=========================================
+
+Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
+Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
+or install DPDK using meson, or the system package manager.
+Note with the system package manager, you need the devel package
+version (dpdk-dev or dpdk-devel).
+
+=========================================" "$LINENO" 5
+      fi
+
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes, found at $RTE_SDK_BIN" >&5
+$as_echo "yes, found at $RTE_SDK_BIN" >&6; }
+
+      if test -e "$RTE_SRCDIR/VERSION"; then
+        rte_ver_year=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($1)}'`
+        rte_ver_month=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($2)}'`
+        rte_ver_minor=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($3)}'`
+        rte_ver_major=$rte_ver_year
+      else
+        if grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_config.h" &> /dev/null; then
+            verfile=rte_config
+        else
+            verfile=rte_version
+        fi
+        rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+      fi
+      dpdk_vars=`cd userlevel/dpdk/ && make -s RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET RTE_VER_YEAR=$rte_ver_year RTE_VER_MONTH=$rte_ver_month RTE_VER_MAJOR=$rte_ver_major RTE_VER_MINOR=$rte_ver_minor`
+      eval $dpdk_vars
+    fi
+
+
+
+
+    RTE_VER_YEAR=$rte_ver_year
+
+    RTE_VER_MONTH=$rte_ver_month
+
+    RTE_VER_MAJOR=$rte_ver_major
+
+    RTE_VER_MINOR=$rte_ver_minor
+
+    DPDK_INCLUDES=-I${RTE_INCLUDE}
+
+    DPDK_LIBS=${DPDK_LIBS}
+
+    DPDK_CFLAGS=${DPDK_CFLAGS}
+
+
+    $as_echo "#define HAVE_DPDK 1" >>confdefs.h
+
+    USE_DPDK=yes
+
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether DPDK has rte_eth_read_clock" >&5
+$as_echo_n "checking whether DPDK has rte_eth_read_clock... " >&6; }
+    if ${READELF} -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null; then
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+      $as_echo "#define HAVE_DPDK_READ_CLOCK 1" >>confdefs.h
+
+    else
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+    fi
+fi
+
+if test "x$enable_dpdk_pool" = xyes; then
+    if test "x$enable_dpdk" = "xno"; then
+        as_fn_error $? "
+=========================================
+
+--enable-dpdk-pool requires --enable-dpdk which was not provided.
+
+=========================================" "$LINENO" 5
+    fi
+    $as_echo "#define HAVE_DPDK_PACKET_POOL 1" >>confdefs.h
+
+fi
+
+if test "x$enable_dpdk_packet" = "xyes"; then
+    if test "x$enable_dpdk" = "xno"; then
+        as_fn_error $? "
+=========================================
+
+--enable-dpdk-packet requires --enable-dpdk which was not provided.
+
+=========================================" "$LINENO" 5
+    fi
+    $as_echo "#define CLICK_PACKET_USE_DPDK 1" >>confdefs.h
+
+fi
 
 
 
@@ -15719,6 +15817,13 @@ _ACEOF
 
 
 
+cat >>confdefs.h <<_ACEOF
+#define CLICK_DIR "$clickdir"
+_ACEOF
+
+
+
+
 
 
 
@@ -15765,6 +15870,18 @@ if test "x$enable_dpdk" != "xno"; then
         provisions="$provisions dpdk17"
     fi
 fi
+
+if test "x$enable_dpdk_packet" = xyes; then
+    provisions="$provisions dpdk-packet"
+    packet_mode="DPDK rte_mbuf"
+else
+    if test "x$enable_dpdk_pool" = xyes; then
+        packet_mode="Click's Packet object with DPDK buffers in the pool"
+    else
+        packet_mode="Click's Packet object with any buffers"
+    fi
+fi
+
 
 if test "x$enable_flow" = xyes; then
     provisions="$provisions flow"
