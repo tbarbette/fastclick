@@ -127,9 +127,12 @@ ELEMENTSCONF = elements
 INSTALLLIBS = libclick.a
 FINDELEMFLAGS = @FINDELEMFLAGS@ --checksum elements.csmk
 -include elements.csmk
+ELEM2EXPORT = elem2export
 else
 DRIVER = $(MINDRIVER)click
 ELEMENTSCONF = elements_$(MINDRIVER)
+ELEM2EXPORT = elem2export
+ELEMENTSSUFFIX =
 endif
 INSTALLPROGS = $(DRIVER)
 
@@ -173,8 +176,8 @@ elements.conf: $(top_builddir)/config.status $(CLICK_BUILDTOOL)
 	$(call verbose_cmd,echo "userlevel @element_groups@" | $(CLICK_BUILDTOOL) findelem -r userlevel -p $(top_srcdir) -X $(srcdir)/elements.exclude $(FINDELEMFLAGS) >,FINDELEMENTS,elements.conf)
 $(ELEMENTSCONF).mk: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
 	$(call verbose_cmd,$(CLICK_BUILDTOOL) elem2make -x "$(STD_ELEMENT_OBJS)" < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).mk)
-$(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
-	$(call verbose_cmd,$(CLICK_BUILDTOOL) elem2export < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).cc)
+$(ELEMENTSCONF)$(ELEMENTSSUFFIX).cc: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
+	$(call verbose_cmd,$(CLICK_BUILDTOOL) $(ELEM2EXPORT) < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF)$(ELEMENTSSUFFIX).cc)
 	@rm -f $(ELEMENTSCONF).d
 
 DEPFILES := $(wildcard *.d)

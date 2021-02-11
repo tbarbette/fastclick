@@ -276,7 +276,7 @@ parse_xml_attrs(HashTable<String, String> &attrs,
 }
 
 void
-ElementMap::parse_xml(const String &str, const String &package_name, ErrorHandler *errh)
+ElementMap::parse_xml(const String &str, const String &package_name, ErrorHandler *errh, String archive)
 {
     if (!errh)
 	errh = ErrorHandler::silent_handler();
@@ -330,6 +330,7 @@ ElementMap::parse_xml(const String &str, const String &package_name, ErrorHandle
 		    g.driver_mask = Driver::driver_mask(attrs["drivers"]);
 		if (!_provided_driver_mask)
 		    _provided_driver_mask = g.driver_mask;
+        g.archive = archive;
 		_def.push_back(g);
 		in_elementmap = true;
 	    }
@@ -384,10 +385,10 @@ ElementMap::parse_xml(const String &str, const String &package_name, ErrorHandle
 }
 
 void
-ElementMap::parse(const String &str, const String &package_name, ErrorHandler *errh)
+ElementMap::parse(const String &str, const String &package_name, ErrorHandler *errh, const String archive)
 {
     if (str.length() && str[0] == '<') {
-	parse_xml(str, package_name, errh);
+	parse_xml(str, package_name, errh, archive);
 	return;
     }
 
@@ -396,6 +397,7 @@ ElementMap::parse(const String &str, const String &package_name, ErrorHandler *e
 	def_index = _def.size();
 	_def.push_back(Globals());
 	_def.back().package = package_name;
+	_def.back().archive = archive;
     }
 
     // set up default data
@@ -426,6 +428,7 @@ ElementMap::parse(const String &str, const String &package_name, ErrorHandler *e
 		_def.push_back(Globals());
 		_def.back() = _def[def_index - 1];
 		_def.back().srcdir = cp_unquote(words[1]);
+	    _def.back().archive = archive;
 	    }
 
 	} else if (words[0] == "$webdoc") {
@@ -434,6 +437,7 @@ ElementMap::parse(const String &str, const String &package_name, ErrorHandler *e
 		_def.push_back(Globals());
 		_def.back() = _def[def_index - 1];
 		_def.back().dochref = cp_unquote(words[1]);
+	_def.back().archive = archive;
 	    }
 
 	} else if (words[0] == "$provides") {

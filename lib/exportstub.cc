@@ -27,3 +27,10 @@ void
 click_unexport_elements()
 {
 }
+
+class Element;
+
+void
+click_delete_element(Element* e)
+{
+}
