@@ -140,7 +140,7 @@ inline bool ReplayBase::load_packets() {
                 if (p_input[i] == 0) {
                     do_pull:
 #if HAVE_BATCH
-                    p_input[i] = input_pull_batch(i,1);
+                    p_input[i] = input_pull_batch(i,1)->first();
 #else
                     p_input[i] = input(i).pull();
 #endif

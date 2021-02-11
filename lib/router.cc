@@ -1714,8 +1714,9 @@ Router::store_local_handler(int eindex, Handler &to_store)
                 break;
             }
         }
-        if (l >= r)
+        if (l >= r) {
             l = _handler_first_by_name.insert(l, -1);
+        } 
         name_index = l - _handler_first_by_name.begin();
     }
 

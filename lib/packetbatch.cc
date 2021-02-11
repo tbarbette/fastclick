@@ -28,18 +28,6 @@ CLICK_DECLS
 #if HAVE_BATCH
 
 # if HAVE_CLICK_PACKET_POOL
-/**
- * Recycle a whole batch of unshared packets of the same type
- *
- * @precond No packet are shared
- */
-CLICK_ALWAYS_INLINE void PacketBatch::recycle_batch(bool is_data) {
-    if (is_data) {
-        WritablePacket::recycle_data_batch(this,tail(),count());
-    } else {
-        WritablePacket::recycle_packet_batch(this,tail(),count());
-    }
-}
 
 /**
  * Recycle a whole batch, faster in most cases as it add batches to the pool in
@@ -82,7 +70,7 @@ void PacketBatch::fast_kill_nonatomic() {
  **/
 PacketBatch *
 PacketBatch::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
-        buffer_destructor_type destructor, void* argument, bool clean )
+        Packet::buffer_destructor_type destructor, void* argument, bool clean)
 {
 #if CLICK_PACKET_USE_DPDK
     click_chatter("UNIMPLEMENTED");

@@ -322,7 +322,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 {
     // Get the thread-local internal queue
     DPDKDevice::TXInternalQueue &iqueue = _iqueues.get();
-    Packet* p = head;
+    Packet* p = head->first();
     Packet* next;
 
     //No recycling through click if we have DPDK-backed packets
