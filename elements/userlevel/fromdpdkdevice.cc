@@ -30,9 +30,8 @@
 #include "fromdpdkdevice.hh"
 #include "tscclock.hh"
 #include "todpdkdevice.hh"
-#if HAVE_JSON
-#include "../json/json.hh"
-#endif
+#include <click/dpdk_glue.hh>
+#include <click/json.hh>
 
 #if HAVE_FLOW_API
     #include <click/flowrulemanager.hh>

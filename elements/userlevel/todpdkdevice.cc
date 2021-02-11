@@ -352,13 +352,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 
         if (unlikely(p != 0)) {
             congestioned = true;
-            if (!_congestion_warning_printed) {
-                if (!_blocking)
-                    click_chatter("%s: packet dropped", name().c_str());
-                else
-                    click_chatter("%s: congestion warning", name().c_str());
-                _congestion_warning_printed = true;
-            }
+            warn_congestion();
         }
 
         //Flush the queue if we have pending packets
@@ -436,13 +430,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
         add_count(sent);
 
         if (unlikely(sent != count)) { //We could not send all packets
-                if (!_congestion_warning_printed) {
-                    if (!_blocking)
-                        click_chatter("%s: packet dropped", name().c_str());
-                    else
-                        click_chatter("%s: congestion warning", name().c_str());
-                    _congestion_warning_printed = true;
-                }
+                warn_congestion();
                 if (_blocking) {
                     int base = sent;
                     count-=sent;

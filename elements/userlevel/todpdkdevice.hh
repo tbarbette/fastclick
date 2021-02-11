@@ -149,8 +149,9 @@ public:
 #endif
     void push(int port, Packet *p);
 
-private:
+protected:
 
+    inline void warn_congestion();
 
     inline void enqueue(rte_mbuf* &q, rte_mbuf* mbuf, const Packet* p);
 
@@ -164,7 +165,6 @@ private:
     int _timeout;
     bool _congestion_warning_printed;
     bool _create;
-    bool _vlan;
     uint32_t _tso;
     bool _tco;
     bool _uco;
@@ -172,6 +172,18 @@ private:
 
     friend class FromDPDKDevice;
 };
+
+
+
+inline void ToDPDKDevice::warn_congestion() {
+            if (!_congestion_warning_printed) {
+                if (!_blocking)
+                    click_chatter("%s: packet dropped", name().c_str());
+                else
+                    click_chatter("%s: congestion warning", name().c_str());
+                _congestion_warning_printed = true;
+            }
+}
 
 CLICK_ENDDECLS
 
