@@ -173,6 +173,8 @@ class Packet { public:
 	    _head = _data = _tail = _end = 0;
 	    _destructor = 0;
     }
+
+    void delete_buffer(unsigned char* head, unsigned char* end);
 #endif
 
 
@@ -3055,6 +3057,40 @@ WritablePacket::rewrite_ip(IPAddress ip, const int shift, bool is_tcp) {
     else
         click_update_in_cksum(&this->udp_header()->uh_sum, t_old_hw, t_new_hw);
 }
+
+#if !CLICK_PACKET_USE_DPDK
+inline void
+Packet::delete_buffer(unsigned char* head, unsigned char* end
+#if CLICK_BSDMODULE
+        ,unsigned char* m
+#endif
+        ) {
+# ifndef CLICK_NOINDIRECT
+    if (_data_packet) {
+	    _data_packet->kill();
+    }
+# else
+  if (false) {}
+# endif
+# if CLICK_USERLEVEL || CLICK_MINIOS
+    else if (head && _destructor) {
+        if (_destructor != empty_destructor)
+            _destructor(head, end - head, _destructor_argument);
+    } else
+#  if HAVE_NETMAP_PACKET_POOL
+    if (head && NetmapBufQ::is_valid_netmap_buffer(head)) {
+        NetmapBufQ::local_pool()->insert_p(head);
+    } else
+#  endif
+    if (head) {
+            delete[] head;
+    }
+# elif CLICK_BSDMODULE
+    if (m)
+	    m_freem(m);
+# endif
+}
+#endif
 
 typedef Packet::PacketType PacketType;
 
