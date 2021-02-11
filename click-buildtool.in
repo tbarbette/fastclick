@@ -425,7 +425,7 @@ $bad_first_files" | sort | uniq -u`
 	    files="$files
 ${ppfx}$i"
 	fi
-	if expr "$checksum_data" != "" '&' "${ppfx}$i" : '[^$ 	
+	if expr "$checksum_data" != "" '&' "${ppfx}$i" : '[^$
 ]*$' >/dev/null; then
 	    checksum_files="$checksum_files ${ppfx}$i"
 	elif test -n "$checksum_data"; then rm -f "$checksum_data"; checksum_data=; fi
@@ -493,6 +493,13 @@ $bad_files" | sort | uniq -u`
 {
   split($2, deps, / +/);
   for (j in deps) {
+    if (deps[j] ~ /^!/) {
+        i = substr(deps[j],2)
+        if (dep[i] > 0) {
+            print $1;
+            break;
+        }
+    } else {
     i = deps[j]
     if (dep[i] <= 0) {
       bad = 1;
@@ -506,6 +513,7 @@ $bad_files" | sort | uniq -u`
 	break;
       }
     }
+}
   }
 }' | sort | uniq`
 	if test -n "$verbose"; then
@@ -601,7 +609,7 @@ $bad_files"
   ++errors
 }
 /static_initialize/ {
-  static_initialize[cur_class] = 1
+  static_initialize[cur_class] = 1;
   next
 }
 /static_cleanup/ {
@@ -651,6 +659,11 @@ END {
       } else
 	klass = substr(exes[j], star + 1)
       if (static_initialize[klass]) {
+          if (!class_name[klass]) {
+              print header[i], ": ", klass, "::static_initialied can only be used with a class_name method!" | "cat 1>&2"
+              ++errors
+          }
+
 	ex = ex klass "-!si ";
 	static_initialize[klass] = 0
       }
@@ -1056,6 +1069,7 @@ END {
   print "#ifdef CLICK_LINUXMODULE\n#define click_add_element_type_stable(n, f, t) click_add_element_type_stable((n), (f), (t), 0)\n#endif";
   print "void\nclick_export_elements()\n{\n", B, "  CLICK_DMALLOC_REG(\"nXXX\");\n}\n";
   print "void\nclick_unexport_elements()\n{\n", C, "}";
+  print "void\nclick_delete_element(Element* e)\n{\ndelete e;}";
 }
 '
     fi
@@ -1672,9 +1686,9 @@ EOF
   compile-shortensyms)
      shift 1; compile_shortensyms "$@"; exit 0;;
   --cf|--cfl|--cfla|--cflag|--cflags|--d|--de|--def|--defs)
-     echo @PROPER_INCLUDES@ @PCAP_INCLUDES@ @DPDK_INCLUDES@ @NETMAP_INCLUDES@ -I@includedir@; exit 0;;
+     echo @PROPER_INCLUDES@ @PCAP_INCLUDES@ @DPDK_INCLUDES@ @DPDK_CFLAGS@ @NETMAP_INCLUDES@ -I@includedir@; exit 0;;
   --o|--ot|--oth|--othe|--other|--otherl|--otherli|--otherlib|--otherlibs)
-     echo @PROPER_LIBS@ @PCAP_LIBS@ @DL_LIBS@ @SOCKET_LIBS@ @PTHREAD_LIBS@ @POSIX_CLOCK_LIBS@;
+     echo @PROPER_LIBS@ @PCAP_LIBS@ @DL_LIBS@ @SOCKET_LIBS@ @DPDK_LIBS@ @PTHREAD_LIBS@ @POSIX_CLOCK_LIBS@;
      exit 0;;
   --toolc|--toolcf|--toolcfl|--toolcfla|--toolcflag|--toolcflags)
      echo -DCLICK_TOOL -I@includedir@; exit 0;;
