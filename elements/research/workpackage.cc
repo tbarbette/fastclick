@@ -22,11 +22,12 @@
 #include <click/error.hh>
 #include <click/standard/scheduleinfo.hh>
 
+#define FRAND_MAX _gens->max()
+
 CLICK_DECLS
 
-std::random_device rd;
+std::random_device WorkPackage::rd;
 
-#define FRAND_MAX _gens->max()
 
 WorkPackage::WorkPackage() : _w(1)
 {
@@ -35,16 +36,16 @@ WorkPackage::WorkPackage() : _w(1)
 int
 WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    int s;
+    double _s;
     if (Args(conf, this, errh)
-        .read_mp("S", s) //Array size in MB
-        .read_mp("N", _n) //Number of array access (4bytes)
-        .read_mp("R", _r) //Percentage of access that are packet read (vs Array access) between 0 and 100
-        .read_mp("PAYLOAD", _payload) //Access payload or only header
-        .read("W",_w) //Amount of call to random, purely CPU intensive fct
+        .read_or_set("S", _s, 0) //Array size in MB
+        .read_or_set("N", _n, 0) //Number of array access (4bytes)
+        .read_or_set("R", _r, 0) //Percentage of access that are packet read (vs Array access) between 0 and 100
+        .read_or_set("PAYLOAD", _payload, false) //Access payload or only header
+        .read_or_set("W",_w, 0) //Amount of call to random, purely CPU intensive fct
         .complete() < 0)
         return -1;
-    _array.resize(s * 1024 * 1024 / sizeof(uint32_t));
+    _array.resize(int(_s * 1024 * 1024 / (float)sizeof(uint32_t)));
     for (int i = 0; i < _array.size(); i++) {
         _array[i] = rd();
     }
@@ -69,8 +70,10 @@ WorkPackage::rmaction(Packet* p, int &n_data)
             data = *(uint32_t*)(p->data() + pos);
             //n_data++;
         } else {
-            unsigned pos = r / ((FRAND_MAX / (_array.size() + 1)) + 1);
-            data = _array[pos];
+            if (_array.size() > 0) {
+                unsigned pos = r / ((FRAND_MAX / (_array.size() + 1)) + 1);
+                data = _array[pos];
+            }
         }
         r = data ^ (r << 24 ^ r << 16  ^ r << 8 ^ r >> 16);
     }

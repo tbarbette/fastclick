@@ -39,6 +39,8 @@ class WorkPackage : public BatchElement {
         bool _payload;
         Vector<uint32_t> _array;
         per_thread<std::mt19937> _gens;
+
+        static std::random_device rd;
 };
 
 CLICK_ENDDECLS
