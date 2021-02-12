@@ -1,6 +1,8 @@
 #include <click/config.h>
 #include <click/clp.h>
+#if HAVE_DPDK
 #include <rte_ethdev.h>
+#endif
 #include <stdlib.h>
 #include <click/pathvars.h>
 
@@ -25,11 +27,11 @@ int main(int argc, char** argv) {
     click_args_t args;
     char cmd[256];
     parse(argc, argv, args);  
-   
+#if HAVE_DPDK
     /*int ret = rte_eal_init(argc, argv);
     if (ret < 0)
         rte_panic("Cannot init EAL\n");*/
-
+#endif
 #if !HAVE_DPDK_XCHG
     perfalert("PacketMill was NOT compiled with XCHG");
 #endif

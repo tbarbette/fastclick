@@ -827,6 +827,7 @@ enable_dpdk_xchg
 enable_dpdk_inside
 enable_dpdk_packet
 enable_dpdk_softqueue
+enable_pool_inlining
 enable_flow_api
 enable_zerocopy
 enable_clone
@@ -1565,6 +1566,10 @@ Optional Features:
       --disable-dpdk-softqueue
                           Do not use internal software queue in TX to buffer
                           packets before flushing.
+    --disable-pool-inlining
+                          Do not optimize pool_prepare_data_burst function
+                          before data structure reordering done at the IR
+                          level.
       --enable-flow-api   Support for the HW flow classification API. Also
                           needs DPDK>=20.02
     --disable-zerocopy    disable Zero Copy
@@ -8265,6 +8270,15 @@ if test "${enable_dpdk_softqueue+set}" = set; then :
   enableval=$enable_dpdk_softqueue; :
 else
   $as_echo "#define HAVE_IQUEUE 1" >>confdefs.h
+
+fi
+
+
+# Check whether --enable-pool-inlining was given.
+if test "${enable_pool_inlining+set}" = set; then :
+  enableval=$enable_pool_inlining; :
+else
+  $as_echo "#define POOL_INLINING 1" >>confdefs.h
 
 fi
 
