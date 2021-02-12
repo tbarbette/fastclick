@@ -352,7 +352,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
             // While there is still place in the iqueue
             struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, _create, _this_node);
             if (likely(mbuf != NULL)) {
-                iqueue.pkts[(iqueue.index + iqueue.nr_pending) & (_internal_tx_queue_size - 1)] =  mbuf;
+                iqueue.pkts[(iqueue.index + iqueue.nr_pending) & (_internal_tx_queue_size - 1)] = mbuf;
                 iqueue.nr_pending++;
             } else {
                 click_chatter("No more DPDK buffer");
@@ -370,11 +370,13 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
             congestioned = true;
             warn_congestion();
 #  if CLICK_PACKET_USE_DPDK
-            while (p) {
-                next = p->next();
-                p->kill();
-                p = next;
-            }
+            if (!_blocking) {
+		    while (p) {
+		        next = p->next();
+		        p->kill();
+		        p = next;
+		    }
+	    }
 #  endif
         }
 
@@ -453,13 +455,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
         add_count(sent);
 
         if (unlikely(sent != count)) { //We could not send all packets
-                if (!_congestion_warning_printed) {
-                    if (!_blocking)
-                        click_chatter("%s: packet dropped", name().c_str());
-                    else
-                        click_chatter("%s: congestion warning", name().c_str());
-                    _congestion_warning_printed = true;
-                }
+                warn_congestion();
                 if (_blocking) {
                     int base = sent;
                     count-=sent;

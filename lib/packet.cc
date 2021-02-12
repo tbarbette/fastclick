@@ -221,7 +221,11 @@ Packet::~Packet()
 #elif CLICK_PACKET_USE_DPDK
     rte_panic("Packet destructor");
 #else
-    delete_buffer(_head, _data);
+    delete_buffer(_head, _end
+#if CLICK_BSDMODULE
+            , _m
+#endif
+            );
     _head = _data = 0;
 #endif
 }
@@ -280,7 +284,7 @@ static PacketPool global_packet_pool = {0,0,0,0};
 
 /** @brief Return the local packet pool for this thread.
     @pre initialize_local_packet_pool() has succeeded on this thread. */
-static CLICK_ALWAYS_INLINE PacketPool& local_packet_pool() {
+static CLICK_ALWAYS_INLINE inline PacketPool& local_packet_pool() {
 #  if HAVE_MULTITHREAD
     return *thread_packet_pool;
 #  else
@@ -1159,7 +1163,11 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     unsigned char *end_copy = old_end + (extra_tailroom >= 0 ? 0 : extra_tailroom);
     memcpy(p->_head + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
 
-    delete_buffer(old_head, old_end);
+    delete_buffer(old_head, old_end
+#if CLICK_BSDMODULE
+    , old_m
+#endif
+            );
 # if HAVE_DPDK_PACKET_POOL
     p->_destructor = desc;
     p->_destructor_argument = arg;

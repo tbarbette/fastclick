@@ -233,6 +233,9 @@ extern "C" {
 static void* hotswap_threadfunc(void*)
 {
     pthread_detach(pthread_self());
+# if HAVE_CLICK_PACKET_POOL
+    WritablePacket::initialize_local_packet_pool();
+# endif
     pthread_mutex_lock(&hotswap_lock);
     if (hotswap_router) {
         click_master->block_all();

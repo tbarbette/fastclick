@@ -3119,7 +3119,11 @@ WritablePacket::rewrite_ip(IPAddress ip, const int shift, bool is_tcp) {
 
 #if !CLICK_PACKET_USE_DPDK
 inline void
-Packet::delete_buffer(unsigned char* head, unsigned char* end) {
+Packet::delete_buffer(unsigned char* head, unsigned char* end
+#if CLICK_BSDMODULE
+        ,unsigned char* m
+#endif
+        ) {
 # ifndef CLICK_NOINDIRECT
     if (_data_packet) {
 	_data_packet->kill();
@@ -3128,12 +3132,12 @@ Packet::delete_buffer(unsigned char* head, unsigned char* end) {
   if (false) {}
 # endif
 # if CLICK_USERLEVEL || CLICK_MINIOS
-    else if (_head && _destructor) {
+    else if (head && _destructor) {
         if (_destructor != empty_destructor)
             _destructor(head, end - head, _destructor_argument);
     } else
 #  if HAVE_NETMAP_PACKET_POOL
-    if (_head && NetmapBufQ::is_valid_netmap_buffer(head)) {
+    if (head && NetmapBufQ::is_valid_netmap_buffer(head)) {
         NetmapBufQ::local_pool()->insert_p(head);
     } else
 #  endif
@@ -3141,8 +3145,8 @@ Packet::delete_buffer(unsigned char* head, unsigned char* end) {
             delete[] head;
     }
 # elif CLICK_BSDMODULE
-    if (_m)
-	    m_freem(_m);
+    if (m)
+	    m_freem(m);
 # endif
 }
 #endif
