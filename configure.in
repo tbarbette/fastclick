@@ -83,6 +83,9 @@ AC_SUBST(AR_CREATEFLAGS)
 
 EXTRA_DRIVER_OBJS=
 EXTRA_TOOL_OBJS=
+INCLUDES_LLVM=
+LLVM_OBJS=
+LIBS_LLVM=
 
 dnl
 dnl drivers
@@ -2333,6 +2336,8 @@ AC_PROG_AWK
 AC_PROG_GREP
 AC_PROG_EGREP
 AC_CHECK_PROGS([MD5SUM], [md5sum md5])
+AC_CHECK_PROGS([LLVMCONFIG], [llvm-config])
+
 
 if test -z "$GMAKE"; then
     AC_MSG_ERROR([
@@ -2345,6 +2350,19 @@ GNU make's pathname.
 ==============================================])
 fi
 
+
+if test -z "$LLVMCONFIG"; then
+    have_llvm=no
+else
+    AC_DEFINE([HAVE_LLVM])
+    have_llvm=yes
+    LLVM_OBJS="llvmutils.o $LLVM_OBJS"
+    LIBS_LLVM="`$LLVMCONFIG --ldflags --system-libs --libs all | tr -d '\n'` $LIBS_LLVM"
+    INCLUDES_LLVM="`$LLVMCONFIG --cxxflags | tr -d '\n'` $INCLUDES_LLVM"    
+fi
+AC_SUBST(LLVM_OBJS)
+AC_SUBST(LIBS_LLVM)
+AC_SUBST(INCLUDES_LLVM)
 
 dnl
 dnl install and clean versions of targets
@@ -2598,6 +2616,11 @@ if test "x$have_pci" = xyes; then
     provisions="$provisions pci"
 fi
 
+dnl add 'llvm' if llvm-config command is available
+if test "x$have_llvm" = xyes; then
+    provisions="$provisions llvm"
+fi
+
 dnl add 're2' if re2 is available
 if test "x$have_re2" = xyes; then
     provisions="$provisions re2"
@@ -2692,6 +2715,7 @@ Configuration Summary:
     RE2    support:              ${have_re2}
     HTTPD  support:              ${have_httpd}
     libpci support:              ${have_pci}
+    LLVM   support:              ${have_llvm}
 "
 
 if test "$feedback" != no; then

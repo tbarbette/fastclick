@@ -253,6 +253,9 @@
 /* Define if DPDK have XCHG API. */
 #undef HAVE_DPDK_XCHG
 
+/* Define if LLVM libraries are available. */
+#undef HAVE_LLVM
+
 /* Define if DPDK software queue for TX is enabled. */
 #undef HAVE_IQUEUE
 
