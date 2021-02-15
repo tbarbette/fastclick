@@ -649,7 +649,7 @@ ElementMap::find_and_parse_package_file(const String& package_name, const Router
     }
     pnames[n++] = "elementmap-devirtualize.xml";
     pnames[n++] = "elementmap.xml";
-    pnames[n++] = "elemenetmap";
+    pnames[n++] = "elementmap";
     for (int i = 0; i < n; i++) {
         String mapname = pnames[i];
 
@@ -665,16 +665,14 @@ ElementMap::find_and_parse_package_file(const String& package_name, const Router
         }
 
         // look for elementmap in file system
-        if (package_name != "<archive>") {
-            String fn = clickpath_find_file(mapname, "share", default_path);
-            if (fn) {
-                if (errh && verbose)
-                    errh->message("parsing %s %<%s%>", filetype.c_str(), fn.c_str());
-                String text = file_string(fn, errh);
-                parse(text, package_name);
-                return true;
-            }
 
+        String fn = clickpath_find_file(mapname, "share", default_path);
+        if (fn) {
+            if (errh && verbose)
+                errh->message("parsing %s %<%s%>", filetype.c_str(), fn.c_str());
+            String text = file_string(fn, errh);
+            parse(text, package_name);
+            return true;
         }
     }
 
