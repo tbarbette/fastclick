@@ -108,7 +108,7 @@ This pass adds `alignas(x)` keyword to the devirtualized element classes, thereb
 
 ### Other Passes
 
-We also worked on a few passes to unroll (or use computed jumps/switch for) the fast path loop. You can check the `click-devirtualize` source code for more information, see [here][devirtualize-code], search for `unroll`, `switch`, and `unroll`. 
+We also worked on a few passes to unroll (or use computed jumps/switch for) the fast path loop. You can check the `click-devirtualize` source code for more information, see [here][devirtualize-code], search for `unroll`, `switch`, and `jmps`. 
 
 ## X-Change
 
