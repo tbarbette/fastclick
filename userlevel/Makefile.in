@@ -63,6 +63,8 @@ endif
 .cc.ii:
 	$(call cxxcompile_nodep,-E $< > $@,CXXCPP)
 
+llvmutils.o: llvmutils.cc
+	$(call cxxcompile,-c $< $(INCLUDES_LLVM) -o $@,CXX)
 
 GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	bitvector.o bighashmap_arena.o hashallocator.o \
@@ -92,7 +94,7 @@ CXXFLAGS = @CXXFLAGS@
 
 DEFS = @DEFS@
 INCLUDES = -I$(top_builddir)/include -I$(top_builddir)/vendor -I$(top_srcdir)/include \
-	-I$(srcdir) -I$(top_srcdir) $(INCLUDES_LLVM)\
+	-I$(srcdir) -I$(top_srcdir) \
 	@PROPER_INCLUDES@ @PCAP_INCLUDES@ @DPDK_INCLUDES@ @NETMAP_INCLUDES@ @NUMA_INCLUDES@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@ `$(CLICK_BUILDTOOL) --otherlibs` $(ELEMENT_LIBS)
@@ -189,7 +191,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 
 
 packetmill: packetmill.cc $(DRIVER)
-	$(CXXCOMPILE) -o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS)) libclick.a packetmill.cc $(LIBS) $(LDFLAGS) ${LIBS_LLVM}
+	$(CXXCOMPILE) -o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS)) libclick.a packetmill.cc $(LIBS) $(LDFLAGS) $(LIBS_LLVM)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 
 elemlist:

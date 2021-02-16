@@ -1,9 +1,14 @@
-
 #ifndef CLICK_LLVMUTILS_HH
 #define CLICK_LLVMUTILS_HH
-#include <llvm/IR/Module.h>
 #include <string>
 #include <vector>
+#include <memory>
+
+namespace llvm {
+    class Module;
+    class StructType;
+    class Type;
+};
 
 std::string demangle(const char *name);
 template <typename T> size_t RemoveDuplicatesKeepOrder(std::vector<T> &vec);

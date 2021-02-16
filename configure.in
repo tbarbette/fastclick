@@ -2350,8 +2350,7 @@ GNU make's pathname.
 ==============================================])
 fi
 
-
-if test -z "$LLVMCONFIG"; then
+if test -z "$LLVMCONFIG" -o -n "${CXX##*clang*}" ; then
     have_llvm=no
 else
     AC_DEFINE([HAVE_LLVM])

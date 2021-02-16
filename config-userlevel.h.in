@@ -295,7 +295,9 @@
 
 /* Include integer type definitions. */
 #ifdef HAVE_INTTYPES_H
-#define __STDC_FORMAT_MACROS
+# ifndef __STDC_FORMAT_MACROS
+#  define __STDC_FORMAT_MACROS
+# endif
 # include <inttypes.h>
 #endif
 #include <sys/types.h>
