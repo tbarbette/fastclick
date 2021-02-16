@@ -1,4 +1,4 @@
-[FastClick](https://www.fastclick.dev)
+[FastClick](https://www.fastclick.dev) ![CI](https://github.com/tbarbette/fastclick/workflows/C/C++%20CI/badge.svg)
 =========
 This is an extended version of the Click Modular Router featuring an
 improved Netmap support and a new DPDK support. It was the result of
