@@ -65,6 +65,8 @@ int main(int argc, char **argv) {
   exec("make embedclick MINDRIVER=embed STATIC=1");
   #if HAVE_LLVM
     if (optimizeIR("embedclick")) {
+      click_chatter("Applying -O3 optimizations");
+      exec("opt -S -O3 embedclick.ll -o embedclick.ll");
       exec("make embedclick-opt");
       argv[0] = "./embedclick-opt";
     } else {
