@@ -1,4 +1,4 @@
-FastClick
+[FastClick](https://www.fastclick.dev)
 =========
 This is an extended version of the Click Modular Router featuring an
 improved Netmap support and a new DPDK support. It was the result of
