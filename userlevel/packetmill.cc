@@ -81,6 +81,8 @@ int main(int argc, char **argv) {
     if (strcmp(argv[i], args.router_file) == 0)
       argv[i] = "config_stripped";
   }
+  /* Hint to NPF Packet Generator */
+  click_chatter("EVENT COMPILED");
   execvp(argv[0], argv);
   return 0;
 }
