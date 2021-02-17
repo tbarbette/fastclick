@@ -116,7 +116,7 @@ FlowRRSwitch::read_handler(Element *e, void *user_data)
             return String(r->_map.size());
         }
         default: {
-            click_chatter("Unknown read handler: %d", what);
+            click_chatter("Unknown read handler");
             return "";
         }
     }
