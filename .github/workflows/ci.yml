@@ -20,7 +20,7 @@ jobs:
     strategy:
         matrix:
             COMPILER: [gcc, clang]
-            FRAMEWORK: [vanilla, dpdk]
+            FRAMEWORK: [vanilla, dpdk, dpdk-light]
 
     steps:
     - uses: actions/checkout@v2
@@ -33,7 +33,7 @@ jobs:
           python -m pip install --upgrade pip
     - name: framework
       run: |
-          if [ "${{matrix.FRAMEWORK}}" = "dpdk" ] ; then
+          if [ "${{matrix.FRAMEWORK}}" = "dpdk" -o "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then
             echo "Compiling DPDK..." ;
             export STABLE=
             export VERSION=20.11
@@ -52,7 +52,11 @@ jobs:
                 cd .. &&
                 cd .. ;
             fi
-            echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
+            if [ "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then
+                echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS --enable-dpdk-packet --disable-clone --disable-task-stats --disable-cpu-load --disable-dpdk-softqueue" >> $GITHUB_ENV
+            else
+                echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
+            fi
             echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
             echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
           fi
