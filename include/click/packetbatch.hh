@@ -793,6 +793,7 @@ inline void PacketBatch::kill() {
 
 typedef Packet::PacketType PacketType;
 
+#if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 /**
  * Recycle a whole batch of unshared packets of the same type
  *
@@ -805,6 +806,7 @@ inline void PacketBatch::recycle_batch(bool is_data) {
         WritablePacket::recycle_packet_batch((WritablePacket*)this->first(),tail(),count());
     }
 }
+#endif
 
 CLICK_ENDDECLS
 #endif
