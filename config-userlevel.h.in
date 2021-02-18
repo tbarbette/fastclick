@@ -256,6 +256,9 @@
 /* Define if LLVM libraries are available. */
 #undef HAVE_LLVM
 
+/* Define if optimizations for pool_prepare_data_burst is not disabled */
+#undef POOL_INLINING
+
 /* Define if DPDK software queue for TX is enabled. */
 #undef HAVE_IQUEUE
 

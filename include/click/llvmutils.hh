@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <click/config.h>
 
 namespace llvm {
     class Module;

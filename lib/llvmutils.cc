@@ -21,6 +21,7 @@
 #include <llvm/Support/SourceMgr.h>
 #include <unordered_map>
 
+
 /****************************************************************************
  *
  * Utility Functions
@@ -736,7 +737,7 @@ bool optimizeIR(std::string input) {
   }
 
 #if HAVE_DPDK_XCHG
-#if POOL_INLINING
+# if POOL_INLINING
   llvm::errs()
       << "Cannot run LLVM passes when pool_prepare_data_burst might get inlined"
       << "\n";
@@ -744,7 +745,8 @@ bool optimizeIR(std::string input) {
                << "\n";
   llvm::errs() << "Skipping IR optimimzation"
                << "\n";
-#endif
+  return false;
+# endif
 #endif
 
   llvm::LLVMContext context;
