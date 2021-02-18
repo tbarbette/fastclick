@@ -134,6 +134,11 @@ struct click_args_t {
 int parse(int argc, char** argv, click_args_t &click_args) {
   ErrorHandler* errh = ErrorHandler::default_handler();
 
+#if HAVE_DPDK
+  //DPDK EAL expects the application name as first argument
+  click_args.dpdk_arg.push_back(argv[0]);
+#endif
+
   // read command line arguments
   Clp_Parser *clp =
     Clp_NewParser(argc, argv, sizeof(options) / sizeof(options[0]), options);
@@ -230,7 +235,6 @@ int parse(int argc, char** argv, click_args_t &click_args) {
 #if HAVE_DPDK
     case DPDK_OPT: {
       const char* arg;
-      click_args.dpdk_arg.push_back(argv[0]);
       do {
         arg = Clp_Shift(clp, 1);
         if (arg == NULL) break;

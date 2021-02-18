@@ -66,5 +66,7 @@ jobs:
           ./configure $FLAGS $FRAMEWORK_FLAGS
     - name: make
       run: make
+    - name: simple_launch
+      run: chmod 700 /home/runner ; if [ "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then ./userlevel/click --dpdk -l 0-0 --no-huge -m 512M --  -e 'DriverManager(stop);' ; fi
     - name: make check
       run: make check

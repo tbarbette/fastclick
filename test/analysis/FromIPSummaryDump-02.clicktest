@@ -1,5 +1,6 @@
 %require -q
 click-buildtool provides FromIPSummaryDump
+not click-buildtool provides dpdk-packet
 
 %script
 
