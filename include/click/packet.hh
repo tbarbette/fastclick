@@ -750,6 +750,7 @@ class Packet { public:
 
     inline void clear_annotations(bool all = true);
     inline void copy_annotations(const Packet *, bool all = true);
+    inline void copy_headers(const Packet *);
     //@}
 
     /** @cond never */
@@ -894,6 +895,7 @@ private:
     void assimilate_mbuf();
 #endif
 
+    WritablePacket *duplicate(int32_t extra_headroom, int32_t extra_tailroom) CLICK_WARN_UNUSED_RESULT;
     inline void shift_header_annotations(const unsigned char *old_head, int32_t extra_headroom);
     WritablePacket *expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom, bool free_on_failure) CLICK_WARN_UNUSED_RESULT;
     WritablePacket *expensive_push(uint32_t nbytes) CLICK_WARN_UNUSED_RESULT;
@@ -1060,7 +1062,12 @@ Packet::clear_annotations(bool all)
 inline void
 Packet::copy_annotations(const Packet *p, bool)
 {
+#if CLICK_PACKET_USE_DPDK
+
+    *(AllAnno*)xanno() = *(AllAnno*)p->xanno();
+#else
     *xanno() = *p->xanno();
+#endif
     set_packet_type_anno(p->packet_type_anno());
     set_device_anno(p->device_anno());
     set_timestamp_anno(p->timestamp_anno());

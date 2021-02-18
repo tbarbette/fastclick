@@ -424,6 +424,27 @@ main(int argc, char **argv)
       return ret;
 
 #if HAVE_DPDK
+  if (!dpdk_enabled) {
+#if CLICK_PACKET_USE_DPDK
+        dpdk_enabled = true;
+        args.dpdk_arg.push_back((char*)(new String("--no-huge"))->c_str());
+        args.dpdk_arg.push_back((char*)(new String("-l"))->c_str());
+        char* s = (char*)malloc(14);
+        snprintf(s,14,"0-%d",click_nthreads - 1);
+        args.dpdk_arg.push_back(s);
+
+        args.dpdk_arg.push_back((char*)(new String("-m"))->c_str());
+
+        args.dpdk_arg.push_back((char*)(new String("512M"))->c_str());
+
+        args.dpdk_arg.push_back((char*)(new String("--log-level=0"))->c_str());
+
+        args.dpdk_arg.push_back((char*)(new String("--"))->c_str());
+#ifdef HAVE_VERBOSE_BATCH
+        click_chatter("ERROR: Click was compiled with --enable-dpdk-packet, and must therefore be launched with the '--dpdk --' arguments. We'll try to run with --dpdk %s %s %s -m 512M --log-level=0 -- but it's likely to fail... This is only to allow automatic testing.",args.dpdk_arg[1],args.dpdk_arg[2], args.dpdk_arg[3]);
+#endif
+#endif
+    }
     if (dpdk_enabled) {
         if (click_nthreads > 1)
             errh->warning("In DPDK mode, set the number of cores with DPDK EAL arguments");
