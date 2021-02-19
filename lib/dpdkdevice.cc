@@ -1262,6 +1262,8 @@ FlowControlModeArg::parse(
         result = FC_TX;
     } else if (str == "none" || str == "off") {
         result = FC_NONE;
+    } else if (str == "unset") {
+        result = FC_UNSET;
     } else
         return false;
 
