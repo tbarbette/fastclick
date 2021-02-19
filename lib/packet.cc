@@ -686,7 +686,7 @@ Packet::make(uint32_t headroom, const void *data,
 	     uint32_t length, uint32_t tailroom, bool clear)
 {
 
-	#if CLICK_LINUXMODULE
+#if CLICK_LINUXMODULE
 		int want = 1;
 		if (struct sk_buff *skb = skbmgr_allocate_skbs(headroom, length + tailroom, &want)) {
 		assert(want == 1);
@@ -711,13 +711,18 @@ Packet::make(uint32_t headroom, const void *data,
         click_chatter("could not alloc pktmbuf");
         return 0;
     }
-    //rte_pktmbuf_prepend(mb, rte_pktmbuf_headroom(mb)); : Already done
+    if (unlikely(headroom > RTE_PKTMBUF_HEADROOM))
+        rte_pktmbuf_prepend(mb, headroom - RTE_PKTMBUF_HEADROOM);
     rte_pktmbuf_data_len(mb) = length;
     rte_pktmbuf_pkt_len(mb) = length;
     if (data)
         memcpy(rte_pktmbuf_mtod(mb, void *), data, length);
     (void) tailroom;
-    return reinterpret_cast<WritablePacket *>(mb);
+    WritablePacket* q = reinterpret_cast<WritablePacket *>(mb);
+    if (clear)
+        q->clear_annotations();
+    return q;
+
 #else
         # if HAVE_CLICK_PACKET_POOL
             WritablePacket *p = WritablePacket::pool_allocate(headroom, length, tailroom, clear);

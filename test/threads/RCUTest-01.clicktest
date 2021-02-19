@@ -3,6 +3,7 @@ Tests RCU data structure
 
 %require
 click-buildtool provides umultithread
+not click-buildtool provides dpdk-packet || test $(nproc) -ge 16
 
 %script
 $VALGRIND click -j 16 -e '

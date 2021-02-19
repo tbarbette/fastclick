@@ -3,6 +3,7 @@ Tests if the router dies in MT context
 
 %require
 click-buildtool provides umultithread
+not click-buildtool provides dpdk-packet || test $(nproc) -ge 16
 
 %script
 for i in $(seq 1 100); do

@@ -3,6 +3,7 @@ Test CPU switch threadvector
 
 %require
 click-buildtool provides umultithread
+not click-buildtool provides dpdk-packet || test $(nproc) -ge 4
 
 %script
 click -j 4 CONFIG
