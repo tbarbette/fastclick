@@ -428,7 +428,7 @@ FromIPSummaryDump::read_packet(ErrorHandler *errh)
     }
 
     // read packet data
-    WritablePacket *q = Packet::make(16, (const unsigned char *) 0, 0, 1000);
+    WritablePacket *q = Packet::make(16, (const unsigned char *) 0, 0, 1000, true); //inject_ip assumes cleared annotations
     if (!q) {
         _ff.error(errh, strerror(ENOMEM));
         return 0;

@@ -446,19 +446,21 @@ main(int argc, char **argv)
 #endif
     }
     if (dpdk_enabled) {
+#ifdef HAVE_VERBOSE_BATCH
         if (click_nthreads > 1)
             errh->warning("In DPDK mode, set the number of cores with DPDK EAL arguments");
 # if HAVE_DECL_PTHREAD_SETAFFINITY_NP
         if (args.click_affinity_offset >= 0)
             errh->warning("In DPDK mode, set core affinity with DPDK EAL arguments");
 # endif
+#endif
         int n_eal_args = rte_eal_init(args.dpdk_arg.size(), args.dpdk_arg.data());
         if (n_eal_args < 0)
             rte_exit(EXIT_FAILURE,
                      "Click was built with DPDK support but there was an\n"
                      "          error parsing the EAL arguments or launching DPDK EAL.\n");
         click_nthreads = rte_lcore_count();
-    }
+     }
 #endif
 
   // provide hotconfig handler if asked
