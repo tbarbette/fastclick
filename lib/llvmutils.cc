@@ -559,6 +559,21 @@ bool reorderStructAllAnno(llvm::Module &M) {
   uint64_t cur_index;
 
   std::vector<uint64_t> accessed_indices;
+  bool found_AllAnno = false;
+
+  /* Check whether AllAnno exsits or not */
+  for (auto ST : M.getIdentifiedStructTypes()) {
+    if (ST->getName() == structName) {
+      found_AllAnno = true;
+    }
+  }
+
+  if (!found_AllAnno) {
+    llvm::errs() << "IR does not have AllAnno struct!\n"
+                 << "Skipping AllAnno reordering!\n";
+    return false;
+  }
+
 
   /* Find the accesses made to the class/struct */
   size_t res = findAccessedIndicesStructAllAnno(M, className, structName,
