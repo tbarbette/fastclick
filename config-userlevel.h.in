@@ -259,6 +259,9 @@
 /* Define if optimizations for pool_prepare_data_burst is not disabled */
 #undef POOL_INLINING
 
+/* Define if AllAnno struct is inlined within Packet Class */
+#undef INLINED_ALLANNO
+
 /* Define if DPDK software queue for TX is enabled. */
 #undef HAVE_IQUEUE
 
