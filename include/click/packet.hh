@@ -422,8 +422,8 @@ class Packet { public:
         return (Anno *) (((unsigned char*)this) + ANNO_OFFSET); }
 
 #elif INLINED_ALLANNO
-    inline const Anno *xanno() const		{ return &cb; }
-    inline Anno *xanno()			{ return &cb; }    
+    CLICK_OPTNONE const Anno *xanno() const		{ return &cb; }
+    CLICK_OPTNONE Anno *xanno()			{ return &cb; }    
 #else
     inline const Anno *xanno() const		{ return &_aa.cb; }
     inline Anno *xanno()			{ return &_aa.cb; }
