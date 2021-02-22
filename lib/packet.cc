@@ -1226,11 +1226,6 @@ Packet::expensive_put(uint32_t nbytes)
 Packet *
 Packet::shift_data(int offset, bool free_on_failure)
 {
-#if CLICK_PACKET_USE_DPDK
-    assert(false);
-#endif
-
-
     if (offset == 0)
 	return this;
 
@@ -1247,25 +1242,25 @@ Packet::shift_data(int offset, bool free_on_failure)
 	dp = network_header();
 
     if (!shared()
-	&& (offset < 0 ? (dp - buffer()) >= (ptrdiff_t)(-offset)
+	    && (offset < 0 ? (dp - buffer()) >= (ptrdiff_t)(-offset)
 	    : tailroom() >= (uint32_t)offset)) {
 	WritablePacket *q = static_cast<WritablePacket *>(this);
 	memmove((unsigned char *) dp + offset, dp, q->end_data() - dp);
 #if CLICK_LINUXMODULE
-	struct sk_buff *mskb = q->skb();
-	mskb->data += offset;
-	mskb->tail += offset;
+        struct sk_buff *mskb = q->skb();
+        mskb->data += offset;
+        mskb->tail += offset;
 #elif CLICK_PACKET_USE_DPDK
         rte_pktmbuf_adj(q->mb(), offset);
         rte_pktmbuf_append(q->mb(), offset);
 #else				/* User-space and BSD kernel module */
-	q->_data += offset;
-	q->_tail += offset;
+        q->_data += offset;
+        q->_tail += offset;
 # if CLICK_BSDMODULE
-	q->m()->m_data += offset;
+        q->m()->m_data += offset;
 # endif
 #endif
-	shift_header_annotations(q->buffer(), offset);
+        shift_header_annotations(q->buffer(), offset);
 	return this;
     } else {
 	int tailroom_offset = (offset < 0 ? -offset : 0);
