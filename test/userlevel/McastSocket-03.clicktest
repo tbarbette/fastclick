@@ -1,6 +1,9 @@
 %info
 Test MulticastSocket without loop.
 
+%require
+not click-buildtool provides dpdk-packet
+
 %script
 # Assumes that a multicast route exists to any network device but 'lo'.
 # Most hosts have a default route to this effect.
