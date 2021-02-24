@@ -1062,12 +1062,7 @@ Packet::clear_annotations(bool all)
 inline void
 Packet::copy_annotations(const Packet *p, bool)
 {
-#if CLICK_PACKET_USE_DPDK
-
-    *(AllAnno*)xanno() = *(AllAnno*)p->xanno();
-#else
     *xanno() = *p->xanno();
-#endif
     set_packet_type_anno(p->packet_type_anno());
     set_device_anno(p->device_anno());
     set_timestamp_anno(p->timestamp_anno());

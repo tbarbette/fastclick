@@ -865,6 +865,7 @@ Packet::clone(bool fast)
     Packet* p = reinterpret_cast<Packet *>(
     rte_pktmbuf_clone(mb(), DPDKDevice::get_mpool(rte_socket_id())));
     p->copy_annotations(this,true);
+    p->copy_headers(this);
     return p;
 #elif CLICK_USERLEVEL || CLICK_BSDMODULE || CLICK_MINIOS
 # if CLICK_BSDMODULE

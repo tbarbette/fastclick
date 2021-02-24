@@ -152,12 +152,12 @@ IPFragmenter::fragment(Packet *p_in)
 	    qip->ip_hl = out_hlen >> 2;
 	    qip->ip_off = htons(ntohs(ip->ip_off) + (off >> 3));
 	    if (out_dlen + off >= in_dlen && !had_mf)
-		qip->ip_off &= ~htons(IP_MF);
-	    qip->ip_len = htons(out_hlen + out_dlen);
-	    qip->ip_sum = 0;
-	    qip->ip_sum = click_in_cksum((const unsigned char *)qip, out_hlen);
+            qip->ip_off &= ~htons(IP_MF);
+            qip->ip_len = htons(out_hlen + out_dlen);
+            qip->ip_sum = 0;
+            qip->ip_sum = click_in_cksum((const unsigned char *)qip, out_hlen);
 
-	    q->copy_annotations(p);
+            q->copy_annotations(p);
 #if HAVE_BATCH
 	    if (receives_batch)
 	        output_push_batch(0, PacketBatch::make_from_packet(q));
