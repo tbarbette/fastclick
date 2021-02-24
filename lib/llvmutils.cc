@@ -777,6 +777,8 @@ bool optimizeIR(std::string input) {
 #if INLINED_ALLANNO
     /* Inline xanno functions after reordering */
     changed |= funcInline(M,"xanno");
+    /* Inline all_anno functions after reordering */
+    changed |= funcInline(M,"all_anno");
 #endif
 
     /* Write the output */
