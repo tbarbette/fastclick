@@ -831,8 +831,9 @@ enable_dpdk_xchg
 enable_dpdk_inside
 enable_dpdk_packet
 enable_dpdk_softqueue
-enable_pool_inlining
 enable_flow_api
+enable_pool_inlining
+enable_inlined_allanno
 enable_zerocopy
 enable_clone
 enable_linuxmodule
@@ -1570,12 +1571,15 @@ Optional Features:
       --disable-dpdk-softqueue
                           Do not use internal software queue in TX to buffer
                           packets before flushing.
+      --enable-flow-api   Support for the HW flow classification API. Also
+                          needs DPDK>=20.02
     --disable-pool-inlining
                           Do not optimize pool_prepare_data_burst function
                           before data structure reordering done at the IR
                           level.
-      --enable-flow-api   Support for the HW flow classification API. Also
-                          needs DPDK>=20.02
+    --enable-inlined-allanno
+                          Inline AllAnno struct into Packet class,
+                          facilitating the data structure reordering.
     --disable-zerocopy    disable Zero Copy
     --disable-clone       disable packet cloning
   --enable-linuxmodule    disable Linux kernel driver
@@ -8281,6 +8285,14 @@ else
 fi
 
 
+# Check whether --enable-flow-api was given.
+if test "${enable_flow_api+set}" = set; then :
+  enableval=$enable_flow_api; :
+else
+  enable_flow_api=no
+fi
+
+
 # Check whether --enable-pool-inlining was given.
 if test "${enable_pool_inlining+set}" = set; then :
   enableval=$enable_pool_inlining; :
@@ -8290,11 +8302,16 @@ else
 fi
 
 
-# Check whether --enable-flow-api was given.
-if test "${enable_flow_api+set}" = set; then :
-  enableval=$enable_flow_api; :
+# Check whether --enable-inlined-allanno was given.
+if test "${enable_inlined_allanno+set}" = set; then :
+  enableval=$enable_inlined_allanno; :
 else
-  enable_flow_api=no
+  enable_inlined_allanno=no
+fi
+
+if test "x$enable_inlined_allanno" = "xyes"; then
+    $as_echo "#define INLINED_ALLANNO 1" >>confdefs.h
+
 fi
 
 

@@ -313,12 +313,21 @@ AC_ARG_ENABLE([dpdk-softqueue],
                     [Do not use internal software queue in TX to buffer packets before flushing.])],
     [:], [AC_DEFINE(HAVE_IQUEUE)])
 
+AC_ARG_ENABLE([flow-api], [AS_HELP_STRING([    --enable-flow-api], [Support for the HW flow classification API. Also needs DPDK>=20.02])], [:], [enable_flow_api=no])
+
 AC_ARG_ENABLE([pool-inlining],
     [AS_HELP_STRING([  --disable-pool-inlining],
                     [Do not optimize pool_prepare_data_burst function before  data structure reordering done at the IR level.])],
     [:], [AC_DEFINE(POOL_INLINING)])
 
-AC_ARG_ENABLE([flow-api], [AS_HELP_STRING([    --enable-flow-api], [Support for the HW flow classification API. Also needs DPDK>=20.02])], [:], [enable_flow_api=no])
+AC_ARG_ENABLE([inlined-allanno],
+    [AS_HELP_STRING([  --enable-inlined-allanno],
+                    [Inline AllAnno struct into Packet class, facilitating the data structure reordering.])],
+    [:], [enable_inlined_allanno=no])
+if test "x$enable_inlined_allanno" = "xyes"; then
+    AC_DEFINE([INLINED_ALLANNO])
+fi
+
 
 AC_ARG_ENABLE([zerocopy],
     [AS_HELP_STRING([  --disable-zerocopy], [disable Zero Copy])],

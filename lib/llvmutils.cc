@@ -559,6 +559,21 @@ bool reorderStructAllAnno(llvm::Module &M) {
   uint64_t cur_index;
 
   std::vector<uint64_t> accessed_indices;
+  bool found_AllAnno = false;
+
+  /* Check whether AllAnno exsits or not */
+  for (auto ST : M.getIdentifiedStructTypes()) {
+    if (ST->getName() == structName) {
+      found_AllAnno = true;
+    }
+  }
+
+  if (!found_AllAnno) {
+    llvm::errs() << "IR does not have AllAnno struct!\n"
+                 << "Skipping AllAnno reordering!\n";
+    return false;
+  }
+
 
   /* Find the accesses made to the class/struct */
   size_t res = findAccessedIndicesStructAllAnno(M, className, structName,
@@ -661,19 +676,17 @@ bool handPick(std::unique_ptr<llvm::Module> &M) {
 }
 
 /*
- * This function replaces optnone with alwaysinline attribute for
- * WritablePacket::pool_prepare_data_burst
+ * This function replaces optnone with alwaysinline attribute for the input functions
+ * E.g., WritablePacket::pool_prepare_data_burst and Anno *xanno()
  */
-bool poolInline(std::unique_ptr<llvm::Module> &M) {
+bool funcInline(std::unique_ptr<llvm::Module> &M, std::string inputFuncName) {
 
-  /* RX Burst Function */
-  std::string poolPrepareFuncName = "pool_prepare_data_burst";
   bool change = false;
 
-  llvm::errs() << "Searching for the pool_prepare_data_burst function ...\n";
+  llvm::errs() << "Searching for the " << inputFuncName << " function ...\n";
   for (auto &F : *M) {
     std::string funcName = demangle(F.getName().data());
-    auto found_func = funcName.find(poolPrepareFuncName);
+    auto found_func = funcName.find(inputFuncName);
     if ((found_func != std::string::npos)) {
       if (F.hasFnAttribute(llvm::Attribute::NoInline)) {
         llvm::errs() << "Removing noinline attribute...\n";
@@ -760,7 +773,13 @@ bool optimizeIR(std::string input) {
     /* Reorder Packet data structure */
     changed |= handPick(M);
     /* Inline pool preparation function after reordering */
-    changed |= poolInline(M);
+    changed |= funcInline(M,"pool_prepare_data_burst");
+#if INLINED_ALLANNO
+    /* Inline xanno functions after reordering */
+    changed |= funcInline(M,"xanno");
+    /* Inline all_anno functions after reordering */
+    changed |= funcInline(M,"all_anno");
+#endif
 
     /* Write the output */
     if (changed) {
