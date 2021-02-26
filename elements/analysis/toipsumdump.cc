@@ -149,7 +149,7 @@ ToIPSummaryDump::initialize(ErrorHandler *errh)
 
 	time_t when = time(0);
     char cwhen[256];
-    strftime(cwhen, sizeof(cwhen), "%c" , localtime(&when));
+    strftime(cwhen, sizeof(cwhen), "%c\n" , localtime(&when));
 	Timestamp now = Timestamp::now();
 	if (now)
 	    sa << "!runtime " << now << " (" << String(cwhen, strlen(cwhen) - 1) << ")\n";
