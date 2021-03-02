@@ -2,12 +2,7 @@
 #define CLICK_SHIFTER_HH
 
 #include <click/config.h>
-#include <click/string.hh>
-#include <click/pair.hh>
 #include <click/batchelement.hh>
-#include <click/batchbuilder.hh>
-#include <click/args.hh>
-#include <click/packet.hh>
 
 
 CLICK_DECLS
@@ -41,7 +36,7 @@ CLICK_DECLS
  * FromDump(trace.pcap)
  * -> Strip(14) -> CheckIPHeader(CHECKSUM false)
  * -> Shifter(1,1,1,1)
- * -> CheckIPHeader(CHECKSUM false)
+ * -> CheckIPHeader(CHECKSUM false) 
  * -> ToDump(trace_1.pcap)
  * 
  **/

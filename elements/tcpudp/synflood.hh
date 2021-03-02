@@ -1,12 +1,12 @@
 #ifndef CLICK_SYNFLOOD_HH
 #define CLICK_SYNFLOOD_HH
+
+#include <click/config.h>
 #include <click/batchelement.hh>
 #include <click/task.hh>
 #include <click/timer.hh>
 #include <click/notifier.hh>
-#include <click/ipflowid.hh>
-#include <click/fromfile.hh>
-#include <click/handlercall.hh>
+
 CLICK_DECLS
 
 
@@ -23,6 +23,7 @@ CLICK_DECLS
  *
  * Sequentially emit TCP SYN packets with increasing source port and IP.
  * The 5-tuple space will be scanned in a round-robin fashion.
+ * The output packets are ethernet packets with the addresses set to 0.
  *
  * The source port will be increased until it will reach the 0 value.
  * Then, it will start from a new source IP and generates SYNs for all the ports.
@@ -54,7 +55,7 @@ CLICK_DECLS
  * 
  *
  * SYNFlood(10.1.1.1, 172.16.1.1, 1, 80, LEN 1400)
- * -> EtherEncap(0x800, 11:11:11:11:11:11, 22:22:22:22:22:22)
+ * -> EtherRewrite(11:11:11:11:11:11, 22:22:22:22:22:22)
  * -> ToDPDKDevice(0)
  * 
  *
