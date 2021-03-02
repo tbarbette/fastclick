@@ -16,6 +16,14 @@
  */
 
 #include "shifter.hh"
+#include <click/config.h>
+#include <click/args.hh>
+#include <click/packet.hh>
+#include <clicknet/ip.h>
+#include <click/error.hh>
+
+
+
 CLICK_DECLS
 
 Shifter::Shifter() {}
@@ -43,7 +51,7 @@ inline void Shifter::process(Packet *p) {
     ip_proto = p->ip_header()->ip_p;
 
     // Process only TCP and UDP packets
-    if (ip_proto == 17 || ip_proto == 6) {
+    if (ip_proto == IP_PROTO_TCP || ip_proto == IP_PROTO_UDP) {
         uint32_t ip_src = ntohl(p->ip_header()->ip_src.s_addr);
         uint16_t sport = ntohs(p->tcp_header()->th_sport);
 
@@ -55,8 +63,8 @@ inline void Shifter::process(Packet *p) {
         dport = ((uint64_t)dport) + _portoffset_dst;
         ip_dst = ((uint64_t)ip_dst) + _ipoffset_dst;
 
-        q->rewrite_ipport(htonl(ip_src), htons(sport), 0, ip_proto == 17);
-        q->rewrite_ipport(htonl(ip_dst), htons(dport), 1, ip_proto == 17);
+        q->rewrite_ipport(htonl(ip_src), htons(sport), 0, ip_proto == IP_PROTO_TCP);
+        q->rewrite_ipport(htonl(ip_dst), htons(dport), 1, ip_proto == IP_PROTO_TCP);
     }
 }
 

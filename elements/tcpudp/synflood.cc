@@ -15,29 +15,13 @@
  * legally binding.
  */
 
-#include <click/config.h>
-
 #include "synflood.hh"
+#include <click/handlercall.hh>
 #include <click/args.hh>
-#include <click/dpdkdevice.hh>
 #include <click/error.hh>
-#include <click/glue.hh>
-#include <click/nameinfo.hh>
-#include <click/packet_anno.hh>
 #include <click/router.hh>
 #include <click/standard/scheduleinfo.hh>
-#include <click/straccum.hh>
-#include <click/userutils.hh>
-#include <clicknet/icmp.h>
-#include <clicknet/ip.h>
-#include <clicknet/tcp.h>
-#include <clicknet/udp.h>
-#include <elements/standard/script.hh>
-#include <fcntl.h>
-#include <rte_malloc.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
+
 
 CLICK_DECLS
 
@@ -91,6 +75,8 @@ inline Packet *SYNFlood::get_packet(bool push) {
     WritablePacket *p = Packet::make(_len);
     click_ip *iph = reinterpret_cast<click_ip *>(p->data() + 14);
     click_tcp *tcph = reinterpret_cast<click_tcp *>(iph + 1);
+    p->set_mac_header(p->data());
+    
     // set up IP header
     iph->ip_v = 4;
     iph->ip_hl = sizeof(click_ip) >> 2;
