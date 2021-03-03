@@ -269,6 +269,7 @@ TCPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
     _tcp_done_timeout = 240;	// 4 minutes
     bool dst_anno = true, has_reply_anno = false;
     int reply_anno;
+    bool handle_migration = false;
 
     if (Args(this, errh).bind(conf)
 	.read("TCP_NODATA_TIMEOUT", SecondsArg(), timeouts[0])
@@ -278,6 +279,7 @@ TCPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("TCP_DONE_TIMEOUT", SecondsArg(), _tcp_done_timeout)
 	.read("DST_ANNO", dst_anno)
 	.read("REPLY_ANNO", AnnoArg(1), reply_anno).read_status(has_reply_anno)
+    .read("HANDLE_MIGRATION", handle_migration)
 	.consume() < 0)
 	return -1;
 
@@ -289,6 +291,8 @@ TCPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
     _annos = (dst_anno ? 1 : 0) + (has_reply_anno ? 2 + (reply_anno << 2) : 0);
     _tcp_data_timeout *= CLICK_HZ; // IPRewriterBase handles the others
     _tcp_done_timeout *= CLICK_HZ;
+
+    _handle_migration = handle_migration;
 
     return IPRewriterBase::configure(conf, errh);
 }

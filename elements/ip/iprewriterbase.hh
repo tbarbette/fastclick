@@ -83,6 +83,8 @@ class IPRewriterHeap { public:
 
 };
 
+#define THREAD_MIGRATION_TIMEOUT 10000
+
 /**
  * Base for Rewriter elements
  *
@@ -108,6 +110,8 @@ class IPRewriterBase : public BatchElement { public:
 
     const char *port_count() const override	{ return "1-/1-"; }
     const char *processing() const override	{ return PUSH; }
+
+    int thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) override;
 
     int configure_phase() const		{ return CONFIGURE_PHASE_REWRITER; }
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;

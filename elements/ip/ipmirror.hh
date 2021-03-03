@@ -1,6 +1,6 @@
 #ifndef CLICK_IPMIRROR_HH
 #define CLICK_IPMIRROR_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -29,7 +29,7 @@ annotation as is.  DST_ANNO defaults to true.
 
 */
 
-class IPMirror : public Element { public:
+class IPMirror : public SimpleElement<IPMirror> { public:
 
     IPMirror() CLICK_COLD;
     ~IPMirror() CLICK_COLD;
