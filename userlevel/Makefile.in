@@ -13,7 +13,7 @@ bindir = @bindir@
 sbindir = @sbindir@
 libdir = @libdir@
 
-VPATH = .:$(top_srcdir)/lib:$(top_srcdir)/vendor/tinyexpr:$(top_srcdir)/$(subdir):$(top_srcdir)/elements/standard
+VPATH = .:$(top_srcdir)/lib:$(top_srcdir)/vendor/tinyexpr:$(top_srcdir)/vendor/nicscheduler:$(top_srcdir)/lib/metron:$(top_srcdir)/$(subdir):$(top_srcdir)/elements/standard
 
 CC = @CC@
 CPP = @CPP@
@@ -74,7 +74,8 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	confparse.o args.o variableenv.o lexer.o elemfilter.o routervisitor.o \
 	routerthread.o router.o master.o timerset.o selectset.o handlercall.o notifier.o \
 	integers.o md5.o crc32.o in_cksum.o iptable.o \
-	archive.o userutils.o driver.o tinyexpr.o \
+	archive.o userutils.o driver.o \
+	tinyexpr.o nicscheduler.o \
 	$(EXTRA_DRIVER_OBJS)
 
 EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@

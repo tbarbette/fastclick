@@ -71,14 +71,13 @@ IPMapper::rewrite_flowid(IPRewriterInput *, const IPFlowID &, IPFlowID &,
 //
 
 IPRewriterBase::IPRewriterBase()
-    : _state(), _set_aggregate(false)
+    : _state(), _set_aggregate(false), _handle_migration(false)
 {
     _gc_interval_sec = default_gc_interval;
 
     _mem_units_no = (click_max_cpu_ids() == 0)? 1 : click_max_cpu_ids();
 
     // One heap and map per core
-    _map  = new Map[_mem_units_no];
     _heap = new IPRewriterHeap*[_mem_units_no];
     _timeouts  = new uint32_t*[_mem_units_no];
     for (unsigned i=0; i<_mem_units_no; i++) {
@@ -96,10 +95,6 @@ IPRewriterBase::~IPRewriterBase()
             _heap[i]->unuse();
         }
         delete [] _heap;
-    }
-
-    if (_map) {
-        delete [] _map;
     }
 
     if (_timeouts) {
@@ -184,6 +179,7 @@ IPRewriterBase::configure(Vector<String> &conf, ErrorHandler *errh)
     int32_t heapcap;
     bool use_cache = false;
     bool set_aggregate = false;
+    bool _handle_migration; //TODO Temp placeholder
 
     if (Args(this, errh).bind(conf)
 	.read("CAPACITY", AnyArg(), capacity_word)
@@ -192,8 +188,9 @@ IPRewriterBase::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("GUARANTEE", SecondsArg(), timeouts[1]).read_status(has_timeout[1])
 	.read("REAP_INTERVAL", SecondsArg(), _gc_interval_sec)
 	.read("REAP_TIME", Args::deprecated, SecondsArg(), _gc_interval_sec)
-	.read("SET_AGGREGATE", set_aggregate)
 	.read("USE_CACHE", use_cache)
+	.read("SET_AGGREGATE", _set_aggregate)
+    .read("HANDLE_MIGRATION", _handle_migration)
 	.consume() < 0)
 	return -1;
 
@@ -255,8 +252,10 @@ IPRewriterBase::initialize(ErrorHandler *errh)
 	if (_input_specs[i].kind == IPRewriterInput::i_mapper)
 	    _input_specs[i].u.mapper->notify_rewriter(this, &_input_specs[i], &cerrh);
     }
+
     for (int i = 0; i < _state.weight(); i ++) {
-        Timer& gc_timer = _state.get_value(i).gc_timer;
+	    IPRewriterState &state = _state.get_value(i);
+        Timer& gc_timer = state.gc_timer;
         new(&gc_timer) Timer(gc_timer_hook, this); //Reconstruct as Timer does not allow assignment
         gc_timer.initialize(this);
         gc_timer.move_thread(_state.get_mapping(i));
@@ -280,13 +279,28 @@ IPRewriterBase::cleanup(CleanupStage)
 IPRewriterEntry *
 IPRewriterBase::get_entry(int ip_p, const IPFlowID &flowid, int input)
 {
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+    //We do not need to get a reference because we are the only writer
+    IPRewriterEntry *m = search_entry(flowid);
+
+
     if (m && ip_p && m->flow()->ip_p() && m->flow()->ip_p() != ip_p)
 	return 0;
     if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
-	IPRewriterInput &is = _input_specs[input];
-	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
-	if (is.rewrite_flowid(flowid, rewritten_flowid, 0) == rw_addmap)
+
+	    IPFlowID rewritten_flowid;
+
+        if (_handle_migration && !precopy)
+            m = search_migrate_entry(flowid, _state);
+
+        if (m) {
+            rewritten_flowid = m->rewritten_flowid();
+        } else {
+	        IPRewriterInput &is = _input_specs[input];
+            rewritten_flowid = IPFlowID::uninitialized_t();
+	        if (!is.rewrite_flowid(flowid, rewritten_flowid, 0) == rw_addmap) {
+                return 0;
+            }
+        }
 	    m = add_flow(ip_p, flowid, rewritten_flowid, input);
     }
     return m;
@@ -296,24 +310,32 @@ IPRewriterEntry *
 IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
 			   Map &map, Map *reply_map_ptr)
 {
+	IPRewriterState &state = *_state;
     IPRewriterBase *reply_element = _input_specs[input].reply_element;
     if ((unsigned) flow->entry(false).output() >= (unsigned) noutputs()
 	|| (unsigned) flow->entry(true).output() >= (unsigned) reply_element->noutputs()) {
-	flow->owner()->owner->destroy_flow(flow);
-	return 0;
+	    flow->owner()->owner->destroy_flow(flow);
+	    return 0;
     }
 
+	state.map_lock.write_begin();
     IPRewriterEntry *old = map.set(&flow->entry(false));
-    assert(!old);
+	state.map_lock.write_end();
+	if (old) {
+		if (_handle_migration)
+			return old; //TODO : an old flow is back. Change expiry
+		else
+			assert(!old);
+	}
 
     auto &heap = _heap[click_current_cpu_id()];
 
     if (!reply_map_ptr)
-	reply_map_ptr = &reply_element->_map[click_current_cpu_id()];
+	reply_map_ptr = &reply_element->_state->map;
     old = reply_map_ptr->set(&flow->entry(true));
     if (unlikely(old)) {		// Assume every map has the same heap.
 	if (likely(old->flow() != flow))
-	    old->flow()->destroy(heap);
+		old->flow()->destroy(heap);
     }
 
     Vector<IPRewriterFlow *> &myheap = heap->_heaps[flow->guaranteed()];
@@ -337,10 +359,17 @@ IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
 	}
     }
 
-    if (map.unbalanced())
-	map.rehash(map.bucket_count() + 1);
-    if (reply_map_ptr != &map && reply_map_ptr->unbalanced())
-	reply_map_ptr->rehash(reply_map_ptr->bucket_count() + 1);
+    if (map.unbalanced()) {
+              state.map_lock.write_begin();
+              map.rehash(map.bucket_count() + 1);
+              state.map_lock.write_end();
+    }
+    if (reply_map_ptr != &map && reply_map_ptr->unbalanced()) {
+              state.map_lock.write_begin();
+          reply_map_ptr->rehash(reply_map_ptr->bucket_count() + 1);
+              state.map_lock.write_begin();
+    }
+
     return &flow->entry(false);
 }
 
@@ -354,6 +383,15 @@ IPRewriterBase::shift_heap_best_effort(click_jiffies_t now_j)
 	click_jiffies_t new_expiry = mf->owner()->owner->best_effort_expiry(mf);
 	mf->change_expiry(_heap[click_current_cpu_id()], false, new_expiry);
     }
+}
+
+int IPRewriterBase::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) {
+	if (stage == THREAD_RECONFIGURE_UP_PRE) {
+        set_migration(true, threads, _state);
+	} else if (stage == THREAD_RECONFIGURE_DOWN_PRE){
+        set_migration(false, threads, _state);
+	}
+	return 0;
 }
 
 bool
