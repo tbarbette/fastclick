@@ -27,6 +27,9 @@ public:
 
     static void static_initialize();
 
+    unsigned get_nb_desc() {
+        return ndesc;
+    }
 private :
     /* Those two are only used during configurations. On runtime, the final
      * n_queues choice is used.*/

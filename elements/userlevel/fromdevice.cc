@@ -92,7 +92,7 @@ FromDevice::~FromDevice()
 int
 FromDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    bool promisc = false, outbound = false, sniffer = true, timestamp = true;
+    bool promisc = false, outbound = false, sniffer = true, timestamp = true, active = true;
     _protocol = 0;
     _snaplen = default_snaplen;
     _headroom = Packet::default_headroom;
@@ -116,6 +116,7 @@ FromDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("ENCAP", WordArg(), encap_type).read_status(has_encap)
         .read("BURST", _burst)
         .read("TIMESTAMP", timestamp)
+        .read("ACTIVE", active)
         .complete() < 0)
         return -1;
     if (_snaplen > 65535 || _snaplen < 14)
@@ -165,6 +166,7 @@ FromDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     _promisc = promisc;
     _outbound = outbound;
     _timestamp = timestamp;
+    _active = active;
     return 0;
 }
 
@@ -319,6 +321,7 @@ FromDevice::initialize(ErrorHandler *errh)
     if (!_ifname)
         return errh->error("interface not set");
 
+    if (_active) {
 #if FROMDEVICE_ALLOW_PCAP
     if (_method == method_default || _method == method_pcap) {
         assert(!_pcap);
@@ -413,8 +416,9 @@ FromDevice::initialize(ErrorHandler *errh)
     if (_method == method_pcap)
         ScheduleInfo::initialize_task(this, &_task, false, errh);
 #endif
+
 #if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_LINUX
-    if (_fd >= 0)
+    if (_fd >= 0 && _active)
         add_select(_fd, SELECT_READ);
 #endif
 
@@ -422,6 +426,7 @@ FromDevice::initialize(ErrorHandler *errh)
         if (KernelFilter::device_filter(_ifname, true, errh) < 0)
             _sniffer = true;
 
+    }
     return 0;
 }
 
@@ -612,7 +617,8 @@ FromDevice::run_task(Task *)
     }
     if (r > 0) {
         _count += r;
-        _task.fast_reschedule();
+        if (likely(_active))
+		_task.fast_reschedule();
 #if HAVE_BATCH
         if (md.batch) {
             md.batch->make_tail(md.batch_last, md.batch_count);

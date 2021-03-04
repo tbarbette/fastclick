@@ -215,7 +215,7 @@ class FromDevice : public BatchElement { public:
     friend void FromDevice_get_packet(u_char*, const struct pcap_pkthdr*,
                                       const u_char*);
 #endif
-
+    bool _active;
     bool _force_ip;
 #if FROMDEVICE_ALLOW_PCAP && TIMESTAMP_NANOSEC && defined(PCAP_TSTAMP_PRECISION_NANO)
     bool _pcap_nanosec;
