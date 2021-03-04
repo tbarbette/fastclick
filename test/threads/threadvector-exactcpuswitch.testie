@@ -1,0 +1,38 @@
+%info
+Test Exact CPU switch threadvector
+
+
+%require
+click-buildtool provides umultithread
+
+
+%script
+click -j 4 CONFIG
+
+%file CONFIG
+cpu :: ExactCPUSwitch();
+is0 :: InfiniteSource -> cpu;
+is2 :: InfiniteSource -> cpu;
+is3 :: InfiniteSource -> cpu;
+
+StaticThreadSched(is0 0, is2 2, is3 3);
+
+cpu[0] -> out0 :: Discard;
+cpu[1] -> out1 :: Discard;
+cpu[2] -> out2 :: Discard;
+
+Script( read cpu.passing_threads,
+        read out0.passing_threads,
+        read out1.passing_threads,
+        read out2.passing_threads,
+        stop)
+
+%expect stderr
+cpu.passing_threads:
+0,2-3
+out0.passing_threads:
+0
+out1.passing_threads:
+2
+out2.passing_threads:
+3
