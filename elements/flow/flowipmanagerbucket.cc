@@ -99,7 +99,7 @@ void FlowIPManagerBucket::cleanup(CleanupStage stage) {
 }
 
 
-void FlowIPManagerBucket::pre_migrate(DPDKEthernetDevice* dev, int from, std::vector<std::pair<int,int>> gids) {
+void FlowIPManagerBucket::pre_migrate(EthernetDevice* dev, int from, std::vector<std::pair<int,int>> gids) {
 	CoreInfo &coref = _cores.get_value_for_thread(from);
     coref.lock.acquire();
     if (coref.pending != 0)
@@ -112,10 +112,10 @@ void FlowIPManagerBucket::pre_migrate(DPDKEthernetDevice* dev, int from, std::ve
 }
 
 
-void FlowIPManagerBucket::post_migrate(DPDKEthernetDevice* dev, int from) {
+void FlowIPManagerBucket::post_migrate(EthernetDevice* dev, int from) {
     if (_mark)
         return;
-    int port_id = dev->get_port_id();
+    int port_id = ((DPDKEthernetDevice*)dev)->get_port_id();
     int v = rte_eth_rx_queue_count(port_id, from);
 
     CoreInfo &coref = _cores.get_value_for_thread(from);

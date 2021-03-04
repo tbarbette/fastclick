@@ -46,8 +46,8 @@ public:
     void cleanup(CleanupStage stage) CLICK_COLD;
 
     //First : group id, second : destination cpu
-    void pre_migrate(DPDKEthernetDevice* dev, int from, std::vector<std::pair<int,int>> gids) override;
-    void post_migrate(DPDKEthernetDevice* dev, int from) override;
+    void pre_migrate(EthernetDevice* dev, int from, std::vector<std::pair<int,int>> gids) override;
+    void post_migrate(EthernetDevice* dev, int from) override;
     void init_assignment(unsigned* table, int sz) override;
 
     void push_batch(int, PacketBatch* batch);
