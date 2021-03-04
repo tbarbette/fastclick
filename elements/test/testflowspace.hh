@@ -19,8 +19,6 @@ struct FourBytes {
 
 /**
  * Flow element that asks for 4 bytes
- *
- *
  */
 class TestFlowSpace : public FlowSpaceElement<FourBytes> {
 
