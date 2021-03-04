@@ -19,7 +19,11 @@ class MethodRSSPP : public MethodRSS, public LoadTracker { public:
     };
     std::vector<Node> _count;
 
+#ifndef HAVE_DPDK
+#define _counter_is_xdp false
+#else
     bool _counter_is_xdp;
+#endif
     int _xdp_table_fd;
     void* _counter;
 
