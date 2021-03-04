@@ -207,6 +207,13 @@ else
     have_libbpf=no
 fi
 
+AC_SEARCH_LIBS([curl_global_init], [curl], [ac_have_curl=yes], [ac_have_curl=no])
+AC_CHECK_HEADERS([curl/curl.h], [ac_have_curl_h=yes], [ac_have_curl_h=no])
+if test "$ac_have_curl$ac_have_curl_h" = yesyes; then
+    AC_DEFINE([HAVE_CURL])
+fi
+
+AC_SEARCH_LIBS([elf_version], [elf], [ac_have_elf=yes], [ac_have_elf=no])
 
 AC_SEARCH_LIBS([MHD_start_daemon], [microhttpd], [ac_have_libmicrohttpd=yes], [ac_have_libmicrohttpd=no])
 AC_CHECK_HEADERS([microhttpd.h], [ac_have_microhttpd_h=yes], [ac_have_microhttpd_h=no])
@@ -235,6 +242,15 @@ if test "x$ac_have_hyperscan$ac_have_hyperscan_h" = "xyesyes"; then
     AC_DEFINE([HAVE_HYPERSCAN])
 else
     have_hyperscan=no
+fi
+
+AC_SEARCH_LIBS([PAPI_start_counters], [papi], [ac_have_papi=yes], [ac_have_papi=no])
+AC_CHECK_HEADERS([papi.h], [ac_have_papi_h=yes], [ac_have_papi_h=no])
+if test "x$ac_have_papi_h$ac_have_papi" = "xyesyes"; then
+    AC_DEFINE([HAVE_PAPI])
+    have_papi=yes
+else
+    have_papi=no
 fi
 
 AC_DEFINE([HAVE_JSON])
@@ -2551,6 +2567,11 @@ if test "x$HAVE_NUMA" = xyes; then
     provisions="$provisions numa"
 fi
 
+dnl add 'papi' if libpapi support is available
+if test "x$have_papi" = xyes; then
+    provisions="$provisions papi"
+fi
+
 dnl add 'pcap' if libpcap is available
 if test "x$HAVE_PCAP" = xyes; then
     provisions="$provisions pcap"
@@ -2655,6 +2676,7 @@ Configuration Summary:
     Netmap support:              ${HAVE_NETMAP}
     PCAP   support:              ${have_pcap}
 
+    PAPI   support:              ${have_papi}
     RE2    support:              ${have_re2}
     BPF    support:              ${have_libbpf}
     HTTPD  support:              ${have_httpd}
