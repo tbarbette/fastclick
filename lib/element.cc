@@ -1863,8 +1863,6 @@ public:
  *      downstream elements, execute the ready function, then call UP_POST or
  *      DOWN_POST
  *
- *
- *
  *  @param is_up True if the threads are being activated, false if deactivated.
  */
 void Element::trigger_thread_reconfiguration(bool is_up, std::function<void()> ready, Bitvector threads) {
