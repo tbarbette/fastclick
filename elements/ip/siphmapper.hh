@@ -19,7 +19,7 @@ CLICK_DECLS
  * IPMapper interface.
  *
  * Like RoundRobinIPMapper, but also uses consistent hashing to map
- * map elements by source IP to the same node in the cluster, even
+ * elements by source IP to the same node in the cluster, even
  * if nodes are added or removed.
  *
  *
@@ -146,7 +146,7 @@ public:
     chash_node_t<K> *in = new chash_node_t<K> [n];
     int p = 0;
     unsigned short index = -1;
-    for (unsigned short i = 0; i < (unsigned)max_servers; i++) {
+    for (unsigned short i = 0; i < max_servers; i++) {
       bool inc = false;
       for (unsigned int j = 0; j < num_nodes; j++) {
 	int tmp = click_random(); // XXX: assumes randoms # from 0 to INT_MAX
