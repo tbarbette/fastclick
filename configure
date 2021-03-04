@@ -7879,6 +7879,88 @@ else
     LIBS="$save_libs"
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing bpf_prog_load_xattr" >&5
+$as_echo_n "checking for library containing bpf_prog_load_xattr... " >&6; }
+if ${ac_cv_search_bpf_prog_load_xattr+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char bpf_prog_load_xattr ();
+int
+main ()
+{
+return bpf_prog_load_xattr ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' bpf; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_bpf_prog_load_xattr=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_bpf_prog_load_xattr+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_bpf_prog_load_xattr+:} false; then :
+
+else
+  ac_cv_search_bpf_prog_load_xattr=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_bpf_prog_load_xattr" >&5
+$as_echo "$ac_cv_search_bpf_prog_load_xattr" >&6; }
+ac_res=$ac_cv_search_bpf_prog_load_xattr
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+  ac_have_libbpf=yes
+else
+  ac_have_libbpf=no
+fi
+
+for ac_header in bpf/bpf.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "bpf/bpf.h" "ac_cv_header_bpf_bpf_h" "$ac_includes_default"
+if test "x$ac_cv_header_bpf_bpf_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_BPF_BPF_H 1
+_ACEOF
+ ac_have_libbpf_h=yes
+else
+  ac_have_libbpf_h=no
+fi
+
+done
+
+if test "x$ac_have_libbpf$ac_have_libbpf_h" = "xyesyes"; then
+    $as_echo "#define HAVE_BPF 1" >>confdefs.h
+
+    have_libbpf=yes
+else
+    have_libbpf=no
+fi
+
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing MHD_start_daemon" >&5
 $as_echo_n "checking for library containing MHD_start_daemon... " >&6; }
 if ${ac_cv_search_MHD_start_daemon+:} false; then :
@@ -12687,6 +12769,8 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_working_pcap_h" >&5
 $as_echo "$ac_cv_working_pcap_h" >&6; }
         test "$ac_cv_working_pcap_h" != yes && HAVE_PCAP=
+    else
+        HAVE_PCAP=no
     fi
 
     if test "$HAVE_PCAP" = yes; then
@@ -17360,6 +17444,7 @@ Configuration Summary:
     PCAP   support:              ${have_pcap}
 
     RE2    support:              ${have_re2}
+    BPF    support:              ${have_libbpf}
     HTTPD  support:              ${have_httpd}
     libpci support:              ${have_pci}
 "

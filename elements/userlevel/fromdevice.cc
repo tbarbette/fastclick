@@ -23,6 +23,8 @@
 #include <click/config.h>
 #include <sys/types.h>
 #include <sys/time.h>
+
+
 #if !defined(__sun)
 # include <sys/ioctl.h>
 #else
@@ -41,7 +43,10 @@
 #include <click/packet_anno.hh>
 #include <click/standard/scheduleinfo.hh>
 #include <click/userutils.hh>
+#include <linux/ethtool.h>
+#include <linux/netlink.h>
 #include <unistd.h>
+#include <linux/sockios.h>
 #include <fcntl.h>
 #include "fakepcap.hh"
 #include <linux/sockios.h>
