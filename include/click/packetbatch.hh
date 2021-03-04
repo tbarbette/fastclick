@@ -9,17 +9,26 @@ CLICK_DECLS
  * Iterate over all packets of a batch. The batch cannot be modified during
  *   iteration. Use _SAFE version if you want to modify it on the fly.
  */
-#define FOR_EACH_PACKET(batch,p) for(Packet* p = batch->first();p != 0;p=p->next())
+#define FOR_EACH_PACKET_LL(first,p) for(Packet* p = first;p != 0;p=p->next())
+
+/**
+ * Iterate over all packets of a batch. The batch cannot be modified during
+ *   iteration. Use _SAFE version if you want to modify it on the fly.
+ */
+#define FOR_EACH_PACKET(batch,p) FOR_EACH_PACKET_LL(batch->first(),p)
 
 /**
  * Iterate over all packets of a batch. The current packet can be modified
  *  during iteration as the "next" pointer is read before going in the core of
  *  the loop.
  */
-#define FOR_EACH_PACKET_SAFE(batch,p) \
-                Packet* fep_next = ((batch != 0)? batch->first()->next() : 0 );\
-                Packet* p = batch->first();\
+#define FOR_EACH_PACKET_LL_SAFE(first,p) \
+                Packet* fep_next = ((first != 0)? first->next() : 0 );\
+                Packet* p = first;\
                 for (;p != 0;p=fep_next,fep_next=(p==0?0:p->next()))
+
+
+#define FOR_EACH_PACKET_SAFE(batch,p) FOR_EACH_PACKET_LL_SAFE(batch->first(),p)
 
 /**
  * Execute a function on each packets of a batch. The function may return
