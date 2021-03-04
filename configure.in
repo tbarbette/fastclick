@@ -2673,6 +2673,8 @@ Configuration Summary:
 
     DPDK   support:              ${dpdk_info}
 
+    RSS++  support:              ${enable_cpu_load}
+
     Netmap support:              ${HAVE_NETMAP}
     PCAP   support:              ${have_pcap}
 
