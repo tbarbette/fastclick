@@ -189,7 +189,7 @@ IPRewriterBase::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("REAP_INTERVAL", SecondsArg(), _gc_interval_sec)
 	.read("REAP_TIME", Args::deprecated, SecondsArg(), _gc_interval_sec)
 	.read("USE_CACHE", use_cache)
-	.read("SET_AGGREGATE", _set_aggregate)
+	.read("SET_AGGREGATE", set_aggregate)
     .read("HANDLE_MIGRATION", _handle_migration)
 	.consume() < 0)
 	return -1;
