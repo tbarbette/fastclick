@@ -2,7 +2,7 @@
 Tests GTPEncap/GTPDecap
 
 %require
-click-buildtool provides gtp
+click-buildtool provides tunnel
 
 %script
 click -e "
