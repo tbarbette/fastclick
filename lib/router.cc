@@ -1083,7 +1083,6 @@ class ElementFilterRouterVisitor : public RouterVisitor { public:
 };
 }
 
-
 /** @brief Search for elements downstream from @a e.
  * @param e element to start search
  * @param port output port (or -1 to search all output ports)
@@ -1447,6 +1446,26 @@ Router::initialize(ErrorHandler *errh)
             if (!errh->nerrors())
                 errh->error("unspecified error");
             all_ok = false;
+        }
+    }
+
+    // Initialize threads if OK so far.
+    if (all_ok) {
+        for (int ord = 0; all_ok && ord < _elements.size(); ord++) {
+            int i = _element_configure_order[ord];
+            assert(element_stage[i] == Element::CLEANUP_INITIALIZED);
+            RouterContextErrh cerrh(errh, "While thread initalizing", element(i));
+            assert(!cerrh.nerrors());
+            if (_elements[i]->thread_configure(Element::THREAD_INITIALIZE, &cerrh, Bitvector(master()->nthreads())) >= 0) {
+                element_stage[i] = Element::CLEANUP_THREAD_INITIALIZED;
+            } else {
+                // don't report 'unspecified error' for ErrorElements:
+                // keep error messages clean
+                if (!cerrh.nerrors() && !_elements[i]->cast("Error"))
+                    cerrh.error("unspecified error");
+                element_stage[i] = Element::CLEANUP_THREAD_INITIALZE_FAILED;
+                all_ok = false;
+            }
         }
     }
 
