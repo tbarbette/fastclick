@@ -23,6 +23,9 @@
 /* Define if select() may be used to wait for file descriptor events. */
 #undef HAVE_ALLOW_SELECT
 
+/* Define if you have the <bpf.h> header file and libbpf. */
+#undef HAVE_BPF
+
 /* Define if <pcap.h> uses bpf_timeval. */
 #undef HAVE_BPF_TIMEVAL
 

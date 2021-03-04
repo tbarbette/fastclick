@@ -198,6 +198,16 @@ else
     LIBS="$save_libs"
 fi
 
+AC_SEARCH_LIBS([bpf_prog_load_xattr], [bpf], [ac_have_libbpf=yes], [ac_have_libbpf=no])
+AC_CHECK_HEADERS([bpf/bpf.h], [ac_have_libbpf_h=yes], [ac_have_libbpf_h=no])
+if test "x$ac_have_libbpf$ac_have_libbpf_h" = "xyesyes"; then
+    AC_DEFINE([HAVE_BPF])
+    have_libbpf=yes
+else
+    have_libbpf=no
+fi
+
+
 AC_SEARCH_LIBS([MHD_start_daemon], [microhttpd], [ac_have_libmicrohttpd=yes], [ac_have_libmicrohttpd=no])
 AC_CHECK_HEADERS([microhttpd.h], [ac_have_microhttpd_h=yes], [ac_have_microhttpd_h=no])
 if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
@@ -2646,6 +2656,7 @@ Configuration Summary:
     PCAP   support:              ${have_pcap}
 
     RE2    support:              ${have_re2}
+    BPF    support:              ${have_libbpf}
     HTTPD  support:              ${have_httpd}
     libpci support:              ${have_pci}
 "
