@@ -16176,8 +16176,8 @@ if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"
 fi
 
-if test "x$enable_gtp" = xyes; then
-    provisions="$provisions gtp"
+if test "x$enable_tunnel" = xyes; then
+    provisions="$provisions tunnel"
 fi
 
 if test "x$have_hyperscan" = xyes; then

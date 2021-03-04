@@ -2506,9 +2506,9 @@ if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"
 fi
 
-dnl add 'gtp' if gtp elements are available
-if test "x$enable_gtp" = xyes; then
-    provisions="$provisions gtp"
+dnl add 'tunnel' if tunnel elements are available
+if test "x$enable_tunnel" = xyes; then
+    provisions="$provisions tunnel"
 fi
 
 dnl add 'hs' if HyperScan lib is available
