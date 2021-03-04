@@ -100,14 +100,15 @@ UDPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
     timeouts[1] = default_guarantee;
 
     if (Args(this, errh).bind(conf)
-	.read("DST_ANNO", dst_anno)
-	.read("REPLY_ANNO", AnnoArg(1), reply_anno).read_status(has_reply_anno)
-	.read("UDP_TIMEOUT", SecondsArg(), timeouts[0])
-	.read("TIMEOUT", SecondsArg(), timeouts[0])
-	.read("UDP_STREAMING_TIMEOUT", SecondsArg(), _udp_streaming_timeout).read_status(has_udp_streaming_timeout)
-	.read("STREAMING_TIMEOUT", SecondsArg(), _udp_streaming_timeout).read_status(has_streaming_timeout)
-	.read("UDP_GUARANTEE", SecondsArg(), timeouts[1])
-	.consume() < 0)
+        .read("DST_ANNO", dst_anno)
+        .read("REPLY_ANNO", AnnoArg(1), reply_anno).read_status(has_reply_anno)
+        .read("UDP_TIMEOUT", SecondsArg(), timeouts[0])
+        .read("TIMEOUT", SecondsArg(), timeouts[0])
+        .read("UDP_STREAMING_TIMEOUT", SecondsArg(), _udp_streaming_timeout).read_status(has_udp_streaming_timeout)
+        .read("STREAMING_TIMEOUT", SecondsArg(), _udp_streaming_timeout).read_status(has_streaming_timeout)
+        .read("UDP_GUARANTEE", SecondsArg(), timeouts[1])
+        .read("HANDLE_MIGRATION", handle_migration)
+        .consume() < 0)
 	return -1;
 
     for (unsigned i=0; i<_mem_units_no; i++) {
@@ -137,9 +138,9 @@ UDPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
     UDPFlow *flow = new(data) UDPFlow
 	(&_input_specs[input], flowid, rewritten_flowid, ip_p,
 	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
-         relevant_timeout(_timeouts[click_current_cpu_id()]));
+         relevant_timeout(_timeouts[click_current_cpu_id()]), input);
 
-    return store_flow(flow, input, _map[click_current_cpu_id()]);
+    return store_flow(flow, input, _state->map);
 }
 
 int
@@ -165,50 +166,45 @@ UDPRewriter::process(int port, Packet *p_in)
     }
 
     IPFlowID flowid(p);
-    IPRewriterEntry *m;
-    IPRewriterState& s = *_state;
-    bool hit = false;
-    if (_use_cache) {
-        if (flowid == s.last_id) {
-            m = s.last_entry;
-            hit = true;
-        } else {
-            m = _map[click_current_cpu_id()].get(flowid);
-        }
-    } else {
-        m = _map[click_current_cpu_id()].get(flowid);
-    }
+
+    IPRewriterEntry *m = search_entry(flowid);
 
     if (!m) {			// create new mapping
         IPRewriterInput &is = _input_specs.unchecked_at(port);
-        IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
+        IPFlowID rewritten_flowid;
 
+        if (_handle_migration && !precopy) {
+            m = search_migrate_entry(flowid, _state);
+            if (m) {
+                m = UDPRewriter::add_flow(ip_p, flowid, m->rewritten_flowid(), port);
+                goto flow_added;
+            }
+        }
+
+        {
+        rewritten_flowid = IPFlowID::uninitialized_t();
         int result = is.rewrite_flowid(flowid, rewritten_flowid, p);
         if (result == rw_addmap) {
             m = UDPRewriter::add_flow(ip_p, flowid, rewritten_flowid, port);
         }
-
-        if (!m) {
+        if (!m)
             return result;
-        } else if (_annos & 2) {
+        }
+flow_added:
+
+        if (_annos & 2) {
             m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
         }
-    }
-    if (_use_cache) {
-        s.last_id = flowid;
-        s.last_entry = m;
     }
 
     UDPFlow *mf = static_cast<UDPFlow *>(m->flow());
     mf->apply(p, m->direction(), _annos);
 
-    if (!hit) {
-        click_jiffies_t now_j = click_jiffies();
-        if (_timeouts[click_current_cpu_id()][1])
-            mf->change_expiry(_heap[click_current_cpu_id()], true, now_j + _timeouts[click_current_cpu_id()][1]);
-        else
-            mf->change_expiry(_heap[click_current_cpu_id()], false, now_j + udp_flow_timeout(mf));
-    }
+    click_jiffies_t now_j = click_jiffies();
+    if (_timeouts[click_current_cpu_id()][1])
+	mf->change_expiry(_heap[click_current_cpu_id()], true, now_j + _timeouts[click_current_cpu_id()][1]);
+    else
+	mf->change_expiry(_heap[click_current_cpu_id()], false, now_j + udp_flow_timeout(mf));
 
     return m->output();
 }
@@ -242,7 +238,7 @@ UDPRewriter::dump_mappings_handler(Element *e, void *)
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
     for (unsigned i = 0; i < rw->_mem_units_no; i++) {
-        for (Map::iterator iter = rw->_map[i].begin(); iter.live(); ++iter) {
+        for (Map::iterator iter = rw->_state.get_value(i).map.begin(); iter.live(); ++iter) {
             iter->flow()->unparse(sa, iter->direction(), now);
             sa << '\n';
         }

@@ -304,9 +304,9 @@ TCPRewriter::add_flow(int /*ip_p*/, const IPFlowID &flowid,
     TCPFlow *flow = new(data) TCPFlow
 	(&_input_specs[input], flowid, rewritten_flowid,
 	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
-         relevant_timeout(_timeouts[click_current_cpu_id()]));
+         relevant_timeout(_timeouts[click_current_cpu_id()]), input);
 
-    return store_flow(flow, input, _map[click_current_cpu_id()]);
+    return store_flow(flow, input, _state->map);
 }
 
 int
@@ -331,21 +331,33 @@ TCPRewriter::process(int port, Packet *p_in)
     }
 
     IPFlowID flowid(p);
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+    IPRewriterEntry *m = search_entry(flowid);
 
     if (!m) {			// create new mapping
-	IPRewriterInput &is = _input_specs.unchecked_at(port);
-	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
 
-	int result = is.rewrite_flowid(flowid, rewritten_flowid, p);
-	if (result == rw_addmap) {
-	    m = TCPRewriter::add_flow(IP_PROTO_TCP, flowid, rewritten_flowid, port);
+        if (_handle_migration && !precopy) {
+            m = search_migrate_entry(flowid, _state);
+            if (m) {
+                m = TCPRewriter::add_flow(IP_PROTO_TCP, flowid, m->rewritten_flowid(), port);
+                goto flow_added;
+            }
         }
 
-	if (!m) {
-	    return result;
-	} else if (_annos & 2) {
-	    m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
+        {
+
+	    IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
+        IPRewriterInput &is = _input_specs.unchecked_at(port);
+        int result = is.rewrite_flowid(flowid, rewritten_flowid, p);
+        if (result == rw_addmap) {
+            m = TCPRewriter::add_flow(IP_PROTO_TCP, flowid, rewritten_flowid, port);
+        }
+	    if (!m) {
+	        return result;
+	    }
+        }
+flow_added:
+        if (_annos & 2) {
+	        m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
         }
     }
 
@@ -354,9 +366,9 @@ TCPRewriter::process(int port, Packet *p_in)
 
     click_jiffies_t now_j = click_jiffies();
     if (_timeouts[click_current_cpu_id()][1])
-	mf->change_expiry(_heap[click_current_cpu_id()], true, now_j + _timeouts[click_current_cpu_id()][1]);
+	    mf->change_expiry(_heap[click_current_cpu_id()], true, now_j + _timeouts[click_current_cpu_id()][1]);
     else
-	mf->change_expiry(_heap[click_current_cpu_id()], false, now_j + tcp_flow_timeout(mf));
+	    mf->change_expiry(_heap[click_current_cpu_id()], false, now_j + tcp_flow_timeout(mf));
 
     return m->output();
 }
@@ -388,7 +400,7 @@ TCPRewriter::tcp_mappings_handler(Element *e, void *)
     TCPRewriter *rw = (TCPRewriter *)e;
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
-    for (Map::iterator iter = rw->_map[click_current_cpu_id()].begin(); iter.live(); ++iter) {
+    for (Map::iterator iter = rw->_state->map.begin(); iter.live(); ++iter) {
 	TCPFlow *f = static_cast<TCPFlow *>(iter->flow());
 	f->unparse(sa, iter->direction(), now);
 	sa << '\n';
