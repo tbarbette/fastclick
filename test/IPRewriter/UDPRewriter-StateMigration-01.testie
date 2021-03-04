@@ -1,0 +1,73 @@
+%info
+Test UDPRewriter support for state migration
+
+Packets are handled on thread 0, the thread 1 starts sending the same set of packet. Normally, in the normal IMP version the packets would be handled as new packets. With thread migration, before activating on thread 1, the source will send a message to downstream elements to prepare for migration. UDPRewriter should therefore find the mapping of thread 0 even on thread 1.
+
+%require
+click-buildtool provides umultithread
+
+%script
+
+click -j 2 -e "
+rw :: UDPRewriter(pattern 1.0.0.1 1024-65535# - - 0 1, drop, HANDLE_MIGRATION true);
+f1 :: FromIPSummaryDump(IN1, STOP true)
+	-> [0]rw;
+
+f2 :: FromIPSummaryDump(IN1, STOP true, MIGRATE true, ACTIVE false)
+	-> [0]rw;
+
+ret1 :: FromIPSummaryDump(IN2, STOP true, ACTIVE false)
+	-> [1]rw;
+
+ret2 :: FromIPSummaryDump(IN2-2, STOP true, ACTIVE false)
+	-> [1]rw;
+
+rw[0] -> ToIPSummaryDump(OUT1, FIELDS thread src sport dst dport proto);
+rw[1] -> ToIPSummaryDump(OUT2, FIELDS thread src sport dst dport proto);
+
+StaticThreadSched(f1 0, f2 1, ret1 0, ret2 1);
+
+DriverManager(pause, write f2.active true, pause, write ret1.active true, pause, write ret2.active true, pause);
+"
+
+%file IN1
+!data src sport dst dport proto
+18.26.4.44 30 10.0.0.4 40 T
+18.26.4.44 30 10.0.0.4 40 T
+18.26.4.44 20 10.0.0.8 80 T
+
+%file IN2
+!data src sport dst dport proto
+10.0.0.4 40 1.0.0.1 1024 T
+10.0.0.4 40 1.0.0.1 1024 T
+10.0.0.8 80 1.0.0.1 1025 T
+10.0.0.8 80 1.0.0.1 1026 T
+
+%file IN2-2
+!data src sport dst dport proto
+10.0.0.4 40 1.0.0.1 1024 T
+10.0.0.4 40 1.0.0.1 1024 T
+10.0.0.8 80 1.0.0.1 1025 T
+10.0.0.8 80 1.0.0.1 1026 T
+
+
+
+%ignorex
+!.*
+
+%expect OUT1
+0 1.0.0.1 1024 10.0.0.4 40 T
+0 1.0.0.1 1024 10.0.0.4 40 T
+0 1.0.0.1 1025 10.0.0.8 80 T
+1 1.0.0.1 1024 10.0.0.4 40 T
+1 1.0.0.1 1024 10.0.0.4 40 T
+1 1.0.0.1 1025 10.0.0.8 80 T
+
+
+%expect OUT2
+0 10.0.0.4 40 18.26.4.44 30 T
+0 10.0.0.4 40 18.26.4.44 30 T
+0 10.0.0.8 80 18.26.4.44 20 T
+1 10.0.0.4 40 18.26.4.44 30 T
+1 10.0.0.4 40 18.26.4.44 30 T
+1 10.0.0.8 80 18.26.4.44 20 T

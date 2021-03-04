@@ -1,0 +1,53 @@
+%info
+
+TCPRewriter state migration
+
+%require
+click-buildtool provides umultithread
+
+%script
+click -j 2 -e "
+rw :: TCPRewriter(pattern 1.0.0.24 1044-65535# - - 0 0, HANDLE_MIGRATION true)
+
+in ::  CheckIPHeader(VERBOSE true)
+	-> CheckTCPHeader(VERBOSE true)
+	-> [0]rw[0]
+	-> CheckIPHeader(VERBOSE true)
+	-> CheckTCPHeader(VERBOSE true)
+	-> ToIPSummaryDump(OUT1, FIELDS thread src sport dst dport proto tcp_seq tcp_ack payload tcp_opt)
+
+f1 :: FromIPSummaryDump(IN1, STOP true, CHECKSUM true) -> in;
+
+f2 :: FromIPSummaryDump(IN1, STOP true, CHECKSUM true, ACTIVE false, MIGRATE true) -> in;
+
+StaticThreadSched(f1 0, f2 1);
+
+DriverManager(pause, write f2.active true, pause);
+"
+
+%file IN1
+!data src sport dst dport proto tcp_seq tcp_ack payload tcp_opt
+# first prime TCPRewriter to create a mapping
+2.0.0.2 21 1.0.0.1 1024 T 0 0 "" .
+2.0.0.2 21 1.0.0.1 1024 T 0 1 "" .
+2.0.0.2 21 1.0.0.1 1024 T 0 18 "" .
+2.0.0.2 21 1.0.0.1 1024 T 0 0 "" sack1:18
+2.0.0.2 21 1.0.0.1 1024 T 0 0 "" sack1:10
+2.0.0.2 21 1.0.0.1 1024 T 0 0 "" sack1-10;sack1-18;sack18-20
+
+%expect OUT1
+0 1.0.0.24 1044 1.0.0.1 1024 T 0 0 "" .
+0 1.0.0.24 1044 1.0.0.1 1024 T 0 1 "" .
+0 1.0.0.24 1044 1.0.0.1 1024 T 0 18 "" .
+0 1.0.0.24 1044 1.0.0.1 1024 T 0 0 "" sack1-18
+0 1.0.0.24 1044 1.0.0.1 1024 T 0 0 "" sack1-10
+0 1.0.0.24 1044 1.0.0.1 1024 T 0 0 "" sack1-10;sack1-18;sack18-20
+1 1.0.0.24 1044 1.0.0.1 1024 T 0 0 "" .
+1 1.0.0.24 1044 1.0.0.1 1024 T 0 1 "" .
+1 1.0.0.24 1044 1.0.0.1 1024 T 0 18 "" .
+1 1.0.0.24 1044 1.0.0.1 1024 T 0 0 "" sack1-18
+1 1.0.0.24 1044 1.0.0.1 1024 T 0 0 "" sack1-10
+1 1.0.0.24 1044 1.0.0.1 1024 T 0 0 "" sack1-10;sack1-18;sack18-20
+
+%ignorex
+!.*
