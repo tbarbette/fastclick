@@ -12,6 +12,28 @@ CLICK_DECLS
 
 class Args;
 
+/*
+=c
+
+Replay([, I<KEYWORDS>])
+
+=s traces
+
+replay an input of packets at a given speed
+
+=d
+
+
+Keyword arguments are:
+
+=over 8
+
+=item STOP
+
+Integer.  Number of loop to replay.
+
+*/
+
 class ReplayBase : public BatchElement { public:
 	ReplayBase() CLICK_COLD;
     ~ReplayBase() CLICK_COLD;
