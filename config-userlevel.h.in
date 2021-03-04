@@ -35,6 +35,9 @@
 /* Define if you have the CPU load cycles tracking function. */
 #undef HAVE_CLICK_LOAD
 
+/* Define if curl is present. */
+#undef HAVE_CURL
+
 /* Define if you have the clock_gettime function. */
 #undef HAVE_CLOCK_GETTIME
 
