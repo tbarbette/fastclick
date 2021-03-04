@@ -13,6 +13,11 @@ StringTest([keywords])
 
 runs regression tests for String
 
+=d
+
+StringTest runs String regression tests at initialization time. It
+does not route packets.
+
 */
 
 class StringTest : public Element { public:
