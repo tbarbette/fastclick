@@ -108,6 +108,7 @@ AggregateCounterVector::find_node(uint32_t a, const Packet* p, bool &outdated)
 {
     Node& n = _nodes.unchecked_at(a);
     uint32_t epoch;
+#if HAVE_DPDK
     if (_mark) {
         struct rte_mbuf* p_mbuf;
         p_mbuf = (struct rte_mbuf *) p->destructor_argument();
@@ -116,7 +117,9 @@ AggregateCounterVector::find_node(uint32_t a, const Packet* p, bool &outdated)
             click_chatter("WARNING : untagged packet");
         }
         epoch = p_mbuf->hash.fdir.hi;
-    } else {
+    } else
+#endif
+    {
         epoch = _epoch;
     }
     if (n.epoch != epoch) {
