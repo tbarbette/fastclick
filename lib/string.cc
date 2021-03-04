@@ -884,6 +884,22 @@ String::replace(char from, char to) const
     return newStr;
 }
 
+/** @brief Return a string with from replaced by to */
+String
+String::replace(String from, String to) const
+{
+    String newStr = *this;
+    int pos = 0;
+    int found = 0;
+    int fromlen = from.length();
+    int tolen = to.length();
+    while ((found = newStr.find_left(from,pos)) >= 0) {
+        pos = found + tolen;
+        newStr = newStr.substring(0,found) + to + newStr.substring(found + fromlen);
+    }
+    return newStr;
+}
+
 /** @brief Return a hex-quoted version of the string.
 
     For example, the string "Abcd" would convert to "\<41626364>". */
