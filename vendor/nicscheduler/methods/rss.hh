@@ -1,8 +1,10 @@
 #ifndef LIBNICSCHEDULER_METHODRSS_HH
 #define LIBNICSCHEDULER_METHODRSS_HH 1
 
+#if HAVE_DPDK
 #include <rte_ethdev.h>
 #include <rte_flow.h>
+#endif
 
 class MethodRSS : public BalanceMethodDevice { public:
 
@@ -16,8 +18,10 @@ class MethodRSS : public BalanceMethodDevice { public:
 
     void cpu_changed() override;
 
+#if HAVE_DPDK
     struct rte_eth_rss_conf _rss_conf;
     std::vector<rte_flow*> _flows;
+#endif
 
     bool update_reta_flow(bool validate = false);
     bool update_reta(bool validate = false);

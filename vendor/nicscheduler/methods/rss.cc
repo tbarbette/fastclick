@@ -21,16 +21,12 @@ int MethodRSS::initialize(ErrorHandler *errh, int startwith) {
 
     _table.resize(_reta_size);
 
-    /*
-    if (_table.size() < 128) {
-    return errh->error("RSS reta table is %d long. It should be at least 128.", _table.size());
-    }*/
     //We update the default reta to 0 to be sure it works
     for (int i = 0; i < _table.size(); i++) {
         _table[i] = 0;
     }
     _fd->set_rss_reta(_fd, _table.data(), _table.size());
-
+#if HAVE_DPDK
     if (_is_dpdk) {
         int port_id = ((DPDKEthernetDevice*)_fd)->get_port_id();
 
@@ -55,7 +51,7 @@ int MethodRSS::initialize(ErrorHandler *errh, int startwith) {
 
         rte_eth_dev_start(port_id);
     }
-
+#endif
     for (int i = 0; i < _table.size(); i++) {
         _table[i] = i % startwith;
     }
@@ -109,7 +105,7 @@ void MethodRSS::cpu_changed() {
     if (balancer->_manager) {
         for (int i = 0; i < m; i++) {
             if (omoves[i].size() > 0) {
-                balancer->_manager->pre_migrate((DPDKEthernetDevice*)_fd, i, omoves[i]);
+                balancer->_manager->pre_migrate((EthernetDevice*)_fd, i, omoves[i]);
             }
         }
     }
@@ -119,13 +115,14 @@ void MethodRSS::cpu_changed() {
     if (balancer->_manager) {
         for (int i = 0; i < m; i++) {
             if (omoves[i].size() > 0) {
-                balancer->_manager->post_migrate((DPDKEthernetDevice*)_fd, i);
+                balancer->_manager->post_migrate((EthernetDevice*)_fd, i);
             }
         }
     }
     click_chatter("Post migration finished");
 }
 
+#if HAVE_DPDK
 inline rte_flow* flow_add_redirect(int port_id, int from, int to, bool validate, int priority = 0) {
         struct rte_flow_attr attr;
         memset(&attr, 0, sizeof(struct rte_flow_attr));
@@ -442,7 +439,7 @@ again:
      return true;
 
 }
-
+#endif
 bool MethodRSS::update_reta(bool validate) {
     Timestamp t = Timestamp::now_steady();
     /*if (_verifier) {

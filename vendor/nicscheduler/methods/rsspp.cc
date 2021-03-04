@@ -58,7 +58,7 @@ inline void MethodRSSPP::apply_moves(std::function<int(int)> cpumap, std::vector
             for (int i = 0; i < omoves.size(); i++) {
                 if (omoves[i].size() > 0) {
                     int from_phys_id = cpumap(i);
-                    balancer->_manager->pre_migrate((DPDKEthernetDevice*)_fd,from_phys_id,omoves[i]);
+                    balancer->_manager->pre_migrate((EthernetDevice*)_fd,from_phys_id,omoves[i]);
                 }
             }
         }
@@ -73,7 +73,7 @@ inline void MethodRSSPP::apply_moves(std::function<int(int)> cpumap, std::vector
             for (int i = 0; i < omoves.size(); i++) {
                 if (omoves[i].size() > 0) {
                     int from_phys_id =  cpumap(i);
-                    balancer->_manager->post_migrate((DPDKEthernetDevice*)_fd,from_phys_id);
+                    balancer->_manager->post_migrate((EthernetDevice*)_fd,from_phys_id);
                 }
             }
         }

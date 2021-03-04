@@ -75,8 +75,8 @@ class MigrationListener { public:
     ~MigrationListener();
 
     //First : group id, second : destination cpu
-    virtual void pre_migrate(DPDKEthernetDevice* dev, int from, std::vector<std::pair<int,int>> gids) = 0;
-    virtual void post_migrate(DPDKEthernetDevice* dev, int from) = 0;
+    virtual void pre_migrate(EthernetDevice* dev, int from, std::vector<std::pair<int,int>> gids) = 0;
+    virtual void post_migrate(EthernetDevice* dev, int from) = 0;
 
     virtual void init_assignment(unsigned* table, int sz) {};
 };

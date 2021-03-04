@@ -1,3 +1,4 @@
+#include <functional>
 #include "nicscheduler.hh"
 
 // NICScheduler functions
