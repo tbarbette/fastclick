@@ -42,6 +42,7 @@
 #define rte_ipv4_hdr ipv4_hdr
 #define rte_ether_addr ether_addr
 #endif
+#include <nicscheduler/ethernetdevice.hh>
 
 #if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
 #define rte_ipv4_hdr ipv4_hdr
@@ -74,13 +75,11 @@ typedef uint32_t counter_t;
 
 extern bool dpdk_enabled;
 
-class DPDKDevice {
+class DPDKDevice : public DPDKEthernetDevice {
 public:
 
-    portid_t port_id;
 
-    DPDKDevice() CLICK_COLD;
-    DPDKDevice(portid_t port_id) CLICK_COLD;
+    DPDKDevice(portid_t port_id = -1) CLICK_COLD;
 
     struct DevInfo {
         inline DevInfo() :
@@ -202,7 +201,13 @@ public:
     String get_device_vendor_name();
     uint16_t get_device_id();
     const char *get_device_driver();
-    int set_rss_max(int max);
+
+    int dpdk_set_rss_max(int max);
+    int dpdk_set_rss_reta(unsigned* reta, unsigned reta_sz);
+    int dpdk_get_rss_reta_size() const;
+    Vector<unsigned>  dpdk_get_rss_reta() const;
+
+    EthernetDevice* get_eth_device();
 
     static unsigned int dev_count() {
 #if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
@@ -439,7 +444,12 @@ template<> struct DefaultArg<FlowControlMode> : public FlowControlModeArg {};
 inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node, bool reset) {
     struct rte_mbuf* mbuf;
     #if CLICK_PACKET_USE_DPDK
-        mbuf = p->mb();
+    mbuf = p->mb();
+    #elif CLICK_PACKET_INSIDE_DPDK
+    mbuf = ((struct rte_mbuf*)p) - 1;
+    rte_pktmbuf_pkt_len(mbuf) = p->length();
+    rte_pktmbuf_data_len(mbuf) = p->length();
+    mbuf->data_off = p->headroom();
     #else
     if (likely(DPDKDevice::is_dpdk_packet(p) && (mbuf = (struct rte_mbuf *)((unsigned char*) p->buffer() - sizeof(rte_mbuf)) ))
 #ifndef CLICK_NOINDIRECT

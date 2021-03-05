@@ -84,7 +84,7 @@ class MigrationListener { public:
 /**
  * NICScheduler library class
  *
- * Maitains a set of used/unused cores, and a pointer to an ethernet device
+ * Maintains a set of used/unused cores, and a pointer to an ethernet device
  * (represented by a given instance of EthernetDevice). An external timer
  * calls the "balance" function to reassign some flows of the ethernet
  * device to different cores, and possibly automatically scale up

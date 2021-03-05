@@ -218,6 +218,10 @@ void* FromDPDKDevice::cast(const char* name) {
     if (String(name) == "UserClockSource")
         return &dpdk_clock;
 #endif
+    if (String(name) == "EthernetDevice")
+        return get_eth_device();
+    if (String(name) == "DPDKDevice")
+        return _dev;
     return RXQueueDevice::cast(name);
 }
 
@@ -289,6 +293,26 @@ void FromDPDKDevice::cleanup(CleanupStage)
 {
     DPDKDevice::cleanup(ErrorHandler::default_handler());
     cleanup_tasks();
+}
+
+void FromDPDKDevice::clear_buffers() {
+    rte_mbuf* pkts[32];
+    for (int q = firstqueue; q <= lastqueue; q++) {
+        unsigned n;
+        int tot = 0;
+        do {
+            n = rte_eth_rx_burst(_dev->port_id, q, pkts, 32);
+            tot += n;
+            for (int i = 0; i < n; i ++) {
+                 rte_pktmbuf_free(pkts[i]);
+            }
+            if (tot > _dev->get_nb_rxdesc()) {
+                click_chatter("WARNING : Called clear_buffers while receiving packets !");
+                break;
+            }
+        } while (n > 0);
+        click_chatter("Cleared %d buffers for queue %d",tot,q);
+    }
 }
 
 bool FromDPDKDevice::run_task(Task *t)
@@ -410,7 +434,7 @@ enum {
     h_active, h_safe_active,
     h_xstats, h_queue_count,
     h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
-    h_rss,
+    h_rss, h_rss_reta, h_rss_reta_size,
     h_mac, h_add_mac, h_remove_mac, h_vf_mac,
     h_mtu,
     h_device, h_isolate,
@@ -482,6 +506,15 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
             return fd->_dev->get_device_vendor_name();
         case h_driver:
             return String(fd->_dev->get_device_driver());
+        case h_rss_reta_size:
+		    return String(fd->_dev->dpdk_get_rss_reta_size());
+        case h_rss_reta:
+            StringAccum acc;
+            Vector<unsigned> list = fd->_dev->dpdk_get_rss_reta();
+            for (int i= 0; i < list.size(); i++) {
+                acc << list[i] << " ";
+            }
+            return acc.take_string();
     }
 
     return 0;
@@ -637,7 +670,7 @@ int FromDPDKDevice::write_handler(
             int max;
             if (!IntArg().parse<int>(input,max))
                 return errh->error("Not a valid integer");
-            return fd->_dev->set_rss_max(max);
+            return fd->_dev->dpdk_set_rss_max(max);
         }
         case h_isolate: {
             if (input.empty()) {
@@ -877,6 +910,8 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("vf_mac_addr",read_handler, h_vf_mac);
 
     add_write_handler("max_rss", write_handler, h_rss, 0);
+    add_read_handler("rss_reta",read_handler, h_rss_reta);
+    add_read_handler("rss_reta_size",read_handler, h_rss_reta_size);
 
     add_read_handler("hw_count",statistics_handler, h_ipackets);
     add_read_handler("hw_bytes",statistics_handler, h_ibytes);
