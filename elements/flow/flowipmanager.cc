@@ -69,7 +69,7 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 #endif
 
-    _reserve += sizeof(uint32_t);
+    _reserve += sizeof(IPFlow5ID)  + sizeof(FlowControlBlock);
 
     return 0;
 }
@@ -85,7 +85,8 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     hash_params.hash_func_init_val = 0;
     hash_params.extra_flag = _flags;
 
-    _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
+    assert(_reserve >=  sizeof(IPFlow5ID) + sizeof(FlowControlBlock));
+    _flow_state_size_full = _reserve;
 
     if (_verbose)
      errh->message("Per-flow size is %d", _reserve);
@@ -112,24 +113,28 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     return 0;
 }
 
-const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next)
+
+static inline FlowControlBlock** fcb_next_ptr(FlowControlBlock* fcb) {
+    return (FlowControlBlock**)(((unsigned char*)&fcb->data_32) + sizeof(IPFlow5ID));
+}
+
+static const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next)
 {
-    *((FlowControlBlock**)&prev->data_32[2]) = next;
+    *fcb_next_ptr(prev) = next;
 };
 
 bool FlowIPManager::run_task(Task* t)
 {
     Timestamp recent = Timestamp::recent_steady();
     _timer_wheel.run_timers([this,recent](FlowControlBlock* prev) -> FlowControlBlock*{
-        FlowControlBlock* next = *((FlowControlBlock**)&prev->data_32[2]);
+        FlowControlBlock* next = *fcb_next_ptr(prev);
         int old = (recent - prev->lastseen).sec();
         if (old > _timeout) {
             if (unlikely(_verbose > 1))
                 click_chatter("Release %p as it is expired since %d", prev, old);
-        //expire
-            rte_hash_free_key_with_position(hash, prev->data_32[0]);
+            //expire
+            rte_hash_del_key(hash, (IPFlow5ID*)&prev->data_32[0]);
         } else {
-            //click_chatter("Cascade %p", prev);
             //No need for lock as we'll be the only one to enqueue there
             _timer_wheel.schedule_after(prev, _timeout - (recent - prev->lastseen).sec(),setter);
         }
@@ -176,7 +181,7 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
             click_chatter("New flow %d", ret);
         fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
         //Remember ID for deletion
-        fcb->data_32[0] = ret;
+        *((IPFlow5ID*)&fcb->data_32[0]) = fid;
         if (_timeout) {
             if (_flags) {
                 _timer_wheel.schedule_after_mp(fcb, _timeout, setter);
