@@ -50,7 +50,6 @@ DeviceBalancer::configure(Vector<String> &conf, ErrorHandler *errh) {
     Element* dev = 0;
     String method;
     String target;
-    String load;
     String source;
     String cycles;
     int startcpu;
@@ -68,7 +67,6 @@ DeviceBalancer::configure(Vector<String> &conf, ErrorHandler *errh) {
         .read_or_set("STARTCPU", startcpu, -1)
         .read_or_set("UNDERLOAD", _underloaded_thresh, 0.25)
         .read_or_set("OVERLOAD", _overloaded_thresh, 0.75)
-        .read_or_set("LOAD", load, "cpu")
         .read_or_set("CYCLES", cycles, "cycles")
         .read_or_set("AUTOSCALE", _autoscale, false)
         .read_or_set("ACTIVE", _active, true)
@@ -107,12 +105,14 @@ DeviceBalancer::configure(Vector<String> &conf, ErrorHandler *errh) {
     if (!fd) {
         return errh->error("Not an Ethernet Device");
     } else {
-        click_chatter("%p{element} will balance %p{element}", this, fd);
+        click_chatter("%p{element} will balance %p{element}", this, dev);
     }
 
     if (set_method(std::string(method.c_str()), fd) != 0) {
         return errh->error("Unknown method %s", method.c_str());
     }
+
+    click_chatter("Balancing method is %s", get_method()->name().c_str());
 
     // Detect if the method is based on a device (very likely) and if it is a DPDK method or not
     if (dynamic_cast<BalanceMethodDevice*>(get_method()) != 0) {
@@ -277,7 +277,7 @@ DeviceBalancer::run_timer(Timer* t) {
             _used_cpus[u].last_cycles = ul;
             uload.push_back(dl);
             utotload += dl;
-            //click_chatter("core %d kcycles %llu %llu load %f", i, ul, dl, master()->thread(i)->load());
+            //click_chatter("core %d kcycles %llu %llu load %f", phys_id, ul, dl, master()->thread(phys_id)->load());
             totload += master()->thread(phys_id)->load();
         }
         if (utotload > 0) {
