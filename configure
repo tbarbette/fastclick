@@ -16206,6 +16206,10 @@ if test $ac_have_linux_kernel = y; then
     fi
 fi
 
+if test "x$enable_cpu_load" = xyes; then
+    provisions="$provisions load"
+fi
+
 if test "$ac_have_libmbdevio$ac_have_mbgdevio_h" = yesyes; then
     provisions="$provisions mbglib"
 fi
