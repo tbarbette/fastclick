@@ -50,7 +50,7 @@ class BucketMapTargetProblem
     }
 
     void solve(NICScheduler* balancer) {
-        click_chatter("Assigning %d buckets to %d targets :", buckets_load.size(), target.size());
+        click_chatter("Assigning %lu buckets to %lu targets :", buckets_load.size(), target.size());
 
         if (unlikely(balancer->verbose() > 1)) {
             for (int i = 0; i < max.size(); i++) {
@@ -157,7 +157,7 @@ class BucketMapTargetProblem
                 }
 
                 if (unlikely(balancer->verbose() > 2))
-                    click_chatter("Bucket %d UNMOVED, load %f", bucket.id, o.id, bucket.load);
+                    click_chatter("Bucket %d UNMOVED, load %f", bucket.id, bucket.load);
 
                 bucket_assigned:
                 while (!save.empty()) {
