@@ -57,7 +57,7 @@ int MethodRSS::initialize(ErrorHandler *errh, int startwith) {
     }
 
     _fd->set_rss_reta(_fd, _table.data(), _table.size());
-    click_chatter("RSS initialized with %d CPUs and %d buckets", startwith, _table.size());
+    click_chatter("RSS initialized with %d CPUs and %lu buckets", startwith, _table.size());
     int err = BalanceMethodDevice::initialize(errh, startwith);
     if (err != 0)
         return err;
@@ -455,7 +455,8 @@ bool MethodRSS::update_reta(bool validate) {
     }
 
     Timestamp s = Timestamp::now_steady();
-    if (validate || balancer->verbose())
-    click_chatter("Reta updated in %d usec",(s-t).usecval());
+    if (validate || balancer->verbose()) {
+        click_chatter("Reta updated in %ld usec",(s-t).usecval());
+    }
     return true;
 }

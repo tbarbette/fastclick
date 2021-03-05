@@ -64,9 +64,9 @@ inline void MethodRSSPP::apply_moves(std::function<int(int)> cpumap, std::vector
         }
 
         Timestamp t = Timestamp::now_steady();
-        auto v = (t-begin).usecval();
+        int64_t v = (t-begin).usecval();
         if (unlikely(balancer->verbose() || v > 100))
-            click_chatter("Solution computed in %d usec, %d moves", v, omoves.size());
+            click_chatter("Solution computed in %ld usec, %lu moves", v, omoves.size());
 
         update_reta();
         if (balancer->_manager) {
@@ -271,7 +271,7 @@ void MethodRSSPP::rebalance(std::vector<std::pair<int,float>> rload) {
             }
 
             if (unlikely(balancer->verbose()))
-                click_chatter("Removing %d buckets of core %d", buckets_indexes.size(), min_core);
+                click_chatter("Removing %lu buckets of core %d", buckets_indexes.size(), min_core);
 
             BucketMapProblem cp(buckets_indexes.size(), load.size()); //load.size() is already fixed
 
@@ -315,8 +315,9 @@ void MethodRSSPP::rebalance(std::vector<std::pair<int,float>> rload) {
             moved = true;
             goto reset_count;
         } else if (suppload < -0.1) { //We need a new core because the total load even with perfect spread incurs 10% overload
-            if (unlikely(balancer->verbose()))
-                click_chatter("Adding a core as load is %f");
+            if (unlikely(balancer->verbose())) {
+                click_chatter("Adding a core as load is %f", suppload);
+            }
             int a_phys_id = balancer->addCore();
             if (a_phys_id == -1) {
                 if (unlikely(balancer->verbose()))
@@ -439,7 +440,7 @@ void MethodRSSPP::rebalance(std::vector<std::pair<int,float>> rload) {
 
             if (imbalance[i] > _threshold) {
                 if (unlikely(balancer->verbose()))
-                    click_chatter("Underloaded %d is cpu %d, imb %f, buckets %d",socket.uid.size(),i, imbalance[i],load[i].nbuckets_nz);
+                    click_chatter("Underloaded %lu is cpu %d, imb %f, buckets %d",socket.uid.size(),i, imbalance[i],load[i].nbuckets_nz);
                 socket.uid.push_back(i);
                 nunderloaded++;
             } else if (imbalance[i] < - _threshold) {
@@ -447,7 +448,7 @@ void MethodRSSPP::rebalance(std::vector<std::pair<int,float>> rload) {
                     click_chatter("WARNING : Core %d is overloaded but has no buckets !", i);
                 } else if (load[i].nbuckets_nz > 1) { //Else there is nothing we can do
                    if (unlikely(balancer->verbose()))
-                        click_chatter("Overloaded %d is cpu %d, imb %f, buckets %d",socket.oid.size(),i, imbalance[i],load[i].nbuckets_nz);
+                        click_chatter("Overloaded %lu is cpu %d, imb %f, buckets %d",socket.oid.size(),i, imbalance[i],load[i].nbuckets_nz);
                     socket.oid.push_back(i);
                     noverloaded++;
                 } else {
