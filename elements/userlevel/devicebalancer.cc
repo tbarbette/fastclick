@@ -30,8 +30,8 @@
 
 #include <string>
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    #include <click/flowdispatcher.hh>
+#if HAVE_FLOW_API
+    #include <click/flowrulemanager.hh>
 #endif
 
 CLICK_DECLS
@@ -105,7 +105,9 @@ DeviceBalancer::configure(Vector<String> &conf, ErrorHandler *errh) {
 
     EthernetDevice* fd = (EthernetDevice*)dev->cast("EthernetDevice");
     if (!fd) {
-        click_chatter("Not an Ethernet Device");
+        return errh->error("Not an Ethernet Device");
+    } else {
+        click_chatter("%p{element} will balance %p{element}", this, fd);
     }
 
     if (set_method(std::string(method.c_str()), fd) != 0) {
@@ -187,15 +189,6 @@ DeviceBalancer::configure(Vector<String> &conf, ErrorHandler *errh) {
         } else {
             return errh->error("You must set a RSSCOUNTER element");
         }
-    //Metron
-    } else if (get_method()->name() == "metron") {
-        MethodMetron* metron = static_cast<MethodMetron*>(get_method());
-        if (Args(this, errh).bind(conf)
-                .read_or_set("CONFIG", metron->_rules_file, "")
-                .read_or_set("MIN_MOVEMENT", metron->_min_movement, 3)
-                .read_or_set("DEFLATION_FACTOR", metron->_deflation_factor, 2)
-                .consume() < 0)
-            return -1;
     }
 
     //Verify and set a potential FlowIPManager argument
