@@ -744,7 +744,7 @@ click_get_cycles()
     uint32_t xlo, xhi;
     __asm__ __volatile__ ("rdtsc" : "=a" (xlo), "=d" (xhi));
     return xlo;
-#elif CLICK_USERLEVEL && HAVE_DPDK && _RTE_CYCLES_H_
+#elif CLICK_USERLEVEL && HAVE_DPDK && defined(_RTE_CYCLES_H_)
     // On other architectures we use DPDK implementation, if available
     return rte_get_tsc_cycles();
 #elif CLICK_USERLEVEL
