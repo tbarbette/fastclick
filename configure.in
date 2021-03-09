@@ -52,7 +52,11 @@ AC_C_INLINE
 CLICK_PROG_CXX
 AC_PROG_CXXCPP
 
+if test `uname -m` == "x86_64"; then
 AX_CHECK_X86_FEATURES
+fi
+
+
 
 AC_TRY_RUN([#include <new>
 
