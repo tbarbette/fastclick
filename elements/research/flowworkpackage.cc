@@ -225,5 +225,5 @@ FlowWorkPackage::add_handlers()
 
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(dpdk)
+ELEMENT_REQUIRES(dpdk dpdk17)
 EXPORT_ELEMENT(FlowWorkPackage)

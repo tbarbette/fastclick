@@ -328,7 +328,9 @@ AC_ARG_ENABLE([clone],
     [AS_HELP_STRING([  --disable-clone], [disable packet cloning])],
     [AC_DEFINE(CLICK_NOINDIRECT)],[:])
 
-
+AC_ARG_ENABLE([rsspp],
+    [AS_HELP_STRING([  --disable-rsspp], [disable RSS++ (enabled if --enable-cpu-load by default)])],
+    [:],[enable_rsspp=yes])
 
 dnl linuxmodule driver and features
 
@@ -1275,6 +1277,17 @@ AC_ARG_ENABLE([cpu-load],
     [:], [enable_cpu_load=no])
 if test "x$enable_cpu_load" = xyes; then
     AC_DEFINE(HAVE_CLICK_LOAD)
+else
+    if test "x$enable_rsspp" = xyes; then
+        AC_MSG_NOTICE([--enable-rsspp needs --enable-cpu-load])
+        enable_rsspp=no
+    fi
+fi
+
+if test "x$enable_rsspp" = xyes; then
+    EXTRA_DRIVER_OBJS="nicscheduler.o $EXTRA_DRIVER_OBJS"
+else
+    enable_rsspp=no
 fi
 
 AC_CHECK_FILE($srcdir/include/click/flowruleparser.hh, [ac_have_flow_rule_parser_h=yes], [ac_have_flow_rule_parser_h=no])
@@ -2595,6 +2608,11 @@ if test "x$have_re2" = xyes; then
     provisions="$provisions re2"
 fi
 
+dnl add 'rsspp' if RSS++ is available
+if test "x$enable_rsspp" = xyes; then
+    provisions="$provisions rsspp"
+fi
+
 dnl add 'smpclick' if compiled with --enable-multithread > 1
 if test "$enable_multithread" != no; then
     provisions="$provisions smpclick"
@@ -2678,7 +2696,7 @@ Configuration Summary:
 
     DPDK   support:              ${dpdk_info}
 
-    RSS++  support:              ${enable_cpu_load}
+    RSS++  support:              ${enable_rsspp}
 
     Netmap support:              ${HAVE_NETMAP}
     PCAP   support:              ${have_pcap}

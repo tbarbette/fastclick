@@ -180,6 +180,8 @@ public:
     void set_init_fc_mode(FlowControlMode fc);
     void set_rx_offload(uint64_t offload);
     void set_tx_offload(uint64_t offload);
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
     void set_init_flow_isolate(const bool &flow_isolate);
 
     inline void set_isolation_mode(const bool &isolated) {
@@ -191,7 +193,7 @@ public:
         }
     };
     inline bool isolated() { return info.flow_isolate; };
-
+#endif
 
 
     unsigned int get_nb_rxdesc();
