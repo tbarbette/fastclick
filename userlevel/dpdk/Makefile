@@ -7,11 +7,6 @@ endif
 
 # This file more or less copies rte.app.sdk, but we cannot use directly DPDK's one because its heavy modifications on the compile variables would break Click build process
 
-# Save C flags
-DPDK_OLD_CFLAGS := $(CFLAGS)
-DPDK_OLD_CXXFLAGS := $(CXXFLAGS)
-DPDK_OLD_LDFLAGS := $(LDFLAGS)
-
 include $(RTE_SDK)/mk/rte.vars.mk
 
 # default path for libs
@@ -89,6 +84,9 @@ endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_BITRATE)        += -lrte_bitratestats
 _LDLIBS-$(CONFIG_RTE_LIBRTE_LATENCY_STATS)  += -lrte_latencystats
 _LDLIBS-$(CONFIG_RTE_LIBRTE_POWER)          += -lrte_power
+ifneq ($(HAVE_DPDK_XCHG),y)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_XCHG_MBUF)          += -lrte_xchg_mbuf
+endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_EFD)            += -lrte_efd
 _LDLIBS-$(CONFIG_RTE_LIBRTE_BPF)            += -lrte_bpf
 ifeq ($(CONFIG_RTE_LIBRTE_BPF_ELF),y)
@@ -495,4 +493,8 @@ ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 16 ] && [ 
 else
 	override LDFLAGS := $(DPDK_OLD_LDFLAGS)
 endif
-include rte_parse.mk
+
+all:
+	@echo 'DPDK_LIBS="$(DPDK_LIBS)"'
+	@echo 'DPDK_CFLAGS="$(CFLAGS)"'
+
