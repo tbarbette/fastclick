@@ -343,6 +343,6 @@ void FlowIPManagerBucket::add_handlers() {
 
 CLICK_ENDDECLS
 
-ELEMENT_REQUIRES(dpdk dpdk17)
+ELEMENT_REQUIRES(dpdk dpdk17 rsspp)
 EXPORT_ELEMENT(FlowIPManagerBucket)
 ELEMENT_MT_SAFE(FlowIPManagerBucket)
