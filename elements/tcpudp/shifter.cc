@@ -42,7 +42,7 @@ int Shifter::configure(Vector<String> &conf, ErrorHandler *errh) {
     return 0;
 }
 
-inline void Shifter::process(Packet *p) {
+inline Packet* Shifter::process(Packet *p) {
     WritablePacket *q = p->uniqueify();
     uint8_t ip_proto;
     uint16_t sport, dport;
@@ -66,18 +66,19 @@ inline void Shifter::process(Packet *p) {
         q->rewrite_ipport(htonl(ip_src), htons(sport), 0, ip_proto == IP_PROTO_TCP);
         q->rewrite_ipport(htonl(ip_dst), htons(dport), 1, ip_proto == IP_PROTO_TCP);
     }
+    return q;
 }
 
 #if HAVE_BATCH
 void Shifter::push_batch(int, PacketBatch *batch) {
-    FOR_EACH_PACKET(batch, p) { process(p); }
+    EXECUTE_FOR_EACH_PACKET(process,batch);
     output_push_batch(0, batch);
 }
 #endif
 
 Packet *Shifter::simple_action(Packet *p) {
-    process(p);
-    output_push(0, p);
+    p = process(p);
+    return p;
 }
 
 CLICK_ENDDECLS
