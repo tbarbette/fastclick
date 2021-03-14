@@ -56,7 +56,7 @@ class Shifter : public BatchElement {
 #endif
 
   private:
-    void process(Packet *p);
+    Packet* process(Packet *p);
 
     int _ipoffset;
     int _portoffset;
