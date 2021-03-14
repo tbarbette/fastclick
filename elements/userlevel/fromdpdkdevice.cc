@@ -177,7 +177,12 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (has_rss)
         _dev->set_init_rss_max(max_rss);
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
     _dev->set_init_flow_isolate(flow_isolate);
+#else
+    if (flow_isolate)
+        return errh->error("Flow isolation needs DPDK >= 18.05. Set FLOW_ISOLATE to false");
+#endif
 #if HAVE_FLOW_API
     if ((mode == FlowRuleManager::DISPATCHING_MODE) && (flow_rules_filename.empty())) {
         errh->warning(
@@ -571,9 +576,11 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
         case h_isolate: {
             return String(fd->get_device()->isolated() ? "1" : "0");
         }
+#endif
     #if HAVE_FLOW_API
         case h_rules_list: {
             portid_t port_id = fd->get_device()->get_port_id();
@@ -672,6 +679,7 @@ int FromDPDKDevice::write_handler(
                 return errh->error("Not a valid integer");
             return fd->_dev->dpdk_set_rss_max(max);
         }
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
         case h_isolate: {
             if (input.empty()) {
                 return errh->error("DPDK Flow Rule Manager (port %u): Specify isolation mode (true/1 -> isolation, otherwise no isolation)", fd->_dev->port_id);
@@ -680,6 +688,7 @@ int FromDPDKDevice::write_handler(
             fd->_dev->set_isolation_mode(status);
             return 0;
         }
+#endif
 
     }
     return -1;

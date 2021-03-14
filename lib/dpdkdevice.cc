@@ -790,7 +790,7 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         }
     }
 
-#if HAVE_FLOW_API
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
     if (info.flow_isolate) {
         set_isolation_mode(true);
     } else {
@@ -983,9 +983,11 @@ void DPDKDevice::set_tx_offload(uint64_t offload) {
     info.tx_offload |= offload;
 }
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
 void DPDKDevice::set_init_flow_isolate(const bool &flow_isolate) {
     info.flow_isolate = flow_isolate;
 }
+#endif
 
 EtherAddress DPDKDevice::get_mac() {
     assert(_is_initialized);

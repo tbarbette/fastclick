@@ -543,5 +543,5 @@ DeviceBalancer::add_handlers()
 
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(load userlevel)
+ELEMENT_REQUIRES(load userlevel rsspp)
 EXPORT_ELEMENT(DeviceBalancer)

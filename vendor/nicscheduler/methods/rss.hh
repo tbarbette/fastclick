@@ -3,7 +3,11 @@
 
 #if HAVE_DPDK
 #include <rte_ethdev.h>
-#include <rte_flow.h>
+
+# if RTE_VERSION >= RTE_VERSION_NUM(17,02,0,0)
+#  define HAVE_DPDK_FLOW 1
+#  include <rte_flow.h>
+# endif
 #endif
 
 class MethodRSS : public BalanceMethodDevice { public:
@@ -18,7 +22,7 @@ class MethodRSS : public BalanceMethodDevice { public:
 
     void cpu_changed() override;
 
-#if HAVE_DPDK
+#if HAVE_DPDK_FLOW
     struct rte_eth_rss_conf _rss_conf;
     std::vector<rte_flow*> _flows;
 #endif

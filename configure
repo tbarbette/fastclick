@@ -825,6 +825,7 @@ enable_dpdk_softqueue
 enable_flow_api
 enable_zerocopy
 enable_clone
+enable_rsspp
 enable_linuxmodule
 enable_fixincludes
 enable_multithread
@@ -1560,6 +1561,8 @@ Optional Features:
                           needs DPDK>=20.02
     --disable-zerocopy    disable Zero Copy
     --disable-clone       disable packet cloning
+    --disable-rsspp       disable RSS++ (enabled if --enable-cpu-load by
+                          default)
   --enable-linuxmodule    disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
     --enable-multithread  support kernel multithreading
@@ -8549,6 +8552,12 @@ else
 fi
 
 
+# Check whether --enable-rsspp was given.
+if test "${enable_rsspp+set}" = set; then :
+  enableval=$enable_rsspp; :
+else
+  enable_rsspp=yes
+fi
 
 
 
@@ -12393,6 +12402,18 @@ fi
 if test "x$enable_cpu_load" = xyes; then
     $as_echo "#define HAVE_CLICK_LOAD 1" >>confdefs.h
 
+else
+    if test "x$enable_rsspp" = xyes; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: --enable-rsspp needs --enable-cpu-load" >&5
+$as_echo "$as_me: --enable-rsspp needs --enable-cpu-load" >&6;}
+        enable_rsspp=no
+    fi
+fi
+
+if test "x$enable_rsspp" = xyes; then
+    EXTRA_DRIVER_OBJS="nicscheduler.o $EXTRA_DRIVER_OBJS"
+else
+    enable_rsspp=no
 fi
 
 as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowruleparser.hh" | $as_tr_sh`
@@ -16249,6 +16270,10 @@ if test "x$have_re2" = xyes; then
     provisions="$provisions re2"
 fi
 
+if test "x$enable_rsspp" = xyes; then
+    provisions="$provisions rsspp"
+fi
+
 if test "$enable_multithread" != no; then
     provisions="$provisions smpclick"
 fi
@@ -17662,7 +17687,7 @@ Configuration Summary:
 
     DPDK   support:              ${dpdk_info}
 
-    RSS++  support:              ${enable_cpu_load}
+    RSS++  support:              ${enable_rsspp}
 
     Netmap support:              ${HAVE_NETMAP}
     PCAP   support:              ${have_pcap}
