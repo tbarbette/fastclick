@@ -52,9 +52,15 @@ AC_C_INLINE
 CLICK_PROG_CXX
 AC_PROG_CXXCPP
 
-if test `uname -m` == "x86_64"; then
-AX_CHECK_X86_FEATURES
-fi
+case "$target" in
+        *x86*)
+                AX_CHECK_X86_FEATURES
+        ;;
+        *)
+                # AC_MSG_WARN(["Skipping x86 tests since target is $target"])
+        ;;
+esac
+
 
 
 
