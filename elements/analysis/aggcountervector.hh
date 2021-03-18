@@ -13,20 +13,40 @@ class HandlerCall;
 /*
 =c
 
-AggregateCounter([I<KEYWORDS>])
+AggregateCounterVector([I<KEYWORDS>])
 
 =s aggregates
 
-counts packets per aggregate annotation
+counts packets per aggregate annotation, and keep tracks of a moving average of the same time.
 
 =d
+
+As opposed to AggregateCounter, this element does not use a heap but a vector. It's therefore much faster but needs to know in advance how much elements will be seen.
+
+Keyword arguments are:
+
+=over 8
+
+=item MASK mask to apply to the AGGREGATE annotation. Hence the vector size will be MASK+1, eg the mask is 511 (0x1f) to count 512 elements.
+
+=e
+
+A typical usage is with RSS++, by setting RSS_AGGREGATE to true in FromDPDKDevice, and using a MASK of 511, one will effecitvely count the number of packets per RSS buckets:
+FromDPDKDevice(..., RETA_SIZE 512, RSS_AGGREGATE true)
+	-> AggregateCounterVectot(MASK 511)
+	-> Discard;
+
+=a
+AggregateCounter
 
  */
 
 
 class AggregateCounterVector : public BatchElement { public:
 
-
+	/**
+	 * The array is composed of _mask+1 Node structures.
+	 */
 	struct Node {
 	    uint64_t count;
 	    uint64_t variance;
