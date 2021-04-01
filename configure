@@ -12831,10 +12831,11 @@ $as_echo_n "checking for DPDK library... " >&6; }
       rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       rte_ver_major=$rte_ver_year
-      if test "x${CLICK_SHARED}" = "x1" ; then
-          DPDK_LIBS=$(pkg-config --libs libdpdk)
+
+      if test "x$enable_dynamic_linking" = xyes; then
+        DPDK_LIBS=$(pkg-config --libs libdpdk)
       else
-		  DPDK_LIBS=$(pkg-config --static --libs libdpdk)
+        DPDK_LIBS=$(pkg-config --libs --static libdpdk)
       fi
 	  DPDK_CFLAGS=$(pkg-config --cflags libdpdk)
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
