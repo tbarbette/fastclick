@@ -542,7 +542,7 @@ void ToDPDKDeviceXCHG::push_batch(int, PacketBatch *head)
 #  if !defined(XCHG_TX_SWAPONLY)
     assert(false);
 #  endif
-    Packet* p = head;
+    Packet* p = head->first();
     Packet* next;
     do {
         congestioned = false;
