@@ -63,6 +63,8 @@ endif
 .cc.ii:
 	$(call cxxcompile_nodep,-E $< > $@,CXXCPP)
 
+llvmutils.o: llvmutils.cc
+	$(call cxxcompile,-c $< $(INCLUDES_LLVM) -o $@,CXX)
 
 GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	bitvector.o bighashmap_arena.o hashallocator.o \
@@ -76,14 +78,16 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	integers.o md5.o crc32.o in_cksum.o iptable.o \
 	archive.o userutils.o driver.o \
 	tinyexpr.o \
-	$(EXTRA_DRIVER_OBJS)
+	$(EXTRA_DRIVER_OBJS) $(LLVM_OBJS)
 
 EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@
+
+LLVM_OBJS = @LLVM_OBJS@
 
 LIBOBJS = $(GENERIC_OBJS) $(STD_ELEMENT_OBJS) clp.o exportstub.o
 STD_ELEMENT_OBJS = addressinfo.o alignmentinfo.o \
 	errorelement.o portinfo.o scheduleinfo.o
-OBJS = $(ELEMENT_OBJS) $(ELEMENTSCONF).o click.o
+OBJS = $(ELEMENT_OBJS) $(ELEMENTSCONF)$(ELEMENTSSUFFIX).o click.o
 
 CPPFLAGS = @CPPFLAGS@ -DCLICK_USERLEVEL
 CFLAGS = @CFLAGS@
@@ -95,6 +99,9 @@ INCLUDES = -I$(top_builddir)/include -I$(top_builddir)/vendor -I$(top_srcdir)/in
 	@PROPER_INCLUDES@ @PCAP_INCLUDES@ @DPDK_INCLUDES@ @NETMAP_INCLUDES@ @NUMA_INCLUDES@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@ `$(CLICK_BUILDTOOL) --otherlibs` $(ELEMENT_LIBS)
+LIBS_IR = @LIBS@ `$(CLICK_BUILDTOOL) --irlibs` $(ELEMENT_LIBS)
+LIBS_LLVM = @LIBS_LLVM@
+INCLUDES_LLVM= @INCLUDES_LLVM@
 DL_LDFLAGS = @DL_LDFLAGS@
 
 CXXCOMPILE = $(CXX) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CXXFLAGS)
@@ -132,10 +139,16 @@ ELEM2EXPORT = elem2export
 else
 DRIVER = $(MINDRIVER)click
 ELEMENTSCONF = elements_$(MINDRIVER)
+ifeq ($(STATIC),1)
+ELEM2EXPORT = elem2exportstatic
+ELEMENTSSUFFIX = .static
+CXXFLAGS := $(CXXFLAGS) -w -fno-access-control
+else
 ELEM2EXPORT = elem2export
 ELEMENTSSUFFIX =
 endif
-INSTALLPROGS = $(DRIVER)
+endif
+INSTALLPROGS = $(DRIVER) packetmill
 
 ifneq ($(ELEMENT_CHECKSUM),)
 ifneq ($(shell $(ELEMENT_CHECKSUMCOMMAND)),$(ELEMENT_CHECKSUM))
@@ -162,6 +175,13 @@ $(DRIVER): Makefile libclick.a $(OBJS)
 	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a $(LIBS),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 endif
+click-opt: Makefile click.ll libclick.a
+	$(call cxxlink,$(DL_LDFLAGS) click.ll libclick.a $(LIBS_IR),LINK)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+
+embedclick-opt: Makefile embedclick.ll libclick.a
+	$(call cxxlink,$(DL_LDFLAGS) embedclick.ll libclick.a $(LIBS_IR),LINK)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 
 libclick.a: Makefile $(LIBOBJS)
 	$(call verbose_cmd,$(AR_CREATE) libclick.a $(LIBOBJS),AR libclick.a)
@@ -169,6 +189,11 @@ libclick.a: Makefile $(LIBOBJS)
 
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+
+
+packetmill: packetmill.cc $(DRIVER)
+	$(CXXCOMPILE) -o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS)) libclick.a packetmill.cc $(LIBS) $(LDFLAGS) $(LIBS_LLVM)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 
 elemlist:
 	@rm -f elements.conf elements.csmk
@@ -201,15 +226,19 @@ uninstall:
 	for i in $(INSTALLPROGS); do rm -f $(DESTDIR)$(bindir)/$$i; done
 
 clean:
-	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf elements.csmk libclick.a
+	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc $(ELEMENTSCONF).static.cc elements.conf elements.csmk libclick.a click-opt
 ifeq ($(shell [ ${HAVE_FLOW_API} ] && echo true),true)
 	rm -rf test-pmd/ ../lib/librte_parse_* librte_parse.*
 endif
 	@-for i in $(INSTALLPROGS); do rm -f ../bin/$$i; done
+
+clean-embed:
+	rm -f clickdv* elements_embed* embedclick* package.uo
+
 clean-lib:
 	rm -f $(LIBOBJS) libclick.a
 distclean: clean
 	-rm -f Makefile
 
 .PHONY: all clean clean-lib distclean elemlist \
-	install install-include install-lib install-man uninstall
+	install install-include install-lib install-man install-packetmill uninstall

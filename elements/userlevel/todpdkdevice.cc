@@ -353,6 +353,15 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
         if (unlikely(p != 0)) {
             congestioned = true;
             warn_congestion();
+#  if CLICK_PACKET_USE_DPDK
+            if (!_blocking) {
+		    while (p) {
+		        next = p->next();
+		        p->kill();
+		        p = next;
+		    }
+	    }
+#  endif
         }
 
         //Flush the queue if we have pending packets

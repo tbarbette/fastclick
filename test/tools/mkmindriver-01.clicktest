@@ -8,7 +8,8 @@ FromDevice(eth0) -> ToDump(/tmp/x);
 
 %expect stderr
 Creating elements_foo.conf...
-Build 'fooclick' with 'make MINDRIVER=foo'.
+Build 'fooclick' with 'make fooclick MINDRIVER=foo'.
+You should also add STATIC=1 if you use --static pass from click-devirtualize.
 
 %expect elements_foo.conf
 elements/ip/ipnameinfo.cc	"elements/ip/ipnameinfo.hh"	IPNameInfo-IPNameInfo IPNameInfo-!si IPNameInfo-!sc

@@ -638,6 +638,10 @@ TOOL_CLEAN_TARGETS
 TOOL_INSTALL_TARGETS
 CLEAN_TARGETS
 INSTALL_TARGETS
+INCLUDES_LLVM
+LIBS_LLVM
+LLVM_OBJS
+LLVMCONFIG
 MD5SUM
 AWK
 PERL
@@ -667,6 +671,7 @@ NETMAP_INCLUDES
 NUMA_INCLUDES
 PCAP_LIBS
 PCAP_INCLUDES
+HAVE_DPDK_XCHG
 USE_DPDK
 DPDK_CFLAGS
 DPDK_LIBS
@@ -820,9 +825,12 @@ enable_poll
 enable_kqueue
 enable_dpdk
 enable_dpdk_pool
+enable_dpdk_xchg
 enable_dpdk_packet
 enable_dpdk_softqueue
 enable_flow_api
+enable_pool_inlining
+enable_inlined_allanno
 enable_zerocopy
 enable_clone
 enable_rsspp
@@ -1552,6 +1560,7 @@ Optional Features:
     --disable-kqueue      do not use kqueue()
     --enable-dpdk         use DPDK
       --enable-dpdk-pool  use DPDK buffer instead of standard Click buffer
+      --enable-dpdk-xchg  use DPDK XCHG API
       --enable-dpdk-packet
                           Click packets are DPDK packet
       --disable-dpdk-softqueue
@@ -1559,6 +1568,13 @@ Optional Features:
                           packets before flushing.
       --enable-flow-api   Support for the HW flow classification API. Also
                           needs DPDK>=20.02
+    --disable-pool-inlining
+                          Do not optimize pool_prepare_data_burst function
+                          before data structure reordering done at the IR
+                          level.
+    --enable-inlined-allanno
+                          Inline AllAnno struct into Packet class,
+                          facilitating the data structure reordering.
     --disable-zerocopy    disable Zero Copy
     --disable-clone       disable packet cloning
     --disable-rsspp       disable RSS++ (enabled if --enable-cpu-load by
@@ -7580,6 +7596,9 @@ test -z "$AR_CREATEFLAGS" && AR_CREATEFLAGS=cru
 
 EXTRA_DRIVER_OBJS=
 EXTRA_TOOL_OBJS=
+INCLUDES_LLVM=
+LLVM_OBJS=
+LIBS_LLVM=
 
 
 
@@ -8506,6 +8525,14 @@ else
 fi
 
 
+# Check whether --enable-dpdk-xchg was given.
+if test "${enable_dpdk_xchg+set}" = set; then :
+  enableval=$enable_dpdk_xchg; :
+else
+  enable_dpdk_xchg=no
+fi
+
+
 # Check whether --enable-dpdk-packet was given.
 if test "${enable_dpdk_packet+set}" = set; then :
   enableval=$enable_dpdk_packet; :
@@ -8528,6 +8555,28 @@ if test "${enable_flow_api+set}" = set; then :
   enableval=$enable_flow_api; :
 else
   enable_flow_api=no
+fi
+
+
+# Check whether --enable-pool-inlining was given.
+if test "${enable_pool_inlining+set}" = set; then :
+  enableval=$enable_pool_inlining; :
+else
+  $as_echo "#define POOL_INLINING 1" >>confdefs.h
+
+fi
+
+
+# Check whether --enable-inlined-allanno was given.
+if test "${enable_inlined_allanno+set}" = set; then :
+  enableval=$enable_inlined_allanno; :
+else
+  enable_inlined_allanno=no
+fi
+
+if test "x$enable_inlined_allanno" = "xyes"; then
+    $as_echo "#define INLINED_ALLANNO 1" >>confdefs.h
+
 fi
 
 
@@ -12930,6 +12979,24 @@ if test "x$enable_dpdk_pool" = xyes; then
 
 fi
 
+if test "x$enable_dpdk_xchg" = "xyes"; then
+    if test "x$enable_dpdk" = "xno"; then
+        as_fn_error $? "
+=========================================
+
+--enable-dpdk-xchg requires --enable-dpdk which was not provided.
+
+=========================================" "$LINENO" 5
+    fi
+    $as_echo "#define HAVE_DPDK_XCHG 1" >>confdefs.h
+
+    HAVE_DPDK_XCHG=y
+
+    DPDK_LIBS=$(echo "$DPDK_LIBS" | sed -e "s/-lrte_xchg_mbuf//")
+
+    EXTRA_DRIVER_OBJS="$EXTRA_DRIVER_OBJS fromdpdkdevicexchg.o todpdkdevicexchg.o"
+fi
+
 if test "x$enable_dpdk_packet" = "xyes"; then
     if test "x$enable_dpdk" = "xno"; then
         as_fn_error $? "
@@ -15964,6 +16031,49 @@ fi
   test -n "$MD5SUM" && break
 done
 
+for ac_prog in llvm-config
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_LLVMCONFIG+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$LLVMCONFIG"; then
+  ac_cv_prog_LLVMCONFIG="$LLVMCONFIG" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_LLVMCONFIG="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+LLVMCONFIG=$ac_cv_prog_LLVMCONFIG
+if test -n "$LLVMCONFIG"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LLVMCONFIG" >&5
+$as_echo "$LLVMCONFIG" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$LLVMCONFIG" && break
+done
+
+
 
 if test -z "$GMAKE"; then
     as_fn_error $? "
@@ -15975,6 +16085,19 @@ GNU make's pathname.
 
 ==============================================" "$LINENO" 5
 fi
+
+if test -z "$LLVMCONFIG" -o -n "${CXX##*clang*}" ; then
+    have_llvm=no
+else
+    $as_echo "#define HAVE_LLVM 1" >>confdefs.h
+
+    have_llvm=yes
+    LLVM_OBJS="llvmutils.o $LLVM_OBJS"
+    LIBS_LLVM="`$LLVMCONFIG --ldflags --system-libs --libs all | tr -d '\n'` $LIBS_LLVM"
+    INCLUDES_LLVM="`$LLVMCONFIG --cxxflags | tr -d '\n'` $INCLUDES_LLVM"
+fi
+
+
 
 
 
@@ -16187,6 +16310,9 @@ else
     fi
 fi
 
+if test "x$enable_dpdk_xchg" = xyes; then
+    provisions="$provisions dpdk-xchg"
+fi
 
 if test "x$enable_flow" = xyes; then
     provisions="$provisions flow"
@@ -16265,6 +16391,10 @@ fi
 
 if test "x$have_pci" = xyes; then
     provisions="$provisions pci"
+fi
+
+if test "x$have_llvm" = xyes; then
+    provisions="$provisions llvm"
 fi
 
 if test "x$have_re2" = xyes; then
@@ -17698,6 +17828,7 @@ Configuration Summary:
     BPF    support:              ${have_libbpf}
     HTTPD  support:              ${have_httpd}
     libpci support:              ${have_pci}
+    LLVM   support:              ${have_llvm}
 "
 
 if test "$feedback" != no; then

@@ -562,6 +562,10 @@ click_static_initialize()
     cp_va_static_initialize();
     ErrorHandler::static_initialize(new FileErrorHandler(stderr, ""));
     LandmarkT::static_initialize();
+# if HAVE_CLICK_PACKET_POOL
+    //We need to initialize a thread pool for the master thread, as initialization phase may start allocating packets
+    WritablePacket::initialize_local_packet_pool();
+# endif
 }
 
 CLICK_ENDDECLS

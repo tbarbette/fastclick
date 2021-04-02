@@ -53,11 +53,26 @@
 #define DEVIRTUALIZE_OPT	311
 #define INSTRS_OPT		312
 #define REVERSE_OPT		313
+#define INLINE_OPT	    314
+#define STATIC_OPT      315
+#define UNROLL_OPT      316
+#define REPLACE_OPT	    317
+#define SWTICH_OPT      318
+#define JMPS_OPT        319
+#define ALIGN_OPT       320
+#define VERBOSE_OPT     321
 
 static const Clp_Option options[] = {
   { "clickpath", 'C', CLICKPATH_OPT, Clp_ValString, 0 },
   { "config", 'c', CONFIG_OPT, 0, Clp_Negate },
   { "devirtualize", 0, DEVIRTUALIZE_OPT, Clp_ValString, Clp_Negate },
+  { "inline", 'I', INLINE_OPT, 0},
+  { "static", 'S', STATIC_OPT, 0},
+  { "replace", 'R', REPLACE_OPT, 0},
+  { "unroll", 'U', UNROLL_OPT, Clp_ValInt, Clp_Mandatory },
+  { "switch", 'W', SWTICH_OPT, Clp_ValInt, Clp_Mandatory },
+  { "jmps", 'J', JMPS_OPT, Clp_ValInt, Clp_Mandatory },
+  { "alignas", 'A', ALIGN_OPT, Clp_ValInt, Clp_Mandatory },
   { "expression", 'e', EXPRESSION_OPT, Clp_ValString, 0 },
   { "file", 'f', ROUTER_OPT, Clp_ValString, 0 },
   { "help", 0, HELP_OPT, 0, 0 },
@@ -69,7 +84,8 @@ static const Clp_Option options[] = {
   { "reverse", 'r', REVERSE_OPT, 0, Clp_Negate },
   { "source", 's', SOURCE_OPT, 0, Clp_Negate },
   { "userlevel", 'u', USERLEVEL_OPT, 0, Clp_Negate },
-  { "version", 'v', VERSION_OPT, 0, 0 }
+  { "version", 'v', VERSION_OPT, 0, 0 },
+  { "verbose", 'V', VERBOSE_OPT, 0, 0 }
 };
 
 static const char *program_name;
@@ -211,9 +227,12 @@ Options:\n\
   -c, --config                 Write new configuration only.\n\
   -r, --reverse                Reverse devirtualization.\n\
   -n, --no-devirtualize CLASS  Don't devirtualize element class CLASS.\n\
+  -I, --inline                 Set all functions inline.\n\
+  -R, --replace                Replace configuration values into code.\n\
   -i, --instructions FILE      Read devirtualization instructions from FILE.\n\
   -C, --clickpath PATH         Use PATH for CLICKPATH.\n\
       --help                   Print this message and exit.\n\
+  -Vn --verbose                Verbose\n\
   -v, --version                Print version number and exit.\n\
 \n\
 Report bugs to <click@librelist.com>.\n", program_name);
@@ -241,6 +260,17 @@ main(int argc, char **argv)
   int compile_kernel = 0;
   int compile_user = 0;
   int reverse = 0;
+  bool verbose = false;
+  int do_replace = 0;
+  int do_inline = 0;
+  int do_static = 0;
+  int do_unroll = 0;
+  int unroll_val = 0;
+  int do_switch = 0;
+  int switch_burst = 0;
+  int do_jmps = 0;
+  int jmp_burst = 0;
+  int do_align = 0;
   Vector<const char *> instruction_files;
   HashTable<String, int> specializing;
 
@@ -303,7 +333,9 @@ particular purpose.\n");
      case KERNEL_OPT:
       compile_kernel = !clp->negated;
       break;
-
+     case VERBOSE_OPT:
+      verbose = true;
+      break;
      case USERLEVEL_OPT:
       compile_user = !clp->negated;
       break;
@@ -322,6 +354,38 @@ particular purpose.\n");
 
      case REVERSE_OPT:
       reverse = !clp->negated;
+      break;
+
+     case REPLACE_OPT:
+      do_replace = !clp->negated;
+      break;
+
+     case INLINE_OPT:
+      do_inline = !clp->negated;
+      break;
+
+     case STATIC_OPT:
+      do_static = !clp->negated;
+      break;
+
+     case UNROLL_OPT:
+      do_unroll = !clp->negated;
+      unroll_val = ( (clp->have_val != 0) ? clp->val.i : 0 );
+      break;
+
+     case SWTICH_OPT:
+      do_switch = !clp->negated;
+      switch_burst = ( (clp->have_val != 0) ? clp->val.i : 0 );
+      break;
+
+     case JMPS_OPT:
+      do_jmps = !clp->negated;
+      jmp_burst = ( (clp->have_val != 0) ? clp->val.i : 0 );
+      break;
+
+     case ALIGN_OPT:
+      if(!clp->negated)
+        do_align = ( (clp->have_val != 0) ? clp->val.i : 0 );
       break;
 
      bad_option:
@@ -415,10 +479,19 @@ particular purpose.\n");
   }
 
   // analyze signatures to determine specialization
-  sigs.analyze(full_elementmap);
+  sigs.analyze(full_elementmap, do_static);
 
   // initialize specializer
   Specializer specializer(router, full_elementmap);
+
+  specializer.verbose(verbose);
+  specializer.should_replace(do_replace);
+  specializer.should_inline(do_inline);
+  specializer.make_static(do_static);
+  specializer.should_unroll(do_unroll, unroll_val);
+  specializer.should_switch(do_switch, switch_burst);
+  specializer.should_jmps(do_jmps, jmp_burst);
+  specializer.should_align(do_align);
   specializer.specialize(sigs, errh);
 
   // quit early if nothing was done
@@ -471,7 +544,8 @@ particular purpose.\n");
     router->add_archive(ae);
 
     ae.name = package_name + suffix + ".hh";
-    ae.data = header.take_string();
+
+    ae.data = (do_static?"/** click-compile: -w -fno-access-control */\n":"") +  header.take_string();
     router->add_archive(ae);
   }
 

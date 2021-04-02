@@ -29,6 +29,8 @@
 
 #if CLICK_PACKET_USE_DPDK
 #define DPDK_ANNO_SIZE sizeof(Packet::AllAnno)
+#elif CLICK_PACKET_INSIDE_DPDK
+#define DPDK_ANNO_SIZE (((sizeof(Packet) - 1) / 4) +1) * 4
 #else
 #define DPDK_ANNO_SIZE 0
 #endif

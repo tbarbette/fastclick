@@ -60,9 +60,7 @@ int QueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
     if (Args(this, errh).bind(conf)
             .read_p("QUEUE", firstqueue)
             .read("N_QUEUES",n_queues)
-           .read("MINTHREADS", _minthreads)
            .read("MAXTHREADS", _maxthreads)
-           .read("BURST", _burst)
            .read("VERBOSE", _verbose)
            .read("ACTIVE", _active)
            .read("ALLOW_NONEXISTENT", allow_nonexistent)
@@ -138,8 +136,6 @@ int RXQueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
     _numa_node_override = -1;
 
     if (Args(this, errh).bind(conf)
-        .read("RSS_AGGREGATE", _set_rss_aggregate)
-        .read("PAINT_QUEUE", _set_paint_anno)
         .read("NUMA", _use_numa)
         .read("NUMA_NODE", _numa_node_override)
         .read("SCALE", scale).read_status(has_scale)

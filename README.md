@@ -70,9 +70,17 @@ In a nutshell:
 
 *You will find more information about the differences with Click in the [related wiki page](https://github.com/tbarbette/fastclick/wiki/Differences-between-FastClick-and-Click)*
 
-Differences with the ANCS paper
--------------------------------
-For simplicity, we reference all input element as "FromDevice" and output
+## Merged work
+This section references projects that have been merged in.
+
+### RSS++
+[RSS++](http://www.diva-portal.org/smash/get/diva2:1371780/FULLTEXT01.pdf) is a NIC-driven scheduler. It is compatible with DPDK (and of course FastClick) application and Kernel applications. The part relevent for FastClick are fully merged in this branch. It provides a solution to automatically scale the number of cores to be used by FromDPDKDevice.
+
+### PacketMill
+[PacketMill](https://packetmill.io) is a serie of optimization to accelerate software
+
+### Differences with the FastClick ANCS paper
+This section states the differences between FastClick as in this repository and the original ANCS paper. For simplicity, we reference all input element as "FromDevice" and output
 element as "ToDevice". However in practice our I/O elements are 
 FromNetmapDevice/ToNetmapDevice and FromDPDKDevice/ToDPDKDevice. They both
 inherit from QueueDevice, which is a generic abstract element to implement a
@@ -80,6 +88,23 @@ device which supports multiple queues (or in a more generic way I/O through
 multiple different threads).
 
 Thread vector and bit vector designate the same thing.
+
+Citing
+------
+If you use FastClick, please cite as follow:
+```
+@inproceedings{barbette2015fast,
+  title={Fast userspace packet processing},
+  author={Barbette Tom, Cyril Soldani and Mathy Laurent},
+  booktitle={2015 ACM/IEEE Symposium on Architectures for Networking and Communications Systems (ANCS)},
+  pages={5--16},
+  year={2015},
+  organization={IEEE},
+  doi={10.1109/ANCS.2015.7110116}
+}
+```
+
+Note that if you use technologies built on top of FastClick, it is relevant to cite the related paper too. I.e. if you use/improve the DeviceBalancer element, you should cite RSS++ instead (or on top of FastClick if FastClick is also a base to your own development).
 
 Getting help
 ------------

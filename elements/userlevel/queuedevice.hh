@@ -40,7 +40,6 @@ private :
     friend TXQueueDevice;
 protected:
 
-	int _burst; //Max size of burst
 
 
     #define NO_LOCK 2
@@ -56,13 +55,15 @@ protected:
         atomic_uint32_t lock;
         unsigned thread_id;
     } CLICK_CACHE_ALIGN;
+
+	int _burst; //Max size of burst
+
     Vector<QueueInfo,CLICK_CACHE_LINE_SIZE> _q_infos;
 
     Bitvector usable_threads;
     int queue_per_threads;
     int queue_share;
     unsigned ndesc;
-    int _verbose;
     bool allow_nonexistent;
 
     int _maxthreads;
@@ -76,15 +77,6 @@ protected:
     //Number of queues per threads, normally 1
     int thread_share;
 
-    static int n_initialized; //Number of total elements configured
-    static int n_elements; //Number of total elements heriting from QueueDevice
-    static int n_inputs; //Number of total input
-    static int use_nodes; //Number of numa nodes used
-
-    static Vector<int> inputs_count; //Number of inputs per numa node
-
-    static Vector<int> shared_offset; //Thread offset for each node
-
     /**
      * Per-thread state. Holds statistics, pointer to the per-thread task and id of the first queue
      * to be served by this thread
@@ -97,11 +89,24 @@ protected:
         Task*       task;
         unsigned    first_queue_id;
     };
+
     per_thread<ThreadState> _thread_state;
 
     int _this_node; // Numa node index
 
     bool _active; // Is this element active
+
+    //Verbosity level
+    int _verbose;
+
+    static int n_initialized; //Number of total elements configured
+    static int n_elements; //Number of total elements heriting from QueueDevice
+    static int n_inputs; //Number of total input
+    static int use_nodes; //Number of numa nodes used
+
+    static Vector<int> inputs_count; //Number of inputs per numa node
+
+    static Vector<int> shared_offset; //Thread offset for each node
 
     /**
      * Attempt to take the per-queue lock

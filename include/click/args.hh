@@ -412,6 +412,83 @@ class Args : public ArgContext {
         return *this;
     }
 
+    Args &validate(const char *keyword) {
+        Slot *slot_status;
+        String str = find(keyword, 0, slot_status);
+        if (str) {
+            assert(false);
+        }
+        return *this;
+
+    }
+    template <typename T>
+    Args &validate(const char *keyword, T &x, const char *static_value) {
+        DefaultArg<T> p = DefaultArg<T>();
+        T v;
+        p.parse(static_value, v);
+        return validate(keyword, x, v);
+    }
+
+    template <typename T, typename V>
+    Args &validate(const char *keyword, T &x, const V &static_value) {
+        Slot *slot_status;
+        String str = find(keyword, 0, slot_status);
+        if (!str) {
+            x = static_value;
+		    return *this;
+        } else {
+		T *s = Args_parse_helper<DefaultArg<T> >::slot(x, *this);
+		postparse(s && (str ? Args_parse_helper<DefaultArg<T> >::parse(DefaultArg<T>(), str, *s, *this) : (*s = static_value, true)), slot_status);
+		    assert(*s == static_value);
+        }
+        return *this;
+    }
+
+
+
+    template <typename T, typename V>
+    Args &validate_f(const char *keyword, T &x, int flags, const V &static_value) {
+	//Todo : cleaner
+
+        Slot *slot_status;
+        String str = find(keyword, flags, slot_status);
+        if (!str) {
+		    return *this;
+        } else {
+		T *s = Args_parse_helper<DefaultArg<T> >::slot(x, *this);
+		postparse(s && (str ? Args_parse_helper<DefaultArg<T> >::parse(DefaultArg<T>(), str, *s, *this) : (*s = static_value, true)), slot_status);
+		assert(*s == static_value);
+        }
+        return *this;
+    }
+
+    template <typename T, typename V>
+    Args &validate_p(const char *keyword, T &x, const V &static_value) {
+        return validate_f(keyword, x, positional, static_value);
+    }
+
+    template <typename T, typename V>
+    Args &validate_mp(const char *keyword, T &x, const V &static_value) {
+        return validate_f(keyword, x, positional | mandatory, static_value);
+    }
+
+    template <typename T>
+    Args &validate_p(const char *keyword, T &x, const char *static_value) {
+        DefaultArg<T> p = DefaultArg<T>();
+        T v;
+        p.parse(static_value, v);
+        return validate_f(keyword, x, positional, v);
+    }
+
+    template <typename T>
+    Args &validate_mp(const char *keyword, T &x, const char *static_value) {
+        DefaultArg<T> p = DefaultArg<T>();
+        T v;
+        p.parse(static_value, v);
+        return validate_f(keyword, x, positional | mandatory, v);
+    }
+
+
     /** @brief Read an argument using a specified parser.
      * @param keyword argument name
      * @param parser parser object

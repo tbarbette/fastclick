@@ -79,6 +79,12 @@ clean-ns:
 	@cd ns && $(MAKE) clean
 clean-userlevel:
 	@cd userlevel && $(MAKE) clean
+clean-lto:
+	find . -name \*.ll -type f -print0  | xargs -0 rm -f
+	find . -name \*.bc -type f -print0  | xargs -0 rm -f
+	find . -name \*.resolution.txt -type f -print0  | xargs -0 rm -f
+clean-embed:
+	@cd userlevel && $(MAKE) clean-embed
 clean-minios:
 	@cd minios && $(MAKE) clean
 clean-tools:
@@ -116,6 +122,8 @@ install-local-include: stamp-h installch
 	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/*.hh $(DESTDIR)$(clickincludedir)
 	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/*.cc $(DESTDIR)$(clickincludedir)
 	$(INSTALL_DATA_IF_CHANGED) $(top_builddir)/include/click/*.h $(DESTDIR)$(clickincludedir)
+	$(mkinstalldirs) $(DESTDIR)$(clickincludedir)/flow
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/flow/*.hh $(DESTDIR)$(clickincludedir)/flow
 	$(mkinstalldirs) $(DESTDIR)$(clickincludedir)/standard
 	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/standard/*.hh $(DESTDIR)$(clickincludedir)/standard
 	$(mkinstalldirs) $(DESTDIR)$(netincludedir)
@@ -178,7 +186,7 @@ check-filenames:
 	@a=`find . \( -name \*.cc -or -name \*.c \) -print | sed 's/.*\/\(.*\)\.c*$$/\1.o/' | grep -v 'elements\.o' | sort | uniq -d`; \
 	if test -z $$a; then echo OK; else echo "*** warning: duplicate object file names:"; echo "$$a"; fi
 
-clean: $(CLEAN_TARGETS) clean-doc clean-local clean-cscope
+clean: $(CLEAN_TARGETS) clean-doc clean-local clean-cscope clean-lto clean-embed
 clean-doc:
 	@cd doc && $(MAKE) clean
 clean-local:

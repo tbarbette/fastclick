@@ -167,6 +167,7 @@ write_config(const String &s, Element *, void *thunk, ErrorHandler *)
 
 extern void click_export_elements();
 extern void click_unexport_elements();
+extern void click_delete_element(Element*);
 
 void
 click_init_config()
@@ -194,4 +195,10 @@ click_cleanup_config()
     delete lexer;
     current_config = 0;
     lexer = 0;
+}
+
+void
+click_delete_element(Element* e)
+{
+    delete e;
 }

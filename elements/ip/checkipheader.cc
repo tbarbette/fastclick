@@ -111,15 +111,6 @@ CheckIPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
         .consume() < 0)
         return -1;
 
-    if (conf.size() == 0 || (conf.size() == 1 && IntArg().parse(conf[0], _offset))) {
-        /* nada */;
-    }
-    else if (Args(conf, this, errh)
-        .read("BADSRC", OldBadSrcArg(), _bad_src)
-        .read("OFFSET", _offset)
-        .complete() < 0)
-        return -1;
-
     _verbose = verbose;
     if (details) {
         _reason_drops = new atomic_uint64_t[NREASONS];

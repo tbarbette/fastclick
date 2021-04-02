@@ -271,6 +271,14 @@
 # define CLICK_ALWAYS_INLINE /* nothing */
 #endif
 
+/* Define macro for funtions that should not be optimized. */
+#if __GNUC__
+# define CLICK_OPTNONE __attribute__((optnone))
+#else
+# define CLICK_OPTNONE /* nothing */
+#endif
+
+
 
 #if CLICK_LINUXMODULE
 # define CLICK_CACHE_ALIGN ____cacheline_aligned;
@@ -327,6 +335,9 @@
 #define ELEMENT_HEADER(x)
 #define ELEMENT_LIBS(x)
 #define ELEMENT_MT_SAFE(x)
+
+
+#define CLICK_NEVER_REPLACE(x) x
 
 /* Assume CLICK_USERLEVEL unless otherwise defined. */
 #if !defined(CLICK_USERLEVEL) && !defined(CLICK_TOOL) && !defined(CLICK_LINUXMODULE) && !defined(CLICK_BSDMODULE) && !defined(CLICK_MINIOS)

@@ -256,6 +256,18 @@
 /* Define if you use only DPDK buffer as data buffer. */
 #undef HAVE_DPDK_PACKET_POOL
 
+/* Define if DPDK have XCHG API. */
+#undef HAVE_DPDK_XCHG
+
+/* Define if LLVM libraries are available. */
+#undef HAVE_LLVM
+
+/* Define if optimizations for pool_prepare_data_burst is not disabled */
+#undef POOL_INLINING
+
+/* Define if AllAnno struct is inlined within Packet Class */
+#undef INLINED_ALLANNO
+
 /* Define if DPDK software queue for TX is enabled. */
 #undef HAVE_IQUEUE
 
@@ -292,7 +304,9 @@
 
 /* Include integer type definitions. */
 #ifdef HAVE_INTTYPES_H
-#define __STDC_FORMAT_MACROS
+# ifndef __STDC_FORMAT_MACROS
+#  define __STDC_FORMAT_MACROS
+# endif
 # include <inttypes.h>
 #endif
 #include <sys/types.h>

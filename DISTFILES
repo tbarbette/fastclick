@@ -432,6 +432,7 @@ lexer.hh
 libdivide.h
 list.hh
 llrpc.h
+llvmutils.hh
 machine.hh
 master.hh
 md5.h
@@ -518,6 +519,7 @@ ipaddress.cc
 ipflowid.cc
 iptable.cc
 lexer.cc
+llvmutils.cc
 master.cc
 md5.cc
 nameinfo.cc
