@@ -26,10 +26,12 @@ class Signatures { public:
 
   void specialize_class(const String &, bool);
 
-  void analyze(ElementMap &);
+  void analyze(ElementMap &, bool do_static=false);
 
   const Vector<int> &signature_ids() const	{ return _sigid; }
   int nsignatures() const			{ return _sigs.size(); }
+
+  const RouterT* router() const { return _router; }
 
  private:
 
@@ -40,7 +42,7 @@ class Signatures { public:
 
   void create_phase_0(const ProcessingT &);
   void check_port_numbers(int eid, const ProcessingT &);
-  bool next_phase(int phase, int eid, Vector<int> &, const ProcessingT &);
+  bool next_phase(int phase, int eid, Vector<int> &, const ProcessingT &, bool do_static = false);
   void print_signature() const;
 
 };

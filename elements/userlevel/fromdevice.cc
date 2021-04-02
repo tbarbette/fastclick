@@ -707,6 +707,7 @@ FromDevice::read_handler(Element* e, void *thunk)
     case h_count:
         return String(fd->_count);
     }
+    return "<error>";
 }
 
 int

@@ -52,6 +52,11 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (parse(conf, errh) != 0)
         return -1;
 
+    if (Args(conf, this, errh)
+		.read("BURST", _burst)
+            .complete() < 0)
+        return -1;
+
     if (_internal_tx_queue_size < _burst * 2) {
         return errh->error("IQUEUE (%d) must be at least twice the size of BURST (%d)!",_internal_tx_queue_size, _burst);
     }

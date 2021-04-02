@@ -27,8 +27,8 @@ int
 FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-        .read_or_set_p("CAPACITY", _table_size, 65536)
-        .read_or_set("RESERVE", _reserve, 0)
+        .CLICK_NEVER_REPLACE(read_or_set_p)("CAPACITY", _table_size, 65536)
+        .CLICK_NEVER_REPLACE(read_or_set)("RESERVE", _reserve, 0)
         .read_or_set("TIMEOUT", _timeout, -1)
         .read_or_set("CACHE", _cache, true)
         .complete() < 0)

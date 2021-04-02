@@ -864,9 +864,10 @@ parse_fraction(const char *begin, const char *end,
 }
 
 //x, ivalue and fvalue may be unitialized, but then the status will be bad and we will return before using that value
+#ifndef __clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-
+#endif
 bool
 FixedPointArg::underparse(const String &str, bool is_signed, uint32_t &result)
 {
@@ -1077,7 +1078,9 @@ DecimalFixedPointArg::parse(const String &str, uint32_t &iresult,
         return true;
     }
 }
+#ifndef __clang__
 #pragma GCC diagnostic pop
+#endif
 
 #if HAVE_FLOAT_TYPES
 bool
