@@ -321,6 +321,7 @@ void FromDPDKDevice::clear_buffers() {
         } while (n > 0);
         click_chatter("Cleared %d buffers for queue %d",tot,q);
     }
+}
 #ifdef DPDK_USE_XCHG
 extern "C" {
 #include <mlx5_xchg.h>
