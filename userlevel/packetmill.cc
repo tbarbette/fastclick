@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   return 1;
 #endif
   click_args_t args;
-  char cmd[256];
+  char cmd[512];
   parse(argc, argv, args);
 #if HAVE_DPDK
   /*int ret = rte_eal_init(argc, argv);
@@ -48,10 +48,13 @@ int main(int argc, char **argv) {
   char pwd[256];
 
   char cpath[256];
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
+
   getcwd(pwd, 256);
   chdir(CLICK_DIR "/userlevel/");
-  sprintf(cpath, "%s/%s", args.router_file[0] == '/' ? "." : pwd,
-          args.router_file);
+  snprintf(cpath, 256, "%.*s/%.*s", 127,args.router_file[0] == '/' ? "." : pwd,
+          127,args.router_file);
   sprintf(
       cmd,
       "../bin/click-devirtualize --inline --replace --static %s > package.uo",
@@ -74,15 +77,16 @@ int main(int argc, char **argv) {
     }
   #else
     perfalert("Skipping IR optimizations, as LLVM libraries could not be found!");
-    argv[0] = "./embedclick";
+    argv[0] = (char*)"./embedclick";
   #endif
   exec("cat config | tail -n +2 > config_stripped");
   for (int i = 0; i < argc; i++) {
     if (strcmp(argv[i], args.router_file) == 0)
-      argv[i] = "config_stripped";
+      argv[i] = (char*)"config_stripped";
   }
   /* Hint to NPF Packet Generator */
   click_chatter("EVENT COMPILED");
   execvp(argv[0], argv);
+#pragma GCC diagnostic pop
   return 0;
 }
