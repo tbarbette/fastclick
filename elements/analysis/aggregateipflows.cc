@@ -435,13 +435,14 @@ AggregateIPFlows::emit_fragment_head(HostPairInfo *hpinfo)
   find_flowinfo:
     // find the packet's FlowInfo
     FlowInfo *finfo, **pprev = &hpinfo->_flows;
-    for (finfo = *pprev; finfo; pprev = &finfo->_next, finfo = *pprev)
-	if (finfo->_aggregate == AGGREGATE_ANNO(head)) {
-	    *pprev = finfo->_next;
-	    finfo->_next = hpinfo->_flows;
-	    hpinfo->_flows = finfo;
-	    break;
-	}
+    for (finfo = *pprev; finfo; pprev = &finfo->_next, finfo = *pprev) {
+        if (finfo->_aggregate == AGGREGATE_ANNO(head)) {
+            *pprev = finfo->_next;
+            finfo->_next = hpinfo->_flows;
+            hpinfo->_flows = finfo;
+            break;
+        }
+    }
 
     if (!finfo) {
         click_chatter("BUG : no finfo");
@@ -649,6 +650,7 @@ void
 AggregateIPFlows::add_handlers()
 {
     add_write_handler("clear", write_handler, H_CLEAR);
+    add_data_handlers("next", Handler::f_read, &_next);
 }
 
 ELEMENT_REQUIRES(AggregateNotifier)

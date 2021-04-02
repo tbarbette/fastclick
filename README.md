@@ -13,7 +13,7 @@ To use these optimization, you need to build and install FastClick as follows:
 
 
 ```bash
-git clone --branch packetmill https://github.com/tbarbette/fastclick.git
+git clone --branch packetmill git@github.com:tbarbette/fastclick.git
 cd fastclick
 ./configure --disable-linuxmodule --enable-userlevel --enable-user-multithread --enable-etherswitch --disable-dynamic-linking --enable-local --enable-dpdk --enable-research --enable-flow --disable-task-stats --enable-cpu-load --prefix $(pwd)/build/ --enable-intel-cpu CXX="clang++ -fno-access-control" CC="clang" CXXFLAGS="-std=gnu++14 -O3" --disable-bound-port-transfer --enable-dpdk-pool --disable-dpdk-packet
 make

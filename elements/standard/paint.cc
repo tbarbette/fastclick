@@ -42,14 +42,12 @@ Paint::configure(Vector<String> &conf, ErrorHandler *errh)
 
 #if HAVE_BATCH
 PacketBatch *
-Paint::simple_action_batch(PacketBatch *p)
+Paint::simple_action_batch(PacketBatch *batch)
 {
-	Packet* cur = p;
-	while (cur != NULL) {
+    FOR_EACH_PACKET(batch, cur) {	
 		cur->set_anno_u8(_anno, _color);
-		cur = cur->next();
 	}
-    return p;
+    return batch;
 }
 #endif
 Packet *

@@ -203,17 +203,17 @@ MultiReplayUnqueue::run_task(Task* task)
             if (head == 0) {
                 head = PacketBatch::start_head(q);
                 if (_quick_clone)
-                    SET_PAINT_ANNO(head,PAINT_ANNO(p));
-                last = head;
+                    SET_PAINT_ANNO(head->first(),PAINT_ANNO(p));
+                last = head->first();
                 c = 1;
             } else {
                 //If next packet is for another output, send the pending batch and start a new one
-                if (PAINT_ANNO(p) != PAINT_ANNO(head)) {
-                    output_push_batch(PAINT_ANNO(head),head->make_tail(last,c));
+                if (PAINT_ANNO(p) != PAINT_ANNO(head->first())) {
+                    output_push_batch(PAINT_ANNO(head->first()),head->make_tail(last,c));
                     head = PacketBatch::start_head(q);
                     if (_quick_clone)
-                        SET_PAINT_ANNO(head,PAINT_ANNO(p));
-                    last = head;
+                        SET_PAINT_ANNO(head->first(),PAINT_ANNO(p));
+                    last = head->first();
                     c = 1;
                 } else {
                     //Just add the packet to the end of the batch
@@ -231,7 +231,7 @@ MultiReplayUnqueue::run_task(Task* task)
 #if HAVE_BATCH
     //Flush pending batch
     if (head)
-        output_push_batch(PAINT_ANNO(head),head->make_tail(last,c));
+        output_push_batch(PAINT_ANNO(head->first()),head->make_tail(last,c));
 #endif
 
 

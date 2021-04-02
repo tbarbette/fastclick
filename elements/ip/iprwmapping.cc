@@ -35,10 +35,11 @@ CLICK_DECLS
 IPRewriterFlow::IPRewriterFlow(IPRewriterInput *owner, const IPFlowID &flowid,
 			       const IPFlowID &rewritten_flowid,
 			       uint8_t ip_p, bool guaranteed,
-			       click_jiffies_t expiry_j)
+			       click_jiffies_t expiry_j,
+				   uint8_t input)
     : _expiry_j(expiry_j), _ip_p(ip_p), _tflags(0),
       _guaranteed(guaranteed), _reply_anno(0),
-      _owner(owner)
+      _owner(owner), _input(input)
 {
     _e[0].initialize(flowid, owner->foutput, false);
     _e[1].initialize(rewritten_flowid.reverse(), owner->routput, true);

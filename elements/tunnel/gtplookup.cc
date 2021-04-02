@@ -173,7 +173,7 @@ GTPLookup::push_batch(int port, PacketBatch* batch) {
 	CLASSIFY_EACH_PACKET(3,fnt,batch,[this](int o, PacketBatch* batch){
 			if (o == 2) {
 			    batch->tail()->set_next(_queue.get());
-			    _queue.set(batch);
+			    _queue.set(batch->first());
 			} else {
 				checked_output_push_batch(o,batch);
 			}

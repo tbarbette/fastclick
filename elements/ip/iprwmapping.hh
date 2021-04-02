@@ -22,11 +22,11 @@ class IPRewriterEntry { public:
     }
 
     void initialize(const IPFlowID &flowid, uint32_t output, bool direction) {
-	assert(output <= 0xFFFFFF);
-	_flowid = flowid;
-	_output = output;
-	_direction = direction;
-	_hashnext = 0;
+		assert(output <= 0xFFFFFF);
+		_flowid = flowid;
+		_output = output;
+		_direction = direction;
+		_hashnext = 0;
     }
 
     const IPFlowID &flowid() const {
@@ -69,7 +69,7 @@ class IPRewriterFlow { public:
 
     IPRewriterFlow(IPRewriterInput *owner, const IPFlowID &flowid,
 		   const IPFlowID &rewritten_flowid,
-		   uint8_t ip_p, bool guaranteed, click_jiffies_t expiry_j);
+		   uint8_t ip_p, bool guaranteed, click_jiffies_t expiry_j, uint8_t input);
 
     IPRewriterEntry &entry(bool direction) {
 	return _e[direction];
@@ -121,6 +121,10 @@ class IPRewriterFlow { public:
 	return _ip_p;
     }
 
+    uint8_t input() const {
+	return _input;
+    }
+
     inline uint32_t agg() const {
     return _agg;
     }
@@ -166,6 +170,7 @@ class IPRewriterFlow { public:
     uint8_t _tflags;
     bool _guaranteed;
     uint8_t _reply_anno;
+    uint8_t _input;
     IPRewriterInput *_owner;
     uint32_t _agg;
 

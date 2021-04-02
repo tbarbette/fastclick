@@ -761,6 +761,7 @@ class Packet { public:
 
     inline void clear_annotations(bool all = true);
     inline void copy_annotations(const Packet *, bool all = true);
+    inline void copy_headers(const Packet *);
     //@}
 
     /** @cond never */
@@ -922,6 +923,7 @@ private:
     void assimilate_mbuf();
 #endif
 
+    WritablePacket *duplicate(int32_t extra_headroom, int32_t extra_tailroom) CLICK_WARN_UNUSED_RESULT;
     inline void shift_header_annotations(const unsigned char *old_head, int32_t extra_headroom);
     WritablePacket *expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom, bool free_on_failure) CLICK_WARN_UNUSED_RESULT;
     WritablePacket *expensive_push(uint32_t nbytes) CLICK_WARN_UNUSED_RESULT;

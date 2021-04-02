@@ -5,6 +5,9 @@
 #include "elements/ip/iprwmapping.hh"
 #include <click/batchelement.hh>
 #include <click/bitvector.hh>
+#include <click/multithread.hh>
+#include <click/error.hh>
+#include <click/standard/scheduleinfo.hh>
 
 CLICK_DECLS
 class IPMapper;
@@ -60,7 +63,7 @@ class IPRewriterHeap { public:
     }
 
     Vector<IPRewriterFlow *>::size_type size() const {
-	return _heaps[0].size() + _heaps[1].size();
+	    return _heaps[0].size() + _heaps[1].size();
     }
     int32_t capacity() const {
 	return _capacity;
@@ -79,6 +82,8 @@ class IPRewriterHeap { public:
     friend class IPRewriterFlow;
 
 };
+
+#define THREAD_MIGRATION_TIMEOUT 10000
 
 /**
  * Base for Rewriter elements
@@ -106,6 +111,8 @@ class IPRewriterBase : public BatchElement { public:
     const char *port_count() const override	{ return "1-/1-"; }
     const char *processing() const override	{ return PUSH; }
 
+    int thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) override;
+
     int configure_phase() const		{ return CONFIGURE_PHASE_REWRITER; }
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;
@@ -120,14 +127,20 @@ class IPRewriterBase : public BatchElement { public:
     }
     virtual HashContainer<IPRewriterEntry> *get_map(int mapid) {
 	return likely(mapid == IPRewriterInput::mapid_default) ?
-               &_map[click_current_cpu_id()] : 0;
+               &_state->map : 0;
     }
 
     enum {
 	get_entry_check = -1, get_entry_reply = -2
     };
+
+    inline IPRewriterEntry *search_entry(const IPFlowID &flowid);
+
+    //Search a flow, adding it in the map if necessary
     virtual IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid,
 				       int input);
+
+    inline void add_flow_timeout(IPRewriterFlow *flow);
     virtual IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
 				      const IPFlowID &rewritten_flowid,
 				      int input) = 0;
@@ -144,22 +157,33 @@ class IPRewriterBase : public BatchElement { public:
 
     unsigned _mem_units_no;
 
-    Map *_map;
+    struct IPRewriterMapState {
+	IPRewriterMapState() : rebalance(0), map_lock(), map() {
+        }
+	    click_jiffies_t rebalance;
+	    RWLock map_lock;
+	    Map map;
+    };
+    struct IPRewriterState : public IPRewriterMapState {
+	IPRewriterState() : IPRewriterMapState(), gc_timer() {
+	    }
+	    Timer gc_timer;
+    };
+
+    template<class T = IPRewriterState> static inline IPRewriterEntry *search_migrate_entry(const IPFlowID &flowid, per_thread<T> &vstate);
+
+    template <class T = IPRewriterState> inline void set_migration(const bool &up, const Bitvector& threads, per_thread<T> &vstate);
+
     Vector<IPRewriterInput> _input_specs;
     IPRewriterHeap **_heap;
     uint32_t **_timeouts;
 
     uint32_t _gc_interval_sec;
-
-    struct IPRewriterState {
-        Timer gc_timer;
-        IPFlowID last_id;
-        IPRewriterEntry* last_entry;
-    };
     per_thread<IPRewriterState> _state;
 
     bool _set_aggregate;
     bool _use_cache;
+    bool _handle_migration;
 
     enum {
 	default_timeout = 300,	   // 5 minutes
@@ -233,7 +257,7 @@ IPRewriterInput::rewrite_flowid(const IPFlowID &flowid,
     case i_pattern: {
 	HashContainer<IPRewriterEntry> *reply_map;
 	if (likely(mapid == mapid_default))
-	    reply_map = &reply_element->_map[click_current_cpu_id()];
+	    reply_map = &reply_element->_state->map;
 	else
 	    reply_map = reply_element->get_map(mapid);
 	i = u.pattern->rewrite_flowid(flowid, rewritten_flowid, *reply_map);
@@ -255,9 +279,8 @@ inline void
 IPRewriterBase::unmap_flow(IPRewriterFlow *flow, Map &map,
 			   Map *reply_map_ptr)
 {
-    //click_chatter("kill %s", hashkey().s().c_str());
     if (!reply_map_ptr)
-	reply_map_ptr = &flow->owner()->reply_element->_map[click_current_cpu_id()];
+	reply_map_ptr = &flow->owner()->reply_element->_state->map;
 
     Map::iterator it = map.find(flow->entry(0).hashkey());
     if (it.get() == &flow->entry(0))
@@ -266,6 +289,161 @@ IPRewriterBase::unmap_flow(IPRewriterFlow *flow, Map &map,
     it = reply_map_ptr->find(flow->entry(1).hashkey());
     if (it.get() == &flow->entry(1))
 	reply_map_ptr->erase(it);
+}
+
+inline IPRewriterEntry *
+IPRewriterBase::search_entry(const IPFlowID &flowid)
+{
+    return _state->map.get(flowid);
+}
+
+const bool precopy = true;
+
+template <class T>
+struct MigrationInfo {
+	bool up;
+	per_thread<T> *vstate;
+	int from_cpu;
+	IPRewriterBase* e;
+};
+
+template <class T>
+bool doMigrate(Task *, void * obj) {
+	click_jiffies_t jiffies = click_jiffies();
+	struct MigrationInfo<T> *info = (struct MigrationInfo<T>*)obj;
+	T &tstate = info->vstate->get_value_for_thread(info->from_cpu);
+	T &jstate = info->vstate->get();
+	click_chatter("Starting migration '%s' from core %d to core %d", (info->up?"up":"down"), info->from_cpu, click_current_cpu_id());
+	if (info->up) {
+		tstate.map_lock.read_begin();
+
+		auto begin = tstate.map.begin();
+		auto end = tstate.map.end();
+		//jstate is not running, we do not need to acquire a lock
+		for (;begin != end; begin++) {
+			IPRewriterFlow *mf = static_cast<IPRewriterFlow *>(begin->flow());
+			if (!begin->direction() && !mf->expired(jiffies)) {
+				/*{
+					auto begine = jstate.map.begin();
+							auto ende = jstate.map.end();
+							//jstate is not running, we do not need to acquire a lock
+							for (;begine != ende; begine++) {
+								click_chatter("Existing %s", begine->flowid().unparse().c_str());
+							}
+				}
+				click_chatter("Add %s -> %s", begin->flowid().unparse().c_str(), begin->rewritten_flowid().unparse().c_str() );
+				*/
+				info->e->add_flow(mf->ip_p(), begin->flowid(), begin->rewritten_flowid(), mf->input());
+			}
+		}
+		tstate.map_lock.read_end();
+	} else {
+		tstate.map_lock.read_begin(); //Deactivating core may be still running
+		//jstate.map_lock.write_begin();
+		auto begin = jstate.map.begin();
+		auto end = jstate.map.end();
+		for (;begin != end; begin++) {
+			IPRewriterFlow *mf = static_cast<IPRewriterFlow *>(begin->flow());
+			if (!begin->direction() && !mf->expired(jiffies)) {
+				info->e->add_flow(mf->ip_p(), begin->flowid(), begin->rewritten_flowid(), mf->input());
+			}
+			//jstate.map_lock.write_relax();
+		}
+		//jstate.map_lock.write_end();
+		tstate.map_lock.read_end();
+	}
+	return true;
+};
+
+template <class T> inline void
+IPRewriterBase::set_migration(const bool &up, const Bitvector& threads, per_thread<T> &vstate) {
+
+	click_jiffies_t jiffies = click_jiffies();
+    if (up) {
+		for (int i = 0; i < threads.size(); i++) {
+			T &tstate = vstate.get_value_for_thread(i);
+            if (precopy) {
+		//TODO have a task that delays the effective migration
+		if (threads[i]) //For each existing core
+			continue;
+		if (tstate.map.empty())
+		    continue;
+		//Copy state from i to j
+		for (int j = 0; j < threads.size(); j++) {
+			if (!threads[j]) //Copy to now activating core
+				continue;
+			click_chatter("Asking core %d to copying state of core %d to core %d",j, i, j);
+			MigrationInfo<T> *info = new MigrationInfo<T>();
+			info->from_cpu = i;
+			info->up = up;
+			info->vstate = &vstate;
+			info->e = this;
+			Task* t = new Task(doMigrate<T>, info, j);
+			ScheduleInfo::initialize_task(this, t, ErrorHandler::default_handler());
+		}
+            } else {
+			    if (!threads[i])
+                    continue;
+                click_chatter("NAT : thread %d now activated. It will fetch unknown flows from neighbour for %dms", i, THREAD_MIGRATION_TIMEOUT);
+                tstate.rebalance = jiffies;
+            }
+		}
+    } else {
+		for (int i = 0; i < threads.size(); i++) {
+			T &tstate = vstate.get_value_for_thread(i);
+            if (precopy) {
+		//In pre-copy, we copy all state of the deactivated core to the other cores
+		//TODO have a task that delays the effective migration on the deactivated CPU, as they have nothing to do
+		if (!threads[i]) //For each deactivating core
+		    continue;
+		if (tstate.map.empty())
+		    continue;
+		//Copy state from i to j
+		for (int j = 0; j < threads.size(); j++) {
+			if (threads[j]) //copy to all non-deactivating core
+				continue;
+			click_chatter("Asking core %d to copying state of core %d to core %d", j, i, j);
+			MigrationInfo<T> *info = new MigrationInfo<T>();
+			info->from_cpu = i;
+			info->up = up;
+			info->vstate = &vstate;
+			info->e = this;
+			Task* t = new Task(doMigrate<T>, info, j);
+			ScheduleInfo::initialize_task(this, t, ErrorHandler::default_handler());
+		}
+            } else {
+		if (threads[i]) {
+				click_chatter("NAT : thread %d now deactivated", i);
+		} else {
+			click_chatter("NAT : thread %d will fetch unknown flows from neighbour for %dms", i, THREAD_MIGRATION_TIMEOUT);
+		}
+				tstate.rebalance = jiffies;
+            }
+		}
+    }
+}
+
+
+template<class T> inline IPRewriterEntry *
+IPRewriterBase::search_migrate_entry(const IPFlowID &flowid, per_thread<T> &vstate)
+{
+    //If the flow does not exist, it may be in other thread's stack if there was a migration
+    if (vstate->rebalance > 0 && click_jiffies() - vstate->rebalance < THREAD_MIGRATION_TIMEOUT * CLICK_HZ ) {
+        //Search in other thread's stacks for the flow
+        for (int i = 0; i < vstate.weight(); i++) {
+            if (vstate.get_mapping(i) == click_current_cpu_id())
+                continue;
+            T* tstate = &vstate.get_value(i);
+            tstate->map_lock.read_begin();
+            IPRewriterEntry *m = tstate->map.get(flowid);
+            tstate->map_lock.read_end();
+            if (m) {
+                //click_chatter("Recovered flow from stack of thread %d", i);
+                return m;
+            }
+        }
+    }
+    return 0;
 }
 
 CLICK_ENDDECLS

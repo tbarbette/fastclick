@@ -151,7 +151,10 @@ EtherVLANEncap::add_handlers()
     add_read_handler("config", read_handler, h_config);
     add_data_handlers("src", Handler::h_read | Handler::h_write, reinterpret_cast<EtherAddress *>(&_ethh.ether_shost));
     add_data_handlers("dst", Handler::h_read | Handler::h_write, reinterpret_cast<EtherAddress *>(&_ethh.ether_dhost));
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
     add_net_order_data_handlers("ethertype", Handler::h_read | Handler::h_write, &_ethh.ether_vlan_encap_proto);
+#pragma GCC diagnostic pop
     add_read_handler("vlan_tci", read_handler, h_vlan_tci);
     add_write_handler("vlan_tci", reconfigure_keyword_handler, "3 VLAN_TCI");
     add_read_handler("vlan_id", read_keyword_handler, "VLAN_ID");

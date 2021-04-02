@@ -37,10 +37,8 @@ Strip::configure(Vector<String> &conf, ErrorHandler *errh)
 PacketBatch *
 Strip::simple_action_batch(PacketBatch *head)
 {
-	Packet* current = head;
-	while (current != NULL) {
+	FOR_EACH_PACKET(head, current) {
 		current->pull(_nbytes);
-		current = current->next();
 	}
 	return head;
 }

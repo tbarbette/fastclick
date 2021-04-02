@@ -3,6 +3,7 @@ Tests the Pipeliner element, in ALWAYS_UP mode
 
 %require
 click-buildtool provides umultithread
+not click-buildtool provides dpdk-packet || test $(nproc) -ge 8
 
 %script
 $VALGRIND click -j 8 -e '

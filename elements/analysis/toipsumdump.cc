@@ -148,7 +148,8 @@ ToIPSummaryDump::initialize(ErrorHandler *errh)
 	    sa << "!host " << buf << '\n';
 
 	time_t when = time(0);
-	const char *cwhen = ctime(&when);
+    char cwhen[256];
+    strftime(cwhen, sizeof(cwhen), "%c\n" , localtime(&when));
 	Timestamp now = Timestamp::now();
 	if (now)
 	    sa << "!runtime " << now << " (" << String(cwhen, strlen(cwhen) - 1) << ")\n";

@@ -42,6 +42,7 @@
 #define rte_ipv4_hdr ipv4_hdr
 #define rte_ether_addr ether_addr
 #endif
+#include <nicscheduler/ethernetdevice.hh>
 
 #if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
 #define rte_ipv4_hdr ipv4_hdr
@@ -74,13 +75,11 @@ typedef uint32_t counter_t;
 
 extern bool dpdk_enabled;
 
-class DPDKDevice {
+class DPDKDevice : public DPDKEthernetDevice {
 public:
 
-    portid_t port_id;
 
-    DPDKDevice() CLICK_COLD;
-    DPDKDevice(portid_t port_id) CLICK_COLD;
+    DPDKDevice(portid_t port_id = -1) CLICK_COLD;
 
     struct DevInfo {
         inline DevInfo() :
@@ -181,6 +180,8 @@ public:
     void set_init_fc_mode(FlowControlMode fc);
     void set_rx_offload(uint64_t offload);
     void set_tx_offload(uint64_t offload);
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
     void set_init_flow_isolate(const bool &flow_isolate);
 
     inline void set_isolation_mode(const bool &isolated) {
@@ -192,7 +193,7 @@ public:
         }
     };
     inline bool isolated() { return info.flow_isolate; };
-
+#endif
 
 
     unsigned int get_nb_rxdesc();
@@ -202,7 +203,13 @@ public:
     String get_device_vendor_name();
     uint16_t get_device_id();
     const char *get_device_driver();
-    int set_rss_max(int max);
+
+    int dpdk_set_rss_max(int max);
+    int dpdk_set_rss_reta(unsigned* reta, unsigned reta_sz);
+    int dpdk_get_rss_reta_size() const;
+    Vector<unsigned>  dpdk_get_rss_reta() const;
+
+    EthernetDevice* get_eth_device();
 
     static unsigned int dev_count() {
 #if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)

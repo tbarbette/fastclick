@@ -1,3 +1,4 @@
+# !!!WARNING!!!
 # In late 2020 Travis-Ci started to highly limit free OSS CI. Therefore
 # we switched to Github Actions. This file is therefore deprecated, but
 # kept in case someone uses internal Travis CI.

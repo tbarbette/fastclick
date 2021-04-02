@@ -53,8 +53,12 @@ class FromFile { public:
     int warning(ErrorHandler *, const char *format, ...) const;
 
   private:
+#if CLICK_PACKET_USE_DPDK
 
+    enum { BUFFER_SIZE = 2048 };
+#else
     enum { BUFFER_SIZE = 32768 };
+#endif
 
     int _fd;
     uint32_t _pos;

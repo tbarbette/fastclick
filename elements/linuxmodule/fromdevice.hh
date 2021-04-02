@@ -156,8 +156,8 @@ class FromDevice : public AnyTaskDevice, public Storage { public:
 
     bool run_task(Task *);
     void reset_counts() {
-	_runs = _empty_runs = _count = _drops = 0;
-	_highwater_length = Storage::size();
+		_runs = _empty_runs = _count = _drops = 0;
+		_highwater_length = Storage::size();
     }
 
   private:

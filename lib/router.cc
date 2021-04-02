@@ -35,7 +35,7 @@
 #include <click/notifier.hh>
 #include <click/nameinfo.hh>
 #include <click/bighashmap_arena.hh>
-#if HAVE_DPDK_PACKET_POOL
+#if HAVE_DPDK_PACKET_POOL || CLICK_PACKET_USE_DPDK
 #include <click/dpdkdevice.hh>
 #endif
 #if HAVE_NETMAP_PACKET_POOL
@@ -1083,7 +1083,6 @@ class ElementFilterRouterVisitor : public RouterVisitor { public:
 };
 }
 
-
 /** @brief Search for elements downstream from @a e.
  * @param e element to start search
  * @param port output port (or -1 to search all output ports)
@@ -1316,6 +1315,14 @@ Router::initialize(ErrorHandler *errh)
     char dmalloc_buf[12];
 #endif
 
+
+#if HAVE_DPDK_PACKET_POOL || CLICK_PACKET_USE_DPDK
+    if (all_ok) {
+        //DPDK initialization may be affected by some configuration and needed by some element initialization (Packet::make with --enable-dpdk-pool)
+        all_ok = DPDKDevice::static_initialize(ErrorHandler::default_handler()) == 0;
+    }
+#endif
+
     // Configure all elements in configure order. Remember the ones that failed
     if (all_ok) {
         Vector<String> conf;
@@ -1344,13 +1351,6 @@ Router::initialize(ErrorHandler *errh)
                 element_stage[i] = Element::CLEANUP_CONFIGURED;
         }
     }
-
-#if HAVE_DPDK_PACKET_POOL
-    if (all_ok) {
-        //DPDK initialization may be affected by some configuration and needed by some element initialization (Packet::make with --enable-dpdk-pool)
-        all_ok = DPDKDevice::static_initialize(ErrorHandler::default_handler()) == 0;
-    }
-#endif
 
 #if HAVE_BATCH
     if (all_ok) {
@@ -1446,6 +1446,26 @@ Router::initialize(ErrorHandler *errh)
             if (!errh->nerrors())
                 errh->error("unspecified error");
             all_ok = false;
+        }
+    }
+
+    // Initialize threads if OK so far.
+    if (all_ok) {
+        for (int ord = 0; all_ok && ord < _elements.size(); ord++) {
+            int i = _element_configure_order[ord];
+            assert(element_stage[i] == Element::CLEANUP_INITIALIZED);
+            RouterContextErrh cerrh(errh, "While thread initalizing", element(i));
+            assert(!cerrh.nerrors());
+            if (_elements[i]->thread_configure(Element::THREAD_INITIALIZE, &cerrh, Bitvector(master()->nthreads())) >= 0) {
+                element_stage[i] = Element::CLEANUP_THREAD_INITIALIZED;
+            } else {
+                // don't report 'unspecified error' for ErrorElements:
+                // keep error messages clean
+                if (!cerrh.nerrors() && !_elements[i]->cast("Error"))
+                    cerrh.error("unspecified error");
+                element_stage[i] = Element::CLEANUP_THREAD_INITIALZE_FAILED;
+                all_ok = false;
+            }
         }
     }
 
@@ -1714,8 +1734,9 @@ Router::store_local_handler(int eindex, Handler &to_store)
                 break;
             }
         }
-        if (l >= r)
+        if (l >= r) {
             l = _handler_first_by_name.insert(l, -1);
+        } 
         name_index = l - _handler_first_by_name.begin();
     }
 

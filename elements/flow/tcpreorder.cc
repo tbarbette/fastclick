@@ -381,7 +381,7 @@ bool TCPReorder::putPacketInList(struct fcb_tcpreorder* tcpreorder, Packet* pack
 
 void TCPReorder::killList(struct fcb_tcpreorder* tcpreorder) {
         SFCB_STACK( //Packet in the list have no reference
-            FOR_EACH_PACKET_SAFE(tcpreorder->packetList,p) {
+            FOR_EACH_PACKET_SAFE(((PacketBatch*)(tcpreorder->packetList)),p) {
                 click_chatter("WARNING : Non-free TCPReorder flow bucket");
                 p->kill();
             }

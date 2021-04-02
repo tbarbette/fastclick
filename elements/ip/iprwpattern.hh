@@ -50,7 +50,7 @@ class IPRewriterPattern { public:
     int _dport;			// net byte order
 
     uint32_t _variation_top;
-    uint32_t _next_variation;
+    atomic_uint32_t _next_variation;
 
     bool _is_napt;
     bool _sequential;

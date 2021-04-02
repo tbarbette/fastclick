@@ -62,6 +62,7 @@ AggregateCounterBase<T>::configure(Vector<String> &conf, ErrorHandler *errh)
     bool packet_count = true;
     bool extra_length = true;
     uint32_t freeze_nnz, stop_nnz;
+    uint32_t mask = (uint32_t)-1;
     uint64_t freeze_count, stop_count;
     String call_nnz, call_count;
     freeze_nnz = stop_nnz = _call_nnz = (uint32_t)(-1);
@@ -69,6 +70,7 @@ AggregateCounterBase<T>::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (Args(conf, this, errh)
 	.read("BYTES", bytes)
+	.read("MASK", mask)
 	.read("IP_BYTES", ip_bytes)
 	.read("MULTIPACKET", packet_count)
 	.read("EXTRA_LENGTH", extra_length)
@@ -85,6 +87,7 @@ AggregateCounterBase<T>::configure(Vector<String> &conf, ErrorHandler *errh)
     _ip_bytes = ip_bytes;
     _use_packet_count = packet_count;
     _use_extra_length = extra_length;
+    _mask = mask;
 
     if ((freeze_nnz != (uint32_t)(-1)) + (stop_nnz != (uint32_t)(-1)) + ((bool)call_nnz) > 1)
 	return errh->error("'AGGREGATE_FREEZE', 'AGGREGATE_STOP', and 'AGGREGATE_CALL' are mutually exclusive");
@@ -235,7 +238,7 @@ AggregateCounterBase<T>::update_batch(PacketBatch *batch, bool frozen)
 
     FOR_EACH_PACKET(batch,p) {
         // AGGREGATE_ANNO is already in host byte order!
-        uint32_t agg = AGGREGATE_ANNO(p);
+        uint32_t agg = AGGREGATE_ANNO(p) & _mask;
         if (agg == last_agg && n) {
         } else {
             n = find_node(last_agg, frozen);
@@ -284,7 +287,7 @@ AggregateCounterBase<T>::update(Packet *p, bool frozen)
     AggregateCounterState& s = _state.get();
 
     // AGGREGATE_ANNO is already in host byte order!
-    uint32_t agg = AGGREGATE_ANNO(p);
+    uint32_t agg = AGGREGATE_ANNO(p) & _mask;
     Node *n = find_node(agg, frozen);
     if (!n)
 	return false;

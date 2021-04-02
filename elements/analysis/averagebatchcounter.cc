@@ -132,7 +132,7 @@ uint32_t
 AverageBatchCounter::compute_agg_frame_len(PacketBatch *batch)
 {
     uint32_t agg_len = 0;
-    for(Packet *p = batch; p != 0; p = p->next()) {
+    FOR_EACH_PACKET(batch, p) {
         uint32_t value = AGGREGATE_ANNO(p);
         if (value > 0) {
             agg_len += value;

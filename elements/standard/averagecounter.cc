@@ -91,7 +91,7 @@ AverageCounterBase<Stats>::simple_action_batch(PacketBatch *batch)
         if (unlikely(_threshold > 0 && jpart - _stats.my_first() > CLICK_HZ)) {
             uint64_t rate = _stats.count() * 1000 / (jpart - _stats.first());
             if (rate > _threshold) {
-                click_chatter("%p{element} : starting compute (rate %d pps)", this, rate);
+                click_chatter("%p{element} : starting compute (rate %lu pps)", this, rate);
                 _threshold = 0;
                 _stats.reset();
             }

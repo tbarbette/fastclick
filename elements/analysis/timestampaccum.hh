@@ -2,6 +2,7 @@
 #ifndef CLICK_TIMESTAMPACCUM_HH
 #define CLICK_TIMESTAMPACCUM_HH
 #include <click/batchelement.hh>
+#include <click/straccum.hh>
 CLICK_DECLS
 
 /*
@@ -37,29 +38,50 @@ Returns the average timestamp difference over all passing packets.
 Resets C<count> and C<time> counters to zero when written.
 
 =a SetCycleCount, RoundTripCycleCount, SetPerfCount, PerfCountAccum */
+template <template <typename> class T>
+class TimestampAccumBase : public BatchElement { public:
 
-class TimestampAccum : public SimpleElement<TimestampAccum> { public:
+    TimestampAccumBase() CLICK_COLD;
+    ~TimestampAccumBase() CLICK_COLD;
 
-    TimestampAccum() CLICK_COLD;
-    ~TimestampAccum() CLICK_COLD;
-
-    const char *class_name() const override	{ return "TimestampAccum"; }
-    const char *port_count() const override	{ return PORTS_1_1; }
+    const char *class_name() const	{ return "TimestampAccum"; }
+    const char *port_count() const	{ return "1-/="; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
-    Packet *simple_action(Packet *);
+    void push(int, Packet *);
 
-  private:
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *);
+#endif
 
-    double _usec_accum;
-    uint64_t _count;
-    double _min;
-    double _max;
+  protected:
+
+    struct State {
+        State() : nsec_accum(0), count(0), nsec_min(UINT64_MAX), nsec_max(0) {
+
+        };
+        uint64_t nsec_accum;
+        uint64_t count;
+        uint64_t nsec_min;
+        uint64_t nsec_max;
+    };
+    T<State> _state;
 
     static String read_handler(Element *, void *) CLICK_COLD;
     static int reset_handler(const String &, Element *, void *, ErrorHandler *);
+
+};
+
+typedef TimestampAccumBase<not_per_thread> TimestampAccum;
+
+class TimestampAccumMP : public TimestampAccumBase<per_thread> { public:
+
+    const char *class_name() const  { return "TimestampAccumMP"; }
+
+    void add_handlers() CLICK_COLD;
+    static String read_handler(Element *, void *) CLICK_COLD;
 
 };
 

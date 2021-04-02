@@ -785,7 +785,7 @@ Packet::make(uint32_t headroom, const void *data,
 	     uint32_t length, uint32_t tailroom, bool clear)
 {
 
-	#if CLICK_LINUXMODULE
+#if CLICK_LINUXMODULE
 		int want = 1;
 		if (struct sk_buff *skb = skbmgr_allocate_skbs(headroom, length + tailroom, &want)) {
 		assert(want == 1);
@@ -810,13 +810,18 @@ Packet::make(uint32_t headroom, const void *data,
         click_chatter("could not alloc pktmbuf");
         return 0;
     }
-    //rte_pktmbuf_prepend(mb, rte_pktmbuf_headroom(mb)); : Already done
+    if (unlikely(headroom > RTE_PKTMBUF_HEADROOM))
+        rte_pktmbuf_prepend(mb, headroom - RTE_PKTMBUF_HEADROOM);
     rte_pktmbuf_data_len(mb) = length;
     rte_pktmbuf_pkt_len(mb) = length;
     if (data)
         memcpy(rte_pktmbuf_mtod(mb, void *), data, length);
     (void) tailroom;
-    return reinterpret_cast<WritablePacket *>(mb);
+    WritablePacket* q = reinterpret_cast<WritablePacket *>(mb);
+    if (clear)
+        q->clear_annotations();
+    return q;
+
 #else
         # if CLICK_PACKET_INSIDE_DPDK
             struct rte_mbuf *mb = DPDKDevice::get_pkt();
@@ -900,6 +905,14 @@ void Packet::empty_destructor(unsigned char *, size_t, void *) {
 
 }
 
+inline
+void Packet::copy_headers(const Packet* p) {
+    set_mac_header(p->mac_header() ? data() + p->mac_header_offset() : 0);
+    set_network_header(p->network_header() ? data() + p->network_header_offset() : 0);
+    if (p->has_transport_header())
+        set_transport_header(data() + p->transport_header_offset());
+}
+
 /** @brief Copy the content and annotations of another packet (userlevel).
  * @param source packet
  * @param headroom for the new packet
@@ -918,10 +931,8 @@ Packet::copy(Packet* p, int headroom)
     _tail = _data + p->length();
 #endif
     copy_annotations(p);
-    set_mac_header(p->mac_header() ? data() + p->mac_header_offset() : 0);
-    set_network_header(p->network_header() ? data() + p->network_header_offset() : 0);
-    if (p->has_transport_header())
-        set_transport_header(data() + p->transport_header_offset());
+    copy_headers(p);
+
     return true;
 }
 
@@ -937,7 +948,7 @@ Packet::copy(Packet* p, int headroom)
  * empty destructor will be set. It is usefull if you won't release this packet
  * before you're sure that the clone will be killed and plan on managing the
  * buffer yourself. This is usefull for pktgen applications where it would
- * be hard to achieve good performances.
+ * be hard to achieve good performances with (useless) reference counting.
  * If the packet is a DPDK packet, it will be referenced as a DPDK packet and
  * the DPDK buffer counter will be updated.
  *
@@ -954,15 +965,16 @@ Packet::clone(bool fast)
     return reinterpret_cast<Packet *>(nskb);
     
 #elif CLICK_PACKET_USE_DPDK
+
+# ifdef CLICK_NOINDIRECT
+    if (!fast) {
+        return duplicate(0,0);
+    }
+# endif
     Packet* p = reinterpret_cast<Packet *>(
-        rte_pktmbuf_clone(mb(), DPDKDevice::get_mpool(rte_socket_id())));
+    rte_pktmbuf_clone(mb(), DPDKDevice::get_mpool(rte_socket_id())));
     p->copy_annotations(this,true);
-    p->shift_header_annotations(buffer(), 0);
-    click_chatter("Clone %p %p",this->mb(),p->mb());
-    click_chatter("Headroom %d %d",headroom(),p->headroom());
-    click_chatter("Tailroom %d %d",tailroom(),p->tailroom());
-    click_chatter("Length %d %d",length(),p->length());
-    click_chatter("Shared %d %d",shared(),p->shared());
+    p->copy_headers(this);
     return p;
 #elif CLICK_USERLEVEL || CLICK_BSDMODULE || CLICK_MINIOS
 # if CLICK_BSDMODULE
@@ -1052,6 +1064,33 @@ Packet::clone(bool fast)
 #endif /* CLICK_LINUXMODULE */
 }
 
+inline WritablePacket *
+Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom)
+{
+#if CLICK_PACKET_USE_DPDK
+    struct rte_mbuf *mb = this->mb();
+    struct rte_mbuf *nmb = DPDKDevice::get_pkt();
+    if (unlikely(!nmb)) {
+        click_chatter("cannot allocate new pktmbuf");
+        return 0;
+    }
+    nmb->data_off = mb->data_off + extra_headroom;
+
+    rte_pktmbuf_data_len(nmb) = length();
+    rte_pktmbuf_pkt_len(nmb) = length();
+
+    WritablePacket *npkt = reinterpret_cast<WritablePacket *>(nmb);
+    memcpy(npkt->buffer(), buffer(), length() + headroom() + tailroom());
+    memcpy(npkt->all_anno(), all_anno(), sizeof (AllAnno));
+
+    npkt->shift_header_annotations(buffer(), extra_headroom);
+
+    return npkt;
+#else
+    abort();
+#endif
+}
+
 WritablePacket *
 Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
 			    bool free_on_failure)
@@ -1083,31 +1122,13 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     return reinterpret_cast<WritablePacket *>(nskb);
 
 #elif CLICK_PACKET_USE_DPDK /* !CLICK_LINUXMODULE */
-    struct rte_mbuf *mb = this->mb();
-    struct rte_mbuf *nmb = DPDKDevice::get_pkt();
-    click_chatter("Expensive uniqueify %p %p, exh = %d, ext = %d",mb,nmb,extra_headroom,extra_tailroom);
-    if (!nmb) {
-        click_chatter("cannot allocate new pktmbuf");
+    auto npkt = duplicate(extra_headroom, extra_tailroom);
+    if (unlikely(!npkt)) {
         if (free_on_failure)
             kill();
         return 0;
     }
-    nmb->data_off = mb->data_off + extra_headroom;
-
-    rte_pktmbuf_data_len(nmb) = length();
-    rte_pktmbuf_pkt_len(nmb) = length();
-
-    WritablePacket *npkt = reinterpret_cast<WritablePacket *>(nmb);
-    memcpy(npkt->buffer(), buffer(), length() + headroom() + tailroom());
-    memcpy(npkt->all_anno(), all_anno(), sizeof (AllAnno));
-
-    npkt->shift_header_annotations(buffer(), extra_headroom);
-
-    click_chatter("Headroom %d %d",headroom(),npkt->headroom());
-    click_chatter("Tailroom %d %d",tailroom(),npkt->tailroom());
-    click_chatter("Length %d %d",length(),npkt->length());
-    click_chatter("Shared %d %d",shared(),npkt->shared());
-    kill(); // Release old mbuf
+    kill();
     return npkt;
 #else /* !CLICK_LINUXMODULE */
 
@@ -1315,11 +1336,6 @@ Packet::expensive_put(uint32_t nbytes)
 Packet *
 Packet::shift_data(int offset, bool free_on_failure)
 {
-#if CLICK_PACKET_USE_DPDK
-    assert(false);
-#endif
-
-
     if (offset == 0)
 	return this;
 
@@ -1336,25 +1352,25 @@ Packet::shift_data(int offset, bool free_on_failure)
 	dp = network_header();
 
     if (!shared()
-	&& (offset < 0 ? (dp - buffer()) >= (ptrdiff_t)(-offset)
+	    && (offset < 0 ? (dp - buffer()) >= (ptrdiff_t)(-offset)
 	    : tailroom() >= (uint32_t)offset)) {
 	WritablePacket *q = static_cast<WritablePacket *>(this);
 	memmove((unsigned char *) dp + offset, dp, q->end_data() - dp);
 #if CLICK_LINUXMODULE
-	struct sk_buff *mskb = q->skb();
-	mskb->data += offset;
-	mskb->tail += offset;
+        struct sk_buff *mskb = q->skb();
+        mskb->data += offset;
+        mskb->tail += offset;
 #elif CLICK_PACKET_USE_DPDK
         rte_pktmbuf_adj(q->mb(), offset);
         rte_pktmbuf_append(q->mb(), offset);
 #else				/* User-space and BSD kernel module */
-	q->_data += offset;
-	q->_tail += offset;
+        q->_data += offset;
+        q->_tail += offset;
 # if CLICK_BSDMODULE
-	q->m()->m_data += offset;
+        q->m()->m_data += offset;
 # endif
 #endif
-	shift_header_annotations(q->buffer(), offset);
+        shift_header_annotations(q->buffer(), offset);
 	return this;
     } else {
 	int tailroom_offset = (offset < 0 ? -offset : 0);

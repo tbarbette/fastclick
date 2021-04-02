@@ -81,7 +81,7 @@ RoundRobinSwitch::push_batch(int, PacketBatch *batch)
     if (_split_batch) {
       CLASSIFY_EACH_PACKET(_max,next,batch,output_push_batch);
     } else {
-      output(next(batch)).push_batch(batch);
+      output(next(batch->first())).push_batch(batch);
     }
 }
 #endif

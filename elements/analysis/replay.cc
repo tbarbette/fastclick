@@ -374,7 +374,7 @@ loop:
 #if HAVE_BATCH
             if (head == 0) {
                 head = PacketBatch::start_head(q);
-                last = head;
+                last = q;
                 c = 1;
             } else {
                 //Just add the packet to the end of the batch

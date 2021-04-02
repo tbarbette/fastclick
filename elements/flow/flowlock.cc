@@ -1,5 +1,5 @@
 /*
- * FlowLock.{cc,hh} - Per-flow lock
+ * flowlock.{cc,hh} - Per-flow lock
  *
  * Copyright (c) 2019-2020 Tom Barbette, KTH Royal Institute of Technology
  *

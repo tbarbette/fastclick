@@ -201,6 +201,23 @@ else
     LIBS="$save_libs"
 fi
 
+AC_SEARCH_LIBS([bpf_prog_load_xattr], [bpf], [ac_have_libbpf=yes], [ac_have_libbpf=no])
+AC_CHECK_HEADERS([bpf/bpf.h], [ac_have_libbpf_h=yes], [ac_have_libbpf_h=no])
+if test "x$ac_have_libbpf$ac_have_libbpf_h" = "xyesyes"; then
+    AC_DEFINE([HAVE_BPF])
+    have_libbpf=yes
+else
+    have_libbpf=no
+fi
+
+AC_SEARCH_LIBS([curl_global_init], [curl], [ac_have_curl=yes], [ac_have_curl=no])
+AC_CHECK_HEADERS([curl/curl.h], [ac_have_curl_h=yes], [ac_have_curl_h=no])
+if test "$ac_have_curl$ac_have_curl_h" = yesyes; then
+    AC_DEFINE([HAVE_CURL])
+fi
+
+AC_SEARCH_LIBS([elf_version], [elf], [ac_have_elf=yes], [ac_have_elf=no])
+
 AC_SEARCH_LIBS([MHD_start_daemon], [microhttpd], [ac_have_libmicrohttpd=yes], [ac_have_libmicrohttpd=no])
 AC_CHECK_HEADERS([microhttpd.h], [ac_have_microhttpd_h=yes], [ac_have_microhttpd_h=no])
 if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
@@ -228,6 +245,15 @@ if test "x$ac_have_hyperscan$ac_have_hyperscan_h" = "xyesyes"; then
     AC_DEFINE([HAVE_HYPERSCAN])
 else
     have_hyperscan=no
+fi
+
+AC_SEARCH_LIBS([PAPI_start_counters], [papi], [ac_have_papi=yes], [ac_have_papi=no])
+AC_CHECK_HEADERS([papi.h], [ac_have_papi_h=yes], [ac_have_papi_h=no])
+if test "x$ac_have_papi_h$ac_have_papi" = "xyesyes"; then
+    AC_DEFINE([HAVE_PAPI])
+    have_papi=yes
+else
+    have_papi=no
 fi
 
 AC_DEFINE([HAVE_JSON])
@@ -340,7 +366,9 @@ AC_ARG_ENABLE([clone],
     [AS_HELP_STRING([  --disable-clone], [disable packet cloning])],
     [AC_DEFINE(CLICK_NOINDIRECT)],[:])
 
-
+AC_ARG_ENABLE([rsspp],
+    [AS_HELP_STRING([  --disable-rsspp], [disable RSS++ (enabled if --enable-cpu-load by default)])],
+    [:],[enable_rsspp=yes])
 
 dnl linuxmodule driver and features
 
@@ -1287,6 +1315,17 @@ AC_ARG_ENABLE([cpu-load],
     [:], [enable_cpu_load=no])
 if test "x$enable_cpu_load" = xyes; then
     AC_DEFINE(HAVE_CLICK_LOAD)
+else
+    if test "x$enable_rsspp" = xyes; then
+        AC_MSG_NOTICE([--enable-rsspp needs --enable-cpu-load])
+        enable_rsspp=no
+    fi
+fi
+
+if test "x$enable_rsspp" = xyes; then
+    EXTRA_DRIVER_OBJS="nicscheduler.o $EXTRA_DRIVER_OBJS"
+else
+    enable_rsspp=no
 fi
 
 AC_CHECK_FILE($srcdir/include/click/flowruleparser.hh, [ac_have_flow_rule_parser_h=yes], [ac_have_flow_rule_parser_h=no])
@@ -1536,10 +1575,11 @@ if test "x$enable_dpdk" != "xno"; then
       rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
       rte_ver_major=$rte_ver_year
-      if test "x${CLICK_SHARED}" = "x1" ; then
-          DPDK_LIBS=$(pkg-config --libs libdpdk)
+
+      if test "x$enable_dynamic_linking" = xyes; then
+        DPDK_LIBS=$(pkg-config --libs libdpdk)
       else
-		  DPDK_LIBS=$(pkg-config --static --libs libdpdk)
+        DPDK_LIBS=$(pkg-config --libs --static libdpdk)
       fi
 	  DPDK_CFLAGS=$(pkg-config --cflags libdpdk)
       AC_MSG_RESULT([yes])
@@ -2550,9 +2590,9 @@ if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"
 fi
 
-dnl add 'gtp' if gtp elements are available
-if test "x$enable_gtp" = xyes; then
-    provisions="$provisions gtp"
+dnl add 'tunnel' if tunnel elements are available
+if test "x$enable_tunnel" = xyes; then
+    provisions="$provisions tunnel"
 fi
 
 dnl add 'hs' if HyperScan lib is available
@@ -2586,6 +2626,11 @@ if test $ac_have_linux_kernel = y; then
     fi
 fi
 
+dnl add 'load' if CPU load is tracked
+if test "x$enable_cpu_load" = xyes; then
+    provisions="$provisions load"
+fi
+
 dnl add 'mbglib' if mbglib support is available
 if test "$ac_have_libmbdevio$ac_have_mbgdevio_h" = yesyes; then
     provisions="$provisions mbglib"
@@ -2611,6 +2656,11 @@ if test "x$HAVE_NUMA" = xyes; then
     provisions="$provisions numa"
 fi
 
+dnl add 'papi' if libpapi support is available
+if test "x$have_papi" = xyes; then
+    provisions="$provisions papi"
+fi
+
 dnl add 'pcap' if libpcap is available
 if test "x$HAVE_PCAP" = xyes; then
     provisions="$provisions pcap"
@@ -2632,6 +2682,11 @@ fi
 dnl add 're2' if re2 is available
 if test "x$have_re2" = xyes; then
     provisions="$provisions re2"
+fi
+
+dnl add 'rsspp' if RSS++ is available
+if test "x$enable_rsspp" = xyes; then
+    provisions="$provisions rsspp"
 fi
 
 dnl add 'smpclick' if compiled with --enable-multithread > 1
@@ -2717,10 +2772,14 @@ Configuration Summary:
 
     DPDK   support:              ${dpdk_info}
 
+    RSS++  support:              ${enable_rsspp}
+
     Netmap support:              ${HAVE_NETMAP}
     PCAP   support:              ${have_pcap}
 
+    PAPI   support:              ${have_papi}
     RE2    support:              ${have_re2}
+    BPF    support:              ${have_libbpf}
     HTTPD  support:              ${have_httpd}
     libpci support:              ${have_pci}
     LLVM   support:              ${have_llvm}
