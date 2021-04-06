@@ -123,6 +123,7 @@ CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
 
     int tpos1 = tpos;
     tpos++;
+    //position in pattern
     int ppos = 1;
 
     while (tpos < stop_at && ppos < plen) {
@@ -166,6 +167,11 @@ CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
     }
 
     if (ppos >= plen) {
+      // if full_symbol, check that the pattern was complete
+      if (full_symbol) {
+        if (!(isspace(ts[tpos]) || (allow_call && ts[tpos] == '(')))
+          continue;
+      }
       // check that this pattern match didn't occur after some evil qualifier,
       // namely '.', '::', or '->'
       int p = tpos1 - 1;

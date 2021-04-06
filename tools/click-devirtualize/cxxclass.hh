@@ -4,6 +4,7 @@
 #include <click/vector.hh>
 #include <click/hashtable.hh>
 class StringAccum;
+class DevirtualizeTest;
 
 String compile_pattern(const String &);
 
@@ -100,6 +101,8 @@ class CxxClass {
   void source_text(StringAccum &) const;
 
   void print_function_list();
+
+  friend class DevirtualizeTest;
 };
 
 class CxxInfo { public:
@@ -126,6 +129,8 @@ class CxxInfo { public:
   int parse_class_definition(const String &, int, const String &, CxxClass* &);
   int parse_class(const String &text, int p, const String &original,
 		  CxxClass *cxx_class);
+
+  friend class DevirtualizeTest;
 
 };
 
