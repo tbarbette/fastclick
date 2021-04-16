@@ -76,9 +76,9 @@ bool QueueDevice::get_spawning_threads(Bitvector& bmk, bool, int port)
 {
     if (noutputs()) { //RX
         //if (_active) { TODO
-            for (int i = firstqueue; i < firstqueue + n_queues; i++) {
+            for (int i = 0; i < n_queues; i++) {
                 for (int j = 0; j < queue_share; j++) {
-                    bmk[thread_for_queue(i) - j] = 1;
+                    bmk[thread_for_queue_offset(i) - j] = 1;
                 }
             }
         // }
@@ -456,7 +456,7 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 
         if (th_share_idx % thread_share != 0) {
             --th_num;
-            _q_infos[qu_num].lock = 0;
+            _q_infos[qu_num - firstqueue].lock = 0;
         }
 
         Task* &task = _thread_state.get_value_for_thread(th_id).task;
@@ -471,7 +471,7 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
         for (int j = 0; j < queue_per_threads; j++) {
             if (_verbose > 2)
                 click_chatter("%s: Queue %d handled by th %d", name().c_str(), qu_num,th_id);
-            _q_infos[qu_num].thread_id = th_id;
+            _q_infos[qu_num - firstqueue].thread_id = th_id;
             // If queues are shared, this mapping is loosy: _q_infos[].thread_id will map to the last thread. That's fine, we only want to retrieve one to find one thread to finish some job
             qu_share_idx++;
             if (qu_share_idx % queue_share == 0)

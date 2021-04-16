@@ -223,7 +223,7 @@ protected:
         return _thread_state.get_value_for_thread(tid).task;
     }
 
-    inline int thread_for_queue(int queue) {
+    inline int thread_for_queue_offset(int queue) {
         return _q_infos[queue].thread_id;
     }
 
