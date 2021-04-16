@@ -156,9 +156,9 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
             int fd = open(irqpath, O_WRONLY);
             if (fd <= 0)
                 continue;
-            sprintf(irqpath,"%d",thread_for_queue(i));
+            sprintf(irqpath,"%d",thread_for_queue_offset(i));
             if (_verbose > 1)
-                click_chatter("Pinning IRQ %d (queue %d) to thread %d",irq_n,i,thread_for_queue(i));
+                click_chatter("Pinning IRQ %d (queue %d) to thread %d",irq_n,i,thread_for_queue_offset(i));
             write(fd, irqpath, (size_t)strlen(irqpath));
             close(fd);
             i++;

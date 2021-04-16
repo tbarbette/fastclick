@@ -676,8 +676,8 @@ int FromDPDKDevice::write_handler(
                             if (fd->_thread_state.get_value(i).task)
                                 fd->_thread_state.get_value(i).task->reschedule();
                         }
-                        for (int q = fd->firstqueue; q <= fd->lastqueue; q++) {
-                            int i = fd->thread_for_queue(q);
+                        for (int q = 0; q <= fd->n_queues; q++) {
+                            int i = fd->thread_for_queue_offset(q);
                         }
                     }, b);
                 } else { // Deactivating
@@ -687,8 +687,8 @@ int FromDPDKDevice::write_handler(
                                 fd->_thread_state.get_value(i).task->unschedule();
                         }
 
-                        for (int q = fd->firstqueue; q <= fd->lastqueue; q++) {
-                            int i = fd->thread_for_queue(q);
+                        for (int q = 0; q <= fd->n_queues; q++) {
+                            int i = fd->thread_for_queue_offset(q);
                         }
                     }, b);
                 }
