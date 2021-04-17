@@ -1,5 +1,5 @@
 /*
- * SetTCPChecksumIP6.{cc,hh} -- sets the TCP header checksum
+ * settcpchecksumip6.{cc,hh} -- sets the TCP header checksum for IPv6 packets
  * Robert Morris
  *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
