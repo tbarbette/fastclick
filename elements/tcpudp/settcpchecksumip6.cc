@@ -22,6 +22,7 @@
 #include <click/error.hh>
 #include <clicknet/ip6.h>
 #include <clicknet/tcp.h>
+
 CLICK_DECLS
 
 SetTCPChecksumIP6::SetTCPChecksumIP6()
@@ -67,5 +68,7 @@ SetTCPChecksumIP6::simple_action(Packet *p_in)
 }
 
 CLICK_ENDDECLS
+
+ELEMENT_REQUIRES(ip6)
 EXPORT_ELEMENT(SetTCPChecksumIP6)
 ELEMENT_MT_SAFE(SetTCPChecksumIP6)
