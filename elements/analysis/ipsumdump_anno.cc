@@ -294,4 +294,5 @@ void IPSummaryDump_Anno::static_cleanup()
 
 ELEMENT_REQUIRES(userlevel IPSummaryDump)
 ELEMENT_PROVIDES(IPSummaryDump_Anno)
+ELEMENT_FEATURES(IPSummaryDump)
 CLICK_ENDDECLS

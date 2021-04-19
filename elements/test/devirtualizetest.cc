@@ -17,7 +17,6 @@
 #include <click/error.hh>
 #include "devirtualizetest.hh"
 #include "../tools/click-devirtualize/cxxclass.hh"
-
 #include "../tools/click-devirtualize/cxxclass.cc"
 
 

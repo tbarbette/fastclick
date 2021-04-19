@@ -103,4 +103,5 @@ void IPSummaryDump_UDP::static_cleanup()
 
 ELEMENT_REQUIRES(userlevel IPSummaryDump)
 ELEMENT_PROVIDES(IPSummaryDump_UDP)
+ELEMENT_FEATURES(IPSummaryDump)
 CLICK_ENDDECLS

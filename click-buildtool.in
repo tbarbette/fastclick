@@ -592,6 +592,12 @@ $bad_files"
   header[$1] = $2
   next
 }
+/:ELEMENT_FEATURES/ {
+  sub(/.*ELEMENT_FEATURES[ 	]*\(/, "", $2)
+  sub(/\).*/, "", $2)
+  features[$1] = $2
+  next
+}
 /:ELEMENT_LIBS/ {
   sub(/.*ELEMENT_LIBS[ 	]*\(\(?/, "", $2)
   sub(/\)?\).*/, "", $2)
@@ -675,8 +681,12 @@ END {
 	ex = ex klass "-!sc ";
 	static_cleanup[klass] = 0
       }
-      if (libs[i])
-	ex = ex "-!lib" libs[i] " "
+      if (libs[i]) {
+        ex = ex "-!lib" libs[i] " "
+      }
+      if (features[i]) {
+        ex = ex "-!features" features[i] " "
+      }
     }
     print '"$outscriptlet"'
   }
@@ -844,6 +854,8 @@ EOF
 	done
     fi
     test -n "$libs" && libs=`echo "$libs" | tsort`
+
+    features=""
 
     # massage awk script based on Linux 2.6 or not
     if test "$linux" = 1; then

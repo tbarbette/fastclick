@@ -955,4 +955,5 @@ void IPSummaryDump_IP::static_cleanup()
 
 ELEMENT_REQUIRES(userlevel IPSummaryDump)
 ELEMENT_PROVIDES(IPSummaryDump_IP)
+ELEMENT_FEATURES(IPSummaryDump)
 CLICK_ENDDECLS

@@ -29,6 +29,7 @@ struct ElementTraits {
     String flags;
     String methods;
     String requirements;
+    String featureslist;
     String provisions;
     String libs;
     String noexport;
@@ -43,6 +44,7 @@ struct ElementTraits {
     bool allows_driver(int d) const	{ return (driver_mask&(1<<d)) != 0; }
 
     bool requires(const String &str) const;
+    bool features(const String &str) const;
     bool provides(const String &str) const;
     inline int flag_value(const String &str) const;
     int hard_flag_value(const String &str) const;
@@ -55,7 +57,7 @@ struct ElementTraits {
     enum {
 	D_NONE,
 	D_CLASS, D_CXX_CLASS, D_HEADER_FILE, D_PORT_COUNT, D_PROCESSING,
-	D_FLOW_CODE, D_FLAGS, D_METHODS, D_REQUIREMENTS, D_PROVISIONS, D_LIBS,
+	D_FLOW_CODE, D_FLAGS, D_METHODS, D_REQUIREMENTS, D_FEATURES, D_PROVISIONS, D_LIBS,
 	D_SOURCE_FILE, D_DOC_NAME, D_NOEXPORT,
 	D_FIRST_DEFAULT = D_CLASS, D_LAST_DEFAULT = D_LIBS
     };

@@ -124,6 +124,16 @@ ElementTraits::requires(const String &n) const
 }
 
 bool
+ElementTraits::features(const String &n) const
+{
+    if (!featureslist)
+	return false;
+    else
+	return requirement_contains(featureslist, n);
+}
+
+
+bool
 ElementTraits::provides(const String &n) const
 {
     if (n == name)
@@ -195,6 +205,7 @@ ElementTraits::component(int what)
       case D_FLAGS:		return &flags;
       case D_METHODS:		return &methods;
       case D_REQUIREMENTS:	return &requirements;
+	  case D_FEATURES:	return &featureslist;
       case D_PROVISIONS:	return &provisions;
       case D_LIBS:		return &libs;
       case D_DOC_NAME:		return &documentation_name;
@@ -219,6 +230,7 @@ ElementTraits::parse_component(const String &s)
 	components.set("flowcode", D_FLOW_CODE);
 	components.set("methods", D_METHODS);
 	components.set("requires", D_REQUIREMENTS);
+	components.set("features", D_FEATURES);
 	components.set("provides", D_PROVISIONS);
 	components.set("libs", D_LIBS);
 	components.set("docname", D_DOC_NAME);
