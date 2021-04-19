@@ -29,6 +29,14 @@ DevirtualizeTest::DevirtualizeTest()
 
 #define CHECK(x) if (!(x)) return errh->error("%s:%d: test %<%s%> failed", __FILE__, __LINE__, #x);
 
+
+CxxFunction DevirtualizeTest::makeFn(String code) {
+    CxxInfo info;
+    info.parse_file("class MyClass { int _bob; void fn(int arg) { "+code+" } };", true);
+    auto cl = info._classes[0];
+    auto fn = cl->_functions[0];
+    return fn;
+}
 int
 DevirtualizeTest::initialize(ErrorHandler *errh)
 {
@@ -49,6 +57,10 @@ DevirtualizeTest::initialize(ErrorHandler *errh)
     CHECK(fn.body().trim() == "int a = bab + 30;");
 
     
+    fn = makeFn("call(a!TEMPVAL!)");
+
+    CHECK(fn.replace_expr("!TEMPVAL!",", 7", false, true));
+
     errh->message("All test passed!");
     return 0;
 }

@@ -4,6 +4,8 @@
 #include <click/element.hh>
 CLICK_DECLS
 
+class CxxFunction;
+
 /*
 =c
 
@@ -11,7 +13,7 @@ DevirtualizeTest()
 
 =s test
 
-runs regression tests for Vector
+runs regression tests for click-devirtualize
 
 =d
 
@@ -27,6 +29,8 @@ class DevirtualizeTest : public Element { public:
     const char *class_name() const override		{ return "DevirtualizeTest"; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
+
+    CxxFunction makeFn(String code);
 
 };
 

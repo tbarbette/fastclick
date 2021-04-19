@@ -110,7 +110,7 @@ Options:\n\
       --help                    Print this message and exit.\n\
   -v, --version                 Print version number and exit.\n\
 \n\
-Report bugs to <click@librelist.com>.\n");
+Report bugs to https://www.fastclick.dev/.\n");
 }
 
 struct click_args_t {
@@ -290,12 +290,13 @@ int parse(int argc, char** argv, click_args_t &click_args) {
       return cleanup(clp, 0);
 
      case VERSION_OPT:
-      printf("click (Click) %s\n", CLICK_VERSION);
+      printf("click (FastClick) %s\n", CLICK_VERSION);
       printf("Copyright (C) 1999-2001 Massachusetts Institute of Technology\n\
 Copyright (C) 2001-2003 International Computer Science Institute\n\
 Copyright (C) 2008-2009 Meraki, Inc.\n\
 Copyright (C) 2004-2011 Regents of the University of California\n\
 Copyright (C) 1999-2012 Eddie Kohler\n\
+Copyright (C) 2015-2021 Tom Barbette\n\
 This is free software; see the source for copying conditions.\n\
 There is NO warranty, not even for merchantability or fitness for a\n\
 particular purpose.\n");

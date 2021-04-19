@@ -628,8 +628,9 @@ particular purpose.\n");
     }
 
     ElementMap default_emap;
-    if (!default_emap.parse_default_file(CLICK_DATADIR, errh, verbose))
-	default_emap.report_file_not_found(CLICK_DATADIR, false, errh);
+    if (!default_emap.parse_default_file(CLICK_DATADIR, errh, verbose)) {
+	    default_emap.report_file_not_found(CLICK_DATADIR, false, errh);
+    }
 
     if (subpackage)
         default_emap.parse_package_file(subpackage, 0, CLICK_DATADIR, errh, verbose);
