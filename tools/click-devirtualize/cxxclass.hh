@@ -94,7 +94,10 @@ class CxxClass {
     _template = tmpl;
   }
 
-  bool find_should_rewrite();
+
+  enum RewriteStatus {REWRITE_NEVER, REWRITE_NO, REWRITE_YES};
+
+  RewriteStatus find_should_rewrite();
   bool should_rewrite(int i) const	{ return _should_rewrite[i]; }
 
   void header_text(StringAccum &, int) const;

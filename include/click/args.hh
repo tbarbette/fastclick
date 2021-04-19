@@ -412,15 +412,19 @@ class Args : public ArgContext {
         return *this;
     }
 
-    Args &validate(const char *keyword) {
+    /**
+     * Verify a value is given
+     */
+    Args &validate(const char *keyword, bool present=false) {
         Slot *slot_status;
         String str = find(keyword, 0, slot_status);
-        if (str) {
+        if (str && !present) {
+            printf("A value was given for %s, but it was not given at time of devirtualization.\n", keyword);
             assert(false);
         }
         return *this;
-
     }
+
     template <typename T>
     Args &validate(const char *keyword, T &x, const char *static_value) {
         DefaultArg<T> p = DefaultArg<T>();
