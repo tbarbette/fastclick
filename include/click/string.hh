@@ -106,6 +106,7 @@ class String { public:
     String trim() const;
     String trim_space() const;
     String trim_space_left() const;
+    String remove(char c) const;
     String replace(char from, char to) const;
     String replace(String from, String to) const;
 

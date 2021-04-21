@@ -385,10 +385,21 @@ Specializer::do_simple_action(SpecializedClass &spc)
   assert(simple_action);
   simple_action->kill();
 
-
-  spc.cxxc->defun
-    (CxxFunction("smaction", false, "inline Packet *", simple_action->args(),
-         simple_action->body(), simple_action->clean_body()));
+  CxxFunction *smaction = spc.cxxc->find("smaction");
+  if (smaction) {
+    String r = smaction->ret_type().unshared().trim();
+    if (r.starts_with("inline"))
+      r = r.substring(6);
+    r = r.remove(' ');
+    if (r != "Packet*") {
+      click_chatter("smaction has not a return type of Packet* (%s)", r.c_str());
+      return;
+    }
+  } else {
+    spc.cxxc->defun
+      (CxxFunction("smaction", false, "inline Packet *", simple_action->args(),
+          simple_action->body(), simple_action->clean_body()));
+  }
   spc.cxxc->defun
     (CxxFunction("push", false, "void", "(int port, Packet *p)",
          "\n  if (Packet *q = smaction(p))\n\
