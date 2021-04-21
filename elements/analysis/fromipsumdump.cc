@@ -743,7 +743,7 @@ FromIPSummaryDump::run_task(Task *)
     return true;
 }
 
-inline Packet *
+Packet *
 FromIPSummaryDump::get_packet(bool push) {
     Packet* p;
     while (1) {

@@ -336,6 +336,7 @@
 #define ELEMENT_REQUIRES(x)
 #define ELEMENT_PROVIDES(x)
 #define ELEMENT_HEADER(x)
+#define ELEMENT_FEATURES(x)
 #define ELEMENT_LIBS(x)
 #define ELEMENT_MT_SAFE(x)
 

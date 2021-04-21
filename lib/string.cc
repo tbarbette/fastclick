@@ -873,6 +873,21 @@ String::trim_space_left() const
 
 /** @brief Return a string with from replaced by to */
 String
+String::remove(char c) const
+{
+    String newStr(*this);
+    char* data = const_cast<char*>(newStr._r.data);
+    int n = 0;
+    for (int i = 0; i < length(); i ++) {
+        if (_r.data[i] != c)
+            data[n++] = _r.data[i];
+    }
+    newStr._r.length = n;
+    return newStr;
+}
+
+/** @brief Return a string with from replaced by to */
+String
 String::replace(char from, char to) const
 {
     String newStr = *this;

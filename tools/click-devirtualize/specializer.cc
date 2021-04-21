@@ -201,7 +201,9 @@ Specializer::check_specialize(int eindex, ErrorHandler *errh)
   SpecializedClass &spc = _specials[sp];
   spc.old_click_name = old_eti.click_name;
   spc.eindex = eindex;
-  if (!old_cxxc->find_should_rewrite() && !_do_replace && !_do_static) {
+  CxxClass::RewriteStatus rw = old_cxxc->find_should_rewrite();
+  click_chatter("%s : %d", old_eti.click_name.c_str(), rw);
+  if (rw != CxxClass::REWRITE_NEVER && !_do_replace && !_do_static) {
     spc.click_name = spc.old_click_name;
     spc.cxx_name = old_eti.cxx_name;
   } else {
@@ -383,10 +385,21 @@ Specializer::do_simple_action(SpecializedClass &spc)
   assert(simple_action);
   simple_action->kill();
 
-
-  spc.cxxc->defun
-    (CxxFunction("smaction", false, "inline Packet *", simple_action->args(),
-         simple_action->body(), simple_action->clean_body()));
+  CxxFunction *smaction = spc.cxxc->find("smaction");
+  if (smaction) {
+    String r = smaction->ret_type().unshared().trim();
+    if (r.starts_with("inline"))
+      r = r.substring(6);
+    r = r.remove(' ');
+    if (r != "Packet*") {
+      click_chatter("smaction has not a return type of Packet* (%s)", r.c_str());
+      return;
+    }
+  } else {
+    spc.cxxc->defun
+      (CxxFunction("smaction", false, "inline Packet *", simple_action->args(),
+          simple_action->body(), simple_action->clean_body()));
+  }
   spc.cxxc->defun
     (CxxFunction("push", false, "void", "(int port, Packet *p)",
          "\n  if (Packet *q = smaction(p))\n\
@@ -865,6 +878,7 @@ Specializer::do_config_replacement() {
                       any_replacement = true;
                       int pos = configline.find_left(param);
                       int endofrep = res;
+                      bool dynamic = false;
                       String symbol = args[1].trim();
                       if (pos >= 0) {
                           //Value given by the user
@@ -877,9 +891,22 @@ Specializer::do_config_replacement() {
                           while (configline[end] != ',' && configline[end] != ')') end++;
                           end -= 1;
                           while (configline[end] == ' ') end--;
-                          value = configline.substring(pos,end+1 - pos);
+                          value = configline.substring(pos,end+1 - pos).trim();
+                          if (value.starts_with("!")) {
+                            dynamic = true;
+                            pos = value.data() - configline.data();
+                            configline = configline.substring(0,pos) + configline.substring(pos + 1);
+                            continue;
+                          }
+
                           click_chatter("Config value is %s",value.c_str());
-                          has_value = true;
+                          if (value.starts_with("$")) {
+                              click_chatter("Variables not yet supported");
+                              has_value = false;
+                              dynamic = true;
+                          } else {
+                              has_value = true;
+                          }
                       } else {
                           //Value not given by the user
                           if (args.size() > 2 && args[2].trim()) {
@@ -900,13 +927,14 @@ Specializer::do_config_replacement() {
 
                       }
                       if (has_value) {
-
                           if (_verbose)
                               click_chatter("Value %s given, primitive : %d",value.c_str(),is_primitive_val(value));
-                          configure->replace_expr("!TEMPVAL!", ", "+symbol+", "+ (is_primitive_val(value)?value:"\""+value+"\""), true, true);
-                      } else {
+                          configure->replace_expr("!TEMPVAL!", ", "+symbol+", "+ (is_primitive_val(value)?value:"\""+value+"\""), false, true);
+                      } else if (!dynamic) {
                           click_chatter("No value given");
-                          configure->replace_expr("!TEMPVAL!", "");
+                          configure->replace_expr("!TEMPVAL!", "", false);
+                      } else {
+                          configure->replace_expr("!TEMPVAL!", ", true", false);
                       }
 
                       if (!has_value || !is_primitive_val(value)) {

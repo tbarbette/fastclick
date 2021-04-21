@@ -163,10 +163,10 @@ void
 Mindriver::require(const String& req, ErrorHandler* errh)
 {
     if (_provisions.get(req) < 0) {
-	if (verbose && _requirements[req] < 0)
-	    errh->message("requiring %<%s%>", req.c_str());
-	_requirements[req] = 1;
-	_nrequirements++;
+        if (verbose && _requirements[req] < 0)
+            errh->message("requiring %<%s%>", req.c_str());
+        _requirements[req] = 1;
+        _nrequirements++;
     }
 }
 
@@ -197,13 +197,13 @@ Mindriver::add_router_requirements(RouterT* router, ElementMap& emap, ErrorHandl
     HashTable<ElementClassT*, int> primitives(-1);
     router->collect_types(primitives);
     for (HashTable<ElementClassT*, int>::iterator i = primitives.begin(); i.live(); i++) {
-	if (!i.key()->primitive())
-	    continue;
-	String tname = i.key()->name();
-	if (!emap.has_traits(tname))
-	    missing_sa << (nmissing++ ? ", " : "") << tname;
-	else
-	    require(tname, errh);
+        if (!i.key()->primitive())
+            continue;
+        String tname = i.key()->name();
+        if (!emap.has_traits(tname))
+            missing_sa << (nmissing++ ? ", " : "") << tname;
+        else
+            require(tname, errh);
     }
 
     if (nmissing == 1)
@@ -236,27 +236,33 @@ handle_router(Mindriver& md, String filename_in, ElementMap &emap, ErrorHandler 
 }
 
 bool
-Mindriver::add_traits(const Traits& t, const ElementMap&, ErrorHandler* errh)
+Mindriver::add_traits(const Traits& t, const ElementMap& emap, ErrorHandler* errh)
 {
     if (t.source_file)
-	add_source_file(t.source_file, errh);
+	    add_source_file(t.source_file, errh);
 
     if (t.name)
-	provide(t.name, errh);
+	    provide(t.name, errh);
 
     if (t.provisions) {
-	Vector<String> args;
-	cp_spacevec(t.provisions, args);
-	for (String* s = args.begin(); s < args.end(); s++)
-	    if (Driver::driver(*s) < 0)
-		provide(*s, errh);
+        Vector<String> args;
+        cp_spacevec(t.provisions, args);
+        for (String* s = args.begin(); s < args.end(); s++) {
+            if (Driver::driver(*s) < 0)
+            provide(*s, errh);
+            for (int i = 1; i < emap.size(); i++) {
+                if (emap.traits_at(i).features(*s)) {
+                    require(emap.traits_at(i).name, errh);
+                }
+            }
+        }
     }
 
     if (t.requirements) {
-	Vector<String> args;
-	cp_spacevec(t.requirements, args);
-	for (String* s = args.begin(); s < args.end(); s++)
-	    require(*s, errh);
+        Vector<String> args;
+        cp_spacevec(t.requirements, args);
+        for (String* s = args.begin(); s < args.end(); s++)
+            require(*s, errh);
     }
 
     return true;
@@ -272,9 +278,11 @@ Mindriver::resolve_requirement(const String& requirement, const ElementMap& emap
 
     int try_name_emapi = emap.traits_index(requirement);
 
+    click_chatter("Resolving %s", requirement.c_str());
+
     if (try_name_emapi > 0) {
-	add_traits(emap.traits_at(try_name_emapi), emap, &lerrh);
-	return true;
+        add_traits(emap.traits_at(try_name_emapi), emap, &lerrh);
+        return true;
     }
 
     if (requirement.starts_with("!")) {
@@ -628,8 +636,9 @@ particular purpose.\n");
     }
 
     ElementMap default_emap;
-    if (!default_emap.parse_default_file(CLICK_DATADIR, errh, verbose))
-	default_emap.report_file_not_found(CLICK_DATADIR, false, errh);
+    if (!default_emap.parse_default_file(CLICK_DATADIR, errh, verbose)) {
+	    default_emap.report_file_not_found(CLICK_DATADIR, false, errh);
+    }
 
     if (subpackage)
         default_emap.parse_package_file(subpackage, 0, CLICK_DATADIR, errh, verbose);

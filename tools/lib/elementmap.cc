@@ -499,6 +499,8 @@ ElementMap::unparse(const String &package) const
         sa << " flags=\"" << xml_quote(e.flags) << "\"";
     if (e.requirements)
         sa << " requires=\"" << xml_quote(e.requirements) << "\"";
+    if (e.featureslist)
+        sa << " features=\"" << xml_quote(e.featureslist) << "\"";
     if (e.provisions)
         sa << " provides=\"" << xml_quote(e.provisions) << "\"";
     if (e.noexport)
@@ -513,7 +515,7 @@ String
 ElementMap::unparse_nonxml() const
 {
     StringAccum sa;
-    sa << "$data\tname\tcxxclass\tdocname\theaderfile\tprocessing\tflowcode\tflags\trequires\tprovides\n";
+    sa << "$data\tname\tcxxclass\tdocname\theaderfile\tprocessing\tflowcode\tflags\trequires\tfeatures\tprovides\n";
     for (int i = 1; i < _e.size(); i++) {
     const Traits &e = _e[i];
     if (!e.name && !e.cxx)
@@ -526,6 +528,7 @@ ElementMap::unparse_nonxml() const
        << cp_quote(e.flow_code) << '\t'
        << cp_quote(e.flags) << '\t'
        << cp_quote(e.requirements) << '\t'
+       << cp_quote(e.featureslist) << '\t'
        << cp_quote(e.provisions) << '\n';
     }
     return sa.take_string();

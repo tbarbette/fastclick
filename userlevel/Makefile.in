@@ -63,9 +63,6 @@ endif
 .cc.ii:
 	$(call cxxcompile_nodep,-E $< > $@,CXXCPP)
 
-llvmutils.o: llvmutils.cc
-	$(call cxxcompile,-c $< $(INCLUDES_LLVM) -o $@,CXX)
-
 GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	bitvector.o bighashmap_arena.o hashallocator.o \
 	ipaddress.o ipflowid.o etheraddress.o \
@@ -111,24 +108,6 @@ COMPILE = $(CC) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS)
 CCLD = $(CC)
 LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
 
-USE_DPDK = @USE_DPDK@
-ifeq ($(USE_DPDK),yes)
-	RTE_SDK = @RTE_SDK@
-	RTE_TARGET = @RTE_TARGET@
-	RTE_VER_MAJOR = @RTE_VER_MAJOR@
-	RTE_VER_MINOR = @RTE_VER_MINOR@
-	RTE_VER_YEAR = @RTE_VER_YEAR@
-	RTE_VER_MONTH = @RTE_VER_MONTH@
-	RTE_USE_PKGCONFIG = @RTE_USE_PKGCONFIG@
-	include rte_parse.mk
-	CFLAGS := $(CFLAGS) @DPDK_CFLAGS@
-	CXXFLAGS := $(CXXFLAGS) @DPDK_CFLAGS@
-	EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
-	ifeq ($(shell [ ${HAVE_FLOW_API} -eq 1 ] && echo true),true)
-		EXTRA_DRIVER_OBJS := flowrulemanager.o flowrulecache.o flowruleparser.o $(EXTRA_DRIVER_OBJS)
-	endif
-endif
-
 ifndef MINDRIVER
 DRIVER = click
 ELEMENTSCONF = elements
@@ -150,14 +129,36 @@ endif
 endif
 INSTALLPROGS = $(DRIVER) packetmill
 
+all: $(INSTALLPROGS) $(INSTALLLIBS)
+
+llvmutils.o: llvmutils.cc
+	$(call cxxcompile,-c $< $(INCLUDES_LLVM) -o $@,CXX)
+
+USE_DPDK = @USE_DPDK@
+ifeq ($(USE_DPDK),yes)
+	RTE_SDK = @RTE_SDK@
+	RTE_TARGET = @RTE_TARGET@
+	RTE_VER_MAJOR = @RTE_VER_MAJOR@
+	RTE_VER_MINOR = @RTE_VER_MINOR@
+	RTE_VER_YEAR = @RTE_VER_YEAR@
+	RTE_VER_MONTH = @RTE_VER_MONTH@
+	RTE_USE_PKGCONFIG = @RTE_USE_PKGCONFIG@
+	include rte_parse.mk
+	CFLAGS := $(CFLAGS) @DPDK_CFLAGS@
+	CXXFLAGS := $(CXXFLAGS) @DPDK_CFLAGS@
+	EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
+	ifeq ($(shell [ ${HAVE_FLOW_API} -eq 1 ] && echo true),true)
+		EXTRA_DRIVER_OBJS := flowrulemanager.o flowrulecache.o flowruleparser.o $(EXTRA_DRIVER_OBJS)
+	endif
+endif
+
+
+
 ifneq ($(ELEMENT_CHECKSUM),)
 ifneq ($(shell $(ELEMENT_CHECKSUMCOMMAND)),$(ELEMENT_CHECKSUM))
 $(shell rm -f $(ELEMENTSCONF).conf $(ELEMENTSCONF).csmk)
 endif
 endif
-
-
-all: $(INSTALLPROGS) $(INSTALLLIBS)
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk

@@ -507,6 +507,8 @@ class Script : public Element { public:
         max_jumps = 1000, STEP_NORMAL = 0, STEP_ROUTER, STEP_TIMER, STEP_JUMP
     };
 
+    void never_devirtualize();
+
     Vector<int> _insns;
     Vector<int> _args;
     Vector<int> _args2;

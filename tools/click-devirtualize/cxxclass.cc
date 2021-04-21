@@ -123,6 +123,7 @@ CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
 
     int tpos1 = tpos;
     tpos++;
+    //position in pattern
     int ppos = 1;
 
     while (tpos < stop_at && ppos < plen) {
@@ -166,6 +167,13 @@ CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
     }
 
     if (ppos >= plen) {
+      // if full_symbol, check that the pattern was complete
+      if (full_symbol) {
+        if (tpos < stop_at && !(isspace(ts[tpos]) || (allow_call && ts[tpos] == '(') || ts[tpos] == ';' || ts[tpos] == ')')) {
+          continue;
+        }
+      }
+
       // check that this pattern match didn't occur after some evil qualifier,
       // namely '.', '::', or '->'
       int p = tpos1 - 1;
@@ -507,7 +515,7 @@ CxxClass::reach(int findex, Vector<int> &reached)
   return should_rewrite;
 }
 
-bool
+CxxClass::RewriteStatus
 CxxClass::find_should_rewrite()
 {
   _has_push.assign(nfunctions(), 0);
@@ -515,7 +523,7 @@ CxxClass::find_should_rewrite()
   _should_rewrite.assign(nfunctions(), 0);
 
   if (_fn_map.get("never_devirtualize") >= 0)
-    return false;
+    return REWRITE_NEVER;
 
   static String push_pattern = compile_pattern("output(#0).push(#1)");
   static String o_push_pattern = compile_pattern("output_push(#0,#1)");
@@ -572,7 +580,7 @@ CxxClass::find_should_rewrite()
 
   if (!any)
       click_chatter("Shouldn't rewrite %s", name().c_str());
-  return any;
+  return any?REWRITE_YES:REWRITE_NO;
 }
 
 void

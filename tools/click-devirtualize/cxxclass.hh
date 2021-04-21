@@ -4,6 +4,7 @@
 #include <click/vector.hh>
 #include <click/hashtable.hh>
 class StringAccum;
+class DevirtualizeTest;
 
 String compile_pattern(const String &);
 
@@ -93,13 +94,18 @@ class CxxClass {
     _template = tmpl;
   }
 
-  bool find_should_rewrite();
+
+  enum RewriteStatus {REWRITE_NEVER, REWRITE_NO, REWRITE_YES};
+
+  RewriteStatus find_should_rewrite();
   bool should_rewrite(int i) const	{ return _should_rewrite[i]; }
 
   void header_text(StringAccum &, int) const;
   void source_text(StringAccum &) const;
 
   void print_function_list();
+
+  friend class DevirtualizeTest;
 };
 
 class CxxInfo { public:
@@ -126,6 +132,8 @@ class CxxInfo { public:
   int parse_class_definition(const String &, int, const String &, CxxClass* &);
   int parse_class(const String &text, int p, const String &original,
 		  CxxClass *cxx_class);
+
+  friend class DevirtualizeTest;
 
 };
 
