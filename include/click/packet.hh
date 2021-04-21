@@ -58,7 +58,7 @@ class Packet { public:
     enum {
 #ifdef CLICK_MINIOS
 	default_headroom = 48,		///< Increase headroom for improved performance.
-#elif CLICK_PACKET_USE_DPDK || HAVE_DPDK_PACKET_POOL
+#elif CLICK_PACKET_USE_DPDK || HAVE_DPDK_PACKET_POOL || CLICK_PACKET_INSIDE_DPDK
 	default_headroom = RTE_PKTMBUF_HEADROOM,
 #elif HAVE_CLICK_PACKET_POOL
 	default_headroom = 64,

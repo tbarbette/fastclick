@@ -582,7 +582,6 @@ CxxClass::header_text(StringAccum &sa, int align=0) const
   if (align)
     sa << "alignas(" << align <<") ";
   sa << _name;
-
   if (_parents.size()) {
     sa << " : ";
     for (int i = 0; i < _parents.size(); i++) {

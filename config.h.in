@@ -144,6 +144,9 @@
 /* Define if the RE2 library is present. */
 #undef HAVE_RE2
 
+/* Define if elements have random alignment. */
+#undef HAVE_RAND_ALIGN
+
 /* Define if you want to use the stride scheduler. */
 #undef HAVE_STRIDE_SCHED
 

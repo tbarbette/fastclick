@@ -494,7 +494,6 @@ Specializer::switch_run_task(SpecializedClass &spc) {
 
   String ret_clause = run_task->body().substring(
     ret_pos, run_task->body().length() );
-
     /* Define the lambda */
     StringAccum new_body;
     new_body << before_for << "\n"
@@ -540,7 +539,6 @@ Specializer::computed_jmps_run_task(SpecializedClass &spc) {
 
   String ret_clause = run_task->body().substring(
     ret_pos, run_task->body().length() );
-
 
     StringAccum new_body;
     new_body << before_for << "\n";

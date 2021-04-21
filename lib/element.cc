@@ -3277,4 +3277,10 @@ Element::run_timer(Timer *timer)
     (void) timer;
 }
 
+#ifdef HAVE_RAND_ALIGN
+
+int Element::nalloc = 0;
+std::mt19937  Element::generator;
+#endif
+
 CLICK_ENDDECLS

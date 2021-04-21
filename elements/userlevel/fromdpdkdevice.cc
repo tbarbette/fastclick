@@ -322,36 +322,55 @@ void FromDPDKDevice::clear_buffers() {
         click_chatter("Cleared %d buffers for queue %d",tot,q);
     }
 }
-
-bool FromDPDKDevice::run_task(Task *t)
-{
-    struct rte_mbuf *pkts[_burst];
-    int ret = 0;
-
-    for (int iqueue = queue_for_thisthread_begin();
-            iqueue<=queue_for_thisthread_end(); iqueue++) {
-#if HAVE_BATCH
-         PacketBatch* head = 0;
-         WritablePacket *last;
+#ifdef DPDK_USE_XCHG
+extern "C" {
+#include <mlx5_xchg.h>
+}
 #endif
-        unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
-        for (unsigned i = 0; i < n; ++i) {
-            unsigned char* data = rte_pktmbuf_mtod(pkts[i], unsigned char *);
-            rte_prefetch0(data);
+
+bool FromDPDKDevice::run_task(Task *t) {
+  struct rte_mbuf *pkts[_burst];
+  int ret = 0;
+
+  int iqueue = queue_for_thisthread_begin();
+  { //This version differs from multi by having support for one queue per thread only, which is extremly usual
+#if HAVE_BATCH
+  PacketBatch *head = 0;
+  WritablePacket *last;
+#endif
+
+#ifdef DPDK_USE_XCHG
+ unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, (struct xchg**)pkts, _burst);
+#else
+ unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
+#endif
+
+for (unsigned i = 0; i < n; ++i) {
+    unsigned char *data = rte_pktmbuf_mtod(pkts[i], unsigned char *);
+    rte_prefetch0(data);
 #if CLICK_PACKET_USE_DPDK
     WritablePacket *p = static_cast<WritablePacket *>(Packet::make(pkts[i], _clear));
 #elif HAVE_ZEROCOPY
-            WritablePacket *p = Packet::make(data,
-                     rte_pktmbuf_data_len(pkts[i]),
-                     DPDKDevice::free_pkt,
-                     pkts[i],
-                     rte_pktmbuf_headroom(pkts[i]),
-                     rte_pktmbuf_tailroom(pkts[i]),
-                     _clear
-                     );
+
+# if CLICK_PACKET_INSIDE_DPDK
+    WritablePacket *p =(WritablePacket*)( pkts[i] + 1);
+    new (p) WritablePacket();
+
+    p->initialize(_clear);
+    p->set_buffer((unsigned char*)(pkts[i]->buf_addr), DPDKDevice::MBUF_DATA_SIZE);
+    p->set_data(data);
+    p->set_data_length(rte_pktmbuf_data_len(pkts[i]));
+    p->set_buffer_destructor(DPDKDevice::free_pkt);
+
+    p->set_destructor_argument(pkts[i]);
+# else
+    WritablePacket *p = Packet::make(
+        data, rte_pktmbuf_data_len(pkts[i]), DPDKDevice::free_pkt, pkts[i],
+        rte_pktmbuf_headroom(pkts[i]), rte_pktmbuf_tailroom(pkts[i]), _clear);
+# endif
 #else
             WritablePacket *p = Packet::make(data,
-                                     (uint32_t)rte_pktmbuf_pkt_len(pkts[i]), _clear);
+                                     (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));
             rte_pktmbuf_free(pkts[i]);
             data = p->data();
 #endif

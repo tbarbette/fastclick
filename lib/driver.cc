@@ -58,6 +58,8 @@
 # include <click/bighashmap_arena.hh>
 #endif
 
+#include <time.h>
+
 #if HAVE_DYNAMIC_LINKING && !CLICK_LINUXMODULE && !CLICK_BSDMODULE
 # define CLICK_PACKAGE_LOADED   1
 #endif
@@ -456,6 +458,18 @@ click_static_initialize()
     Router::add_read_handler(0, "classes", read_handler, (void *)GH_CLASSES);
     Router::add_read_handler(0, "packages", read_handler, (void *)GH_PACKAGES);
 
+#ifdef HAVE_RAND_ALIGN
+    char * env = getenv("CLICK_ELEM_RAND_SEED");
+    int seed;
+    if (env) {
+        seed = atoi(env);
+    } else {
+        seed = time(0);
+    }
+
+    click_chatter("Element seed is %d", seed);
+    Element::generator.seed(seed);
+#endif
     click_export_elements();
 }
 

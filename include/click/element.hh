@@ -10,6 +10,10 @@
 #include <click/sync.hh>
 #include <functional>
 
+#ifdef HAVE_RAND_ALIGN
+#include <random>
+#endif
+
 CLICK_DECLS
 class Router;
 class Master;
@@ -55,6 +59,45 @@ class Element { public:
     enum { SELECT_READ = 1, SELECT_WRITE = 2 };
     virtual void selected(int fd, int mask);
     virtual void selected(int fd);
+#endif
+
+#ifdef HAVE_RAND_ALIGN
+
+   static int nalloc;
+   static std::mt19937 generator;
+// Overloading CLass specific new operator
+  inline static void* operator new(size_t sz)
+  {
+      char * env = getenv("CLICK_ELEM_RAND_MAX");
+      int max = 0;
+      if (env)
+          max = atoi(env);
+      max = max / alignof(Element);
+      int of;
+      if (max > 0) {
+          int rand = generator() / (generator.max() / max);
+          of = (rand) * alignof(Element);
+      } else {
+          of = 0;
+      }
+    void* m = aligned_alloc(alignof(Element), sz + of);
+    //click_chatter("EALLOC %d OF %d AL %d", sz, of, alignof(Element) );
+
+    //click_chatter("RESULT-EL%d %d", nalloc++, of );
+
+    // Generate an interrupt
+// std::raise(SIGINT);
+    return ((unsigned char*)m) + of;
+  }
+  static void* operator new(size_t sz, void* p)
+  {
+    return p;
+  }
+  // Overloading CLass specific delete operator
+  static void operator delete(void* m)
+  {
+    //Let's leak
+  }
 #endif
 
     inline bool is_fullpush() const;
