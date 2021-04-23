@@ -63,6 +63,9 @@ endif
 .cc.ii:
 	$(call cxxcompile_nodep,-E $< > $@,CXXCPP)
 
+llvmutils.o: llvmutils.cc
+	$(call cxxcompile,-c $< $(INCLUDES_LLVM) -o $@,CXX)
+
 GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	bitvector.o bighashmap_arena.o hashallocator.o \
 	ipaddress.o ipflowid.o etheraddress.o \
@@ -131,9 +134,6 @@ INSTALLPROGS = $(DRIVER) packetmill
 
 all: $(INSTALLPROGS) $(INSTALLLIBS)
 
-llvmutils.o: llvmutils.cc
-	$(call cxxcompile,-c $< $(INCLUDES_LLVM) -o $@,CXX)
-
 USE_DPDK = @USE_DPDK@
 ifeq ($(USE_DPDK),yes)
 	RTE_SDK = @RTE_SDK@
@@ -193,7 +193,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 
 
 packetmill: packetmill.cc $(DRIVER)
-	$(call cxxcompile,-o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS)) libclick.a packetmill.cc $(LIBS) $(LDFLAGS) $(LIBS_LLVM),CXXLINK)
+	$(call cxxcompile,-o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS) $(LLVM_OBJS)) libclick.a packetmill.cc $(LIBS) $(LDFLAGS) $(LIBS_LLVM),CXXLINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 
 elemlist:
