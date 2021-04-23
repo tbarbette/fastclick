@@ -1,75 +1,38 @@
-# FastClick (PacketMill)
+[FastClick](https://www.fastclick.dev) ![CI](https://github.com/tbarbette/fastclick/workflows/C/C++%20CI/badge.svg)
+=========
+This is an extended version of the Click Modular Router featuring an
+improved Netmap support and a new DPDK support. It was the result of
+our ANCS paper available at http://hdl.handle.net/2268/181954, but received
+multiple contributions and improvements since then.
 
-This repo is a modified FastClick that comes with some additional source-code optimization techniques to improve the performance of high-speed packet processing. Additionally, it implements different metadata management models, i.e., copying, overlaying, and X-Change.
+The [Wiki](https://github.com/tbarbette/fastclick/wiki) provides documentation about the elements and how to use some FastClick features
+such as batching.
 
-For more information, please refer to PacketMill's [paper][packetmill-paper] and [repo][packetmill-repo].
+Announcements
+-------------
+Be sure to watch the repository and check out the [GitHub Discussions](https://github.com/tbarbette/fastclick/discussions) to stay up to date!
 
+Quick start for DPDK
+--------------------
 
-## Source-code Modifications
+ * Install DPDK's dependencies (`sudo apt install libelf-dev build-essential pkg-config zlib1g-dev libnuma-dev`)
+ * Install DPDK (http://core.dpdk.org/doc/quick-start/). Since 20.11 you have to use meson : `meson build && cd build && ninja && sudo ninja install`
+ * Build FastClick, with support for DPDK using the following command:
 
-PacketMill performs multiple source-code optimizations that exploit the availabe information in a given NF configuration file. We have implemented these optimizations on top of `click-devirtualize`. 
-
-To use these optimization, you need to build and install FastClick as follows:
-
-
-```bash
-git clone --branch packetmill git@github.com:tbarbette/fastclick.git
-cd fastclick
-./configure --disable-linuxmodule --enable-userlevel --enable-user-multithread --enable-etherswitch --disable-dynamic-linking --enable-local --enable-dpdk --enable-research --enable-flow --disable-task-stats --enable-cpu-load --prefix $(pwd)/build/ --enable-intel-cpu CXX="clang++ -fno-access-control" CC="clang" CXXFLAGS="-std=gnu++14 -O3" --disable-bound-port-transfer --enable-dpdk-pool --disable-dpdk-packet
+```
+./configure --enable-dpdk --enable-intel-cpu --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --disable-cpu-load
 make
-sudo make uninstall
-sudo make install
 ```
+  * Since DPDK is using Meson and pkg-config, to compile against various, or non-globally installed DPDK versions, one can prepend `PKG_CONFIG_PATH=path/to/libpdpdk.pc/../` to both configure and make.
 
-You need to define `RTE_SDK` and `RTE_TARGET` before configuring FastClick.
+*You will find more information in the [High-Speed I/O wiki page](https://github.com/tbarbette/fastclick/wiki/High-speed-I-O).*
 
-**Note: PacketMill's [repo][packetmill-repo] offers a automated pipeline/workflow for building/installing PacketMill (FastClick + X-Change) and performing some experiments related to PacketMill's PacketMill's [paper][packetmill-paper].**
-
-### Devirtualize Pass
-
-This optimization pass removes virtual function calls from elements' source code based on the input configuration file. More specifically, it duplicates the source code, override some methods, and defines the type of called pointers & the called functions. The following code snippet shows the source code of `FromDPDKDevice::output_push` defined by `click-devirtualize` after applying the pass.
-
-```cpp
-inline void
-FromDPDKDevice_a_afd0::output_push(int i, Packet *p) const
-{
-  if (i == 0) { ((Classifier_a_aFNT_a3_sc0 *)output(i).element())->Classifier_a_aFNT_a3_sc0::push(0, p); return; }
-  output(i).push(p);
-}
+FastClick "Light"
+-----------------
+FastClick, like Click comes with a lot of features that you may not use. The following options will improve performance further :
 ```
-
-The new source code replaces the actual call as opposed to the normal FastClick code that uses `output(port).push_batch(batch);`. This pass has been originally introduced by `click-devirtualize`. We have adopted it and modified it to work with FastClick. Fore more information, please check click-devirtualize [paper][devirtualize-paper].
-
-To use this pass, run the following commands:
-
-**Note that you need to compile & install FastClick before applying any pass.**
-
-```bash
-sudo bin/click-devirtualize CONFIG  > package.uo
-ar x package.uo config
-cd userlevel
-sudo ../bin/click-mkmindriver -V -C .. -p embed --ship -u ../package.uo
-make embedclick MINDRIVER=embed STATIC=0
-```
-
-After building `embedclick`, you can run the new click binary with the new configuration file. For instance, you can run the following command:
-
-```bash
-sudo userlevel/embedclick --dpdk -l 0-35 -n 6 -w 0000:17:00.0 -v -- config
-```
-
-To see the changes to the source code, you can check `clickdv*.cc` and `clickdv*.hh` files in `userlevel/`. 
-
-### Replace Pass
-
-This pass replaces the variables with their available value in the configuration file. For instance, the following code snippet shows a part `FromDPDKDevice::run_task` function. Replace pass substitutes `_burst` variable by its value, `32`, which is specified in the input configuration file.
-
-```cpp
-// FastClick
-unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
-
-// click-devirtualize + replace pass
-unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, 32);
+./configure --enable-dpdk --enable-intel-cpu --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --disable-cpu-load --enable-dpdk-packet --disable-clone --disable-dpdk-softqueue
+make
 ```
  * Disable task stats suppress statistics tracking for advanced task scheduling with e.g. BalancedThreadSched. With DPDK, it's polling anyway... And as far as scheduling is concerned, RSS++ has a better solution.
  * Disable CPU load will remove load tracking. That is accounting for a CPU percentage while using DPDK by counting cycles spent in empty runs vs all runs. Accessible with the "load" handler.
