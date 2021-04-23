@@ -1,8 +1,9 @@
 %script
-click -e "DevirtualizeTest; DriverManager(stop);"
+click -qe "DevirtualizeTest; DriverManager(stop);"
 
 %expect stderr
-All test passed!
+config:1:{{.*}}
+  All tests pass!
 
 %ignorex
 #.*

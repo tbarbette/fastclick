@@ -60,7 +60,7 @@ DevirtualizeTest::initialize(ErrorHandler *errh)
 
     CHECK(fn.replace_expr("!TEMPVAL!",", 7", false, true));
 
-    errh->message("All test passed!");
+    errh->message("All tests pass!");
     return 0;
 }
 

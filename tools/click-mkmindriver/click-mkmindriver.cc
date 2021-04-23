@@ -278,8 +278,6 @@ Mindriver::resolve_requirement(const String& requirement, const ElementMap& emap
 
     int try_name_emapi = emap.traits_index(requirement);
 
-    click_chatter("Resolving %s", requirement.c_str());
-
     if (try_name_emapi > 0) {
         add_traits(emap.traits_at(try_name_emapi), emap, &lerrh);
         return true;
