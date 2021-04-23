@@ -74,10 +74,10 @@ In a nutshell:
 This section references projects that have been merged in.
 
 ### RSS++
-[RSS++](http://www.diva-portal.org/smash/get/diva2:1371780/FULLTEXT01.pdf) is a NIC-driven scheduler. It is compatible with DPDK (and of course FastClick) application and Kernel applications. The part relevent for FastClick are fully merged in this branch. It provides a solution to automatically scale the number of cores to be used by FromDPDKDevice.
+[RSS++](http://www.diva-portal.org/smash/get/diva2:1371780/FULLTEXT01.pdf) is a NIC-driven scheduler. It is compatible with DPDK (and of course FastClick) application and Kernel applications. The part relevent for FastClick are fully merged in this branch. It provides a solution to automatically scale the number of cores to be used by FromDPDKDevice. Except for its integration of a simulated Metron, PacketMill has been completely merged in.
 
 ### PacketMill
-[PacketMill](https://packetmill.io) is a serie of optimization to accelerate software
+[PacketMill](https://packetmill.io) is a serie of optimization to accelerate software. It has been mostly merged-in. See [README.packetmill.md] for more details.
 
 ### Differences with the FastClick ANCS paper
 This section states the differences between FastClick as in this repository and the original ANCS paper. For simplicity, we reference all input element as "FromDevice" and output
