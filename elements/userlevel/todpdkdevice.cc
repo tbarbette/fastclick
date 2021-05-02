@@ -45,7 +45,7 @@ ToDPDKDevice::~ToDPDKDevice()
 
 int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    int maxqueues = 128;
+    int maxqueues;
     String dev;
     if (Args(this, errh).bind(conf)
             .read_mp("PORT", dev)
@@ -56,10 +56,12 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
 
     if (Args(conf, this, errh)
-        .read("TIMEOUT", _timeout)
+        .read_or_set("TIMEOUT", _timeout, 0)
         .read("NDESC",ndesc)
-        .read("MAXQUEUES", maxqueues)
+        .read_or_set("MAXQUEUES", maxqueues,128)
         .read("ALLOC",_create)
+        .read("BURST",_burst)
+
 #if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
         .read("TSO", _tso)
         .read("IPCO", _ipco)
