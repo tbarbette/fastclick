@@ -29,7 +29,7 @@ With `mode=ALERT all=0`, you will only receive an alert in the log that you can 
 cd ~/middleclick/ &&  tail -f click.log
 ```
 
-With `mode=REPLACE all=1 pattern=nginx.org", you will replace all occurences of nginx.com per nginx.com:
+With `mode=REPLACE all=1 pattern=nginx.org", you will replace all occurences of nginx.com per nginx.org:
 ```
 <a href="http://nginx.org/">nginx.org</a>.<br/>
 ```
