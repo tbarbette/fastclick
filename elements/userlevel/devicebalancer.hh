@@ -51,10 +51,34 @@ More details about the methods can be found in include/click/NICScheduler*
 According to the result of the optimization, the element will re-program
 the indirection table using the ethtool API.
 
-This element extends NICScheduler*
-be used to implement NICScheduler*
+This element extends NICScheduler*.
+
 Therefore if you're looking into the implementation, you should read
 vendor/NICScheduler*
+
+Exemple usage :
+
+DeviceBalancer(DEV fd0, METHOD rsspp, VERBOSE $VERBOSE, STARTCPU 4, RSSCOUNTER agg, AUTOSCALE 0);
+
+=a
+
+=over 8
+
+=item DEV Element handling the device to balance
+
+=item METHOD Balancing method, eg rss or rsspp
+
+=item VERBOSE Verbosity level
+
+=item STARTCPU Number of CPU to use at startup
+
+=item RSSCOUNTER Element such as AggregateCounterVector to count packets per RSS index
+
+=item AUTOSCALE Enable autoscaling
+
+*
+
+
 */
 
 class DeviceBalancer : public Element, public NICScheduler {
