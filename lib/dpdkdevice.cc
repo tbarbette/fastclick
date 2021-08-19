@@ -96,21 +96,24 @@ const char *DPDKDevice::get_device_driver()
 
 #define RETA_CONF_SIZE     (ETH_RSS_RETA_SIZE_512 / RTE_RETA_GROUP_SIZE)
 
-int DPDKDevice::dpdk_set_rss_max(int max)
+int DPDKDevice::dpdk_set_rss_max(int max, unsigned sz)
 {
+    if (sz > ETH_RSS_RETA_SIZE_512)
+        return -1;
     struct rte_eth_rss_reta_entry64 reta_conf[RETA_CONF_SIZE];
     struct rte_eth_dev_info dev_info;
 
     rte_eth_dev_info_get(port_id, &dev_info);
-    uint16_t reta_size = dev_info.reta_size;
+
+    uint16_t reta_size = sz >= 0 ? sz : dev_info.reta_size;
     uint32_t i;
     int status;
     /* RETA setting */
     memset(reta_conf, 0, sizeof(reta_conf));
-    for (i = 0; i < reta_size; i++) {
+    for (i = 0; i < sz; i++) {
 			reta_conf[i / RTE_RETA_GROUP_SIZE].mask = UINT64_MAX;
     }
-	for (i = 0; i < reta_size; i++) {
+	for (i = 0; i < sz; i++) {
 			uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
 			uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
 			uint32_t core_id = i % max;
@@ -119,7 +122,7 @@ int DPDKDevice::dpdk_set_rss_max(int max)
 	/* RETA update */
 	status = rte_eth_dev_rss_reta_update(port_id,
 			reta_conf,
-			reta_size);
+			sz);
 	return status;
 }
 
@@ -786,8 +789,8 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
     #endif
     }
 
-    if (info.init_rss > 0) {
-        if (dpdk_set_rss_max(info.init_rss) != 0) {
+    if (info.init_rss > 0 || info.init_reta_size > 0) {
+        if (dpdk_set_rss_max(info.init_rss > 0?info.init_rss:info.rx_queues.size(), info.init_reta_size) != 0) {
             return errh->error("Could not set RSS to %d queues",info.init_rss);
         }
     }
@@ -963,6 +966,11 @@ void DPDKDevice::set_init_mac(EtherAddress mac) {
 void DPDKDevice::set_init_mtu(uint16_t mtu) {
     assert(!_is_initialized);
     info.init_mtu = mtu;
+}
+
+void DPDKDevice::set_init_reta_size(int reta_size) {
+    assert(!_is_initialized);
+    info.init_reta_size = reta_size;
 }
 
 void DPDKDevice::set_init_rss_max(int rss_max) {

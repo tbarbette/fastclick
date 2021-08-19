@@ -84,7 +84,7 @@ public:
     struct DevInfo {
         inline DevInfo() :
             vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
-            init_mac(), init_mtu(0), init_rss(-1), init_fc_mode(FC_UNSET),
+            init_mac(), init_mtu(0), init_rss(-1), init_reta_size(-1), init_fc_mode(FC_UNSET),
             rx_queues(0, false), tx_queues(0, false), n_rx_descs(0), n_tx_descs(0),
             num_pools(0), promisc(false),
 	    mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
@@ -108,6 +108,7 @@ public:
             click_chatter("                MAC Address: %s", init_mac.unparse().c_str());
             click_chatter("      Maximum Transfer Unit: %u", init_mtu);
             click_chatter("Receive Side Scaling queues: %d", init_rss);
+            click_chatter("                  RETA Size: %d", init_reta_size);
             click_chatter("          Flow Control Mode: %d", init_fc_mode);
             click_chatter("             # of Rx Queues: %d", rx_queues.size());
             click_chatter("             # of Tx Queues: %d", tx_queues.size());
@@ -134,6 +135,7 @@ public:
         EtherAddress init_mac;
         uint16_t init_mtu;
         int init_rss;
+        int init_reta_size;
         FlowControlMode init_fc_mode;
         Vector<bool> rx_queues;
         Vector<bool> tx_queues;
@@ -177,6 +179,7 @@ public:
     void set_init_mac(EtherAddress mac);
     void set_init_mtu(uint16_t mtu);
     void set_init_rss_max(int rss_max);
+    void set_init_reta_size(int reta_size);
     void set_init_fc_mode(FlowControlMode fc);
     void set_rx_offload(uint64_t offload);
     void set_tx_offload(uint64_t offload);
@@ -204,7 +207,7 @@ public:
     uint16_t get_device_id();
     const char *get_device_driver();
 
-    int dpdk_set_rss_max(int max);
+    int dpdk_set_rss_max(int max, unsigned reta_sz = -1);
     int dpdk_set_rss_reta(unsigned* reta, unsigned reta_sz);
     int dpdk_get_rss_reta_size() const;
     Vector<unsigned>  dpdk_get_rss_reta() const;
