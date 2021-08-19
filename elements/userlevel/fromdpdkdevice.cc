@@ -75,7 +75,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     int num_pools = 0;
     Vector<int> vf_vlan;
     int max_rss = 0;
+    int reta_size = 0;
     bool has_rss = false;
+    bool has_reta_size;
     bool flow_isolate = false;
 #if HAVE_FLOW_API
     String flow_rules_filename;
@@ -105,6 +107,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("RX_INTR", _rx_intr)
 #endif
         .read("MAX_RSS", max_rss).read_status(has_rss)
+        .read("RETA_SIZE", reta_size).read_status(has_reta_size)
         .read("TIMESTAMP", set_timestamp)
         .read_or_set("RSS_AGGREGATE", _set_rss_aggregate, false)
         .read_or_set("PAINT_QUEUE", _set_paint_anno, false)
@@ -179,6 +182,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (has_rss)
         _dev->set_init_rss_max(max_rss);
+
+    if (has_reta_size)
+        _dev->set_init_reta_size(reta_size);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
     _dev->set_init_flow_isolate(flow_isolate);
