@@ -35,6 +35,10 @@ Returns the accumulated cycles for all passing packets.
 Returns the number of packets with zero-valued cycle counter annotations that
 have passed.  These aren't included in the C<count>.
 
+= cycles_pp read-only
+
+Returns the average number of cycles per packets 
+
 =h reset_counts write-only
 
 Resets C<count>, C<cycles>, and C<zero_count> counters to zero when written.
