@@ -54,7 +54,7 @@ AC_PROG_CXXCPP
 
 case "$target" in
         *x86*)
-                AX_CHECK_X86_FEATURES
+                AX_CHECK_X86_FEATURES([CFLAGS="$CFLAGS $X86_FEATURE_CFLAGS";CXXFLAGS="$CXXFLAGS $X86_FEATURE_CFLAGS"])
         ;;
         *)
                 # AC_MSG_WARN(["Skipping x86 tests since target is $target"])
