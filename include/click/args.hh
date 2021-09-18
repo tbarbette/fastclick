@@ -7,6 +7,7 @@
 #include <click/confparse.hh>
 #include <click/timestamp.hh>
 #include <click/bitvector.hh>
+#include <type_traits>
 #if CLICK_BSDMODULE
 # include <machine/stdarg.h>
 #else
@@ -456,7 +457,6 @@ class Args : public ArgContext {
         }
         return *this;
     }
-
 
 
     template <typename T, typename V>
