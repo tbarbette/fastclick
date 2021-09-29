@@ -86,7 +86,7 @@ Search::push_batch(int port, PacketBatch *batch) {
 }
 #endif
 
-
 CLICK_ENDDECLS
+
 EXPORT_ELEMENT(Search)
 ELEMENT_MT_SAFE(Search)

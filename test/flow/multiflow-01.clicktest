@@ -3,7 +3,7 @@
 TCPRewriter and FTPPortMapper sequence number translation, even for SACK.
 
 %require
-click-buildtool provides flow
+click-buildtool provides flow FlowIPManagerHMP
 
 %script
 $VALGRIND click -e "

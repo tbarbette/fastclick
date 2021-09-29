@@ -184,8 +184,7 @@ IPRouteTable::push(int port, Packet *p)
 void
 IPRouteTable::push_batch(int port, PacketBatch *batch)
 {
-
-  CLASSIFY_EACH_PACKET(noutputs() + 1,([this,port](Packet* p){return process(port,p);}),batch,checked_output_push_batch);
+    CLASSIFY_EACH_PACKET(noutputs() + 1,([this,port](Packet* p){return process(port,p);}),batch,checked_output_push_batch);
 }
 #endif
 

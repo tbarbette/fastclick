@@ -53,7 +53,7 @@ Keyword arguments are:
 FlowIPLoadBalancer, FlowIPNAT */
 
 class FlowSwitch : public FlowStateElement<FlowSwitch,FlowSwitchEntry>,
-                           public TCPHelper, public LoadBalancer {
+                           public TCPHelper, public LoadBalancer<int> {
     public:
         FlowSwitch() CLICK_COLD;
         ~FlowSwitch() CLICK_COLD;
@@ -71,7 +71,7 @@ class FlowSwitch : public FlowStateElement<FlowSwitch,FlowSwitchEntry>,
 
         void push_flow(int, FlowSwitchEntry*, PacketBatch *);
 
-	void add_handlers() override;
+	    void add_handlers() override;
 
 private:
 	static int handler(int op, String& s, Element* e, const Handler* h, ErrorHandler* errh);

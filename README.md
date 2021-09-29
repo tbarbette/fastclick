@@ -1,9 +1,12 @@
 [FastClick](https://www.fastclick.dev) ![CI](https://github.com/tbarbette/fastclick/workflows/C/C++%20CI/badge.svg)
 =========
-This is an extended version of the Click Modular Router featuring an
+FastClick is an extended version of the Click Modular Router featuring an
 improved Netmap support and a new DPDK support. It was the result of
 our ANCS paper available at http://hdl.handle.net/2268/181954, but received
-multiple contributions and improvements since then.
+multiple contributions and improvements since then, such as flow support with
+MiddleClick, specialized binaries with PacketMill, precise intra-server
+load-balancing with RSS++ and many more individual contributions over the years.
+[More details below](#merged_work).
 
 The [Wiki](https://github.com/tbarbette/fastclick/wiki) provides documentation about the elements and how to use some FastClick features
 such as batching.
@@ -77,7 +80,10 @@ This section references projects that have been merged in.
 [RSS++](http://www.diva-portal.org/smash/get/diva2:1371780/FULLTEXT01.pdf) is a NIC-driven scheduler. It is compatible with DPDK (and of course FastClick) application and Kernel applications. The part relevent for FastClick are fully merged in this branch. It provides a solution to automatically scale the number of cores to be used by FromDPDKDevice. Except for its integration of a simulated Metron, RSS++ has been completely merged in.
 
 ### PacketMill
-[PacketMill](https://packetmill.io) is a serie of optimization to accelerate software. It has been mostly merged-in. See [README.packetmill.md] for more details.
+[PacketMill](https://packetmill.io) is a serie of optimization to accelerate high-speed packet processing, by building a specialized binary. It has been mostly merged-in. See [README.packetmill.md] for more details.
+
+### MiddleClick
+[MiddleClick](https://www.diva-portal.org/smash/record.jsf?pid=diva2%3A1582880&dswid=810)) brought in (Fast)Click the ability to understand flows and sessions on top of packets. See [README.middleclick.md] for more details.
 
 ### Differences with the FastClick ANCS paper
 This section states the differences between FastClick as in this repository and the original ANCS paper. For simplicity, we reference all input element as "FromDevice" and output

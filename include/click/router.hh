@@ -136,7 +136,7 @@ class Router { public:
 
     void add_requirement(const String &type, const String &value);
     int add_element(Element *e, const String &name, const String &conf, const String &filename, unsigned lineno);
-    int add_connection(int from_idx, int from_port, int to_idx, int to_port);
+    int add_connection(int from_idx, int from_port, int to_idx, int to_port, bool is_context, String context);
 #if CLICK_LINUXMODULE
     int add_module_ref(struct module* module);
 #endif
@@ -158,23 +158,54 @@ class Router { public:
      * Used to solve dependencies in router initialization.
      */
     class InitFuture { public:
-        InitFuture();
+        InitFuture(Element* owner = 0);
         ~InitFuture();
+
+        virtual void notifyParent(InitFuture* future);
 
         virtual int solve_initialize(ErrorHandler* errh);
 
-        void postOnce(InitFuture* future);
-
-        void post(std::function<int(void)>);
-        virtual void post(InitFuture* future);
+        virtual int completed(ErrorHandler* errh);
     protected:
+        bool _completed;
+        Element* _owner;
+    };
+
+    class ChildrenFuture : public InitFuture { public:
+        ChildrenFuture(Element* owner = 0);
+        ~ChildrenFuture();
+        virtual int solve_initialize(ErrorHandler* errh);
+        void postOnce(InitFuture* future);
+        virtual void post(InitFuture* future);
+        void post(std::function<int(ErrorHandler*)>, Element* owner = 0);
+        void post(std::function<int(void)>, Element* owner = 0);
+        virtual int completed(ErrorHandler* errh);
+    private:
         Vector<InitFuture*> _children;
     };
-    InitFuture _root_init_future;
 
-    InitFuture* get_root_init_future() {
+    class FctFuture : public InitFuture { public:
+        FctFuture(std::function<int(void)> f, Element* owner = 0);
+        FctFuture(std::function<int(ErrorHandler*)> f, Element* owner = 0);
+        ~FctFuture();
+
+        virtual int solve_initialize(ErrorHandler* errh) override;
+        std::function<int(ErrorHandler*)> _f;
+    };
+
+    class FctChildFuture : public FctFuture { public:
+        FctChildFuture(std::function<int(ErrorHandler*)> f, Element* owner, InitFuture* future);
+        ~FctChildFuture();
+
+        virtual int solve_initialize(ErrorHandler* errh) override;
+    private:
+        InitFuture* _child;
+    };
+
+    ChildrenFuture* get_root_init_future() {
         return &_root_init_future;
     }
+
 #endif
     int initialize(ErrorHandler* errh);
     void activate(bool foreground, ErrorHandler* errh);
@@ -213,12 +244,21 @@ class Router { public:
 
     struct Connection {
         Port p[2];
+        bool _is_context;
+        String _context;
 
-        Connection() {
+
+        Connection() : _is_context(false), _context("") {
         }
-        Connection(int from_idx, int from_port, int to_idx, int to_port) {
+        Connection(int from_idx, int from_port, int to_idx, int to_port) : _is_context(false), _context("") {
             p[0] = Port(to_idx, to_port);
             p[1] = Port(from_idx, from_port);
+        }
+        Connection(int from_idx, int from_port, int to_idx, int to_port, bool is_context, String context) {
+            p[0] = Port(to_idx, to_port);
+            p[1] = Port(from_idx, from_port);
+            _is_context = is_context;
+            _context = context;
         }
 
         const Port &operator[](int i) const {
@@ -272,6 +312,7 @@ class Router { public:
     };
 
     Master* _master;
+    ChildrenFuture _root_init_future;
 
     atomic_uint32_t _runcount;
 
@@ -392,6 +433,7 @@ class Router { public:
     /** @cond never */
     friend class Master;
     friend class Task;
+    friend class Lexer;
     friend int Element::set_nports(int, int);
     /** @endcond never */
 

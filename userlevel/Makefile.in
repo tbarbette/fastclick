@@ -67,7 +67,7 @@ llvmutils.o: llvmutils.cc
 	$(call cxxcompile,-c $< $(INCLUDES_LLVM) -o $@,CXX)
 
 GENERIC_OBJS = string.o straccum.o nameinfo.o \
-	bitvector.o bighashmap_arena.o hashallocator.o \
+	bitvector.o bighashmap_arena.o hashallocator.o allocator.o \
 	ipaddress.o ipflowid.o etheraddress.o \
 	packet.o packetbatch.o \
 	error.o timestamp.o glue.o task.o timer.o atomic.o fromfile.o gaprate.o \
@@ -79,6 +79,17 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	archive.o userutils.o driver.o \
 	tinyexpr.o \
 	$(EXTRA_DRIVER_OBJS) $(LLVM_OBJS)
+
+USE_FLOW = @USE_FLOW@
+USE_CTX = @USE_CTX@
+ifeq ($(USE_FLOW),yes)
+GENERIC_OBJS += flow.o flowelement.o flownode.o
+ifeq ($(USE_CTX),yes)
+GENERIC_OBJS += flowbuffer.o bytestreammaintainer.o modificationlist.o \
+	circularbuffer.o rbt.o bufferpool.o bufferpoolnode.o
+endif
+endif
+
 
 EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@
 

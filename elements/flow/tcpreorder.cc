@@ -26,12 +26,14 @@ TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
     .complete() < 0)
         return -1;
 
+    VirtualFlowManager::fcb_builded_init_future()->post([this](ErrorHandler* errh){return reorder_initialize(errh);},this);
+
     return 0;
 }
 
 
 int
-TCPReorder::solve_initialize(ErrorHandler *errh) {
+TCPReorder::reorder_initialize(ErrorHandler *errh) {
     ElementCastTracker track(router(), "TCPIn");
     router()->visit_downstream(this,0,&track);
     /*if (track.size() == 0) {
@@ -44,7 +46,6 @@ TCPReorder::solve_initialize(ErrorHandler *errh) {
     if (track.size() > 0) {
         return errh->error("TCPIn now includes support for reordering. Use TCPReorder alone if you only want TCP Reordering");
     }
-    return 0;
 }
 
 void*
@@ -320,16 +321,20 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
         unsigned hlen = ip->ip_hl << 2;
         click_tcp *th = (click_tcp *) (((char *)ip) + hlen);
         //click_chatter("Last packet, releasing timeout");
+        if (th->th_flags & (TH_FIN | TH_RST))
+                fcb_release_timeout();
     }
 
   send_batch:
   if (!tcpreorder->packetList && had_awaiting) {
       //We don't have awaiting packets anymore, remove the fct
       //click_chatter("We are now in order, removing release fct");
+      fcb_remove_release_fnt(tcpreorder,&fcb_release_fnt);
   } else if (tcpreorder->packetList && !had_awaiting) {
       //Set release fnt
       if (_verbose)
           click_chatter("Out of order, setting release fct");
+      fcb_set_release_fnt(static_cast<FlowReleaseChain*>(tcpreorder), &fcb_release_fnt);
   }
     assert(tcpreorder->expectedPacketSeq);
     tcpreorder->packetList = packet;
@@ -340,7 +345,7 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
         batch->set_count(count);
         batch->set_tail(last);
         last->set_next(0);
-        flow_assert(batch->find_count() == count);
+        flow_assert(batch->first()->find_count() == count);
 
         return batch;
     }
@@ -579,6 +584,26 @@ Packet* TCPReorder::sortList(Packet *list)
         /* Otherwise repeat, merging lists twice the size */
         insize *= 2;
     }
+}
+
+void TCPReorder::fcb_release_fnt(FlowControlBlock* fcb, void* thunk) {
+    TCPReorder* tr = static_cast<TCPReorder*>(thunk);
+    if (tr->_verbose)
+        click_chatter("Flushing %p{element}, data off %d",tr,tr->_flow_data_offset);
+    fcb_tcpreorder* tcpreorder = reinterpret_cast<fcb_tcpreorder*>(&fcb->data[tr->_flow_data_offset]);
+
+    int i = 0;
+    if (tcpreorder->packetList) {
+        FOR_EACH_PACKET_LL_SAFE(tcpreorder->packetList,p) {
+            p->kill();
+            i++;
+        }
+    }
+
+    //click_chatter("Released %d",i);
+    tcpreorder->packetList = 0;
+    if (tcpreorder->previous_fnt)
+        tcpreorder->previous_fnt(fcb, tcpreorder->previous_thunk);
 }
 
 CLICK_ENDDECLS

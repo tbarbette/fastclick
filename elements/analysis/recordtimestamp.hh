@@ -100,6 +100,7 @@ private:
     NumberPacket *_np;
 };
 
+
 const TimestampT read_timestamp = TimestampUnread;
 
 inline TimestampT RecordTimestamp::get(uint64_t i) {

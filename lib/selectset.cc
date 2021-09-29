@@ -379,7 +379,7 @@ kevent_compare(const void *ap, const void *bp, void *)
     return afd - bfd;
 }
 
-void
+bool
 SelectSet::run_selects_kqueue(RouterThread *thread)
 {
 # if HAVE_MULTITHREAD
@@ -404,7 +404,7 @@ SelectSet::run_selects_kqueue(RouterThread *thread)
     int was_errno = errno;
 
     if (post_select(thread, true))
-	return;
+	return false;
 
     thread->set_thread_state(RouterThread::S_RUNSELECT);
     if (n < 0 && was_errno != EINTR)
@@ -421,11 +421,12 @@ SelectSet::run_selects_kqueue(RouterThread *thread)
 	    call_selected(fd, mask);
 	}
     }
+    return n > 0;
 }
 #endif /* HAVE_ALLOW_KQUEUE */
 
 #if HAVE_ALLOW_POLL
-void
+bool
 SelectSet::run_selects_poll(RouterThread *thread)
 {
 # if HAVE_MULTITHREAD
@@ -446,15 +447,16 @@ SelectSet::run_selects_poll(RouterThread *thread)
 	timeout = 0;
     else if (delay_type > 0)
 	timeout = (t.sec() >= INT_MAX / 1000 ? INT_MAX - 1000 : t.msecval());
+    else if (thread->_idle_dorun >= 0)
+    timeout = 0;
     else
 	timeout = -1;
     thread->set_thread_state_for_blocking(delay_type);
-
     int n = poll(my_pollfds.begin(), my_pollfds.size(), timeout);
     int was_errno = errno;
 
     if (post_select(thread, true))
-	return;
+	return false;
 
     thread->set_thread_state(RouterThread::S_RUNSELECT);
     if (n < 0 && was_errno != EINTR)
@@ -479,10 +481,11 @@ SelectSet::run_selects_poll(RouterThread *thread)
 		if (p < my_pollfds.end() && fd != p->fd)
 		    p--;
 	    }
+   return n > 0;
 }
 
 #else /* !HAVE_ALLOW_POLL */
-void
+bool
 SelectSet::run_selects_select(RouterThread *thread)
 {
     fd_set read_mask = _read_select_fd_set;
@@ -510,7 +513,7 @@ SelectSet::run_selects_select(RouterThread *thread)
     int was_errno = errno;
 
     if (post_select(thread, true))
-	return;
+	return false;
 
     thread->set_thread_state(RouterThread::S_RUNSELECT);
     if (n < 0 && was_errno != EINTR)
@@ -536,10 +539,11 @@ SelectSet::run_selects_select(RouterThread *thread)
 		if (p < _pollfds.end() && fd != p->fd)
 		    p--;
 	    }
+    return n > 0;
 }
 #endif /* HAVE_ALLOW_POLL */
 
-void
+bool
 SelectSet::run_selects(RouterThread *thread)
 {
     // Wait in select() for input or timer, and call relevant elements'
@@ -547,7 +551,7 @@ SelectSet::run_selects(RouterThread *thread)
 
 #if HAVE_MULTITHREAD
     if (!_select_lock.attempt())
-	return;
+	return false;
 #endif
 
     // Return early if paused.
@@ -555,7 +559,7 @@ SelectSet::run_selects(RouterThread *thread)
 #if HAVE_MULTITHREAD
 	_select_lock.release();
 #endif
-	return;
+	return false;
     }
 
     // Return early (just run signals) if there are no selectors and there are
@@ -566,21 +570,22 @@ SelectSet::run_selects(RouterThread *thread)
 	_select_lock.release();
 #endif
 	post_select(thread, false);
-	return;
+	return false;
     }
 
+    bool work_done = false;
     // Call the relevant selector implementation.
     do {
 #if HAVE_ALLOW_KQUEUE
 	if (_kqueue >= 0) {
-	    run_selects_kqueue(thread);
+		work_done |= run_selects_kqueue(thread);
 	    break;
 	}
 #endif
 #if HAVE_ALLOW_POLL
-	run_selects_poll(thread);
+	work_done |= run_selects_poll(thread);
 #else
-	run_selects_select(thread);
+	work_done |= run_selects_select(thread);
 #endif
     } while (0);
 
@@ -588,6 +593,7 @@ SelectSet::run_selects(RouterThread *thread)
     _select_processor = click_invalid_processor();
     _select_lock.release();
 #endif
+    return work_done;
 }
 
 CLICK_ENDDECLS

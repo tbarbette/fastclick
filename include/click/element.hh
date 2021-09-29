@@ -19,6 +19,7 @@ class Router;
 class Master;
 class RouterThread;
 class Task;
+class IdleTask;
 class Timer;
 class NotifierSignal;
 class Element;
@@ -55,6 +56,7 @@ class Element { public:
 
     virtual bool run_task(Task *task);  // return true iff did useful work
     virtual void run_timer(Timer *timer);
+    virtual bool run_idle_task(IdleTask *task);
 #if CLICK_USERLEVEL
     enum { SELECT_READ = 1, SELECT_WRITE = 2 };
     virtual void selected(int fd, int mask);
@@ -214,9 +216,9 @@ class Element { public:
     virtual bool get_spawning_threads(Bitvector& b, bool isoutput, int port);
 
     Bitvector get_pushing_threads();
-    Bitvector get_passing_threads(bool forward, int port, Element* origin, bool &_is_fullpush, int level = 0);
-    Bitvector get_passing_threads(Element* origin, int level = 0);
-    Bitvector get_passing_threads();
+    Bitvector get_passing_threads(bool forward, int port, Element* origin, bool &_is_fullpush, int level = 0, bool touching = false);
+    Bitvector get_passing_threads(Element* origin, int level = 0, bool touching = false);
+    Bitvector get_passing_threads(bool touching = false);
 
     Bitvector get_spawning_threads();
 
@@ -316,12 +318,20 @@ class Element { public:
         inline void start_batch();
         inline void end_batch();
 #endif
+#if HAVE_FLOW_DYNAMIC
+        inline void set_unstack(bool unstack) {
+            _unstack = unstack;
+        }
+        inline bool unstack() const {
+            return _unstack;
+        }
+#endif
 
 #if CLICK_STATS >= 1
         unsigned npackets() const       { return _packets; }
 #endif
 
-        inline void assign(bool isoutput, Element *e, int port);
+        inline void assign_peer(bool isoutput, Element *e, int port, bool unstack=false);
 
       private:
 
@@ -329,7 +339,10 @@ class Element { public:
         int _port;
         #ifdef HAVE_AUTO_BATCH
         per_thread<PacketBatch*> current_batch;
-        #endif
+	#endif
+#if HAVE_FLOW_DYNAMIC
+        bool _unstack;
+#endif
 
 #if HAVE_BOUND_PORT_TRANSFER
         union {
@@ -352,7 +365,7 @@ class Element { public:
 #endif
 
         inline Port();
-        inline void assign(bool isoutput, Element *owner, Element *e, int port);
+        inline void assign_owner(bool isoutput, Element *owner, Element *e, int port, bool unstack=false);
 
         friend class Element;
         friend class BatchElement;
@@ -644,6 +657,9 @@ Element::input_is_push(int port) const
 inline
 Element::Port::Port()
     : _e(0), _port(-2)
+#if HAVE_FLOW_DYNAMIC
+      , _unstack(false)
+#endif
 {
     PORT_ASSIGN(0);
 }
@@ -652,10 +668,15 @@ Element::Port::Port()
 #pragma GCC diagnostic ignored "-Wpmf-conversions"
 #endif
 inline void
-Element::Port::assign(bool isoutput, Element *e, int port)
+Element::Port::assign_peer(bool isoutput, Element *e, int port, bool unstack)
 {
     _e = e;
     _port = port;
+#if HAVE_FLOW_DYNAMIC
+    _unstack = unstack;
+#else
+    (void)unstack;
+#endif
 #ifdef HAVE_AUTO_BATCH
     for (unsigned i = 0; i < current_batch.weight() ; i++)
         current_batch.set_value(i,0);
@@ -685,10 +706,10 @@ Element::Port::assign(bool isoutput, Element *e, int port)
 #pragma GCC diagnostic pop
 #endif
 inline void
-Element::Port::assign(bool isoutput, Element *owner, Element *e, int port)
+Element::Port::assign_owner(bool isoutput, Element *owner, Element *e, int port, bool unstack)
 {
     PORT_ASSIGN(owner);
-    assign(isoutput, e, port);
+    assign_peer(isoutput, e, port, unstack);
 }
 
 /** @brief Returns whether this port is active (a push output or a pull input).
@@ -744,6 +765,16 @@ inline void
 Element::Port::push(Packet* p) const
 {
     assert(_e && p);
+#if HAVE_FLOW_DYNAMIC
+    FlowControlBlock* tmp_stack = 0;
+    if (_unstack) {
+        tmp_stack = fcb_stack;
+#if HAVE_FLOW_DYNAMIC
+        fcb_stack->release(1);
+#endif
+        fcb_stack = 0;
+    }
+#endif
 #ifdef HAVE_AUTO_BATCH
     if (likely(_e->in_batch_mode == BATCH_MODE_YES)) {
         if (*current_batch != 0) {
@@ -783,6 +814,11 @@ Element::Port::push(Packet* p) const
 # else
     _e->push(_port, p);
 # endif
+    }
+#endif
+#if HAVE_FLOW_DYNAMIC
+    if (_unstack) {
+        fcb_stack = tmp_stack;
     }
 #endif
 }
@@ -842,6 +878,17 @@ Element::Port::pull() const
  */
 void
 Element::Port::push_batch(PacketBatch* batch) const {
+#if HAVE_FLOW_DYNAMIC
+    FlowControlBlock* tmp_stack = 0;
+    if (unlikely(_unstack && fcb_stack)) {
+        tmp_stack = fcb_stack;
+#if HAVE_FLOW_DYNAMIC
+        fcb_stack->release(batch->count());
+#endif
+        fcb_stack = 0;
+    }
+#endif
+
 #if BATCH_DEBUG
     click_chatter("Pushing batch of %d packets to %p{element}",batch->count(),_e);
 #endif
@@ -849,6 +896,11 @@ Element::Port::push_batch(PacketBatch* batch) const {
     _bound_batch.push_batch(_e,_port,batch);
 #else
     _e->push_batch(_port,batch);
+#endif
+#if HAVE_FLOW_DYNAMIC
+    if (unlikely(_unstack)) {
+        fcb_stack = tmp_stack;
+    }
 #endif
 }
 

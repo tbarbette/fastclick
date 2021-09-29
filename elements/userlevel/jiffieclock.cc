@@ -25,7 +25,7 @@
 CLICK_DECLS
 
 JiffieClock::JiffieClock() :
-_task(this), _timer(this), _verbose(false)
+_task(this), _timer(this), _verbose(false),_minprecision(2)
 {
 
 }
@@ -35,6 +35,7 @@ JiffieClock::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
         .read_p("VERBOSE", _verbose)
+        .read_p("MINPRECISION", _minprecision)
         .complete() < 0)
         return -1;
     return 0;
@@ -62,13 +63,12 @@ void JiffieClock::run_timer(Timer* t) {
     Timestamp current_time = Timestamp::now_steady();
     int64_t delta = (current_time - last_jiffies_update).msec() / (1000 / CLICK_HZ);
     if (delta > 0) {
-        if (unlikely(delta > 2)) {//Accept a little jump from time to time, but not double jump
+        if (unlikely(delta > _minprecision)) {//Accept a little jump from time to time, but not double jump
             //We try all the click threads
             int nt = (t->home_thread_id() + 1) % master()->nthreads();
             if (nt == home_thread_id()) {
-                if (_verbose)
-                    click_chatter("Click tasks are too heavy and the jiffie accumulator cannot run at least once every %dmsec, the user jiffie clock is deactivated.",1000 / CLICK_HZ);
-                click_jiffies_fct = 0;
+                click_chatter("Click tasks are too heavy and the jiffie accumulator cannot run at least once every %dmsec, the user jiffie clock is deactivated.",_minprecision);
+                click_jiffies_fct = &click_timestamp_jiffies;
                 return;
             }
             if (_verbose)
@@ -86,7 +86,7 @@ click_jiffies_t JiffieClock::read_jiffies(void* data) {
 }
 
 
-bool JiffieClock::run_task(Task* timer) {
+bool JiffieClock::run_task(Task*) {
     if (_verbose)
         click_chatter("Switching to accumulated jiffies");
     jiffies = click_jiffies();

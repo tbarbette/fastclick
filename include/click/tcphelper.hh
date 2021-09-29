@@ -12,6 +12,7 @@
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
 #include <click/element.hh>
+#include <click/ipflowid.hh>
 #include <functional>
 
 
@@ -34,6 +35,8 @@ CLICK_DECLS
 class TCPHelper : public IPHelper
 {
 public:
+    TCPHelper() CLICK_COLD;
+
 
     WritablePacket* forgeRst(Packet* packet) {
         // Get the information needed to ack the given packet
@@ -237,10 +240,25 @@ public:
      */
     static inline void resetTCPChecksum(WritablePacket* packet);
 
-
     static int iterateOptions(Packet *packet, std::function<bool(uint8_t,void*)> fnt);
 
+    static void printPacket(Packet* p);
 };
+
+inline void TCPHelper::printPacket(Packet* p) {
+    String sup = "";
+    String flags = "";
+    if (isSyn(p))
+        flags += "S";
+    if (isAck(p)) {
+        flags += "A";
+        sup += "ACK " + String(ntohl(p->tcp_header()->th_ack));
+    }
+    if (isRst(p))
+        flags += "R";
+
+    click_chatter("%s: %u+%u [%s] %s %s", p->timestamp_anno().unparse().c_str(), ntohl(p->tcp_header()->th_seq), getPayloadLength(p), flags.c_str(), IPFlowID(p).unparse().c_str(), sup.c_str());
+}
 
 inline tcp_seq_t
 TCPHelper::getNextSequenceNumber(Packet* packet) const

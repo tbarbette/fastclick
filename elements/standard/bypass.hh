@@ -101,6 +101,7 @@ class Bypass : public BatchElement { public:
     struct Locator : public RouterVisitor {
         Element* _e;
         int _port;
+        bool _unstack;
         int _from_port;
         Locator(int from_port);
         bool visit(Element *e, bool isoutput, int port,
@@ -110,8 +111,9 @@ class Bypass : public BatchElement { public:
     struct Assigner : public RouterVisitor {
         Element* _e;
         int _port;
+        bool _unstack;
         Vector<int> _interesting;
-        Assigner(Element *e, int port);
+        Assigner(Element *e, int port, bool unstack);
         bool visit(Element *e, bool isoutput, int port,
                    Element *from_e, int from_port, int distance);
     };

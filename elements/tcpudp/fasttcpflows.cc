@@ -41,6 +41,7 @@ FastTCPFlows::FastTCPFlows()
     _rate_limited = true;
     _first = _last = 0;
     _count = 0;
+    _sequence = 0;
 }
 
 FastTCPFlows::~FastTCPFlows()
@@ -174,9 +175,10 @@ FastTCPFlows::initialize(ErrorHandler *)
     for (unsigned i=0; i<_nflows; i++) {
         unsigned short sport = (click_random() >> 2) % 0xFFFF;
         unsigned short dport = (click_random() >> 2) % 0xFFFF;
+        tcp_seq_t seq = click_random();
 
         // SYN packet
-        WritablePacket *q = Packet::make(_len);
+        WritablePacket *q = Packet::make(_sequence?60:_len);
         _flows[i].syn_packet = q;
         memcpy((void*)_flows[i].syn_packet->data(), &_ethh, 14);
         click_ip *ip =
@@ -185,7 +187,7 @@ FastTCPFlows::initialize(ErrorHandler *)
         // set up IP header
         ip->ip_v = 4;
         ip->ip_hl = sizeof(click_ip) >> 2;
-        ip->ip_len = htons(_len-14);
+        ip->ip_len = htons(_sequence?54-14:_len-14);
         ip->ip_id = 0;
         ip->ip_p = IP_PROTO_TCP;
         ip->ip_src = _sipaddr;
@@ -200,16 +202,21 @@ FastTCPFlows::initialize(ErrorHandler *)
         // set up TCP header
         tcp->th_sport = sport;
         tcp->th_dport = dport;
-        tcp->th_seq = click_random();
+        tcp->th_seq = htonl(seq);
         tcp->th_ack = click_random();
         tcp->th_off = sizeof(click_tcp) >> 2;
         tcp->th_flags = TH_SYN;
         tcp->th_win = 65535;
         tcp->th_urp = 0;
         tcp->th_sum = 0;
-        unsigned short len = _len-14-sizeof(click_ip);
+        unsigned short len = (_sequence?54:_len)-14-sizeof(click_ip);
         unsigned csum = click_in_cksum((uint8_t *)tcp, len);
         tcp->th_sum = click_in_cksum_pseudohdr(csum, ip, len);
+
+        if (_sequence)
+            seq = seq + 1;
+        else
+            seq = click_random();
 
         // DATA packet with PUSH and ACK
         q = Packet::make(_len);
@@ -235,7 +242,7 @@ FastTCPFlows::initialize(ErrorHandler *)
         // set up TCP header
         tcp->th_sport = sport;
         tcp->th_dport = dport;
-        tcp->th_seq = click_random();
+        tcp->th_seq = htonl(seq);
         tcp->th_ack = click_random();
         tcp->th_off = sizeof(click_tcp) >> 2;
         tcp->th_flags = TH_PUSH | TH_ACK;
@@ -270,7 +277,10 @@ FastTCPFlows::initialize(ErrorHandler *)
         // set up TCP header
         tcp->th_sport = sport;
         tcp->th_dport = dport;
-        tcp->th_seq = click_random();
+        if (_sequence)
+            tcp->th_seq = htonl(seq + _len-14-sizeof(click_ip) - sizeof(click_tcp));
+        else
+            tcp->th_seq = click_random();
         tcp->th_ack = click_random();
         tcp->th_off = sizeof(click_tcp) >> 2;
         tcp->th_flags = TH_FIN;
@@ -292,15 +302,15 @@ FastTCPFlows::initialize(ErrorHandler *)
 void
 FastTCPFlows::cleanup(CleanupStage)
 {
-    if (_flows) {
-       for (unsigned i=0; i<_nflows; i++) {
-            _flows[i].syn_packet->kill();
-            _flows[i].data_packet->kill();
-            _flows[i].fin_packet->kill();
-        }
-        delete[] _flows;
-        _flows = 0;
+  if (_flows) {
+    for (unsigned i=0; i<_nflows; i++) {
+      _flows[i].syn_packet->kill();
+      _flows[i].data_packet->kill();
+      _flows[i].fin_packet->kill();
     }
+    delete[] _flows;
+    _flows = 0;
+  }
 }
 
 Packet *
