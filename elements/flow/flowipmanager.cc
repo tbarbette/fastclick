@@ -27,7 +27,7 @@
 
 CLICK_DECLS
 
-FlowIPManager::FlowIPManager() : _verbose(1), _flags(0), _timer(this), _task(this), _cache(true)
+FlowIPManager::FlowIPManager() : _verbose(1), _flags(0), _timer(this), _task(this), _cache(true), Router::InitFuture(this)
 {
 }
 
@@ -42,7 +42,7 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (Args(conf, this, errh)
         .read_or_set_p("CAPACITY", _table_size, 65536)
-        .read_or_set("RESERVE",_reserve, 0)
+        .read_or_set("RESERVE", _reserve, 0)
         .read_or_set("TIMEOUT", _timeout, 60)
 #if RTE_VERSION > RTE_VERSION_NUM(18,8,0,0)
         .read_or_set("LF", lf, false)
@@ -110,7 +110,7 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
 
     }
 
-    return 0;
+    return Router::InitFuture::solve_initialize(errh);
 }
 
 

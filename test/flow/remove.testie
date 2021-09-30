@@ -1,0 +1,191 @@
+%info
+Test MiddleClick correctness in UDP
+
+Try the WordMatcher element to find a pattern in 2 flows. The pattern "is" repeats twice in the first flow, and accross 2 packets in the second flow. We
+test a variety of modes :
+- ALERT : Just print on match
+- MASK  : Mask the pattern
+- REPLACE:Replace the pattern by something else but limited to the pattern size
+- REPLACEALL:Replace ALL pattern by something else but limited to the pattern size
+- FULL  : Replace the pattern by a string, adding bytes
+- FULLALL:Like FULL but replace multiple occurences
+- FULLLESS:Replacement shorter than the pattern, so it will remove bytes
+- FULLLESSALL:Same but replace all patterns
+
+%require
+click-buildtool provides flow ctx
+
+%script
+click CONFIG
+
+%file CONFIG
+FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
+-> Print("IN",-1)
+-> fs :: CTXManager(VERBOSE 0, CONTEXT NONE)
+~> IPIn
+-> UDPIn
+-> WordMatcher(WORD is, MODE MASK)
+-> IPOut
+-> Print("OUT",-2)
+-> ToIPSummaryDump(MASK, FIELDS wire_len src dst proto payload);
+
+fs ~> Print("NON UDP") -> Discard;
+
+FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
+-> Print("IN",-1)
+-> CTXManager(VERBOSE 0, CONTEXT NONE)
+~> IPIn
+-> UDPIn
+-> WordMatcher(WORD is, MODE REMOVE)
+-> IPOut
+-> Print("OUT",-2)
+-> ToIPSummaryDump(REMOVE, FIELDS wire_len src dst proto payload);
+
+FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
+-> Print("IN",-1)
+-> CTXManager(VERBOSE 0, CONTEXT NONE)
+~> IPIn
+-> UDPIn
+-> WordMatcher(WORD is, MODE REPLACE)
+-> IPOut
+-> Print("OUT",-2)
+-> ToIPSummaryDump(REPLACE, FIELDS wire_len src dst proto payload);
+
+FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
+-> Print("IN",-1)
+-> CTXManager(VERBOSE 0, CONTEXT NONE)
+~> IPIn
+-> UDPIn
+-> WordMatcher(WORD is, MODE REPLACE, ALL true)
+-> IPOut
+-> Print("OUT",-2)
+-> ToIPSummaryDump(REPLACEALL, FIELDS wire_len src dst proto payload);
+
+FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
+-> Print("IN",-1)
+-> CTXManager(VERBOSE 0, CONTEXT NONE)
+~> IPIn
+-> UDPIn
+-> WordMatcher(WORD is, MODE FULL)
+-> IPOut
+-> Print("OUT",-2)
+-> ToIPSummaryDump(FULL, FIELDS wire_len src dst proto payload);
+
+FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
+-> Print("IN",-1)
+-> CTXManager(VERBOSE 0, CONTEXT NONE)
+~> IPIn
+-> UDPIn
+-> WordMatcher(WORD is, MODE FULL, ALL true)
+-> IPOut
+-> Print("OUT",-2)
+-> ToIPSummaryDump(FULLALL, FIELDS wire_len src dst proto payload);
+
+FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
+-> Print("IN",-1)
+-> CTXManager(VERBOSE 0, CONTEXT NONE)
+~> IPIn
+-> UDPIn
+-> WordMatcher(WORD is, MODE FULL, ALL false, MSG X)
+-> IPOut
+-> Print("OUT",-2)
+-> ToIPSummaryDump(FULLLESS, FIELDS wire_len src dst proto payload);
+
+FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
+-> Print("IN",-1)
+-> CTXManager(VERBOSE 0, CONTEXT NONE)
+~> IPIn
+-> UDPIn
+-> WordMatcher(WORD is, MODE FULL, ALL true, MSG X)
+-> IPOut
+-> Print("OUT",-2)
+-> ToIPSummaryDump(FULLLESSALL, FIELDS wire_len src dst proto payload);
+
+%file IN1
+!data src dst proto payload
+18.26.4.44 18.26.4.44 U thisisan
+18.26.4.44 18.26.4.44 U at
+18.26.4.44 18.26.4.44 U tack
+18.26.4.44 18.26.4.45 U thi
+18.26.4.44 18.26.4.45 U sca
+18.26.4.44 18.26.4.45 U t
+
+%expect MASK
+!IPSummaryDump 1.3
+!data wire_len ip_src ip_dst ip_proto payload
+36 18.26.4.44 18.26.4.44 U "th**isan"
+30 18.26.4.44 18.26.4.44 U "at"
+32 18.26.4.44 18.26.4.44 U "tack"
+31 18.26.4.44 18.26.4.45 U "th*"
+31 18.26.4.44 18.26.4.45 U "*ca"
+29 18.26.4.44 18.26.4.45 U "t"
+
+%expect REMOVE
+!IPSummaryDump 1.3
+!data wire_len ip_src ip_dst ip_proto payload
+34 18.26.4.44 18.26.4.44 U "thisan"
+30 18.26.4.44 18.26.4.44 U "at"
+32 18.26.4.44 18.26.4.44 U "tack"
+30 18.26.4.44 18.26.4.45 U "th"
+30 18.26.4.44 18.26.4.45 U "ca"
+29 18.26.4.44 18.26.4.45 U "t"
+
+%expect REPLACE
+!IPSummaryDump 1.3
+!data wire_len ip_src ip_dst ip_proto payload
+36 18.26.4.44 18.26.4.44 U "th<fisan"
+30 18.26.4.44 18.26.4.44 U "at"
+32 18.26.4.44 18.26.4.44 U "tack"
+31 18.26.4.44 18.26.4.45 U "th<"
+31 18.26.4.44 18.26.4.45 U "fca"
+29 18.26.4.44 18.26.4.45 U "t"
+
+%expect REPLACEALL
+!IPSummaryDump 1.3
+!data wire_len ip_src ip_dst ip_proto payload
+36 18.26.4.44 18.26.4.44 U "th<f<fan"
+30 18.26.4.44 18.26.4.44 U "at"
+32 18.26.4.44 18.26.4.44 U "tack"
+31 18.26.4.44 18.26.4.45 U "th<"
+31 18.26.4.44 18.26.4.45 U "fca"
+29 18.26.4.44 18.26.4.45 U "t"
+
+%expect FULL
+!IPSummaryDump 1.3
+!data wire_len ip_src ip_dst ip_proto payload
+82 18.26.4.44 18.26.4.44 U "th<font color='red'>Blocked content !</font><br />isan"
+30 18.26.4.44 18.26.4.44 U "at"
+32 18.26.4.44 18.26.4.44 U "tack"
+31 18.26.4.44 18.26.4.45 U "th<"
+77 18.26.4.44 18.26.4.45 U "font color='red'>Blocked content !</font><br />ca"
+29 18.26.4.44 18.26.4.45 U "t"
+
+%expect FULLALL
+!IPSummaryDump 1.3
+!data wire_len ip_src ip_dst ip_proto payload
+128 18.26.4.44 18.26.4.44 U "th<font color='red'>Blocked content !</font><br /><font color='red'>Blocked content !</font><br />an"
+30 18.26.4.44 18.26.4.44 U "at"
+32 18.26.4.44 18.26.4.44 U "tack"
+31 18.26.4.44 18.26.4.45 U "th<"
+77 18.26.4.44 18.26.4.45 U "font color='red'>Blocked content !</font><br />ca"
+29 18.26.4.44 18.26.4.45 U "t"
+
+%expect FULLLESS
+!IPSummaryDump 1.3
+!data wire_len ip_src ip_dst ip_proto payload
+35 18.26.4.44 18.26.4.44 U "thXisan"
+30 18.26.4.44 18.26.4.44 U "at"
+32 18.26.4.44 18.26.4.44 U "tack"
+31 18.26.4.44 18.26.4.45 U "thX"
+30 18.26.4.44 18.26.4.45 U "ca"
+29 18.26.4.44 18.26.4.45 U "t"
+
+%expect FULLLESSALL
+!IPSummaryDump 1.3
+!data wire_len ip_src ip_dst ip_proto payload
+34 18.26.4.44 18.26.4.44 U "thXXan"
+30 18.26.4.44 18.26.4.44 U "at"
+32 18.26.4.44 18.26.4.44 U "tack"
+31 18.26.4.44 18.26.4.45 U "thX"
+30 18.26.4.44 18.26.4.45 U "ca"
+29 18.26.4.44 18.26.4.45 U "t"

@@ -103,7 +103,7 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("BURST", burst)
         .read("MIGRATE", migrate)
         .read("TIMESTAMP", timestamp)
-	.read_or_set("TIMES", _times, 1)
+	    .read_or_set("TIMES", _times, 1)
     .complete() < 0)
     return -1;
     if (_sampling_prob > (1 << SAMPLING_SHIFT)) {

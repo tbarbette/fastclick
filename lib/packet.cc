@@ -604,6 +604,11 @@ inline bool WritablePacket::is_from_data_pool(WritablePacket *p) {
 void
 WritablePacket::recycle(WritablePacket *p)
 {
+#if HAVE_FLOW_DYNAMIC
+        if (fcb_stack) {
+            fcb_stack->release(1);
+        }
+#endif
     PacketPool& packet_pool = local_packet_pool();
     bool data = is_from_data_pool(p);
 
@@ -642,6 +647,15 @@ WritablePacket::recycle(WritablePacket *p)
 void
 WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
+#if HAVE_FLOW_DYNAMIC
+    if (fcb_stack) {
+        fcb_stack->release(count);
+    } else {
+#if DEBUG_CLASSIFIER_RELEASE > 1
+        click_chatter("Warning : kill in recycle_packet_batch without FCB");
+#endif
+    }
+#endif
     PacketPool& packet_pool = local_packet_pool();
 #if HAVE_VECTOR_PACKET_POOL
     assert(false);
@@ -664,6 +678,15 @@ WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigne
 void
 WritablePacket::recycle_data_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
+#if HAVE_FLOW_DYNAMIC
+    if (fcb_stack) {
+        fcb_stack->release(count);
+    } else {
+# if DEBUG_CLASSIFIER_RELEASE > 1
+        click_chatter("Warning : kill in recycle_data_batch without FCB");
+# endif
+    }
+#endif
     PacketPool& packet_pool = local_packet_pool();
 #if HAVE_VECTOR_PACKET_POOL
     assert(false);
@@ -820,6 +843,10 @@ Packet::make(uint32_t headroom, const void *data,
     WritablePacket* q = reinterpret_cast<WritablePacket *>(mb);
     if (clear)
         q->clear_annotations();
+#if HAVE_FLOW_DYNAMIC
+            if (fcb_stack)
+                fcb_stack->acquire(1);
+#endif
     return q;
 
 #else
@@ -851,6 +878,10 @@ Packet::make(uint32_t headroom, const void *data,
         # endif
             if (data)
                 memcpy(p->data(), data, length);
+#if HAVE_FLOW_DYNAMIC
+			if (fcb_stack)
+			    fcb_stack->acquire(1);
+#endif
             return p;
         #endif
 
@@ -896,6 +927,10 @@ assert(false); //TODO
 	p->_end = p->_tail + tailroom;
 	p->_destructor = destructor;
 	p->_destructor_argument = argument;
+#if HAVE_FLOW_DYNAMIC
+    if (fcb_stack)
+        fcb_stack->acquire(1);
+#endif
     }
     return p;
 # endif
@@ -1087,6 +1122,8 @@ Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom)
 
     return npkt;
 #else
+    (void)extra_headroom;
+    (void)extra_tailroom;
     abort();
 #endif
 }
@@ -1139,6 +1176,10 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
             kill();
         return 0;
     }
+#if HAVE_FLOW_DYNAMIC
+    if (likely(fcb_stack))
+        fcb_stack->acquire(1);
+#endif
 
     uint8_t *old_head = _head, *old_end = _end;
     int headroom = this->headroom();
@@ -1167,7 +1208,9 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
 # ifndef CLICK_NOINDIRECT
         p->_data_packet = NULL; //packet from pool_data_allocate can be dirty
 # endif
+        SFCB_STACK(
         WritablePacket::recycle(p);
+        );
         p = (WritablePacket*)this;
     }
 
@@ -1457,6 +1500,36 @@ Packet::static_cleanup()
 #endif
 }
 
+WritablePacket *
+Packet::make_similar(Packet* original, uint32_t length)
+{
+#if HAVE_DPDK && !HAVE_DPDK_PACKET_POOL && !CLICK_PACKET_USE_DPDK
+    if (DPDKDevice::is_dpdk_buffer(original) && length <= DPDKDevice::MBUF_DATA_SIZE) {
+        WritablePacket* p = WritablePacket::pool_allocate();
+        if (!p)
+            return 0;
+		p->initialize(false);
+
+#if HAVE_FLOW_DYNAMIC
+            if (fcb_stack)
+                fcb_stack->acquire(1);
+#endif
+        rte_mbuf* mbuf = DPDKDevice::get_pkt();
+	    p->_head = (unsigned char*)mbuf->buf_addr;
+        p->_data = rte_pktmbuf_mtod(mbuf, unsigned char*);
+	    p->_tail = p->_data + length;
+	    p->_end = p->_head + DPDKDevice::MBUF_DATA_SIZE;
+        p->_destructor = DPDKDevice::free_pkt;
+        p->_destructor_argument = mbuf;
+        return p;
+    }
+#else
+        (void)original;
+#endif
+    {
+        return make(default_headroom, (const unsigned char *) 0, length, 0);
+    }
+}
 
 #if HAVE_STATIC_ANNO
 unsigned int Packet::clean_offset = 0;

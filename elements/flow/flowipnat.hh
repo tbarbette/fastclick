@@ -19,7 +19,7 @@ CLICK_DECLS
 //If 1, prevent reusing ports while connections are active
 #define HAVE_NAT_NEVER_REUSE 1 //Actually for the LB
 
-#define NAT_COLLIDE 0  //Avoid port collisions, same but for the NAT
+#define NAT_COLLIDE 1  //1 to avoid port collisions, if 0 just reuse port numbers after they exhaust
 
 #if DEBUG_NAT>=2
 # define nat_debug_chatter(args...) click_chatter(args)
@@ -39,6 +39,7 @@ CLICK_DECLS
 
 CLICK_DECLS
 
+#if HAVE_NAT_NEVER_REUSE
 struct NATCommon {
     NATCommon(uint16_t _port, MPSCDynamicRing<NATCommon*>* _ring) :
                 port(_port), closing(0), ring(_ring) {
@@ -49,6 +50,7 @@ struct NATCommon {
     uint8_t closing; // Has one side started to close?
     MPSCDynamicRing<NATCommon*>* ring;
 };
+#endif
 
 class NATState {
     public:
@@ -114,6 +116,9 @@ class FlowIPNAT : public FlowStateElement<FlowIPNAT,NATEntryIN> , TCPHelper {
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
         int initialize(ErrorHandler *errh);
+
+        //TCP only for now, just to reuse the macro but nothing prevents UDP
+        FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 22/0/ffff 20/0/ffff:ARRAY", FLOW_TCP);
 
         static const int timeout = NAT_FLOW_TIMEOUT;
         NATCommon* pick_port();
@@ -201,10 +206,12 @@ inline bool update_state(T* flowdata, const Packet* q)
             flowdata->ref->closing = 1;
             return true;
         }
-        // unreachable
-    } else if (unlikely(flowdata->ref->closing == 2 && q->tcp_header()->th_flags & TH_ACK && flowdata->fin_seen)) {
+        //unreachable
+    /*} else if (unlikely(flowdata->ref->closing == 2 && q->tcp_header()->th_flags & TH_ACK && flowdata->fin_seen)) {
         nat_debug_chatter("CLOSING ACK");
         return false;
+    }*/
+        return true;
     }
     return true;
 #else

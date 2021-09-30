@@ -13,7 +13,9 @@
 CLICK_DECLS
 
 #ifdef HAVE_FLOW
-
+# if HAVE_CTX
+class CTXManager;
+# endif
 class VirtualFlowManager;
 
 enum FlowType {
@@ -23,6 +25,7 @@ enum FlowType {
     FLOW_IP,
     FLOW_TCP,
     FLOW_UDP,
+    FLOW_ICMP,
     FLOW_HTTP
 };
 
@@ -31,7 +34,12 @@ public:
     FlowElement();
     ~FlowElement();
 
-    virtual FlowType getContext();
+# if HAVE_CTX
+    virtual FlowNode* get_table(int iport, Vector<FlowElement*> contextStack);
+
+    virtual FlowNode* resolveContext(FlowType, Vector<FlowElement*> stack);
+# endif
+    virtual FlowType getContext(int port);
 
     virtual bool stopClassifier() { return false; };
 };
@@ -40,10 +48,10 @@ public:
 /**
  * Element that needs FCB space
  */
-class VirtualFlowSpaceElement : public FlowElement, Router::InitFuture {
+class VirtualFlowSpaceElement : public FlowElement {
 public:
-    VirtualFlowSpaceElement() :_flow_data_offset(-1) {
-    }
+    VirtualFlowSpaceElement();
+
     virtual const size_t flow_data_size() const = 0;
     virtual const int flow_data_index() const {
         return -1;
@@ -185,32 +193,19 @@ protected:
  * that will only trigger when all parents have called. To do this,
  * you call add() in the constructor of the parents.
  */
-class CounterInitFuture : public Router::InitFuture { public:
-    CounterInitFuture(String name, std::function<void(void)> on_reached) : _n(0), _name(name), _on_reached(on_reached) {
+class CounterInitFuture : public Router::ChildrenFuture { public:
+    CounterInitFuture(String name, std::function<int(ErrorHandler*)> on_reached);
+    CounterInitFuture(String name, std::function<void(void)> on_reached);
 
+    virtual void notifyParent(InitFuture* future) override;
 
-    }
+    virtual int solve_initialize(ErrorHandler* errh) override;
 
-    void add() {
-        _n ++;
-    }
-
-    virtual void post(Router::InitFuture* future) {
-        Router::InitFuture::post(future);
-    }
-
-    virtual int solve_initialize(ErrorHandler* errh) {
-        if (--_n == 0) {
-            _on_reached();
-            return Router::InitFuture::solve_initialize(errh);
-        }
-        return 0;
-    }
-
+    virtual int completed(ErrorHandler* errh) override;
 private:
     int _n;
     String _name;
-    std::function<void(void)> _on_reached;
+    std::function<int(ErrorHandler*)> _on_reached;
 };
 
 /**
@@ -218,6 +213,13 @@ private:
  */
 class VirtualFlowManager : public FlowElement { public:
     VirtualFlowManager();
+
+    static CounterInitFuture* fcb_builded_init_future() {
+        return &_fcb_builded_init_future;
+    }
+
+    static CounterInitFuture _fcb_builded_init_future;
+
 protected:
     int _reserve;
 
@@ -225,14 +227,19 @@ protected:
     Vector<EDPair>  _reachable_list;
 
     static Vector<VirtualFlowManager*> _entries;
-    static CounterInitFuture _fcb_builded_init_future;
+
 
     void find_children(int verbose = 0);
 
     static void _build_fcb(int verbose,  bool ordered);
     static void build_fcb();
+    virtual void fcb_built() {
+
+    }
 
     bool stopClassifier() { return true; };
+
+    friend class CTXElement;
 };
 
 template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {
@@ -240,7 +247,7 @@ template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {
 public :
 
     FlowSpaceElement() CLICK_COLD;
-    virtual int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
+
     void fcb_set_init_data(FlowControlBlock* fcb, const T data) CLICK_COLD;
 
     virtual const size_t flow_data_size()  const override { return sizeof(T); }
@@ -289,7 +296,7 @@ public :
     typedef FlowStateElement<Derived, T> derived;
 
     FlowStateElement() CLICK_COLD;
-    virtual int solve_initialize(ErrorHandler *errh) CLICK_COLD;
+
     virtual const size_t flow_data_size()  const { return sizeof(AT); }
 
     /**
@@ -359,6 +366,62 @@ private:
 
 };
 
+
+template<typename T, int index> class FlowSharedBufferElement : public FlowSpaceElement<T> {
+
+public :
+
+	FlowSharedBufferElement() : FlowSpaceElement<T>() {
+
+	}
+
+	const size_t flow_data_size()  const final { return sizeof(T); }
+	const int flow_data_index()  const final { return index; }
+};
+
+
+
+#define DefineFlowSharedBuffer(name,type,index) class FlowSharedBuffer ## name ## Element : public FlowSharedBufferElement<type,index>{ };
+
+DefineFlowSharedBuffer(Paint,int,0);
+#define NR_SHARED_FLOW 1
+
+class FlowElementVisitor : public RouterVisitor {
+public:
+    Element* origin;
+	FlowElementVisitor(Element* e) : origin(e) {
+
+	}
+
+	struct inputref {
+	    FlowElement* elem;
+	    int iport;
+	};
+	Vector<struct inputref> dispatchers;
+
+	bool visit(Element *e, bool isoutput, int port,
+			       Element *from_e, int from_port, int distance) {
+		FlowElement* dispatcher = dynamic_cast<FlowElement*>(e);
+		if (dispatcher != NULL) {
+		    if (dispatcher == origin)
+		        return false;
+		    struct inputref ref = {.elem = dispatcher, .iport = port};
+			dispatchers.push_back(ref);
+			return false;
+		} else {
+
+		}
+        /*if (v.dispatchers[i] == (FlowElement*)e) {
+            click_chatter("Classification loops are unsupported, place another CTXManager before reinjection of the packets.");
+            e->router()->please_stop_driver();
+            return 0;
+        }*/
+		return true;
+	}
+
+	static FlowNode* get_downward_table(Element* e, int output, Vector<FlowElement*> context, bool resolve_context = false);
+};
+
 /**
  * FlowSpaceElement
  */
@@ -367,32 +430,117 @@ template<typename T>
 FlowSpaceElement<T>::FlowSpaceElement() : VirtualFlowSpaceElement() {
 }
 
+# if HAVE_CTX
 template<typename T>
-int
-FlowSpaceElement<T>::solve_initialize(ErrorHandler *errh) {
-    if (_flow_data_offset == -1) {
-        return errh->error("No FlowManager() element sets the flow context for %s !",name().c_str());
-    }
-    return 0;
-}
+void FlowSpaceElement<T>::fcb_set_init_data(FlowControlBlock* fcb, const T data) {
+    for (int i = 0; i < sizeof(T); i++) {
+        if (fcb->data[FCBPool::init_data_size() + _flow_data_offset + i] && fcb->data[_flow_data_offset + i] != ((uint8_t*)&data)[i]) {
+            click_chatter("In %p{element} for offset %d :",this, _flow_data_offset+i);
+            click_chatter("Index [%d] : Cannot set data to %d, as it is already %d",i,*((T*)(&fcb->data[_flow_data_offset])),data);
+            click_chatter("Is marked as set : %d", fcb->data[FCBPool::init_data_size() + _flow_data_offset + i]);
+            fcb->reverse_print();
 
+            click_chatter("It generally means your graph is messed up");
+            assert(false);
+        }
+        fcb->data[FCBPool::init_data_size() + _flow_data_offset + i] = 0xff;
+    }
+    *((T*)(&fcb->data[_flow_data_offset])) = data;
+}
+# endif
+
+/**
+ * FlowSpaceElement
+ */
 
 template<class Derived, typename T>
 FlowStateElement<Derived, T>::FlowStateElement() : VirtualFlowSpaceElement() {
 }
 
+/**
+ * Macro to define context
+ *
+ * In practice it will overwrite get_table
+ */
+# if HAVE_CTX
 
-template<class Derived, typename T>
-int FlowStateElement<Derived, T>::solve_initialize(ErrorHandler *errh) {
-    if (_flow_data_offset == -1) {
-        return errh->error("No FlowManager() element sets the flow context for %s !",name().c_str());
-    }
-    return 0;
+#define DEFAULT_4TUPLE "12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 20/0/ffffffff:HASH-3"
+
+//Those should not be used anymore, as the FLOW_CONTEXT is a much better alternative that assuming the top session is IP...
+#define TCP_SESSION "9/06! 12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 20/0/ffffffff:HASH-3"
+#define UDP_SESSION "9/11! 12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 20/0/ffffffff:HASH-3"
+
+//Use only one of the 3 following macros
+
+/**
+ * Define a context (such as FLOW_IP) but no rule/session
+ */
+#define FLOW_ELEMENT_DEFINE_CONTEXT(ft) \
+FlowNode* get_table(int iport, Vector<FlowElement*> context) override CLICK_COLD {\
+    context.push_back(this);\
+    return FlowElement::get_table(iport, context);\
+}\
+virtual FlowType getContext(int) override {\
+    return ft;\
+}\
+
+/**
+ * Define a context (such as FLOW_TCP) and a rule/session definition
+ */
+#define FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(rule,ft) \
+FlowNode* get_table(int iport, Vector<FlowElement*> contextStack) override CLICK_COLD {\
+    if (ft)\
+        contextStack.push_back(this);\
+    FlowNode* down = FlowElement::get_table(iport,contextStack); \
+    FlowNode* my = FlowClassificationTable::parse(this,rule).root;\
+    return my->combine(down, true, true, true, this);\
+}\
+virtual FlowType getContext(int) override {\
+    return ft;\
+}\
+
+/**
+ * Define only a rule/session definition but no context
+ */
+#define FLOW_ELEMENT_DEFINE_SESSION(rule) \
+        FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(rule,FLOW_NONE)
+
+/**
+ * Defin two rules/sessions but no context
+ */
+#define FLOW_ELEMENT_DEFINE_SESSION_DUAL(ruleA,ruleB) \
+FlowNode* get_table(int iport, Vector<FlowElement*> context) override CLICK_COLD {\
+    return FlowClassificationTable::parse(this,ruleA).root->combine(FlowClassificationTable::parse(this,ruleB).root,false,false,true,this)->combine(FlowElement::get_table(iport,context), true, true, true, this);\
+}
+
+/**
+ * Define the context no matter the input port, and a rule but only for one specific port
+ */
+#define FLOW_ELEMENT_DEFINE_PORT_SESSION_CONTEXT(port_num,rule,ft) \
+FlowNode* get_table(int iport, Vector<FlowElement*> contextStack) override {\
+    if (iport == port_num) {\
+        return FlowClassificationTable::parse(this,rule).root->combine(FlowElement::get_table(iport,contextStack), true, true, true, this);\
+    }\
+    if (ft)\
+        contextStack.push_back(this);\
+    return FlowElement::get_table(iport,contextStack);\
+}\
+virtual FlowType getContext(int) override {\
+    return ft;\
 }
 
 #endif
+#else //Not even HAVE_FLOW
+typedef BatchElement FlowElement;
+#endif
+#if !defined(HAVE_CTX)
+#define FLOW_ELEMENT_DEFINE_SESSION(rule,context)
+#define FLOW_ELEMENT_DEFINE_PORT_CONTEXT(port,rule,context)
+#define FLOW_ELEMENT_DEFINE_SESSION_DUAL(ruleA,ruleB)
+#define FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(rule,context)
+#define FLOW_ELEMENT_DEFINE_PORT_SESSION_CONTEXT(port,rule,context)
+#endif
 
 CLICK_ENDDECLS
-
 
 #endif

@@ -111,6 +111,8 @@ Router::~Router()
     if (_refcount != 0)
         click_chatter("deleting router while ref count = %d", _refcount.value());
 
+    pool_allocator_mt_base::set_dying(true);
+
     // unuse the hotswap router
     if (_hotswap_router)
         _hotswap_router->unuse();
@@ -442,13 +444,13 @@ Router::add_element(Element *e, const String &ename, const String &conf,
 }
 
 int
-Router::add_connection(int from_idx, int from_port, int to_idx, int to_port)
+Router::add_connection(int from_idx, int from_port, int to_idx, int to_port, bool is_context, String context)
 {
     assert(from_idx >= 0 && from_port >= 0 && to_idx >= 0 && to_port >= 0);
     if (_state != ROUTER_NEW)
         return -1;
 
-    Connection c(from_idx, from_port, to_idx, to_port);
+    Connection c(from_idx, from_port, to_idx, to_port, is_context, context);
 
     // check for continuing sorted order
     if (_conn_sorted && _conn.size() && c < _conn.back())
@@ -580,7 +582,7 @@ Router::check_hookup_completeness(ErrorHandler *errh)
                 ci = (p ? _conn_output_sorter[cix] : cix);
                 if (likely(last != _conn[ci][p]))
                     last = _conn[ci][p];
-                else if (_elements[last.idx]->port_active(p, last.port))
+                else if (_elements[last.idx]->port_active(p, last.port) && !_conn[ci]._context)
                     hookup_error(last, p, "illegal reuse of %<%p{element}%> %s %d", errh, true);
             }
         }
@@ -915,10 +917,12 @@ Router::visit(Element *first_element, bool forward, int first_port,
     Vector<PortDistance> sources;
     if (first_port < 0) {
         for (int port = 0; port < first_element->nports(forward); ++port) {
-            sources.push_back(PortDistance{Port(first_element->eindex(), port), 0});
+            int distance = visitor->distance(_elements[first_element->eindex()], 0) - 1;
+            sources.push_back(PortDistance{Port(first_element->eindex(), port), distance});
         }
     } else if (first_port < first_element->nports(forward)) {
-        sources.push_back(PortDistance{Port(first_element->eindex(), first_port), 0});
+        int distance = visitor->distance(_elements[first_element->eindex()], 0) - 1;
+        sources.push_back(PortDistance{Port(first_element->eindex(), first_port), distance});
     }
 
     Vector<PortDistance> next_sources;
@@ -1206,15 +1210,41 @@ Router::initialize_handlers(bool defaults, bool specifics)
             _elements[i]->add_handlers();
 }
 
-Router::InitFuture::InitFuture() : _children() {
+Router::InitFuture::InitFuture(Element* owner) :  _owner(owner), _completed(false) {
 
 }
 
 Router::InitFuture::~InitFuture() {
 }
 
+void
+Router::InitFuture::notifyParent(Router::InitFuture*) {
+}
+
+
 int
 Router::InitFuture::solve_initialize(ErrorHandler* errh) {
+    _completed = true;
+    return 0;
+}
+
+int
+Router::InitFuture::completed(ErrorHandler* errh) {
+    if (!_completed)
+        return errh->error("An initialization step was not called. This indicates a broken dependency in some element, probably %p{element}.", _owner);
+    return 0;
+}
+
+
+Router::ChildrenFuture::ChildrenFuture(Element* owner) : InitFuture(owner) {
+
+}
+
+Router::ChildrenFuture::~ChildrenFuture() {
+}
+
+int
+Router::ChildrenFuture::solve_initialize(ErrorHandler* errh) {
     bool all_ok = true;
     for (int i = 0; i < _children.size(); i++) {
         if (_children[i]->solve_initialize(errh) < 0) {
@@ -1223,45 +1253,84 @@ Router::InitFuture::solve_initialize(ErrorHandler* errh) {
     }
     if (!all_ok)
         return -1;
+    _completed = true;
     return 0;
 }
 
 void
-Router::InitFuture::postOnce(InitFuture* future) {
+Router::ChildrenFuture::postOnce(InitFuture* future) {
     for (int i = 0; i < _children.size(); i++) {
             if (_children[i] == future)
-                break;
+                return;
     }
     post(future);
 }
 
-class FctFuture : public Router::InitFuture { public:
-
-    FctFuture(std::function<int(void)> f) : _f(f) {
-    };
-
-    ~FctFuture() {};
-
-    int solve_initialize(ErrorHandler* errh) {
-        int r = _f();
-        delete this;
-        return r;
-    };
-
-    std::function<int(void)> _f;
-};
+void
+Router::ChildrenFuture::post(InitFuture* future) {
+    _children.push_back(future);
+    future->notifyParent(this);
+}
 
 void
-Router::InitFuture::post(std::function<int(void)> f) {
-    InitFuture* future = new FctFuture(f);
+Router::ChildrenFuture::post(std::function<int(ErrorHandler*)> f, Element* owner) {
+    InitFuture* future = new FctFuture(f, owner);
     post(future);
 }
 
 void
-Router::InitFuture::post(InitFuture* future) {
-    _children.push_back(future);
+Router::ChildrenFuture::post(std::function<int(void)> f, Element* owner) {
+    InitFuture* future = new FctFuture(f, owner);
+    post(future);
 }
 
+
+int
+Router::ChildrenFuture::completed(ErrorHandler* errh) {
+    for (int i = 0; i< _children.size(); i++) {
+        if (_children[i]->completed(errh) != 0)
+            return -1;
+    }
+    return Router::InitFuture::completed(errh);
+}
+
+Router::FctFuture::FctFuture(std::function<int(void)> f, Element* owner) : _f([f](ErrorHandler*){return f();}), Router::InitFuture(owner) {
+};
+
+Router::FctFuture::FctFuture(std::function<int(ErrorHandler*)> f, Element* owner) : _f(f), Router::InitFuture(owner) {
+};
+
+Router::FctFuture::~FctFuture() {
+
+}
+
+int Router::FctFuture::solve_initialize(ErrorHandler* errh) {
+    RouterContextErrh cerrh(errh, "While initializing", _owner);
+    int r = _f(&cerrh);
+    if (r != 0) {
+        if (errh->nerrors() == 0)
+            errh->error("Unspecified error when initializing element %p{element}'s snippet", _owner);
+        return r;
+    }
+    r = Router::InitFuture::solve_initialize(errh);
+    return r;
+};
+
+Router::FctChildFuture::FctChildFuture(std::function<int(ErrorHandler*)> f, Element* owner, Router::InitFuture* future) : Router::FctFuture(f, owner), _child(future) {
+    future->notifyParent(this);
+};
+
+Router::FctChildFuture::~FctChildFuture() {
+
+}
+
+int Router::FctChildFuture::solve_initialize(ErrorHandler* errh) {
+    int r = Router::FctFuture::solve_initialize(errh);
+    if (r != 0)
+        return r;
+    r = _child->solve_initialize(errh);
+    return r;
+};
 
 int
 Router::initialize(ErrorHandler *errh)
@@ -1442,10 +1511,25 @@ Router::initialize(ErrorHandler *errh)
                 all_ok = false;
             }
         }
-        if (_root_init_future.solve_initialize(errh) < 0) {
+        if (_root_init_future.solve_initialize(errh) != 0) {
             if (!errh->nerrors())
-                errh->error("unspecified error");
+                errh->error("unspecified error when initializing elements through dependency graph");
             all_ok = false;
+        }
+        if (all_ok && _root_init_future.completed(errh) != 0) {
+            if (errh->nerrors() == 0)
+                errh->error("Some node of the dependency graphs were not initialized, but it's unclear which ones...");
+            all_ok = false;
+        }
+        if (all_ok) {
+            for (int ord = 0; all_ok && ord < _elements.size(); ord++) {
+                int i = _element_configure_order[ord];
+                InitFuture* init = dynamic_cast<InitFuture*>(_elements[i]);
+                if (init != 0 && init->completed(errh) != 0) {
+                    errh->error("%p{element} was not initialized. This is probably a bug, its dependency is never registered in configure.", _elements[i]);
+                    all_ok = false;
+                }
+            }
         }
     }
 

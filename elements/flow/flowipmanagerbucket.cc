@@ -28,7 +28,7 @@
 
 CLICK_DECLS
 
-FlowIPManagerBucket::FlowIPManagerBucket() : _verbose(1), _tables(0), _groups(0), _def_thread(0), _mark(false), _do_migration(true) {
+FlowIPManagerBucket::FlowIPManagerBucket() : _verbose(1), _tables(0), _groups(0), _def_thread(0), _mark(false), _do_migration(true), Router::InitFuture(this) {
 
 }
 

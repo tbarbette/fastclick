@@ -6,9 +6,22 @@
 #include <click/allocator.hh>
 CLICK_DECLS
 
-#if HAVE_FLOW
+#ifdef HAVE_FLOW
 
-#define HAVE_FLOW_DYNAMIC 1
+
+#define DEBUG_CLASSIFIER_MATCH 0 //0 no, 1 build-time only, 2 whole time, 3 print table after each dup
+#define DEBUG_CLASSIFIER_RELEASE 0
+#define DEBUG_CLASSIFIER_TIMEOUT 0
+#define DEBUG_CLASSIFIER_TIMEOUT_CHECK 0 //1 check at release, 2 check at insert (big hit)
+#define DEBUG_CLASSIFIER 0 //1 : Build-time only, >1 : whole time, >2 lock prints
+
+#define HAVE_STATIC_CLASSIFICATION 0 || !HAVE_FLOW_DYNAMIC
+
+#define RELEASE_RESET 0
+#define RELEASE_KEEP 1
+#define RELEASE_EPOCH 2
+
+#define DEBUG_CLASSIFIER_CHECK 0
 
 #if DEBUG_CLASSIFIER > 1
     #define debug_flow_2(...) click_chatter(__VA_ARGS__);
@@ -23,14 +36,64 @@ CLICK_DECLS
 
 #if DEBUG_CLASSIFIER_CHECK || DEBUG_CLASSIFIER
     #define flow_assert(...) assert(__VA_ARGS__);
-       #define FLOW_INDEX(table,index) table[index]
+	#define FLOW_INDEX(table,index) table[index]
 #else
     #define flow_assert(...)
-       #define FLOW_INDEX(table,index) table.unchecked_at(index)
+	#define FLOW_INDEX(table,index) table.unchecked_at(index)
 #endif
 
-class FCBPool;
+#define HAVE_DYNAMIC_FLOW_RELEASE_FNT 1
+
 class FlowControlBlock;
+class FCBPool;
+class FlowNode;
+class Element;
+
+union FlowNodeData{
+	uint8_t data_8;
+	uint16_t data_16;
+	uint32_t data_32;
+#if HAVE_LONG_CLASSIFICATION
+	uint64_t data_64;
+	void* data_ptr;
+#endif
+
+	explicit FlowNodeData() :
+#if HAVE_LONG_CLASSIFICATION
+	    data_64(0)
+#else
+	    data_32(0)
+#endif
+	{};
+
+#if HAVE_LONG_CLASSIFICATION
+	explicit FlowNodeData(uint8_t d) : data_64(d) {};
+	explicit FlowNodeData(uint16_t d) : data_64(d) {};
+	explicit FlowNodeData(uint32_t d) : data_64(d) {};
+	explicit FlowNodeData(uint64_t d) : data_64(d) {};
+#else
+	explicit FlowNodeData(uint8_t d) : data_32(d) {};
+	explicit FlowNodeData(uint16_t d) : data_32(d) {};
+	explicit FlowNodeData(uint32_t d) : data_32(d) {};
+	explicit FlowNodeData(uint64_t d) : data_32((uint32_t)d) {};
+#endif
+
+	inline bool equals(const FlowNodeData &other) {
+#if HAVE_LONG_CLASSIFICATION
+        return data_64 == other.data_64;
+#else
+        return data_32 == other.data_32;
+#endif
+	}
+
+	inline uint64_t get_long() const {
+#if HAVE_LONG_CLASSIFICATION
+        return data_64;
+#else
+        return data_32;
+#endif
+	}
+};
 
 typedef void (*SubFlowRealeaseFnt)(FlowControlBlock* fcb, void* thunk);
 struct FlowReleaseChain {
@@ -45,12 +108,14 @@ private:
     #ifdef FLOW_ATOMIC_USE_COUNT
         atomic_uint32_t use_count;
     #else
-	    int use_count;
+	    unsigned use_count;
     #endif
 #endif
 
 	public:
-
+#if DEBUG_CLASSIFIER
+		int thread = -1;
+#endif
         Timestamp lastseen; //Last seen is also used without sloppy timeout for cache purposes
 
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
@@ -95,24 +160,29 @@ private:
 		void* thunk;
 #endif
 
-		//FlowNode* parent; this is a construct that depends on the classifier, hence it should be used as normal data
+		FlowNode* parent;
 
         union {
             uint8_t data[0];
             uint16_t data_16[0];
             uint32_t data_32[0];
             uint64_t data_64[0];
+            FlowNodeData node_data[0];
         };
-
+        inline FlowNodeData& get_data() {
+            return node_data[0];
+        }
         //No data after this
 
-        void combine_data(uint8_t* data);
+        bool combine_data(uint8_t* data, Element* origin);
 		inline void initialize() {
 #if HAVE_FLOW_DYNAMIC
 			use_count = 0;
 #endif
             flags = 0;
-
+#if DEBUG_CLASSIFIER
+            thread = -1;
+#endif
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
             release_fnt = 0;
             thunk = 0;
@@ -129,11 +199,11 @@ private:
 
 		inline void _do_release();
 
-        inline int count() const {
+        inline unsigned count() const {
 			return use_count;
 		}
 
-        inline void reset_count(int n) {
+        inline void reset_count(unsigned n) {
 			use_count = n;
 		}
 #else
@@ -147,12 +217,12 @@ private:
 			return 0;
 		}
 #endif
-		FlowControlBlock* duplicate(int use_count);
+		FlowControlBlock* duplicate(unsigned use_count);
         inline FCBPool* get_pool() const;
 
 		void print(String prefix, int data_offset =-1, bool show_ptr=false) const;
         void reverse_print();
-        //FlowNode* find_root();
+        FlowNode* find_root();
 
 		bool empty();
 
@@ -177,7 +247,7 @@ class FlowControlBlockRef { public:
     typedef const FlowControlBlockRef &key_const_reference;
 
     key_const_reference hashkey() const {
-	return const_cast<key_const_reference>(*this);
+	    return const_cast<key_const_reference>(*this);
     }
 
     inline int hashcode() const {
@@ -191,6 +261,7 @@ class FlowTableHolder;
 
 extern __thread FlowControlBlock* fcb_stack;
 extern __thread FlowTableHolder* fcb_table;
+
 
 
 #define SFCB_STACK(fnt) \
@@ -222,6 +293,8 @@ private:
             }
 
             inline void assign(SFCBList list) {
+                flow_assert(_p == NULL);
+                flow_assert(_count == 0);
                 _count = list._count;
                 _p = list._p;
             }
@@ -231,6 +304,7 @@ private:
             }
 
             inline void add(FlowControlBlock* fcb) {
+                flow_assert(fcb);
 #if CLICK_DEBUG_FCBPOOL
                 assert(*(((uint64_t*)fcb) + 1) != ALLOCATOR_POISON);
                 assert(fcb->count() == 0);
@@ -243,6 +317,7 @@ private:
 
             inline FlowControlBlock* get() {
                 FlowControlBlock* fcb = _p;
+                flow_assert(fcb);
 #if CLICK_DEBUG_FCBPOOL
                 assert(*(((uint64_t*)fcb) + 1) == ALLOCATOR_POISON);
                 *(((uint64_t*)fcb) + 1) = 0;
@@ -340,7 +415,7 @@ public:
 
     inline FlowControlBlock* allocate_empty() {
         FlowControlBlock* fcb = allocate();
-        bzero(fcb->data, data_size());
+        bzero(fcb->data + sizeof(FlowNodeData), data_size() - sizeof(FlowNodeData));
         return fcb;
     }
 
@@ -375,7 +450,7 @@ public:
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     void delete_all_flows();
 #endif
-   // void set_release_fnt(SubFlowRealeaseFnt pool_release_fnt, void* thunk);
+    void set_release_fnt(SubFlowRealeaseFnt pool_release_fnt, void* thunk);
 
 
     inline void release(FlowControlBlock* fcb) {
@@ -462,9 +537,9 @@ extern __thread FlowTableHolder* fcb_table;
 		 abort();
 	 }
 #endif
-            use_count+=packets_nr;
+            use_count += packets_nr;
 #if DEBUG_CLASSIFIER_RELEASE > 1
-            click_chatter("Acquire %d to %p, total is %d",packets_nr,this,use_count);
+            click_chatter("Acquire %d to %p, total is %d", packets_nr, this, use_count);
 #endif
 }
 
@@ -489,7 +564,7 @@ inline void FlowControlBlock::release(int packets_nr) {
 #ifndef NDEBUG
 	if ((int)use_count - packets_nr  < 0) {
 		click_chatter("ERROR : negative release : release %p, use_count = %d, releasing %d",this,use_count,packets_nr);
-		assert(use_count - packets_nr >= 0);
+		//assert(use_count - packets_nr >= 0);
 	}
 #endif
 	use_count -= packets_nr;

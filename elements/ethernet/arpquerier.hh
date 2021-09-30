@@ -1,11 +1,11 @@
 #ifndef CLICK_ARPQUERIER_HH
 #define CLICK_ARPQUERIER_HH
-#include <click/batchelement.hh>
 #include <click/etheraddress.hh>
 #include <click/ipaddress.hh>
 #include <click/sync.hh>
 #include <click/hashtablemp.hh>
 #include <click/timer.hh>
+#include <click/flow/flowelement.hh>
 #include "arptable.hh"
 CLICK_DECLS
 
@@ -171,7 +171,7 @@ Clear the ARP table.
 ARPTable, ARPResponder, ARPFaker, AddressInfo
 */
 
-class ARPQuerier : public BatchElement { public:
+class ARPQuerier : public FlowElement { public:
 
     ARPQuerier() CLICK_COLD;
     ~ARPQuerier() CLICK_COLD;
@@ -183,6 +183,21 @@ class ARPQuerier : public BatchElement { public:
     // click-undead should consider all paths live (not just "xy/x"):
     const char *flags() const			{ return "L2"; }
     void *cast(const char *name);
+
+    FlowNode* get_table(int iport, Vector<FlowElement*> contextStack) override {
+        if (iport == 1) {
+            return FlowClassificationTable::parse(this, "20/0002").root->combine(FlowElement::get_table(iport,contextStack), true, true, true, this);
+        }
+        contextStack.push_back(this);
+        return FlowElement::get_table(iport,contextStack);
+    }
+
+    virtual FlowType getContext(int port) override {
+        if (port == 1)
+            return FLOW_ARP;
+        if (port == 0)
+            return FLOW_IP;
+    }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int live_reconfigure(Vector<String> &, ErrorHandler *);

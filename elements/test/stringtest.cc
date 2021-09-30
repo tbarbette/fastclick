@@ -23,6 +23,7 @@
 #include <click/straccum.hh>
 #include <click/error.hh>
 #include <click/vector.hh>
+
 CLICK_DECLS
 
 
@@ -65,6 +66,13 @@ StringTest::initialize(ErrorHandler *errh)
     CHECK(s.search("ME") == 0);
     CHECK(s.search("!") == s.data() + s.length() - 1);
     CHECK(String("").search("!") == 0);
+
+    char buf[25];
+    int n;
+    n = sprintf(buf, "%d", 12);
+    CHECK(StringRef(buf,n) == "12");
+    n = sprintf(buf, "%d", 0);
+    CHECK(StringRef(buf,n) == "0");
 
 
     if (!errh->nerrors()) {

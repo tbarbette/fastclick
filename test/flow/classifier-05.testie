@@ -1,0 +1,34 @@
+%info
+Checking for an invalid configuration : two paths have colliding entries, ie
+a packet could go to both ports, so we fail because we don't know to which
+ports it should go.
+
+This would be legal with FlowContextDispatcher.
+
+%require
+click-buildtool provides flow ctx
+
+%script
+click C || exit 0
+
+%file C
+Idle -> d1 :: CTXManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> fd :: CTXDispatcher(- 0, - 1);
+
+fd[0] -> CTXDispatcher(0/10 1/20 0, -) -> Discard;
+fd[1] -> CTXDispatcher(0/10 0, -) -> Discard;
+
+Script(TYPE ACTIVE, stop);
+
+%expect stderr
+Placing  fd :: CTXDispatcher at [4-7]
+Placing  CTXDispatcher@4 :: CTXDispatcher at [8-11]
+Placing  CTXDispatcher@6 :: CTXDispatcher at [8-11]
+
+!!!
+WARNING : CONFLICTING CLASSIFICATION !
+fd :: CTXDispatcher has two sub-path that clash. This usually happen if two output ports have similar classification, such as sending IP packets both to port 0 and port 1. Context of each ports must be entierly exclusives.
+They merge with different FCB values (1, 0 at offset 4), hence different decisions!
+WARNING : CONFLICTING CLASSIFICATION !
+!!!
+ 0 UC:1 ED:0 (data 000000000100000000000000)
+Aborted{{.*}}

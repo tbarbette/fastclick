@@ -75,7 +75,9 @@ class Unqueue : public BatchElement { public:
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
-    bool run_task(Task *);
+    bool get_spawning_threads(Bitvector& b, bool isoutput, int port) override;
+
+    bool run_task(Task *) override;
 
   private:
 

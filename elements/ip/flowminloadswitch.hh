@@ -22,7 +22,7 @@ CLICK_DECLS
  * passing by and is therefore *not* thread-safe.
  *
  * =a
- * Switch, HashSwitch, StrideSwitch, RandomSwitch, FlowRRSwitch
+ * Switch, HashSwitch, StrideSwitch, RandomSwitch, IPRRSwitch
  */
 class FlowMinLoadSwitch : public BatchElement {
 

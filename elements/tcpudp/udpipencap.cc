@@ -176,6 +176,29 @@ void UDPIPEncap::add_handlers()
     add_write_handler("dport", reconfigure_keyword_handler, "3 DPORT");
 }
 
+
+int
+RandomUDPIPEncap::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    bool cksum;
+
+    if (Args(conf, this, errh)
+    .read_p("CHECKSUM", BoolArg(), cksum)
+    .complete() < 0)
+    return -1;
+
+    _saddr = IPAddress(click_random()).in_addr();
+    _daddr = IPAddress(click_random()).in_addr();
+    _sport = click_random();
+    _dport = click_random();
+    _cksum = cksum;
+
+    return 0;
+}
+
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(UDPIPEncap)
 ELEMENT_MT_SAFE(UDPIPEncap)
+EXPORT_ELEMENT(RandomUDPIPEncap)
+ELEMENT_MT_SAFE(RandomUDPIPEncap)

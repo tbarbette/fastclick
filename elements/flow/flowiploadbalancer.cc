@@ -80,13 +80,12 @@ bool FlowIPLoadBalancer::new_flow(IPLBEntry* flowdata, Packet* p)
 
 void FlowIPLoadBalancer::push_flow(int, IPLBEntry* flowdata, PacketBatch* batch)
 {
-    auto fnt = [this,flowdata](Packet*&p) -> bool {
+    unsigned b = flowdata->chosen_server;
+    auto fnt = [this,b](Packet*&p) -> bool {
         WritablePacket* q =p->uniqueify();
         p = q;
 
-	unsigned b = flowdata->chosen_server;
-
-        nat_debug_chatter("Packet for flow %d", flowdata->chosen_server);
+        nat_debug_chatter("Packet for flow %d", b);
         IPAddress srv = _dsts[b];
 
         q->ip_header()->ip_dst = srv;

@@ -51,8 +51,9 @@ class DelayShaper : public BatchElement, public ActiveNotifier { public:
 
     Packet *pull(int) override;
 #if HAVE_BATCH
-    PacketBatch *pull_batch(int, unsigned) override;
+    PacketBatch* pull_batch(int, unsigned) override;
 #endif
+
     void run_timer(Timer *);
 
   private:
@@ -62,6 +63,7 @@ class DelayShaper : public BatchElement, public ActiveNotifier { public:
     Timer _timer;
     NotifierSignal _upstream_signal;
     ActiveNotifier _notifier;
+    int _burst;
 
     static String read_param(Element *, void *) CLICK_COLD;
     static int write_param(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
