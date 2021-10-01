@@ -1,0 +1,33 @@
+from mininet.topo import Topo
+from mininet.net import Mininet
+from mininet.util import dumpNodeConnections
+from mininet.cli import CLI
+
+import sys
+import time
+
+
+class MyTopo(Topo):
+    def build(self):
+        self.h1 = self.addHost("h1", ip="babe:1::5/64")
+        self.h2 = self.addHost("h2", ip="babe:1::10/64")
+        self.sw1 = self.addHost("sw1", ip="babe:1::6/64")
+        self.sw2 = self.addHost("sw2", ip="babe:1::8/64")
+        self.addLink(self.h1, self.sw1)
+        self.addLink(self.h2, self.sw2)
+        self.addLink(self.sw1, self.sw2)
+
+
+def simpleRun():
+    topo = MyTopo()
+    net = Mininet(topo)
+    net.start()
+
+    dumpNodeConnections(net.hosts)
+    
+    CLI(net)
+    net.stop()
+
+
+if __name__ == "__main__":
+    simpleRun()
