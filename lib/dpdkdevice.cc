@@ -1501,8 +1501,8 @@ unsigned DPDKDevice::RING_PRIV_DATA_SIZE  = 0;
 
 bool DPDKDevice::_is_initialized = false;
 HashTable<portid_t, DPDKDevice> DPDKDevice::_devs;
-struct rte_mempool** DPDKDevice::_pktmbuf_pools;
-unsigned DPDKDevice::_nr_pktmbuf_pools;
+struct rte_mempool** DPDKDevice::_pktmbuf_pools = 0;
+unsigned DPDKDevice::_nr_pktmbuf_pools = 0;
 bool DPDKDevice::no_more_buffer_msg_printed = false;
 
 CLICK_ENDDECLS
