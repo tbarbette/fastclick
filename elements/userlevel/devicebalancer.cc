@@ -26,7 +26,7 @@
 #ifdef HAVE_BPF
 #include "xdploader.hh"
 #endif
-#include "../flow/flowipmanager.hh"
+#include "../flow/flowipmanagerbucket.hh"
 
 #include <string>
 
@@ -226,8 +226,8 @@ DeviceBalancer::initialize(ErrorHandler *errh) {
 
     if (_manager) {
         MethodRSS* method = dynamic_cast<MethodRSS*>(_method);
-        if (method != 0) {
-            dynamic_cast<FlowIPManager*>(_manager)->post([this,method](){
+        if (method != 0 && dynamic_cast<FlowIPManagerBucket*>(_manager) != 0) {
+            dynamic_cast<FlowIPManagerBucket*>(_manager)->post([this,method](){
                     _manager->init_assignment(method->_table.data(), method->_table.size());
                     return 0;
             });

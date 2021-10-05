@@ -184,6 +184,7 @@ class ARPQuerier : public FlowElement { public:
     const char *flags() const			{ return "L2"; }
     void *cast(const char *name);
 
+#if HAVE_CTX
     FlowNode* get_table(int iport, Vector<FlowElement*> contextStack) override {
         if (iport == 1) {
             return FlowClassificationTable::parse(this, "20/0002").root->combine(FlowElement::get_table(iport,contextStack), true, true, true, this);
@@ -198,6 +199,7 @@ class ARPQuerier : public FlowElement { public:
         if (port == 0)
             return FLOW_IP;
     }
+#endif
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int live_reconfigure(Vector<String> &, ErrorHandler *);

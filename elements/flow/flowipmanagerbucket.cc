@@ -28,7 +28,7 @@
 
 CLICK_DECLS
 
-FlowIPManagerBucket::FlowIPManagerBucket() : _verbose(1), _tables(0), _groups(0), _def_thread(0), _mark(false), _do_migration(true), Router::InitFuture(this) {
+FlowIPManagerBucket::FlowIPManagerBucket() : _verbose(1), _tables(0), _groups(0), _def_thread(0), _mark(false), _do_migration(true), Router::ChildrenFuture(this) {
 
 }
 
@@ -91,7 +91,7 @@ int FlowIPManagerBucket::solve_initialize(ErrorHandler *errh) {
     }
     click_chatter("%p{element} initialized with %d groups and %d threads", this, _groups, _def_thread);
 
-    return Router::InitFuture::solve_initialize(errh);
+    return Router::ChildrenFuture::solve_initialize(errh);
 }
 
 void FlowIPManagerBucket::cleanup(CleanupStage stage) {
