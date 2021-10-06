@@ -1,7 +1,8 @@
 $init = <<SCRIPT
-  apt update
-  DEBIAN_FRONTEND=noninteractive apt install -y build-essential fakeroot debhelper autoconf automake libssl-dev graphviz python-all python-qt4 python-twisted-conch libtool git tmux vim python-pip python-paramiko python-sphinx graphviz autoconf automake bzip2 debhelper dh-autoreconf libssl-dev libtool openssl procps python-all python-qt4 python-twisted-conch python-zopeinterface module-assistant dkms make libc6-dev python-argparse uuid-runtime netbase kmod python-twisted-web iproute2 ipsec-tools openvswitch-switch libpcap-dev libnuma-dev libmicrohttpd-dev python3-pip python3-matplotlib htop wireshark-gtk python3 linux-tools-generic lynx gdb evince nginx libre2-dev
-  pip install alabaster
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential fakeroot debhelper autoconf automake libssl-dev graphviz python-all python-qt4 python-twisted-conch libtool git tmux vim python-pip python-paramiko python-sphinx graphviz autoconf automake bzip2 debhelper dh-autoreconf libssl-dev libtool openssl procps python-all python-qt4 python-twisted-conch python-zopeinterface module-assistant dkms make libc6-dev python-argparse uuid-runtime netbase kmod python-twisted-web iproute2 ipsec-tools openvswitch-switch libpcap-dev libnuma-dev libmicrohttpd-dev python3-pip python3-matplotlib htop wireshark-gtk python3 linux-tools-generic lynx gdb evince nginx libre2-dev
+  python2 -m pip install alabaster
+  curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output /dev/stdout | python3
   python3 -m pip install --upgrade pip
 SCRIPT
 
@@ -26,10 +27,10 @@ $mininet = <<SCRIPT
 SCRIPT
 
 $dpdk = <<SCRIPT
-  wget http://fast.dpdk.org/rel/dpdk-19.11.1.tar.xz
-  tar xf dpdk-19.11.1.tar.xz
-  rm dpdk-19.11.1.tar.xz
-  pushd dpdk-stable-19.11.1
+  wget http://fast.dpdk.org/rel/dpdk-19.11.10.tar.xz
+  tar xf dpdk-19.11.10.tar.xz
+  rm dpdk-19.11.10.tar.xz
+  pushd dpdk-stable-19.11.10
   make config T=x86_64-native-linuxapp-gcc O=x86_64-native-linuxapp-gcc
   echo "export RTE_SDK=$(pwd)" >> ~/.profile
   echo "export RTE_TARGET=x86_64-native-linuxapp-gcc" >> ~/.profile
