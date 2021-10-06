@@ -28,6 +28,10 @@ def simpleRun():
     # Add default routes to see the packets
     net["h1"].cmd("ip -6 route add default dev h1-eth0")
     net["h2"].cmd("ip -6 route add default dev h2-eth0")
+
+    # Add IPv6 addresses to h1 and h2
+    net["h1"].cmd("ifconfig h1-eth0 add babe:1::5/64")
+    net["h2"].cmd("ifconfig h2-eth0 add babe:2::5/64")
     
     CLI(net)
     net.stop()
