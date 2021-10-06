@@ -608,7 +608,7 @@ inline size_t avx2_strstr_anysize(const char* s, size_t n, const char* needle, s
 
     return std::string::npos;
 }
-#else
+#elif HAVE_SSE42
 inline size_t sse42_strstr_anysize(const char* s, size_t n, const char* needle, size_t k) {
     const __m128i N = _mm_loadu_si128((__m128i*)needle);
 
@@ -637,14 +637,49 @@ inline size_t sse42_strstr_anysize(const char* s, size_t n, const char* needle, 
 
     return std::string::npos;
 }
+#else
+inline size_t sse2_strstr_anysize(const char* s, size_t n, const char* needle, size_t k) {
+
+    assert(k > 0);
+    assert(n > 0);
+
+    const __m128i first = _mm_set1_epi8(needle[0]);
+    const __m128i last  = _mm_set1_epi8(needle[k - 1]);
+
+    for (size_t i = 0; i < n; i += 16) {
+
+        const __m128i block_first = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s + i));
+        const __m128i block_last  = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s + i + k - 1));
+
+        const __m128i eq_first = _mm_cmpeq_epi8(first, block_first);
+        const __m128i eq_last  = _mm_cmpeq_epi8(last, block_last);
+
+        uint16_t mask = _mm_movemask_epi8(_mm_and_si128(eq_first, eq_last));
+
+        while (mask != 0) {
+
+            const auto bitpos = bits::get_first_bit_set(mask);
+
+            if (memcmp(s + i + bitpos + 1, needle + 1, k - 2) == 0) {
+                return i + bitpos;
+            }
+
+            mask = bits::clear_leftmost_set(mask);
+        }
+    }
+
+    return std::string::npos;
+}
 #endif
 
 //Inline functions
 inline char* CTXElement::searchInContent(char *content, const StringRef &pattern, uint32_t length) {
 #ifdef HAVE_AVX2
     int pos = avx2_strstr_anysize(content, length, pattern.data(), pattern.length());
-#else
+#elif HAVE_SSE42
     int pos = sse42_strstr_anysize(content, length, pattern.data(), pattern.length());
+#else 
+    int pos = sse2_strstr_anysize(content, length, pattern.data(), pattern.length());
 #endif
     if (pos == std::string::npos)
         return 0;

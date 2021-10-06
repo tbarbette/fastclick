@@ -119,9 +119,6 @@
 /* Define if you want to use Intel-specific instructions. */
 #undef HAVE_INTEL_CPU
 
-/* Define if you want to use AVX2 instructions. */
-#undef HAVE_AVX2
-
 /* Define if 64-bit integer types are enabled. */
 #undef HAVE_INT64_TYPES
 
@@ -202,6 +199,9 @@
 
 /* The size of a `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
+
+/* Define if SSE4.2 instruction is available. */
+#undef HAVE_SSE42
 
 /* Define if you want to run multithreaded Click. */
 #undef __MTCLICK__

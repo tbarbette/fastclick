@@ -1485,6 +1485,24 @@ else
     AC_MSG_RESULT([no])
 fi
 
+dnl Support SSE4.2 instructions
+
+AC_ARG_ENABLE([sse42],
+        AS_HELP_STRING([--disable-sse42],
+                   [Do not check whether SSE4.2 is enabled]),
+          [check_sse42=no],
+          [check_sse42=yes])
+
+AC_MSG_CHECKING([if SSE4.2 should be used])
+if test "x$ax_cv_gcc_x86_cpu_supports_sse4_2$check_sse42" = "xyesyes"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([HAVE_SSE42],1)
+else
+    AC_MSG_RESULT([no])
+fi
+
+
+
 AC_ARG_ENABLE([atomic-builtins],
     [AS_HELP_STRING([--enable-atomic-builtins], [Use GCC builtins atomic functions instead of Click own implementation. It should be always used in non-x86 systems. It requires GCC >= 4.7.0])],
     [:], [enable_atomic_builtins=no])
