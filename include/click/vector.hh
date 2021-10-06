@@ -193,6 +193,8 @@ class Vector {
 
     inline void clear();
 
+    inline Vector<T,ALIGNMENT> sub(size_type begin, size_type sz);
+
     inline void swap(Vector<T,ALIGNMENT> &x);
 
     inline void shuffle(int n);
@@ -490,6 +492,16 @@ inline bool Vector<T,ALIGNMENT>::reserve(size_type n) {
 template <typename T, size_t ALIGNMENT>
 inline void Vector<T,ALIGNMENT>::swap(Vector<T,ALIGNMENT> &x) {
     vm_.swap(x.vm_);
+}
+
+/** @brief Swap the contents of this vector and @a x. */
+template <typename T, size_t ALIGNMENT>
+inline Vector<T,ALIGNMENT> Vector<T,ALIGNMENT>::sub(size_type begin, size_type sz) {
+    Vector<T,ALIGNMENT> n(sz,0);
+    for (int i = 0; i < sz; i++) {
+        n[i] = *(T *)&vm_.l_[i + begin];
+    }
+    return n;
 }
 
 /** @brief Replace this vector's contents with a copy of @a x. */

@@ -1,0 +1,36 @@
+%info
+Checking for an "else" configuration : two paths have colliding entries, but the second one is explicitely attached as an "else" path
+
+%require
+click-buildtool provides flow ctx
+
+%script
+click -j 1 C
+
+%file C
+Idle -> d1 :: CTXManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> fd :: FlowContextDispatcher(- 0, - 1);
+
+fd[0] -> Print(A) -> fdA :: CTXDispatcher(0/10 1/20 0, -) -> Print(AE) -> Discard;
+fd[1] -> Print(B) -> fdB :: CTXDispatcher(0/10 0, -) -> Print(BE) -> Discard;
+InfiniteSource(DATA \<2000>, LIMIT 1, STOP true) -> d1;
+InfiniteSource(DATA \<1030>, LIMIT 1, STOP true) -> d1;
+InfiniteSource(DATA \<1020>, LIMIT 1, STOP true) -> d1;
+DriverManager(wait, wait, wait, stop);
+
+%expect stderr
+Placing  fd :: FlowContextDispatcher at [4-7]
+Placing  fdA :: CTXDispatcher at [8-11]
+Placing  fdB :: CTXDispatcher at [8-11]
+Table of d1 after optimization :
+---
+0/FF (TWOCASE, 1 children)
+|-> 16
+|  1/FF (TWOCASE, 1 children)
+|  |-> 32 UC:1 ED:0 (data 200000000000000000000000)
+|  |-> DEFAULT 0 UC:1 ED:0 (data 000000000100000000000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff00000000)
+---
+B:    2 | 1030
+BE:    2 | 1030
+A:    2 | 1020
+AE:    2 | 1020

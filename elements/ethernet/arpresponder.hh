@@ -1,7 +1,7 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_ARPRESPONDER_HH
 #define CLICK_ARPRESPONDER_HH
-#include <click/batchelement.hh>
+#include <click/flow/flowelement.hh>
 #include <click/etheraddress.hh>
 #include <click/ipaddress.hh>
 #include <click/vector.hh>
@@ -75,7 +75,7 @@ CLICK_DECLS
  *
  * ARPQuerier, ARPFaker, AddressInfo */
 
-class ARPResponder : public BatchElement { public:
+class ARPResponder : public FlowElement { public:
 
     ARPResponder() CLICK_COLD;
     ~ARPResponder() CLICK_COLD;
@@ -83,6 +83,8 @@ class ARPResponder : public BatchElement { public:
     const char *class_name() const override		{ return "ARPResponder"; }
     const char *port_count() const override		{ return PORTS_1_1X2; }
     const char *processing() const override		{ return PROCESSING_A_AH; }
+
+    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("20/0001", FLOW_ARP);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     bool can_live_reconfigure() const		{ return true; }

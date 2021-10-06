@@ -1,0 +1,109 @@
+%require
+click-buildtool provides flow ctx
+
+%script
+click C1
+click C2
+click C3
+
+%file C1
+fc1 :: CTXManager(VERBOSE 1)
+-> fcd :: FlowContextDispatcher(- 0, - 1, -);
+
+fcd[0] -> Print(M0) ->  fd0 :: CTXDispatcher(0/00/ff) -> Print(0) -> Discard;
+fcd[1] -> Print(M1) ->  fd1 :: CTXDispatcher(0/05) -> Print(1) -> Discard;
+fcd[2] -> Print(DROPPED) -> Discard;
+
+InfiniteSource(\<03>, LIMIT 1, STOP true) -> fc1;
+InfiniteSource(\<05>, LIMIT 1, STOP true) -> fc1;
+
+DriverManager(pause, pause, stop);
+
+%file C2
+fc2 :: CTXManager(VERBOSE 1)
+-> fcd2 :: FlowContextDispatcher(- 0, - 1);
+
+fcd2[0] -> Print(M0) -> CTXDispatcher(0/02 1/00/ff, -) -> Print(0) -> Discard;
+fcd2[1] -> Print(M1) -> CTXDispatcher(1/05, -) -> Print(1) -> Discard;
+
+InfiniteSource(\<0203>, LIMIT 1, STOP true) -> fc2;
+InfiniteSource(\<0205>, LIMIT 1, STOP true) -> fc2;
+InfiniteSource(\<0005>, LIMIT 1, STOP true) -> fc2;
+InfiniteSource(\<0003>, LIMIT 1, STOP true) -> fc2;
+
+%file C3
+fc3 :: CTXManager(VERBOSE 1)
+-> fcd3 :: FlowContextDispatcher(- 0, - 1);
+
+fcd3[0] ->  CTXDispatcher(0/02 1/00/ff, - drop) -> Print(0) -> Discard;
+fcd3[1] ->  CTXDispatcher(2/05, - drop) -> Print(1) -> Discard;
+
+InfiniteSource(\<020300>, LIMIT 1, STOP true) -> fc3;
+InfiniteSource(\<020305>, LIMIT 1, STOP true) -> fc3;
+InfiniteSource(\<020005>, LIMIT 1, STOP true) -> fc3;
+InfiniteSource(\<010000>, LIMIT 1, STOP true) -> fc3;
+InfiniteSource(\<010005>, LIMIT 1, STOP true) -> fc3;
+%expect stderr
+
+Placing  fcd :: FlowContextDispatcher at [4-7]
+Placing  fd0 :: CTXDispatcher at [8-11]
+Placing  fd1 :: CTXDispatcher at [8-11]
+fd1 :: CTXDispatcher has no default rule. Non-matching traffic will be dropped. Add a list rule '-' to avoid this message.
+Table of fc1 after optimization :
+---
+0/FF (TWOCASE, 1 children)
+|-> 5 UC:1 ED:0 (data 050000000100000000000000)
+|-> DEFAULT
+|  0/FF (ARRAY, 0 children, dynamic)
+|  |-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000)
+---
+M0:    1 | 03
+0:    1 | 03
+M1:    1 | 05
+1:    1 | 05
+
+Placing  fcd2 :: FlowContextDispatcher at [4-7]
+Placing  CTXDispatcher@4 :: CTXDispatcher at [8-11]
+Placing  CTXDispatcher@8 :: CTXDispatcher at [8-11]
+Table of fc2 after optimization :
+---
+0/FF (TWOCASE, 1 children)
+|-> 2
+|  1/FF (TWOCASE, 1 children)
+|  |-> 5 UC:1 ED:0 (data 050000000100000000000000)
+|  |-> DEFAULT
+|  |  1/FF (ARRAY, 0 children, dynamic)
+|  |  |-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000)
+|-> DEFAULT
+|  1/FF (TWOCASE, 1 children)
+|  |-> 5 UC:1 ED:0 (data 050000000100000000000000)
+|  |-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff00000000)
+---
+M0:    2 | 0203
+0:    2 | 0203
+M1:    2 | 0205
+1:    2 | 0205
+M1:    2 | 0005
+1:    2 | 0005
+
+Placing  fcd3 :: FlowContextDispatcher at [4-7]
+Placing  CTXDispatcher@3 :: CTXDispatcher at [8-11]
+Placing  CTXDispatcher@6 :: CTXDispatcher at [8-11]
+Table of fc3 after optimization :
+---
+0/FF (TWOCASE, 1 children)
+|-> 2
+|  2/FF (TWOCASE, 1 children)
+|  |-> 5 UC:1 ED:0 (data 050000000100000000000000)
+|  |-> DEFAULT
+|  |  1/FF (ARRAY, 0 children, dynamic)
+|  |  |-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000)
+|-> DEFAULT
+|  2/FF (TWOCASE, 1 children)
+|  |-> 5 UC:1 ED:0 (data 050000000100000000000000)
+|  |-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff00000000)
+---
+1:    3 | 010005
+1:    3 | 020305
+1:    3 | 020005
+0:    3 | 020300

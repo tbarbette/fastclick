@@ -1,0 +1,333 @@
+%require
+click-buildtool provides flow ctx
+
+%script
+click COMPLEX
+
+%file COMPLEX
+define($IP1 10.200.0.1)
+define($MAC1 3c:fd:fe:9e:5c:40)
+define($NET1  10.200.0.0/16)
+define($RANGE1  10.200.0.0/30)
+define($HOST1 $RANGE1)
+
+define($IP2 10.100.0.1)
+define($MAC2 3c:fd:fe:9e:5c:41)
+define($NET2  10.100.0.0/16)
+define($HOST2 10.100.1.2)
+
+define($SERVERIP1 10.100.1.1)
+define($SERVERIP2 10.100.2.1)
+define($SERVERIP3 10.100.3.1)
+define($SERVERIP4 10.100.4.1)
+
+define($SIP1 10.100.1.2)
+define($SIP2 10.100.2.2)
+define($SIP3 10.100.3.2)
+define($SIP4 10.100.4.2)
+
+//Parameters
+define($rxverbose 99)
+define($txverbose 99)
+define($bout 32)
+define($ignore 0)
+
+elementclass ARPDispatcher {
+        input[0]->
+		iparp :: CTXDispatcher(
+                        12/0800,
+                        12/0806,
+                        -)
+		iparp[0] -> [0]output
+		iparp[1] -> arptype ::CTXDispatcher(20/0001, 20/0002, -)
+		iparp[2] -> [3]output
+
+		arptype[0] -> [1]output
+		arptype[1] -> [2]output
+		arptype[2] -> [3]output
+}
+
+
+elementclass Receiver { $port, $mac, $ip, $range |
+
+    input[0]
+    -> arpq :: ARPQuerier($ip, $mac)
+    -> etherOUT :: Null
+
+    input[1]
+    -> fc :: CTXManager(BUILDER 1, AGGCACHE 1, CACHESIZE 65536, VERBOSE 1, EARLYDROP false)
+    -> arpr :: ARPDispatcher()
+
+    arpr[0]
+    -> FlowStrip(14)
+    -> receivercheck :: CheckIPHeader(CHECKSUM false) [0-1] => [0]
+     IPPrint(IP)
+    -> inc :: CTXDispatcher(9/01 0, 9/06 0, -)
+
+
+    inc[0] //TCP or ICMP
+    -> [0]output;
+
+
+	inc[1]
+    -> Unstrip(14)
+    -> Print("DISCARDED NON TCP OR ICMP")
+	-> Discard
+
+    arpr[1]
+    -> Print("RX ARP Request $mac", -1)
+    -> arpRespIN :: ARPResponder($range $mac)
+    -> Print("TX ARP Responding", -1)
+    -> etherOUT;
+
+    arpRespIN[1] -> Print("ARP Packet not for $mac") -> Discard
+
+    arpr[2]
+    -> Print("RX ARP Response $mac", -1)
+    -> [1]arpq;
+
+    arpr[3] -> Print("Unknown packet type IN???",-1) -> Discard();
+
+
+    etherOUT
+    -> Print("OUT $mac",-1)
+    -> Discard
+}
+
+
+
+ipOUT :: CTXIPRoute($HOST1 2,
+                    $HOST2 2,
+                    $NET1 0,
+                    $NET2 1)
+
+r1 :: Receiver(0000:02:00.0,$MAC1,$IP1,$RANGE1) [0]
+ -> Paint(0)
+ -> ipOUT
+
+r2 :: Receiver(0000:02:00.1,$MAC2,$IP2,$IP2 $SIP1 $SIP2 $SIP3 $SIP4) [0]
+-> Paint(1)
+    -> ipOUT;
+
+back :: PaintSwitch()
+back[0] -> r1
+back[1] -> r2
+
+ipOUT[0]
+ -> pINRX :: Print(DIRECTRX)
+ ~> IPIn
+ -> IPPrint(BACKWARD)
+ -> tINRX :: TCPIn(FLOWDIRECTION 0,OUTNAME tOUTRX,RETURNNAME tINTX,RETRANSMIT_PT true)
+ -> tOUTRX :: TCPOut(READONLY true)
+ -> IPOut(READONLY true)
+ -> IPPrint(BACKWARDOUT)
+ -> [0]r1;
+
+pINRX~> IPPrint(OTHERRX) -> [0]r1;
+
+ipOUT[1]
+ -> Print(DIRECTTX)
+ -> other :: FlowContextDispatcher(- 0, - 1)
+ -> IPPrint("FORWARD")
+ -> IPIn
+ -> tINTX :: TCPIn(FLOWDIRECTION 1, OUTNAME tOUTTX, RETURNNAME tINRX, RETRANSMIT_PT true)
+ -> tOUTTX :: TCPOut(READONLY false)
+ -> ipOUTTX :: IPOut(READONLY false)
+ -> IPPrint(DIRECTTXOUT)
+ -> [0]r2;
+
+//treTX[1] -> IPPrint(REXMIT)  -> Discard;
+//-> [0]ipOUTTX;
+
+other[1] -> IPPrint(OTHERTX) -> [0]r2;
+
+ipOUT[2]
+    -> Null
+    -> fcdi :: FlowContextDispatcher(- 0, - 1)
+    -> Print("ICMPorLocalTCP")
+    -> icmptype :: CTXDispatcher(09/01 20/08, -)
+    -> ICMPPingResponder
+    -> back;
+
+    icmptype[1] -> Print("Unhandled ICMP", -1) -> Discard;
+    fcdi[1] -> Print("NOT ICMP") -> Discard;
+
+FromIPSummaryDump(RX, STOP true) -> EtherEncap(0x0800, 1:1:1:1:1:1, 2:2:2:2:2:2) -> [1]r1;
+FromIPSummaryDump(TX, STOP true) -> EtherEncap(0x0800, 3:3:3:3:3:3, 4:4:4:4:4:4) -> [1]r2;
+
+//#############################
+DriverManager(
+                pause,
+                pause,
+                stop);
+%expect stderr
+Placing  ipOUT :: CTXIPRoute at [16-19]
+Placing  other :: FlowContextDispatcher at [20-23]
+Placing  context_flowcontextdispatcher_4 :: FlowContextDispatcher at [20-23]
+Placing  fcdi :: FlowContextDispatcher at [20-23]
+Placing  tINRX :: TCPIn at [24-95]
+Placing  tINTX :: TCPIn at [24-95]
+Placing  icmptype :: CTXDispatcher at [24-27]
+Placing  r2/arpr/iparp :: CTXDispatcher at [8-11]
+Placing  r1/arpr/iparp :: CTXDispatcher at [8-11]
+Placing  r2/inc :: CTXDispatcher at [12-15]
+Placing  r2/arpr/arptype :: CTXDispatcher at [12-15]
+Placing  r1/inc :: CTXDispatcher at [12-15]
+Placing  r1/arpr/arptype :: CTXDispatcher at [12-15]
+{{Adding element.*}}
+{{Adding element.*}}
+{{Adding element.*}}
+{{Adding element.*}}
+{{Adding element.*}}
+{{Adding element.*}}
+Table of r2/fc after optimization :
+---
+12/FFFF (THREECASE, 2 children)
+|-> 1544
+|  20/FFFF (THREECASE, 2 children)
+|  |-> 512 UC:1 ED:0 (data 000200000000000001000000010000000000000000000000000000000000)
+|  |-> 256 UC:1 ED:0 (data 000100000000000001000000000000000000000000000000000000000000)
+|  |-> DEFAULT 0 UC:1 ED:0 (data 000000000000000001000000020000000000000000000000000000000000)
+|-> 8
+|  23/FF (THREECASE, 2 children)
+|  |-> 6
+|  |  30/FFFFFFFC (TWOCASE, 1 children)
+|  |  |-> 51210 UC:1 ED:0 (data 0ac800000000000000000000000000000200000000000000010000000000)
+|  |  |-> DEFAULT
+|  |  |  30/FFFFFFFF (TWOCASE, 1 children)
+|  |  |  |-> 33645578 UC:1 ED:0 (data 0a6401020000000000000000000000000200000000000000010000000000)
+|  |  |  |-> DEFAULT
+|  |  |  |  30/FFFF (THREECASE, 2 children)
+|  |  |  |  |-> 25610
+|  |  |  |  |  26/FFFFFFFF (HASH-2053, 0 children, dynamic)
+|  |  |  |  |  |-> DEFAULT
+|  |  |  |  |  |  32/FFFF (HASH-2053, 0 children, dynamic)
+|  |  |  |  |  |  |-> DEFAULT
+|  |  |  |  |  |  |  34/FFFFFFFF (HASH-2053, 0 children, dynamic)
+|  |  |  |  |  |  |  |-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000000000000100000000000000000000000000)
+|  |  |  |  |-> 51210
+|  |  |  |  |  26/FFFFFFFF (HASH-2053, 0 children, dynamic)
+|  |  |  |  |  |-> DEFAULT
+|  |  |  |  |  |  32/FFFF (HASH-2053, 0 children, dynamic)
+|  |  |  |  |  |  |-> DEFAULT
+|  |  |  |  |  |  |  34/FFFFFFFF (HASH-2053, 0 children, dynamic)
+|  |  |  |  |  |  |  |-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000000000000000000000000000000000000000)
+|  |  |  |  |-> DEFAULT 0 UC:1 ED:1 (data 00000000000000000000000000000000ffffffff00000000000000000000)
+|  |-> 1
+|  |  30/FFFFFFFC (TWOCASE, 1 children)
+|  |  |-> 51210
+|  |  |  34/FF (TWOCASE, 1 children)
+|  |  |  |-> 8 UC:1 ED:0 (data 080000000000000000000000000000000200000000000000000000000000)
+|  |  |  |-> DEFAULT 0 UC:1 ED:0 (data 000000000000000000000000000000000200000000000000010000000000)
+|  |  |-> DEFAULT
+|  |  |  30/FFFFFFFF (TWOCASE, 1 children)
+|  |  |  |-> 33645578
+|  |  |  |  34/FF (TWOCASE, 1 children)
+|  |  |  |  |-> 8 UC:1 ED:0 (data 080000000000000000000000000000000200000000000000000000000000)
+|  |  |  |  |-> DEFAULT 0 UC:1 ED:0 (data 000000000000000000000000000000000200000000000000010000000000)
+|  |  |  |-> DEFAULT
+|  |  |  |  30/FFFF (THREECASE, 2 children)
+|  |  |  |  |-> 25610 UC:1 ED:0 (data 0a6400000000000000000000000000000100000001000000000000000000)
+|  |  |  |  |-> 51210 UC:1 ED:0 (data 0ac800000000000000000000000000000000000001000000000000000000)
+|  |  |  |  |-> DEFAULT 0 UC:1 ED:1 (data 00000000000000000000000000000000ffffffff00000000000000000000)
+|  |-> DEFAULT 0 UC:1 ED:0 (data 000000000000000000000000010000000000000000000000000000000000)
+|-> DEFAULT 0 UC:1 ED:0 (data 000000000000000002000000000000000000000000000000000000000000)
+---
+Table of r1/fc after optimization :
+---
+12/FFFF (THREECASE, 2 children)
+|-> 1544
+|  20/FFFF (THREECASE, 2 children)
+|  |-> 512 UC:1 ED:0 (data 000200000000000001000000010000000000000000000000000000000000)
+|  |-> 256 UC:1 ED:0 (data 000100000000000001000000000000000000000000000000000000000000)
+|  |-> DEFAULT 0 UC:1 ED:0 (data 000000000000000001000000020000000000000000000000000000000000)
+|-> 8
+|  23/FF (THREECASE, 2 children)
+|  |-> 6
+|  |  30/FFFFFFFC (TWOCASE, 1 children)
+|  |  |-> 51210 UC:1 ED:0 (data 0ac800000000000000000000000000000200000000000000010000000000)
+|  |  |-> DEFAULT
+|  |  |  30/FFFFFFFF (TWOCASE, 1 children)
+|  |  |  |-> 33645578 UC:1 ED:0 (data 0a6401020000000000000000000000000200000000000000010000000000)
+|  |  |  |-> DEFAULT
+|  |  |  |  30/FFFF (THREECASE, 2 children)
+|  |  |  |  |-> 25610
+|  |  |  |  |  26/FFFFFFFF (HASH-2053, 0 children, dynamic)
+|  |  |  |  |  |-> DEFAULT
+|  |  |  |  |  |  32/FFFF (HASH-2053, 0 children, dynamic)
+|  |  |  |  |  |  |-> DEFAULT
+|  |  |  |  |  |  |  34/FFFFFFFF (HASH-2053, 0 children, dynamic)
+|  |  |  |  |  |  |  |-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000000000000100000000000000000000000000)
+|  |  |  |  |-> 51210
+|  |  |  |  |  26/FFFFFFFF (HASH-2053, 0 children, dynamic)
+|  |  |  |  |  |-> DEFAULT
+|  |  |  |  |  |  32/FFFF (HASH-2053, 0 children, dynamic)
+|  |  |  |  |  |  |-> DEFAULT
+|  |  |  |  |  |  |  34/FFFFFFFF (HASH-2053, 0 children, dynamic)
+|  |  |  |  |  |  |  |-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000000000000000000000000000000000000000)
+|  |  |  |  |-> DEFAULT 0 UC:1 ED:1 (data 00000000000000000000000000000000ffffffff00000000000000000000)
+|  |-> 1
+|  |  30/FFFFFFFC (TWOCASE, 1 children)
+|  |  |-> 51210
+|  |  |  34/FF (TWOCASE, 1 children)
+|  |  |  |-> 8 UC:1 ED:0 (data 080000000000000000000000000000000200000000000000000000000000)
+|  |  |  |-> DEFAULT 0 UC:1 ED:0 (data 000000000000000000000000000000000200000000000000010000000000)
+|  |  |-> DEFAULT
+|  |  |  30/FFFFFFFF (TWOCASE, 1 children)
+|  |  |  |-> 33645578
+|  |  |  |  34/FF (TWOCASE, 1 children)
+|  |  |  |  |-> 8 UC:1 ED:0 (data 080000000000000000000000000000000200000000000000000000000000)
+|  |  |  |  |-> DEFAULT 0 UC:1 ED:0 (data 000000000000000000000000000000000200000000000000010000000000)
+|  |  |  |-> DEFAULT
+|  |  |  |  30/FFFF (THREECASE, 2 children)
+|  |  |  |  |-> 25610 UC:1 ED:0 (data 0a6400000000000000000000000000000100000001000000000000000000)
+|  |  |  |  |-> 51210 UC:1 ED:0 (data 0ac800000000000000000000000000000000000001000000000000000000)
+|  |  |  |  |-> DEFAULT 0 UC:1 ED:1 (data 00000000000000000000000000000000ffffffff00000000000000000000)
+|  |-> DEFAULT 0 UC:1 ED:0 (data 000000000000000000000000010000000000000000000000000000000000)
+|-> DEFAULT 0 UC:1 ED:0 (data 000000000000000002000000000000000000000000000000000000000000)
+---
+IP: 0.000000: 1.100.1.1 > 10.100.1.2: icmp echo (0, 0)
+ICMPorLocalTCP:   28 | 4500001c 00000000 64010000 01640101 0a640102 08000000
+OUT 3c:fd:fe:9e:5c:40:   42 | ffffffff ffff3cfd fe9e5c40 08060001 08000604 00013cfd fe9e5c40 0ac80001 00000000 00000164 0101
+IP: 0.000000: 1.200.0.5 > 10.200.0.1: icmp echo (0, 0)
+ICMPorLocalTCP:   28 | 4500001c 00000000 64010000 01c80005 0ac80001 08000000
+OUT 3c:fd:fe:9e:5c:40:   42 | ffffffff ffff3cfd fe9e5c40 08060001 08000604 00013cfd fe9e5c40 0ac80001 00000000 000001c8 0005
+IP: 0.000000: 1.100.1.1 > 10.100.1.5: icmp echo (0, 0)
+DIRECTTX:   28 | 4500001c 00000000 64010000 01640101 0a640105 08000000
+OTHERTX: 0.000000: 1.100.1.1 > 10.100.1.5: icmp echo (0, 0)
+OUT 3c:fd:fe:9e:5c:41:   42 | ffffffff ffff3cfd fe9e5c41 08060001 08000604 00013cfd fe9e5c41 0a640001 00000000 00000a64 0105
+IP: 0.000000: 1.200.0.5 > 10.200.0.100: icmp echo (0, 0)
+DIRECTRX:   28 | 4500001c 00000000 64010000 01c80005 0ac80064 08000000
+OTHERRX: 0.000000: 1.200.0.5 > 10.200.0.100: icmp echo (0, 0)
+OUT 3c:fd:fe:9e:5c:40:   42 | ffffffff ffff3cfd fe9e5c40 08060001 08000604 00013cfd fe9e5c40 0ac80001 00000000 00000ac8 0064
+IP: 0.000000: 18.26.4.44.30 > 10.100.1.2.80: . 0:0(0,40,40) win 0
+ICMPorLocalTCP:   40 | 45000028 00000000 64060000 121a042c 0a640102 001e0050
+Unhandled ICMP:   40 | 45000028 00000000 64060000 121a042c 0a640102 001e0050 00000000 00000000 50000000 00000000
+IP: 0.000000: 18.26.4.44.30 > 10.200.0.1.80: . 0:0(0,40,40) win 0
+ICMPorLocalTCP:   40 | 45000028 00000000 64060000 121a042c 0ac80001 001e0050
+Unhandled ICMP:   40 | 45000028 00000000 64060000 121a042c 0ac80001 001e0050 00000000 00000000 50000000 00000000
+IP: 0.000000: 18.26.4.44.20 > 10.100.17.30.80: . 0:0(0,40,40) win 0
+DIRECTTX:   40 | 45000028 00000000 64060000 121a042c 0a64111e 00140050
+FORWARD: 0.000000: 18.26.4.44.20 > 10.100.17.30.80: . 0:0(0,40,40) win 0
+IP: 0.000000: 18.26.4.44.20 > 10.200.0.100.80: . 0:0(0,40,40) win 0
+DIRECTRX:   40 | 45000028 00000000 64060000 121a042c 0ac80064 00140050
+BACKWARD: 0.000000: 18.26.4.44.20 > 10.200.0.100.80: . 0:0(0,40,40) win 0
+
+
+%file RX
+!data src dst icmp_type_name
+!proto icmp
+1.100.1.1 10.100.1.2 echo 0 0
+1.100.1.1 10.100.1.5 echo 0 0
+!data link src sport dst dport proto
+1 18.26.4.44 30 10.100.1.2 80 T
+2 18.26.4.44 20 10.100.17.30 80 T
+
+%file TX
+!data src dst icmp_type_name
+!proto icmp
+1.200.0.5 10.200.0.1 echo 0 0
+1.200.0.5 10.200.0.100 echo 0 0
+!data link src sport dst dport proto
+1 18.26.4.44 30 10.200.0.1 80 T
+2 18.26.4.44 20 10.200.0.100 80 T

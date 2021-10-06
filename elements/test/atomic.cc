@@ -7,7 +7,7 @@ AtomicTest::AtomicTest()
 {
 }
 
-static void test_32(ErrorHandler *errh)
+static void test_32(ErrorHandler *)
 {
     click_chatter("atomic_uint32_t is using %s implementation", atomic_uint32_t::use_builtins() ? "builtins" : "click" );
 
@@ -80,7 +80,7 @@ static void test_32(ErrorHandler *errh)
 }
 
 
-static void test_64(ErrorHandler *errh)
+static void test_64(ErrorHandler *)
 {
     click_chatter("atomic_uint64_t is using %s implementation", atomic_uint32_t::use_builtins() ? "builtins" : "click" );
 

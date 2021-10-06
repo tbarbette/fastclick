@@ -135,4 +135,26 @@ EtherAddressArg::direct_parse(const String& str, EtherAddress& value, Args& args
     return s && parse(str, *s, args, flags);
 }
 
+bool
+EtherAddressArg::parse(const String &str, Vector<EtherAddress> &result, const ArgContext &args)
+{
+    Vector<EtherAddress> v;
+    String arg(str);
+    EtherAddress addr;
+    int nwords = 0;
+    while (String word = cp_shift_spacevec(arg)) {
+	++nwords;
+	if (parse(word, addr, args, 0))
+	    v.push_back(addr);
+	else
+	    return false;
+    }
+    if (nwords == v.size()) {
+	v.swap(result);
+	return true;
+    }
+    args.error("out of memory");
+    return false;
+}
+
 CLICK_ENDDECLS

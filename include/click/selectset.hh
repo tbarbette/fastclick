@@ -43,7 +43,7 @@ class SelectSet { public:
     int add_select(int fd, Element *element, int mask);
     int remove_select(int fd, Element *element, int mask);
 
-    void run_selects(RouterThread *thread);
+    bool run_selects(RouterThread *thread);
     inline void wake_immediate() {
 	_wake_pipe_pending = true;
 	ignore_result(write(_wake_pipe[1], "", 1));
@@ -91,12 +91,12 @@ class SelectSet { public:
     inline void call_selected(int fd, int mask) const;
     inline bool post_select(RouterThread *thread, bool acquire);
 #if HAVE_ALLOW_KQUEUE
-    void run_selects_kqueue(RouterThread *thread);
+    bool run_selects_kqueue(RouterThread *thread);
 #endif
 #if HAVE_ALLOW_POLL
-    void run_selects_poll(RouterThread *thread);
+    bool run_selects_poll(RouterThread *thread);
 #else
-    void run_selects_select(RouterThread *thread);
+    bool run_selects_select(RouterThread *thread);
 #endif
 
     inline void lock();

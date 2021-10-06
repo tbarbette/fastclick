@@ -35,6 +35,9 @@
 /* Define if you have the CPU load cycles tracking function. */
 #undef HAVE_CLICK_LOAD
 
+/* Define if context system is enabled. */
+#undef HAVE_CTX
+
 /* Define if curl is present. */
 #undef HAVE_CURL
 
@@ -243,6 +246,21 @@
 
 /* Define if Zero-copy is enabled. */
 #undef HAVE_ZEROCOPY
+
+/* Define if Flow sloppy timeout is enabled. */
+#undef HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+
+/* Enable dynamic flow system */
+#undef HAVE_FLOW_DYNAMIC
+
+/* Define if use atomic use count */
+#undef FLOW_ATOMIC_USE_COUNT
+
+/* Define if flow nodes should be released. */
+#undef FLOW_KEEP_STRUCTURE
+
+/* Define if flow hash mode. */
+#define FLOW_HASH_RELEASE 2
 
 /* Define if Netmap support is enabled. */
 #undef HAVE_NETMAP

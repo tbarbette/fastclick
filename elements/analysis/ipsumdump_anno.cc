@@ -74,6 +74,7 @@ static bool anno_extract(PacketDesc& d, const FieldWriter *f)
 	return true;
     case T_WIRE_LEN:
 	d.v = p->length();
+  return true;
     case T_THREAD:
     d.v = click_current_cpu_id();
 	return true;

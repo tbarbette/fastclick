@@ -124,9 +124,16 @@ protected :
     friend class Router;
 };
 
+#define BATCH_ELEMENT_DEFINE_SIMPLE_ACTION_BATCH(T) \
+    PacketBatch* simple_action_batch(PacketBatch* batch) override {\
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE(T::simple_action,batch,[](Packet*){});\
+        return batch;\
+    }
+
 #else
+#define BATCH_ELEMENT_DEFINE_SIMPLE_ACTION_BATCH(T)
 class BatchElement : public Element { public:
-    inline void checked_output_push_batch(int port, PacketBatch* batch) {
+    inline void checked_output_push_batch(int, PacketBatch*) {
         click_chatter("Error : checked_output_push_batch called without batching being enabled");
         assert(false);
     }
@@ -234,7 +241,7 @@ class SimpleElement : public BatchElement { public:
             output(port).push(p);
     }
 
-    Packet* pull(int port) override  {
+    Packet* pull(int port) override {
         Packet *p = input(port).pull();
         if (p)
             p = static_cast<T&>(*this).simple_action(p);

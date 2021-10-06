@@ -1,0 +1,76 @@
+%info
+
+Testing context link for a usual ARP configuration, first with the implicit
+context link then with an explicit CTXDispatcher.
+
+%require
+click-buildtool provides flow ctx
+
+%script
+click CONFIG
+click CONFIG2
+
+%file CONFIG
+arpq :: ARPQuerier(IP 1.1.1.1, ETH 1:1:1:1:1:1)
+-> td :: Discard; //Fake ToDevice
+
+fc :: CTXManager(VERBOSE 1)
+-> fd :: Null
+
+fd ~> Print(Q) -> [1]arpq;
+fd ~> Print(R) -> [0]ARPResponder -> td;
+fd ~> Print(O) -> [0]arpq;
+
+InfiniteSource(DATA \< ffffffff ffff3cfd fe9e5b60 08060001 08000604 00013cfd fe9e5b60 0ac80005 00000000 00000ac8 00010000 00000000 00000000 00000000 00000000 >, LIMIT 1, STOP true) -> fc
+InfiniteSource(DATA \< 3cfdfe9e 5b603cfd fe9e5c40 08060001 08000604 00023cfd fe9e5c40 0ac80001 3cfdfe9e 5b600ac8 0005 >, LIMIT 1, STOP true) -> fc
+InfiniteSource(DATA \< 3cfdfe9e 5b603cfd fe9e5c40 08000000 >, LIMIT 1, STOP true) -> fc
+DriverManager(wait,wait,wait,stop)
+
+%file CONFIG2
+arpq :: ARPQuerier(IP 1.1.1.1, ETH 1:1:1:1:1:1)
+-> td :: Discard; //Fake ToDevice
+
+fc :: CTXManager(VERBOSE 1)
+-> fd :: CTXDispatcher(12/0806 20/0002, 12/0806 20/0001, -)
+fd[0] -> Print(Q) -> [1]arpq;
+fd[1] -> Print(R) -> [0]ARPResponder -> td;
+fd[2] -> Print(O) -> [0]arpq;
+
+InfiniteSource(DATA \< ffffffff ffff3cfd fe9e5b60 08060001 08000604 00013cfd fe9e5b60 0ac80005 00000000 00000ac8 00010000 00000000 00000000 00000000 00000000 >, LIMIT 1, STOP true) -> fc
+InfiniteSource(DATA \< 3cfdfe9e 5b603cfd fe9e5c40 08060001 08000604 00023cfd fe9e5c40 0ac80001 3cfdfe9e 5b600ac8 0005 >, LIMIT 1, STOP true) -> fc
+InfiniteSource(DATA \< 3cfdfe9e 5b603cfd fe9e5c40 08000000 >, LIMIT 1, STOP true) -> fc
+DriverManager(wait,wait,wait,stop)
+
+%stderr
+Placing  context_flowcontextdispatcher_3 :: FlowContextDispatcher at [4-7]
+Table of fc after optimization :
+---
+12/FFFF (THREECASE, 2 children)
+|-> 1544
+|  20/FFFF (THREECASE, 2 children)
+|  |-> 512 UC:1 ED:0 (data 0002000000000000)
+|  |-> 256 UC:1 ED:0 (data 0001000001000000)
+|  |-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+|-> 8 UC:1 ED:0 (data 0800000002000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+---
+R:   60 | ffffffff ffff3cfd fe9e5b60 08060001 08000604 00013cfd
+Q:   42 | 3cfdfe9e 5b603cfd fe9e5c40 08060001 08000604 00023cfd
+O:   16 | 3cfdfe9e 5b603cfd fe9e5c40 08000000
+arpq :: ARPQuerier: would query for 0.0.0.0; missing dest IP addr annotation?
+
+Placing  fd :: CTXDispatcher at [4-7]
+Table of fc after optimization :
+---
+12/FFFF (TWOCASE, 1 children)
+|-> 1544
+|  20/FFFF (THREECASE, 2 children)
+|  |-> 512 UC:1 ED:0 (data 0002000000000000)
+|  |-> 256 UC:1 ED:0 (data 0001000001000000)
+|  |-> DEFAULT 0 UC:1 ED:0 (data 0000000002000000)
+|-> DEFAULT 0 UC:1 ED:0 (data 0000000002000000)
+---
+R:   60 | ffffffff ffff3cfd fe9e5b60 08060001 08000604 00013cfd
+Q:   42 | 3cfdfe9e 5b603cfd fe9e5c40 08060001 08000604 00023cfd
+O:   16 | 3cfdfe9e 5b603cfd fe9e5c40 08000000
+arpq :: ARPQuerier: would query for 0.0.0.0; missing dest IP addr annotation?

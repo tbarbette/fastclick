@@ -175,6 +175,7 @@ template <typename T> class MPMCDynamicRing {
 
     inline void initialize(int size, const char* name, int flags = 0) {
         assert(!_ring);
+        assert(dpdk_enabled);
         _ring = rte_ring_create(name, next_pow2(size), SOCKET_ID_ANY, flags);
         if (unlikely(_ring == 0)) {
             click_chatter("Could not create DPDK ring error %d: %s",rte_errno,rte_strerror(rte_errno));
@@ -237,7 +238,7 @@ template <typename T> class MPSCDynamicRing : public MPMCDynamicRing<T> {
 /**
  * Ring with size set at initialization time
  *
- * NOT MT-Safe
+ * Not optimized
  */
 template <typename T> class MPMCDynamicRing : public SPSCDynamicRing<T> {
 	Spinlock _lock;

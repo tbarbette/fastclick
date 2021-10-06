@@ -16,7 +16,7 @@
 
 CLICK_DECLS
 
-FlowIPManagerIMP::FlowIPManagerIMP() : _verbose(1), _flags(0), _timer(this), _task(this), _tables(0), _cache(true) {
+FlowIPManagerIMP::FlowIPManagerIMP() : _verbose(1), _flags(0), _timer(this), _task(this), _tables(0), _cache(true), Router::InitFuture(this) {
 }
 
 FlowIPManagerIMP::~FlowIPManagerIMP()
@@ -95,7 +95,7 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
     _timer.schedule_after(Timestamp::make_sec(1));*/
     _task.initialize(this, false);
 
-    return 0;
+    return Router::InitFuture::solve_initialize(errh);
 }
 
 

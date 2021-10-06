@@ -103,6 +103,10 @@ PacketBatch::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
     if (i != count) {
         click_chatter("Size of list %d, expected %d\n", i, count);
     }
+#if HAVE_FLOW
+    if (fcb_stack)
+        fcb_stack->acquire(count);
+#endif
     return PacketBatch::make_from_simple_list(head, last, i);
 #endif
 }

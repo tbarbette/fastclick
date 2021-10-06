@@ -1,0 +1,18 @@
+%info
+
+Verify an invalid CTX configuration is catched
+
+%require
+click-buildtool provides flow ctx
+
+%script
+click C || exit 0
+
+%file C
+Idle -> a :: CTXManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> Discard;
+
+Script(TYPE ACTIVE, stop);
+
+%expect stderr
+a: CTXManager without any downward dispatcher?
+Router could not be initialized!

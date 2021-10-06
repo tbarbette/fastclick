@@ -82,12 +82,13 @@ Bypass::pull(int port)
 }
 
 Bypass::Locator::Locator(int from_port)
-    : _e(0), _port(0), _from_port(from_port) {
+    : _e(0), _port(0), _from_port(from_port), _unstack(false)
+{
 }
 
 bool
 Bypass::Locator::visit(Element* e, bool isoutput, int port,
-                       Element*, int from_port, int)
+                       Element* from_e, int from_port, int)
 {
     //click_chatter("Bypass: Locator Visiting %p{element}:%d\n", e, port);
     if (from_port != _from_port)
@@ -99,11 +100,15 @@ Bypass::Locator::visit(Element* e, bool isoutput, int port,
         }
     _e = e;
     _port = port;
+#if HAVE_FLOW_DYNAMIC
+    _unstack = const_cast<Element::Port&>(from_e->port(isoutput,port)).unstack();
+#endif
     return false;
 }
 
-Bypass::Assigner::Assigner(Element* e, int port)
-    : _e(e), _port(port) {
+Bypass::Assigner::Assigner(Element* e, int port, bool unstack)
+    : _e(e), _port(port), _unstack(unstack)
+{
 }
 
 bool
@@ -130,7 +135,7 @@ Bypass::Assigner::visit(Element* e, bool isoutput, int port,
     // Just cheat.
     //click_chatter("Bypass: Assigning %p{element}:%d to %p{element}:%d\n", _e, _port, e, port);
     //TODO : Support batching
-    const_cast<Element::Port&>(e->port(isoutput, port)).assign(isoutput, _e, _port);
+    const_cast<Element::Port&>(e->port(isoutput, port)).assign_peer(isoutput, _e, _port, _unstack); //FLOW is still not supproted, we just avoid compilation problems here
     return false;
 }
 
@@ -142,7 +147,7 @@ Bypass::fix()
         Locator loc(_active);
         router()->visit(this, direction, _active, &loc);
         if (loc._e) {
-            Assigner ass(loc._e, loc._port);
+            Assigner ass(loc._e, loc._port, loc._unstack);
             // for the reconnect port 1: if !_active then we already have the target. _active case is handled below
             router()->visit(this, !direction, _active ? 0 : -1, &ass);
         }
@@ -150,7 +155,7 @@ Bypass::fix()
             Locator loc(0);
             router()->visit(this, direction, 0, &loc);
             if (loc._e) {
-                Assigner ass(loc._e, loc._port);
+                Assigner ass(loc._e, loc._port, loc._unstack);
                 router()->visit(this, !direction, 1, &ass);
             }
         }

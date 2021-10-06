@@ -112,6 +112,8 @@ class FastUDPFlows : public BatchElement {
         void change_ports(int);
         Packet *get_packet();
 
+        static int eth_write_handler(const String &, Element *, void *, ErrorHandler *);
+
         void set_length(unsigned len) {
             if (len < 60) {
                 click_chatter("warning: packet length < 60, defaulting to 60");

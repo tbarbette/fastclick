@@ -7,6 +7,11 @@
 #include <vector>
 
 CLICK_DECLS
+
+/**
+ * Ensure that patch going through have a minimal size, if not
+ * it waits for more packet, using a timeout to limit the amount of waiting time.
+ */
 class MinBatch: public BatchElement { public:
 
     MinBatch() CLICK_COLD;

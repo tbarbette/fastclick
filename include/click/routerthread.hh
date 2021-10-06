@@ -174,6 +174,8 @@ class alignas(CLICK_CACHE_LINE_SIZE) RouterThread { public:
     atomic_uint32_t _task_blocker;
     atomic_uint32_t _task_blocker_waiting;
 
+    int _idle_dorun;
+    IdleTask* _idletask;
     Task::Pending _pending_head;
     Task::Pending *_pending_tail;
     SpinlockIRQ _pending_lock;
@@ -254,9 +256,9 @@ class alignas(CLICK_CACHE_LINE_SIZE) RouterThread { public:
 #endif
     }
 
-    inline void run_tasks(int ntasks);
+    inline bool run_tasks(int ntasks);
     inline void process_pending();
-    inline void run_os();
+    inline bool run_os();
 #if HAVE_ADAPTIVE_SCHEDULER
     void client_set_tickets(int client, int tickets);
     inline void client_update_pass(int client, const Timestamp &before);
@@ -269,6 +271,7 @@ class alignas(CLICK_CACHE_LINE_SIZE) RouterThread { public:
     inline bool current_thread_is_running_cleanup() const;
 
     friend class Task;
+    friend class IdleTask;
     friend class Master;
 #if CLICK_USERLEVEL
     friend class SelectSet;

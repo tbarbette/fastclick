@@ -64,7 +64,7 @@ IP Address of this load-balancer.
 FlowIPLoadBalancer, FlowIPNAT */
 
 class FlowIPLoadBalancer : public FlowStateElement<FlowIPLoadBalancer,IPLBEntry>,
-                           public TCPHelper, public LoadBalancer {
+                           public TCPHelper, public LoadBalancer<IPAddress> {
     public:
         FlowIPLoadBalancer() CLICK_COLD;
         ~FlowIPLoadBalancer() CLICK_COLD;
