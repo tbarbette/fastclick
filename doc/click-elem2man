@@ -1326,8 +1326,13 @@ sub process_comment ($$$) {
     # close output file & make links if appropriate
     if ($filename_func) {
         close OUT;
-        use File::Which;
-        $zcat = which("gzcat") ? "gzcat" : "zcat";
+	$zcat = "gzcat";
+	eval
+	{
+	  require File::Which;
+	  $zcat = File::Which::which("gzcat") ? "gzcat" : "zcat";
+	};
+
         if ($gzip ? open(INX, "-|", $zcat, $main_outname) : open(INX, "<", $main_outname)) {
             $gzip ? open(OUTX, "-|", $zcat, $main_outname . "~") : open(OUTX, "<", $main_outname . "~");
             local($/) = undef;
