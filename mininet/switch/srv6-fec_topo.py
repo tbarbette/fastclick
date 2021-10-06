@@ -24,6 +24,10 @@ def simpleRun():
     net.start()
 
     dumpNodeConnections(net.hosts)
+
+    # Add default routes to see the packets
+    net["h1"].cmd("ip -6 route add default dev h1-eth0")
+    net["h2"].cmd("ip -6 route add default dev h2-eth0")
     
     CLI(net)
     net.stop()
