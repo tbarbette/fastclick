@@ -45,14 +45,14 @@ FlowIPNAT::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-int FlowIPNAT::initialize(ErrorHandler *errh)
-{
+
+int FlowIPNAT::initialize(ErrorHandler *errh) {
     /* Get "touching" threads. That is threads passing by us and touching
      * our state.
      * NATReverse takes care of telling that it will touch our hashtable
      * therefore touching is actually the passing threads for both directions
      */
-    Bitvector touching = get_passing_threads();//TODO touching true
+    Bitvector touching = get_passing_threads(true);
 
     /**
      * If only one thread touch this element, disable MT-safeness.
@@ -64,7 +64,7 @@ int FlowIPNAT::initialize(ErrorHandler *errh)
     /**
      * Get passing threads, that is the threads that will call push_flow
      */
-    Bitvector passing = get_passing_threads(); // TODO touching false
+    Bitvector passing = get_passing_threads(false);
     if (passing.weight() == 0) {
         return errh->warning("No thread passing by, element will not work if it's not indeed idle");
     }
@@ -118,6 +118,7 @@ NATCommon* FlowIPNAT::pick_port()
         }*/
 #else
         //Reinsert the reference at the back
+        static_assert(false);
         _state->available_ports.insert(ref);
 #endif
     }
@@ -156,6 +157,7 @@ void FlowIPNAT::release_flow(NATEntryIN* fcb)
 #if NAT_COLLIDE
     release_ref(fcb->ref, _own_state);
 #else
+    _state->available_ports.insert(fcb->ref);
     fcb->ref = 0;
 #endif
 }
@@ -200,6 +202,7 @@ FlowIPNATReverse::~FlowIPNATReverse()
 {
 }
 
+
 int
 FlowIPNATReverse::configure(Vector<String> &conf, ErrorHandler *errh)
 {
@@ -227,20 +230,22 @@ bool FlowIPNATReverse::new_flow(NATEntryOUT* fcb, Packet* p)
     lb_assert(fcb->ref->ref > 0);
     if (fcb->ref->ref == 1) { //Connection was reset by the inserter
         click_chatter("Got a closed connection");
-    release_ref(fcb->ref, _in->_own_state);
+        release_ref(fcb->ref, _in->_own_state);
         return false;
     }
     return true;
 }
 
-void FlowIPNATReverse::release_flow(NATEntryOUT* fcb)
-{
-    // click_chatter("Release rvr %d", ntohs(fcb->ref->port));
+void FlowIPNATReverse::release_flow(NATEntryOUT* fcb) {
+//    click_chatter("Release rvr %d",ntohs(fcb->ref->port));
+
 #if NAT_COLLIDE
-    release_ref(fcb->ref, _in->_own_state);
+	release_ref(fcb->ref, _in->_own_state);
 #else
+    _state->available_ports.insert(fcb->ref);
     fcb->ref = 0;
 #endif
+
 }
 
 void FlowIPNATReverse::push_flow(int port, NATEntryOUT* flowdata, PacketBatch* batch)

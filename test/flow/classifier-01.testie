@@ -1,0 +1,57 @@
+%require
+click-buildtool provides flow ctx
+
+%script
+click C
+
+%file C
+Idle -> a :: CTXManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> CTXDispatcher(0/10) -> Discard; //Accept  0/10, else drop
+Idle -> b :: CTXManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> CTXDispatcher(0/10,-) -> Discard; //Accept 0/10, else drop
+Idle -> c :: CTXManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> CTXDispatcher(0/10,-)[0-1] => {[0] -> Discard; [1] -> Discard;}
+
+Idle -> d1 :: CTXManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> CTXDispatcher(0/10 0, 0/20 0, -) -> Discard;
+Idle -> d2 :: CTXManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> CTXDispatcher(0/10 0, 0/20 0, - drop) -> Discard;
+
+Script(TYPE ACTIVE, stop);
+
+%expect stderr
+
+Placing  CTXDispatcher@3 :: CTXDispatcher at [4-7]
+Placing  CTXDispatcher@7 :: CTXDispatcher at [4-7]
+Placing  CTXDispatcher@11 :: CTXDispatcher at [4-7]
+Placing  CTXDispatcher@15 :: CTXDispatcher at [4-7]
+Placing  CTXDispatcher@19 :: CTXDispatcher at [4-7]
+CTXDispatcher@3 :: CTXDispatcher has no default rule. Non-matching traffic will be dropped. Add a list rule '-' to avoid this message.
+
+Table of b after optimization :
+---
+0/FF (TWOCASE, 1 children)
+|-> 16 UC:1 ED:0 (data 1000000000000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+---
+Table of d1 after optimization :
+---
+0/FF (THREECASE, 2 children)
+|-> 32 UC:1 ED:0 (data 2000000000000000)
+|-> 16 UC:1 ED:0 (data 1000000000000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+---
+Table of a after optimization :
+---
+0/FF (TWOCASE, 1 children)
+|-> 16 UC:1 ED:0 (data 1000000000000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+---
+Table of d2 after optimization :
+---
+0/FF (THREECASE, 2 children)
+|-> 32 UC:1 ED:0 (data 2000000000000000)
+|-> 16 UC:1 ED:0 (data 1000000000000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+---
+Table of c after optimization :
+---
+0/FF (TWOCASE, 1 children)
+|-> 16 UC:1 ED:0 (data 1000000000000000)
+|-> DEFAULT 0 UC:1 ED:0 (data 0000000001000000)
+---

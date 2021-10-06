@@ -1,0 +1,41 @@
+%info
+Test with child rules
+
+It is actually not possible for f and g to be true,
+f and g result in always drop. It is not possible to have 0/10 and 0/12 on the same path, idem for g.
+
+%require
+click-buildtool provides flow ctx
+
+%script
+click C
+
+%file C
+Idle -> a :: CTXManager(VERBOSE 1, AGGCACHE false) -> CTXDispatcher(0/10 4/20, -) -> Discard;
+
+Idle -> b :: CTXManager(VERBOSE 1, AGGCACHE false) -> CTXDispatcher(4/20 0/10, -) -> Discard;
+
+
+Script(TYPE ACTIVE, stop);
+
+%expect stderr
+Placing  CTXDispatcher@3 :: CTXDispatcher at [4-7]
+Placing  CTXDispatcher@7 :: CTXDispatcher at [4-7]
+Table of a after optimization :
+---
+0/FF (TWOCASE, 1 children)
+|-> 16
+|  4/FF (TWOCASE, 1 children)
+|  |-> 32 UC:1 ED:0 (data 2000000000000000)
+|  |-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+---
+Table of b after optimization :
+---
+4/FF (TWOCASE, 1 children)
+|-> 32
+|  0/FF (TWOCASE, 1 children)
+|  |-> 16 UC:1 ED:0 (data 1000000000000000)
+|  |-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+---

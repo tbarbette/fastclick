@@ -44,6 +44,9 @@
 /* Define if PollDevice should run fast to get good benchmark numbers */
 #undef CLICK_WARP9
 
+/* Define if you have the __builtin_ctz function. */
+#undef HAVE___BUILTIN_CTZ
+
 /* Define if you have the __builtin_clz function. */
 #undef HAVE___BUILTIN_CLZ
 
@@ -61,6 +64,9 @@
 
 /* Define if you have the __builtin_ffsll function. */
 #undef HAVE___BUILTIN_FFSLL
+
+/* Define if you have the __builtin_popcount function. */
+#undef HAVE___BUILTIN_POPCOUNT
 
 /* Define if you have the __has_trivial_copy compiler intrinsic. */
 #undef HAVE___HAS_TRIVIAL_COPY
@@ -103,6 +109,9 @@
 
 /* Define if the C++ compiler understands template alias. */
 #undef HAVE_CXX_TEMPLATE_ALIAS
+
+/* Define if Flow support is enabled. */
+#undef HAVE_FLOW
 
 /* Define if the machine is indifferent to alignment. */
 #undef HAVE_INDIFFERENT_ALIGNMENT
@@ -190,6 +199,9 @@
 
 /* The size of a `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
+
+/* Define if SSE4.2 instruction is available. */
+#undef HAVE_SSE42
 
 /* Define if you want to run multithreaded Click. */
 #undef __MTCLICK__

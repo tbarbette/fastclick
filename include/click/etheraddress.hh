@@ -224,6 +224,8 @@ class EtherAddressArg { public:
     inline bool direct_parse(const String& str, unsigned char* value, Args& args) {
 	return direct_parse(str, *reinterpret_cast<EtherAddress *>(value), args);
     }
+    static bool parse(const String &str, Vector<EtherAddress> &result,
+		      const ArgContext &args = blank_args);
   private:
     int flags_;
     static bool parse(const String& str, EtherAddress& value, const ArgContext& args, int flags);
@@ -232,6 +234,7 @@ class EtherAddressArg { public:
 
 template<> struct DefaultArg<EtherAddress> : public EtherAddressArg {};
 template<> struct has_trivial_copy<EtherAddress> : public true_type {};
+template<> struct DefaultArg<Vector<EtherAddress> > : public EtherAddressArg {};
 
 CLICK_ENDDECLS
 #endif

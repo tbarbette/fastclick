@@ -1,0 +1,30 @@
+%require
+click-buildtool provides flow ctx
+
+%script
+click C1
+
+%file C1
+fc1 :: CTXManager(VERBOSE 1)
+
+-> fd :: CTXDispatcher(10/0/ffffffff)
+-> fd2 :: CTXDispatcher(10/0/ffff 12/0/ffff)
+-> Print(A)
+-> Discard;
+
+fd[1]
+-> Print(B) -> Discard;
+
+InfiniteSource(LENGTH 20, LIMIT 1, STOP true) -> fc1;
+
+DriverManager(pause, stop);
+
+%expect stderr
+Placing  fd :: CTXDispatcher at [4-7]
+Placing  fd2 :: CTXDispatcher at [8-11]
+Table of fc1 after optimization :
+---
+10/FFFFFFFF (HASH-257, 0 children, dynamic)
+|-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000)
+---
+A:   20 | 52616e64 6f6d2062 756c6c73 68697420 696e2061

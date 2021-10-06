@@ -101,6 +101,7 @@ class ARPTable : public Element { public:
     const char *class_name() const override		{ return "ARPTable"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler*) CLICK_COLD;
     bool can_live_reconfigure() const		{ return true; }
     void take_state(Element *, ErrorHandler *);
     void add_handlers() CLICK_COLD;
@@ -209,6 +210,7 @@ class ARPTable : public Element { public:
   private:
 
     ReadWriteLock _lock;
+    bool _need_lock;
 
     typedef HashContainer<ARPEntry> Table;
     Table _table;
@@ -233,7 +235,8 @@ class ARPTable : public Element { public:
 inline int
 ARPTable::lookup(IPAddress ip, EtherAddress *eth, uint32_t poll_timeout_j)
 {
-    _lock.acquire_read();
+    if (_need_lock)
+        _lock.acquire_read();
     int r = -1;
     if (Table::iterator it = _table.find(ip)) {
 	click_jiffies_t now = click_jiffies();
@@ -248,7 +251,8 @@ ARPTable::lookup(IPAddress ip, EtherAddress *eth, uint32_t poll_timeout_j)
 		r = 0;
 	}
     }
-    _lock.release_read();
+    if (_need_lock)
+        _lock.release_read();
     return r;
 }
 

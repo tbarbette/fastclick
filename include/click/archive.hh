@@ -71,7 +71,7 @@ struct ArchiveElement {
 	return 0;
     }
 
-    static const int extract(const Vector<ArchiveElement> &ar, const String &name, const String &dest, ErrorHandler* errh = 0) {
+    static int extract(const Vector<ArchiveElement> &ar, const String &name, const String &dest, ErrorHandler* errh = 0) {
         const ArchiveElement *ae = find(ar, name);
 		FILE *f = fopen(dest.c_str(), "wb");
 		if (!f) {

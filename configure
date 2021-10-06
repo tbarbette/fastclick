@@ -710,6 +710,8 @@ BUILD_RANLIB
 BUILD_AR
 BUILD_CXX
 BUILD_CC
+USE_CTX
+USE_FLOW
 POSIX_CLOCK_LIBS
 LIBOBJS
 freebsd_includedir
@@ -740,7 +742,6 @@ KERNEL_CXXFLAGS
 KERNEL_CXX
 KERNEL_CFLAGS
 KERNEL_CC
-X86_FEATURE_CFLAGS
 CXXCPP
 ac_ct_CXX
 CXXFLAGS
@@ -857,6 +858,7 @@ enable_all_elements
 enable_analysis
 enable_app
 enable_aqm
+enable_ctx
 enable_ethernet
 enable_etherswitch
 enable_flow
@@ -884,6 +886,11 @@ enable_nanotimestamp
 enable_simtime
 enable_user_timestamp
 enable_bound_port_transfer
+enable_sloppy
+enable_flow_atomic
+enable_flow_dynamic
+enable_flow_structure
+enable_flow_hash
 enable_tools
 enable_dynamic_linking
 enable_stats
@@ -899,6 +906,7 @@ enable_schedule_debugging
 enable_portable_binary
 enable_intel_cpu
 enable_avx2
+enable_sse42
 enable_atomic_builtins
 with_numa
 with_netmap
@@ -1599,6 +1607,7 @@ Optional Features:
   --disable-analysis      do not include elements for network analysis
   --disable-app           do not include application-level elements
   --disable-aqm           do not include active queue management elements
+  --enable-ctx            include Context-based elements for MiddleClick
   --disable-ethernet      do not include Ethernet elements
   --enable-etherswitch    include Ethernet switch elements
   --enable-flow           include Enable flow system and elements
@@ -1628,6 +1637,16 @@ Optional Features:
   --enable-user-timestamp enable support for user-provided clock system
   --enable-bound-port-transfer
                           enable port transfer function ptr optimization
+    --disable-sloppy      disable Sloppy flow timeouts
+    --disable-flow-atomic use non-atomic flow reference counting
+    --disable-flow-dynamic
+                          allow dynamic flow system
+    --disable-flow-structure
+                          do not free classifier nodes in pool, mark them as
+                          released to somehow keep the receive strucutre
+                          intact
+    --enable-flow-hash=[reset|keep|epoch]
+                          set flow hashtable release mechanism
   --enable-tools=WHERE    enable tools (host/build/mixed/no) [[mixed]]
   --disable-dynamic-linking
                           disable dynamic linking
@@ -1651,6 +1670,7 @@ Optional Features:
                           unportable binaries
   --enable-intel-cpu      enable Intel-specific machine instructions
   --disable-avx2          Do not check whether AVX2 is enabled
+  --disable-sse42         Do not check whether SSE4.2 is enabled
   --enable-atomic-builtins
                           Use GCC builtins atomic functions instead of Click
                           own implementation. It should be always used in
@@ -6895,7 +6915,6 @@ fi
 
 
 
-
   CFLAGS="$CFLAGS $X86_FEATURE_CFLAGS";CXXFLAGS="$CXXFLAGS $X86_FEATURE_CFLAGS"
 
 
@@ -9035,6 +9054,17 @@ if test "x$enable_aqm" = xyes; then
     :
 
 fi
+# Check whether --enable-ctx was given.
+if test "${enable_ctx+set}" = set; then :
+  enableval=$enable_ctx;
+else
+  enable_ctx=NO
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_ctx" = xNO -o "x$enable_ctx" = x \) && enable_ctx=yes
+if test "x$enable_ctx" = xyes; then
+    :
+
+fi
 # Check whether --enable-ethernet was given.
 if test "${enable_ethernet+set}" = set; then :
   enableval=$enable_ethernet;
@@ -10912,6 +10942,97 @@ if test "x$enable_flow" = xyes; then
         $as_echo "#define HAVE_FLOW 1" >>confdefs.h
 
     fi
+    USE_FLOW=yes
+
+fi
+
+if test "x$enable_ctx" = xyes; then
+    $as_echo "#define HAVE_CTX 1" >>confdefs.h
+
+    USE_CTX=yes
+
+else
+    enable_ctx="no"
+fi
+
+# Check whether --enable-sloppy was given.
+if test "${enable_sloppy+set}" = set; then :
+  enableval=$enable_sloppy; :
+else
+  enable_sloppy=yes
+fi
+
+if test "x$enable_sloppy" = xyes; then
+    $as_echo "#define HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT 1" >>confdefs.h
+
+fi
+
+# Check whether --enable-flow-atomic was given.
+if test "${enable_flow_atomic+set}" = set; then :
+  enableval=$enable_flow_atomic; :
+else
+  enable_flow_atomic=yes
+fi
+
+if test "x$enable_flow_atomic" = xyes; then
+    $as_echo "#define FLOW_ATOMIC_USE_COUNT 1" >>confdefs.h
+
+fi
+
+# Check whether --enable-flow-dynamic was given.
+if test "${enable_flow_dynamic+set}" = set; then :
+  enableval=$enable_flow_dynamic; :
+else
+  enable_flow_dynamic=yes
+fi
+
+if test "x$enable_flow$enable_flow_dynamic" = xyesyes; then
+    $as_echo "#define HAVE_FLOW_DYNAMIC 1" >>confdefs.h
+
+fi
+
+# Check whether --enable-flow-structure was given.
+if test "${enable_flow_structure+set}" = set; then :
+  enableval=$enable_flow_structure; :
+else
+  enable_flow_structure=yes
+fi
+
+if test "x$enable_flow_structure" = xyes; then
+    $as_echo "#define FLOW_KEEP_STRUCTURE 1" >>confdefs.h
+
+fi
+
+# Check whether --enable-flow-hash was given.
+if test "${enable_flow_hash+set}" = set; then :
+  enableval=$enable_flow_hash; :
+else
+  enable_flow_hash=""
+fi
+
+
+if echo "$enable_flow_hash" | grep epoch >/dev/null 2>&1; then
+
+$as_echo "#define FLOW_HASH_RELEASE 2" >>confdefs.h
+
+elif echo "$enable_flow_hash" | grep keep >/dev/null 2>&1; then
+
+$as_echo "#define FLOW_HASH_RELEASE 1" >>confdefs.h
+
+elif echo "$enable_flow_hash" | grep reset >/dev/null 2>&1; then
+
+$as_echo "#define FLOW_HASH_RELEASE 0" >>confdefs.h
+
+else
+    if test "x$enable_flow_structure" = xyes; then
+
+$as_echo "#define FLOW_HASH_RELEASE 1" >>confdefs.h
+
+    else
+
+$as_echo "#define FLOW_HASH_RELEASE 2" >>confdefs.h
+
+    fi
 fi
 
 # Check whether --enable-tools was given.
@@ -12759,6 +12880,29 @@ else
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
 fi
+
+
+# Check whether --enable-sse42 was given.
+if test "${enable_sse42+set}" = set; then :
+  enableval=$enable_sse42; check_sse42=no
+else
+  check_sse42=yes
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking if SSE4.2 should be used" >&5
+$as_echo_n "checking if SSE4.2 should be used... " >&6; }
+if test "x$ax_cv_gcc_x86_cpu_supports_sse4_2$check_sse42" = "xyesyes"; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+    $as_echo "#define HAVE_SSE42 1" >>confdefs.h
+
+else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
 
 # Check whether --enable-atomic-builtins was given.
 if test "${enable_atomic_builtins+set}" = set; then :
@@ -16348,6 +16492,13 @@ if test "x$enable_flow" = xyes; then
 else
     enable_flow="no"
 fi
+
+if test "x$enable_ctx" = xyes; then
+    provisions="$provisions ctx"
+else
+    enable_ctx="no"
+fi
+
 
 if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"

@@ -5,6 +5,8 @@
 #include <click/glue.hh>
 #include <click/timestamp.hh>
 #include <click/packet_anno.hh>
+
+#include "flow/common.hh"
 #if CLICK_LINUXMODULE
 # include <click/skbmgr.hh>
 #elif CLICK_PACKET_USE_DPDK
@@ -33,6 +35,7 @@ struct click_icmp;
 struct click_ip6;
 struct click_tcp;
 struct click_udp;
+
 CLICK_DECLS
 
 //#define HAVE_VECTOR_PACKET_POOL 1
@@ -74,6 +77,7 @@ class Packet { public:
 				uint32_t length, uint32_t tailroom, bool clear = true) CLICK_WARN_UNUSED_RESULT;
     static inline WritablePacket *make(const void *data, uint32_t length) CLICK_WARN_UNUSED_RESULT;
     static inline WritablePacket *make(uint32_t length) CLICK_WARN_UNUSED_RESULT;
+    static WritablePacket *make_similar(Packet* original, uint32_t length) CLICK_WARN_UNUSED_RESULT;
 #if CLICK_LINUXMODULE
     static Packet *make(struct sk_buff *skb) CLICK_WARN_UNUSED_RESULT;
 #elif CLICK_PACKET_USE_DPDK
@@ -396,6 +400,12 @@ class Packet { public:
     inline const click_icmp *icmp_header() const;
     inline const click_tcp *tcp_header() const;
     inline const click_udp *udp_header() const;
+
+    inline uint16_t getContentOffset() const;
+    inline void setContentOffset(uint16_t offset);
+    inline const unsigned char* getPacketContent();
+    inline bool isPacketContentEmpty() const;
+    inline uint16_t getPacketContentSize() const;
     //@}
 
 #if CLICK_LINUXMODULE
@@ -850,11 +860,6 @@ class Packet { public:
 #else
 	Packet *next;
 	Packet *prev;
-	AllAnno()
-#if !CLICK_PACKET_USE_DPDK
-#endif
-	{
-	}
     };
 #endif
 
@@ -963,6 +968,9 @@ private:
     };
 #endif
 
+#include <clicknet/tcp.h>
+#include <clicknet/udp.h>
+
 class WritablePacket : public Packet { public:
 
     inline unsigned char *data() const;
@@ -978,11 +986,13 @@ class WritablePacket : public Packet { public:
     inline click_icmp *icmp_header() const;
     inline click_tcp *tcp_header() const;
     inline click_udp *udp_header() const;
+    inline unsigned char* getPacketContent();
 
     inline void rewrite_ips(IPPair pair, bool is_tcp = true);
     inline void rewrite_ips_ports(IPPair pair, uint16_t sport, uint16_t dport, bool is_tcp = true);
     inline void rewrite_ipport(IPAddress ip, uint16_t port, const int shift, bool is_tcp = true);
     inline void rewrite_ip(IPAddress ip, const int shift, bool is_tcp = true);
+    inline void rewrite_seq(tcp_seq_t seq, const int shift);
 
 #if !CLICK_LINUXMODULE
     inline void init_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
@@ -1766,7 +1776,12 @@ Packet::kill()
 			b->list = 0;
 		# endif
 		skbmgr_recycle_skbs(b);
-	#elif CLICK_PACKET_USE_DPDK
+    #elif CLICK_PACKET_USE_DPDK
+#if HAVE_FLOW_DYNAMIC
+        if (fcb_stack) {
+            fcb_stack->release(1);
+        }
+#endif
 		//Dpdk takes care of indirect and related things
 		rte_pktmbuf_free(mb());
 	#elif HAVE_CLICK_PACKET_POOL && !defined(CLICK_FORCE_EXPENSIVE)
@@ -1801,6 +1816,11 @@ Packet::kill_nonatomic()
     # endif
         skbmgr_recycle_skbs(b);
 #elif CLICK_PACKET_USE_DPDK
+#if HAVE_FLOW_DYNAMIC
+        if (fcb_stack) {
+            fcb_stack->release(1);
+        }
+#endif
         rte_pktmbuf_free(mb());
 #elif HAVE_CLICK_PACKET_POOL
 
@@ -1810,7 +1830,7 @@ Packet::kill_nonatomic()
         {
             WritablePacket::recycle(static_cast<WritablePacket *>(this));
 
-    }
+        }
 #else
         if (_use_count.nonatomic_dec_and_test()) {
             delete this;
@@ -2983,9 +3003,6 @@ WritablePacket::set_data_length(uint32_t data_length) {
 }
 #endif
 
-#include <clicknet/tcp.h>
-#include <clicknet/udp.h>
-
 inline void
 WritablePacket::rewrite_ips(IPPair pair, bool is_tcp) {
     assert(this->network_header());
@@ -3102,6 +3119,25 @@ WritablePacket::rewrite_ip(IPAddress ip, const int shift, bool is_tcp) {
         click_update_in_cksum(&this->udp_header()->uh_sum, t_old_hw, t_new_hw);
 }
 
+//0 for seq, 1 for ack
+inline void
+WritablePacket::rewrite_seq(tcp_seq_t seq, const int shift) {
+    assert(this->network_header());
+    assert(this->transport_header());
+    uint32_t t_old_hw = 0;
+    uint32_t t_new_hw = 0;
+
+    uint16_t *xseq = reinterpret_cast<uint16_t *>(&this->tcp_header()->th_seq);
+    t_old_hw = (uint32_t) xseq[shift * 2];
+    t_old_hw += (t_old_hw >> 16);
+    memcpy(&xseq[shift*2], &seq, 4);
+    t_new_hw = (uint32_t) xseq[shift * 2];
+    t_new_hw += (t_new_hw >> 16);
+
+    click_update_in_cksum(&this->tcp_header()->th_sum, t_old_hw, t_new_hw);
+}
+
+
 #if !CLICK_PACKET_USE_DPDK
 inline void
 Packet::delete_buffer(unsigned char* head, unsigned char* end
@@ -3137,6 +3173,51 @@ Packet::delete_buffer(unsigned char* head, unsigned char* end
 #endif
 
 typedef Packet::PacketType PacketType;
+
+
+inline unsigned char* WritablePacket::getPacketContent()
+{
+    uint16_t offset = getContentOffset();
+
+    return (data() + offset);
+}
+
+
+inline const unsigned char* Packet::getPacketContent()
+{
+    uint16_t offset = getContentOffset();
+
+    return (data() + offset);
+}
+
+inline bool Packet::isPacketContentEmpty() const
+{
+    uint16_t offset = getContentOffset();
+
+    if(offset >= length())
+        return true;
+    else
+        return false;
+}
+
+inline uint16_t Packet::getPacketContentSize() const
+{
+    uint16_t offset = getContentOffset();
+
+    return length() - offset;
+}
+
+inline void Packet::setContentOffset(uint16_t offset)
+{
+    set_anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET, offset);
+}
+
+inline uint16_t Packet::getContentOffset() const
+{
+    return anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET);
+}
+
+
 
 CLICK_ENDDECLS
 #endif

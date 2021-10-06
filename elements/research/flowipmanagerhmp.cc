@@ -25,7 +25,7 @@
 
 CLICK_DECLS
 
-FlowIPManagerHMP::FlowIPManagerHMP()
+FlowIPManagerHMP::FlowIPManagerHMP() : Router::InitFuture(this)
 {
     _current = 0;
 }
@@ -48,6 +48,7 @@ FlowIPManagerHMP::configure(Vector<String> &conf, ErrorHandler *errh)
     find_children(_verbose);
 
     router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
+
     _fcb_builded_init_future.post(this);
 
     return 0;

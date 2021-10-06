@@ -5,6 +5,7 @@
 .*.cmd
 .dotest
 .vimhistory
+.vscode
 Makefile
 autom4te*
 bin

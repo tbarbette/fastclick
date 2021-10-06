@@ -166,13 +166,13 @@ class TCPRewriter : public IPRewriterBase { public:
 			      const IPFlowID &rewritten_flowid, int input);
     void destroy_flow(IPRewriterFlow *flow);
     click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
-	return flow->expiry() + tcp_flow_timeout(static_cast<const TCPFlow *>(flow)) -
+	    return flow->expiry() + tcp_flow_timeout(static_cast<const TCPFlow *>(flow)) -
                _timeouts[click_current_cpu_id()][1];
     }
 
     void push(int, Packet *);
 #if HAVE_BATCH
-     void push_batch(int port, PacketBatch *batch);
+    void push_batch(int port, PacketBatch *batch);
 #endif
 
     void add_handlers() CLICK_COLD;

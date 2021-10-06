@@ -21,41 +21,116 @@
 #include <click/flow/flowelement.hh>
 #include <algorithm>
 #include <set>
-
+#if HAVE_CTX
+#include "../elements/ctx/ctxmanager.hh"
+#endif
 
 CLICK_DECLS
 
 #ifdef HAVE_FLOW
 
+#if HAVE_CTX
+FlowNode*
+FlowElementVisitor::get_downward_table(Element* e,int output, Vector<FlowElement*> contextStack, bool resolve_context) {
+	FlowNode* merged = 0;
+
+    FlowElementVisitor v(e);
+
+    e->router()->visit(e,true,output,&v);
+#if DEBUG_CLASSIFIER
+    if (v.dispatchers.size() > 0)
+        click_chatter("Children of %p{element}[%d] : ",e,output);
+    else
+        click_chatter("%p{element}[%d] has no children",e,output);
+#endif
+    //TODO : Do not catch all bugs
+    for (int i = 0; i < v.dispatchers.size(); i++) {
+        //click_chatter("%p{element}",v.dispatchers[i].elem);
+		if (v.dispatchers[i].elem == (FlowElement*)e) {
+			click_chatter("Classification loops are unsupported, place another CTXManager before reinjection of the packets.");
+			e->router()->please_stop_driver();
+			return 0;
+		}
+		FlowNode* ctx = 0;
+        debug_flow("Resolve context :%d", resolve_context);
+		if (resolve_context) {
+            debug_flow("%p{element}'s context is %d",v.dispatchers[i].elem, v.dispatchers[i].elem->getContext(v.dispatchers[i].iport));
+		    ctx = contextStack.back()->resolveContext(v.dispatchers[i].elem->getContext(v.dispatchers[i].iport),contextStack);
+		}
+		FlowNode* child_table = v.dispatchers[i].elem->get_table(v.dispatchers[i].iport, contextStack);
+		if (ctx) {
+		    child_table = ctx->combine(child_table,true,true,true, e);
+		}
+#if DEBUG_CLASSIFIER
+		click_chatter("Traversal merging of %p{element} [%d] : ",v.dispatchers[i].elem,v.dispatchers[i].iport);
+		if (child_table) {
+		    child_table->print();
+		} else {
+		    click_chatter("--> No table !");
+		}
+		if (merged) {
+		    click_chatter("With :");
+		    merged->print();
+		} else {
+		    click_chatter("With NONE");
+		}
+#endif
+		if (merged)
+			merged = merged->combine(child_table, false, false, true, e);
+		else
+			merged = child_table;
+		if (merged) {
+#if DEBUG_CLASSIFIER
+		    click_chatter("Merged traversal[%d] with %p{element}",i,v.dispatchers[i].elem);
+#endif
+		    merged->debug_print();
+		    merged->check();
+            flow_assert(merged->is_full_dummy() || !merged->is_dummy());
+		    //assert(merged->has_no_default());
+		}
+	}
+#if DEBUG_CLASSIFIER
+    click_chatter("%p{element}: Traversal finished",e);
+#endif
+	return merged;
+}
+#endif
+
+
 FlowElement::FlowElement()
 {
-    if (flow_code() != Element::COMPLETE_FLOW) {
-        click_chatter("Flow Elements must be x/x in their flows");
-        assert(flow_code() == Element::COMPLETE_FLOW);
-    }
-    if (in_batch_mode < BATCH_MODE_NEEDED)
-        in_batch_mode = BATCH_MODE_NEEDED;
+
 };
 
 FlowElement::~FlowElement()
 {
 };
-/*
+
+#if HAVE_CTX
 FlowNode*
 FlowElement::get_table(int iport, Vector<FlowElement*> contextStack) {
 
-    return FlowElementVisitor::get_downward_table(this,-1,contextStack);
+    return FlowElementVisitor::get_downward_table(this, -1, contextStack);
 }
 
 FlowNode*
 FlowElement::resolveContext(FlowType, Vector<FlowElement*> contextStack) {
     return FlowClassificationTable::make_drop_rule().root;
 }
-*/
+#endif
 
-FlowType  FlowElement::getContext()
+FlowType  FlowElement::getContext(int)
 {
     return FLOW_NONE;
+}
+
+VirtualFlowSpaceElement::VirtualFlowSpaceElement() :_flow_data_offset(-1) {
+    if (flow_code() != Element::COMPLETE_FLOW) {
+        click_chatter("Flow Elements must be x/x in their flows");
+        assert(flow_code() == Element::COMPLETE_FLOW);
+    }
+    if (in_batch_mode < BATCH_MODE_NEEDED)
+        in_batch_mode = BATCH_MODE_NEEDED;
 }
 
 void *
@@ -138,6 +213,10 @@ ElementDistanceCastTracker::visit(Element *e, bool, int, Element *, int, int dis
     if (fe && fe->stopClassifier())
         return false;
     if (e->cast("VirtualFlowSpaceElement")) {
+        Router::InitFuture* future = (Router::InitFuture*)e->cast("FCBBuiltFuture");
+        if (future) {
+	        VirtualFlowManager::_fcb_builded_init_future.postOnce(future);
+        }
         if (dynamic_cast<VirtualFlowSpaceElement*>(fe)->flow_data_size() > 0)
             insert(e,distance);
         return _continue;
@@ -158,7 +237,7 @@ bool cmp(el a, el b)
 
 VirtualFlowManager::VirtualFlowManager()
 {
-    _fcb_builded_init_future.add();
+
 }
 
 void VirtualFlowManager::find_children(int verbose)
@@ -182,12 +261,11 @@ void VirtualFlowManager::find_children(int verbose)
 
 void VirtualFlowManager::build_fcb()
 {
-    _build_fcb(1,true);
+    _build_fcb(1, true);
 }
 
 Vector<VirtualFlowManager*> VirtualFlowManager::_entries;
 CounterInitFuture VirtualFlowManager::_fcb_builded_init_future("FCBBuilder", VirtualFlowManager::build_fcb);
-
 
 class ManagerReachVisitor : public RouterVisitor { public:
     Element* _target;
@@ -240,7 +318,8 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
         VirtualFlowManager* fc = dynamic_cast<VirtualFlowManager*>(_entries[i]);
 
         for (int j = 0; j < _entries[i]->_reachable_list.size(); j++) {
-            if (verbose > 1) click_chatter("%p{element} : %d", _entries[i]->_reachable_list[j].first, _entries[i]->_reachable_list[j].second);
+            if (verbose > 1)
+                click_chatter("%p{element} : %d", _entries[i]->_reachable_list[j].first, _entries[i]->_reachable_list[j].second);
             auto ptr = common.find_insert(_entries[i]->_reachable_list[j].first->eindex(),CountDistancePair(0,_entries[i]->_reachable_list[j].second));
             ptr->second.first++;
             if (ptr->second.second < _entries[i]->_reachable_list[j].second) {
@@ -258,23 +337,24 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
     // Sorting the element, so we place the most shared first, then the minimal distance first. With the current version of the algo, this is not needed anymore
     std::sort(elements.begin(), elements.end(),cmp);
 
-    // We now place all elements
+    // We now place all Flow Elements (that extend VirtualFlowSpaceElement)
     std::set<int> already_placed;
     for (auto it = elements.begin(); it != elements.end(); it++) {
-        VirtualFlowSpaceElement* e = dynamic_cast<VirtualFlowSpaceElement*>(router->element(it->id));
+        Element* elem = router->element(it->id);
+        VirtualFlowSpaceElement* e = dynamic_cast<VirtualFlowSpaceElement*>(elem);
         if (verbose > 1)
             click_chatter("Placing %p{element} : in %d sets, distance %d", e, it->count, it->distance);
         int my_place;
         int min_place = 0;
 
-        //We need to verify the reserved space for all possible FlowManager
+        //We need to verify the reserved space for all possible CTXManager
         for (int i = 0; i < _entries.size(); i++) {
             VirtualFlowManager* fc = dynamic_cast<VirtualFlowManager*>(_entries[i]);
             //If this flow manager can reach the element, then we need to have enough reserved space
             for (int j = 0; j < _entries[i]->_reachable_list.size(); j++) {
                 if (_entries[i]->_reachable_list[j].first->eindex() == it->id) {
-                    if (fc->_reserve > min_place)
-                        min_place = fc->_reserve;
+                    if (fc->_reserve >= min_place)
+                        min_place = fc->_reserve + 1;
 
                     break;
                 }
@@ -313,7 +393,6 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
             click_chatter("Placing  %p{element} at [%d-%d]",e,my_place,my_place + e->flow_data_size() -1 );
         already_placed.insert(it->id);
         e->_flow_data_offset = my_place;
-	_fcb_builded_init_future.post(e);
     }
 
     //Set pool data size for classifiers
@@ -326,8 +405,45 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
             if (tot > fc->_reserve)
                 fc->_reserve = tot;
         }
+        fc->fcb_built();
     }
 }
+
+
+CounterInitFuture::CounterInitFuture(String name, std::function<int(ErrorHandler*)> on_reached) : _n(0), _name(name), _on_reached(on_reached) {
+
+
+}
+
+CounterInitFuture::CounterInitFuture(String name, std::function<void(void)> on_reached) : _n(0), _name(name), _on_reached([on_reached](ErrorHandler*){on_reached();return 0;}) {
+
+}
+
+void CounterInitFuture::notifyParent(InitFuture* future) {
+    _n ++;
+}
+
+int
+CounterInitFuture::solve_initialize(ErrorHandler* errh) {
+    //click_chatter("%s: n==%d", _name.c_str(),_n);
+    if (--_n == 0) {
+        int err = _on_reached(errh);
+        if (err != 0)
+            return err;
+        _completed = true;
+        return Router::ChildrenFuture::solve_initialize(errh);
+    }
+    return 0;
+}
+
+int
+CounterInitFuture::completed(ErrorHandler* errh) {
+    if (!_completed)
+        errh->error("In %s:", _name.c_str());
+    return InitFuture::completed(errh);
+}
+
+
 
 #endif
 CLICK_ENDDECLS

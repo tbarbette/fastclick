@@ -190,7 +190,7 @@ IPRewriterBase::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("REAP_TIME", Args::deprecated, SecondsArg(), _gc_interval_sec)
 	.read("USE_CACHE", use_cache)
 	.read("SET_AGGREGATE", set_aggregate)
-    .read("HANDLE_MIGRATION", _handle_migration)
+	.read("HANDLE_MIGRATION", _handle_migration)
 	.consume() < 0)
 	return -1;
 
@@ -254,7 +254,7 @@ IPRewriterBase::initialize(ErrorHandler *errh)
     }
 
     for (int i = 0; i < _state.weight(); i ++) {
-	    IPRewriterState &state = _state.get_value(i);
+        IPRewriterState &state = _state.get_value(i);
         Timer& gc_timer = state.gc_timer;
         new(&gc_timer) Timer(gc_timer_hook, this); //Reconstruct as Timer does not allow assignment
         gc_timer.initialize(this);
@@ -287,7 +287,7 @@ IPRewriterBase::get_entry(int ip_p, const IPFlowID &flowid, int input)
 	return 0;
     if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
 
-	    IPFlowID rewritten_flowid;
+	IPFlowID rewritten_flowid;
 
         if (_handle_migration && !precopy)
             m = search_migrate_entry(flowid, _state);
@@ -310,7 +310,7 @@ IPRewriterEntry *
 IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
 			   Map &map, Map *reply_map_ptr)
 {
-	IPRewriterState &state = *_state;
+    IPRewriterState &state = *_state;
     IPRewriterBase *reply_element = _input_specs[input].reply_element;
     if ((unsigned) flow->entry(false).output() >= (unsigned) noutputs()
 	|| (unsigned) flow->entry(true).output() >= (unsigned) reply_element->noutputs()) {

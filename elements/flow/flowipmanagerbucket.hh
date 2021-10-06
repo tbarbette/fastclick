@@ -29,7 +29,7 @@ struct rte_hash;
  * neither set the offsets for placement in the FCB automatically. Look at
  * the middleclick branch for alternatives.
  */
-class FlowIPManagerBucket: public VirtualFlowManager, public Router::InitFuture, public MigrationListener {
+class FlowIPManagerBucket: public VirtualFlowManager, public Router::ChildrenFuture, public MigrationListener {
 public:
 
     FlowIPManagerBucket() CLICK_COLD;

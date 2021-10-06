@@ -29,7 +29,7 @@ CLICK_DECLS
 
 Spinlock FlowIPManagerSpinlock::hash_table_lock;
 
-FlowIPManagerSpinlock::FlowIPManagerSpinlock() : _verbose(1), _flags(0), _timer(this), _task(this)
+FlowIPManagerSpinlock::FlowIPManagerSpinlock() : _verbose(1), _flags(0), _timer(this), _task(this), Router::InitFuture(this)
 {
 }
 
@@ -55,6 +55,7 @@ FlowIPManagerSpinlock::configure(Vector<String> &conf, ErrorHandler *errh)
     find_children(_verbose);
 
     router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
+
     _fcb_builded_init_future.post(this);
 
     return 0;
@@ -93,7 +94,7 @@ int FlowIPManagerSpinlock::solve_initialize(ErrorHandler *errh)
     _timer.initialize(this);
     _timer.schedule_after(Timestamp::make_sec(1));
     _task.initialize(this, false);
-    return 0;
+    return Router::InitFuture::solve_initialize(errh);
 }
 
 const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next)

@@ -90,6 +90,7 @@ ARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 	_arpt->configure(subconf, errh);
 	_my_arpt = true;
     }
+    _arpt->add_remote_element(this);
 
     IPAddress my_mask;
     if (conf.size() == 1)
@@ -183,11 +184,13 @@ ARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-ARPQuerier::initialize(ErrorHandler * errh)
+ARPQuerier::initialize(ErrorHandler *errh)
 {
     _arp_queries = 0;
     _drops = 0;
     _arp_responses = 0;
+    if (_my_arpt)
+        return _arpt->initialize(errh);
     if (_have_cache) {
         if (_poll_timeout_j == 0) {
             errh->warning("CACHE will be ineffective with a timeout of 0...");
@@ -300,19 +303,18 @@ ARPQuerier::handle_ip(Packet *p, bool response)
 
     IPAddress dst_ip = q->dst_ip_anno();
     EtherAddress *dst_eth = reinterpret_cast<EtherAddress *>(q->ether_header()->ether_dhost);
-    click_jiffies_t now = click_jiffies();
+
     int r;
 
-	if (_have_cache) {
-		if (_cache->find(dst_ip, now, *dst_eth, false)) {
-			goto found;
-		}
-	}
+    if (_have_cache) {
+        click_jiffies_t now = click_jiffies();
+	if (_cache->find(dst_ip, now, *dst_eth, false)) {
+            goto found;
+        }
+    }
     // Easy case: requires only read lock
   retry_read_lock:
-
-
-	r = _arpt->lookup(dst_ip, dst_eth, _poll_timeout_j);
+    r = _arpt->lookup(dst_ip, dst_eth, _poll_timeout_j);
     if (r >= 0) {
 	assert(!dst_eth->is_broadcast());
 	if (r > 0)
@@ -353,8 +355,10 @@ ARPQuerier::handle_ip(Packet *p, bool response)
 	return 0;
     }
 
-    if (_have_cache)
-	    _cache->insert(dst_ip, now, *dst_eth);
+    if (_have_cache) {
+        click_jiffies_t now = click_jiffies();
+        _cache->insert(dst_ip, now, *dst_eth);
+    }
 
     found:
     // It's time to emit the packet with our Ethernet address as source.  (Set

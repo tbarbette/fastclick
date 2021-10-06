@@ -26,7 +26,7 @@ enum {
     lexElementclass,
     lexRequire,
     lexProvide,
-    lexDefine
+    lexDefine,
 };
 
 class Lexeme { public:

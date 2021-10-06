@@ -1475,7 +1475,7 @@ class fast_rcu { public:
         _write_lock.acquire();
         rcu_current_local = _rcu_current;
 
-        int rcu_next = (rcu_current_local + 1) & 1;
+        int rcu_next = (rcu_current_local + 1) & (RCU_N - 1);
         int bad_epoch = (_write_epoch - RCU_N) + 1;
 
         unsigned i = 0;
