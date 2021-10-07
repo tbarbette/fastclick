@@ -74,6 +74,25 @@ struct click_ip6_fragment {
     uint32_t ip6_frag_id;
 };
 
+#ifndef IP6PROTO_SEGMENT_ROUTING
+#define IP6PROTO_SEGMENT_ROUTING 4
+#endif
+struct click_ip6_sr {
+	uint8_t ip6_sr_next;
+	uint8_t ip6_hdrlen;
+	uint8_t type; // Always 4 for Segment Routing
+	uint8_t segment_left;
+	uint8_t last_entry; // Number of segments in the Segment List
+	uint8_t flags;
+	uint16_t tag;
+	struct in6_addr segments[0]; // Segment List (variable length)
+};
+
+struct click_sr6_tlv {
+	uint8_t type;
+	uint8_t len;
+	uint8_t value[0];
+};
 
 uint16_t in6_fast_cksum(const struct in6_addr *saddr,
 			const struct in6_addr *daddr,
