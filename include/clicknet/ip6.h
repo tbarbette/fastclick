@@ -48,6 +48,8 @@ struct click_ip6 {
 #define ip6_nxt			ip6_ctlun.ip6_un1.ip6_un1_nxt
 #define ip6_hlim		ip6_ctlun.ip6_un1.ip6_un1_hlim
 
+#define IP_PROTO_SRV6       43
+
 #define IP6_FLOW_MASK		0x000FFFFFU
 #define IP6_FLOW_SHIFT		0
 #define IP6_CLASS_MASK		0x0FF00000U
