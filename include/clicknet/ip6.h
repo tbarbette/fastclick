@@ -41,6 +41,11 @@ struct click_ip6 {
     struct in6_addr ip6_dst;	/* 24-39 dest address */
 };
 
+struct click_ip6_eh {
+	uint8_t nxt;
+	uint8_t len;
+};
+
 #define ip6_v			ip6_ctlun.ip6_un3.ip6_un3_v
 #define ip6_vfc			ip6_ctlun.ip6_un2_vfc
 #define ip6_flow		ip6_ctlun.ip6_un1.ip6_un1_flow
@@ -48,7 +53,14 @@ struct click_ip6 {
 #define ip6_nxt			ip6_ctlun.ip6_un1.ip6_un1_nxt
 #define ip6_hlim		ip6_ctlun.ip6_un1.ip6_un1_hlim
 
-#define IP_PROTO_SRV6       43
+#define IP6_EH_HOPBYHOP		 0
+#define IP6_EH_FRAGMENT		 43
+#define IP6_EH_ROUTING       44
+#define IP6_EH_AH            51
+#define IP6_EH_ESP           50
+#define IP6_EH_NONXT         59
+#define IP6_EH_DST           60
+#define IP6_EH_MOBILITY      135
 
 #define IP6_FLOW_MASK		0x000FFFFFU
 #define IP6_FLOW_SHIFT		0
@@ -111,6 +123,42 @@ uint16_t in6_cksum(const struct in6_addr *saddr,
 		   uint16_t ori_csum,
 		   unsigned char *addr,
 		   uint16_t len2);
+
+static int round_up(int num, int factor)
+{
+    return num + factor - 1 - (num + factor - 1) % factor;
+}
+
+inline void* ip6_find_hdr(const click_ip6* ip6, const uint8_t type, unsigned char* end) {
+	click_ip6_eh* eh = (click_ip6_eh*)(ip6 + 1);
+    uint8_t nxt = ip6->ip6_nxt;
+    
+    do {
+        if ((unsigned char*)eh >= end)
+            return 0;
+		if (nxt == type)
+			return eh;
+        switch (nxt) {
+            case IP6_EH_HOPBYHOP:
+			case IP6_EH_ROUTING:
+			    nxt = eh->nxt;
+        		eh = eh + eh->len;
+				break;
+			case IP6_EH_AH:
+				nxt = eh->nxt;
+        		eh = eh + round_up((eh->len + 2) * 4, 8);
+				break;
+			case IP6_EH_FRAGMENT:
+				nxt = eh->nxt;
+        		eh = eh + 8;
+                break;
+			case IP6_EH_NONXT:
+            default:
+                return 0;
+        }
+
+    } while (1);
+}
 
 CLICK_CXX_UNPROTECT
 #include <click/cxxunprotect.h>
