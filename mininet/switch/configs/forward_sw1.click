@@ -5,13 +5,14 @@ elementclass Input { $port |
 	-> CheckIP6Header()
 	-> IP6Print("IP6 from port $port")
 
-	-> c2 :: Classifier(6/2B,-)
-	-> IP6SRv6FECEncode(fc00::a, fc00::9)
+	-> Print(BENCAP, -1)
+	-> IP6SREncap(ADDR babe:2::1, ADDR fc00::9, ADDR fc00::a)
+	-> Print(ENCAPED, -1)
+	-> IPPrint(IPENCAPED)
 	-> EtherEncap(0x86DD, SRC 0:0:0:0:0:2, DST 0:0:0:0:0:3)	
 	-> output;
 
     c[1] -> Print("Non-IPv6") -> Discard;
-	c2[1] -> Print("Non-SRv6") -> output;
 }
 
 fd1  :: FromDevice(sw1-eth0, SNIFFER false);
