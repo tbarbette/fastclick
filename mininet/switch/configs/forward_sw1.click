@@ -8,6 +8,7 @@ elementclass Input { $port |
 	-> Print(BENCAP, -1)
 	-> IP6SREncap(ADDR babe:2::1, ADDR fc00::9, ADDR fc00::a)
 	-> Print(ENCAPED, -1)
+	-> IPPrint(IPENCAPED)
 	-> EtherEncap(0x86DD, SRC 0:0:0:0:0:2, DST 0:0:0:0:0:3)	
 	-> output;
 

@@ -39,12 +39,12 @@ struct click_ip6 {
     } ip6_ctlun;
     struct in6_addr ip6_src;	/* 8-23	 source address */
     struct in6_addr ip6_dst;	/* 24-39 dest address */
-};
+} CLICK_SIZE_PACKED_ATTRIBUTE;
 
 struct click_ip6_eh {
 	uint8_t nxt;
 	uint8_t len;
-};
+} CLICK_SIZE_PACKED_ATTRIBUTE;
 
 #define ip6_v			ip6_ctlun.ip6_un3.ip6_un3_v
 #define ip6_vfc			ip6_ctlun.ip6_un2_vfc
@@ -86,7 +86,7 @@ struct click_ip6_fragment {
 					/*	 bit 13-14: reserved	     */
 					/*	 bit 15: More Fragment	     */
     uint32_t ip6_frag_id;
-};
+} CLICK_SIZE_PACKED_ATTRIBUTE;
 
 #ifndef IP6PROTO_SEGMENT_ROUTING
 #define IP6PROTO_SEGMENT_ROUTING 4
@@ -100,13 +100,13 @@ struct click_ip6_sr {
 	uint8_t flags;
 	uint16_t tag;
 	struct in6_addr segments[0]; // Segment List (variable length)
-};
+} CLICK_SIZE_PACKED_ATTRIBUTE;
 
 struct click_sr6_tlv {
 	uint8_t type;
 	uint8_t len;
 	uint8_t value[0];
-};
+} CLICK_SIZE_PACKED_ATTRIBUTE;
 
 uint16_t in6_fast_cksum(const struct in6_addr *saddr,
 			const struct in6_addr *daddr,
