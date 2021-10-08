@@ -129,7 +129,7 @@ static int round_up(int num, int factor)
     return num + factor - 1 - (num + factor - 1) % factor;
 }
 
-void* inline ip6_find_hdr(const click_ip6* ip6, const uint8_t type, unsigned char* end) {
+inline void* ip6_find_hdr(const click_ip6* ip6, const uint8_t type, unsigned char* end) {
 	click_ip6_eh* eh = (click_ip6_eh*)(ip6 + 1);
     uint8_t nxt = ip6->ip6_nxt;
     
