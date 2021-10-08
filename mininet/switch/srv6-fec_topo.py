@@ -9,10 +9,10 @@ import time
 
 class MyTopo(Topo):
     def build(self):
-        self.h1 = self.addHost("h1")
-        self.h2 = self.addHost("h2")
-        self.sw1 = self.addHost("sw1", ip="babe:1::6/64")
-        self.sw2 = self.addHost("sw2", ip="babe:1::8/64")
+        self.h1 = self.addHost("h1",  mac='00:00:00:00:00:01')
+        self.h2 = self.addHost("h2",  mac='00:00:00:00:00:04')
+        self.sw1 = self.addHost("sw1", ip="babe:1::6/64",  mac='00:00:00:00:00:02')
+        self.sw2 = self.addHost("sw2", ip="babe:1::8/64",  mac='00:00:00:00:00:03')
         self.addLink(self.h1, self.sw1)
         self.addLink(self.h2, self.sw2)
         self.addLink(self.sw1, self.sw2)

@@ -54,8 +54,8 @@ struct click_ip6_eh {
 #define ip6_hlim		ip6_ctlun.ip6_un1.ip6_un1_hlim
 
 #define IP6_EH_HOPBYHOP		 0
-#define IP6_EH_FRAGMENT		 43
-#define IP6_EH_ROUTING       44
+#define IP6_EH_ROUTING       43
+#define IP6_EH_FRAGMENT		 44
 #define IP6_EH_AH            51
 #define IP6_EH_ESP           50
 #define IP6_EH_NONXT         59

@@ -4,7 +4,11 @@ elementclass Input { $port |
 	-> Strip(14)
 	-> CheckIP6Header()
 	-> IP6Print("IP6 from port $port")
-	-> Unstrip(14)
+
+	-> Print(BENCAP, -1)
+	-> IP6SREncap(ADDR babe:2::1, ADDR fc00::9, ADDR fc00::a)
+	-> Print(ENCAPED, -1)
+	-> EtherEncap(0x86DD, SRC 0:0:0:0:0:2, DST 0:0:0:0:0:3)	
 	-> output;
 
     c[1] -> Print("Non-IPv6") -> Discard;
