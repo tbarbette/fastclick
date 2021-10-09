@@ -5,6 +5,8 @@
 #include <click/atomic.hh>
 #include <clicknet/ip6.h>
 #include <click/ip6address.hh>
+#include <tinymt32/tinymt32.h>
+#include <swifsymbol/swifsymbol.h>
 
 #define TLV_TYPE_FEC_SOURCE 28
 #define TLV_TYPE_FEC_REPAIR 29
@@ -14,31 +16,23 @@ CLICK_DECLS
 
 /*
 =c
-IP6Encap(ENC, DEC)
+
+IP6SRv6FECEncode(ENC, DEC)
+
 =s ip
-Executes Forward Erasure Correction (FEC) using IPv6 Segment Routing
+
+Forward Erasure Correction for IPv6 Segment Routing
+
 =d
-Protects each incoming packet with Forward Erasure Correction.
-Adds a TLV field in the Segment Routing Header of each source symbol.
-Creates new packets for the repair symbols with source=ENC and destination=DEC
 
-Keyword arguments are:
-TODO */
+Takes the encoder and decoder SIDs
 
-#ifndef TINYMT32_T_HH
-#define TINYMT32_T_HH
-/**
- * tinymt32 internal state vector and parameters
- */
-struct TINYMT32_T {
-    uint32_t status[4];
-    uint32_t mat1;
-    uint32_t mat2;
-    uint32_t tmat;
-};
+=e
 
-typedef struct TINYMT32_T tinymt32_t;
-#endif
+
+  IP6SRv6FECEncode(fc00::a, fc00::9)
+
+=a IP6Encap */
 
 // SRv6-FEC TLV structures
 struct source_tlv_t {
@@ -86,7 +80,7 @@ class IP6SRv6FECEncode : public Element {
   bool can_live_reconfigure() const     { return true; }
   void add_handlers() CLICK_COLD;
 
-  void push(int, Packet *) override;
+  void push(int, Packet * p_in) override;
 
  private:
 
