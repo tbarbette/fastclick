@@ -30,9 +30,8 @@ IP6SRv6FECEncode::IP6SRv6FECEncode()
     memset(&_rlc_info, 0, sizeof(rlc_info_t));
     _rlc_info.window_size = 4; // TODO: dynamically change
     _rlc_info.window_step = 2; // TODO: dynamically change
-    _repair_packet = Packet::make(LOCAL_MTU);
-    rlc_init_muls();
-    rlc_reset_coefs();
+    rlc_fill_muls(_rlc_info.muls);
+    _rlc_info.prng = rlc_reset_coefs();
 }
 
 IP6SRv6FECEncode::~IP6SRv6FECEncode()
@@ -75,78 +74,35 @@ IP6SRv6FECEncode::add_handlers()
 void
 IP6SRv6FECEncode::fec_framework(Packet *p_in)
 {
-    const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
-    const click_ip6_sr *srv6 = reinterpret_cast<const click_ip6_sr *>(p_in->data() + sizeof(click_ip6));
     int err;
 
     // Call FEC Scheme
     err = IP6SRv6FECEncode::fec_scheme(p_in);
-    if (err < 0) { return; }
+    if (err < 0) { 
+        return; 
+    }
 
-    // TODO: currently make two copies to be sure not to override values
-    //       how could we improve the performance
-    uint16_t srv6_len = 8 + srv6->ip6_hdrlen * 8;
-    uint8_t buffer1[40];
-    uint8_t buffer2[srv6_len];
-    // Copy the IPv6 Header and SRv6 Header
-    memcpy(buffer1, ip6, 40);
-    memcpy(buffer2, srv6, srv6_len);
-
-    // Extend the packet to add the TLV
-    WritablePacket *p = p_in->push(sizeof(source_tlv_t));
-    if (!p)
-        return;
-    // Add the TLV
-    memcpy(p->data(), buffer1, 40);
-    memcpy(p->data() + 40, buffer2, srv6_len);
-    _source_tlv.type = TLV_TYPE_FEC_SOURCE;
-    _source_tlv.len = sizeof(source_tlv_t) - 2; // Ignore type and len
-    memcpy(p->data() + 40 + srv6_len, &_source_tlv, sizeof(source_tlv_t));
-
-    // Update the new length of the SRv6 Header
-    click_ip6_sr *srv6_update = reinterpret_cast<click_ip6_sr *>(p->data() + 40);
-    ++srv6_update->ip6_hdrlen;
-    click_ip6 *ip6_update = reinterpret_cast<click_ip6 *>(p->data());
-    ip6_update->ip6_ctlun.ip6_un1.ip6_un1_plen += htons(8);
-    output(0).push(p);
+    WritablePacket *p = srv6_fec_add_source_tlv(p_in, &_source_tlv);
+    if (!p) {
+        output(0).push(p_in); // TODO: simply reject packet ?
+    } else {
+        output(0).push(p);
+    }
 
     if (err == 1) { // Repair
-        // Encapsulate repair symbol in packet
-        // IPv6 and SRv6 Headers
-        click_ip6 *r_ip6 = reinterpret_cast<click_ip6 *>(_repair_packet->data());
-        click_ip6_sr *r_srv6 = reinterpret_cast<click_ip6_sr *>(_repair_packet->data() + sizeof(click_ip6));
-        repair_tlv_t *r_tlv = reinterpret_cast<repair_tlv_t *>(_repair_packet->data() + sizeof(click_ip6) + 8 + 32);
-
-        // IPv6 Header
-        memcpy(&r_ip6->ip6_src, enc.data(), sizeof(IP6Address));
-        memcpy(&r_ip6->ip6_dst, dec.data(), sizeof(IP6Address));
-        r_ip6->ip6_flow = htonl(6 << IP6_V_SHIFT);
-        r_ip6->ip6_plen = htons(_rlc_info.max_length + sizeof(click_ip6) + sizeof(click_ip6_sr) + sizeof(repair_tlv_t) + 2 * sizeof(IP6Address));
-        r_ip6->ip6_nxt = IPPROTO_ROUTING;
-        r_ip6->ip6_hlim = 53;
-
-        r_srv6->type = IP6PROTO_SEGMENT_ROUTING;
-        r_srv6->segment_left = 1;
-        r_srv6->last_entry = 1;
-        r_srv6->flags = 0;
-        r_srv6->tag = 0;
-        r_srv6->ip6_sr_next = 0;
-        r_srv6->ip6_hdrlen = sizeof(repair_tlv_t) + 2 * sizeof(IP6Address);
-        memcpy(&r_srv6->segments[0], enc.data(), sizeof(IP6Address));
-        memcpy(&r_srv6->segments[1], dec.data(), sizeof(IP6Address));
-        // Add repair TLV
-        memcpy(r_tlv, &_repair_tlv, sizeof(repair_tlv_t));
+        if (!_repair_packet) {
+            click_chatter("No repair packet TODO");
+            return;
+        }
+        encapsulate_repair_payload(_repair_packet, &_repair_tlv, &enc, &dec, _rlc_info.max_length);
 
         // Send repair packet
         output(0).push(_repair_packet);
 
         // Reset parameters of the RLC information
         _rlc_info.max_length = 0;
-        rlc_reset_coefs();
-        _repair_packet = Packet::make(LOCAL_MTU);
-        if (!_repair_packet) {
-            return; // What to do ?
-        }
+        memset(&_repair_tlv, 0, sizeof(repair_tlv_t));
+        _rlc_info.prng = rlc_reset_coefs();
     }
 }
 
@@ -159,8 +115,11 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
     _source_tlv.padding = 0;
     _source_tlv.sfpid = _rlc_info.encoding_symbol_id;
 
-    // Store packet aka on-the-line coding
-    rlc_encode_otl(p_in);
+    // Store packet as source symbol
+    store_source_symbol(p_in, _rlc_info.encoding_symbol_id);
+
+    // Store the maximum length = length of the repair packet
+    _rlc_info.max_length = MAX(_rlc_info.max_length, p_in->length());
 
     // Update RLC information
     ++_rlc_info.buffer_size;
@@ -168,6 +127,19 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
 
     // Generate a repair symbol if full window
     if (_rlc_info.buffer_size == _rlc_info.window_size) {
+        // Create new repair packet with correct size
+        _repair_packet = Packet::make(_rlc_info.max_length + sizeof(click_ip6) + sizeof(click_ip6_sr) + sizeof(repair_tlv_t) + 2 * sizeof(IP6Address));
+        if (!_repair_packet) {
+            click_chatter("Cannot get repair packet TODO");
+            return -1;
+        }
+
+        // Encode the source symbols in repair
+        rlc_encode_symbols(_source_tlv.sfpid);
+
+        // Free the out-of-window source symbols
+        rlc_free_out_of_window(_source_tlv.sfpid);
+
         // Complete the Repair FEC Payload ID
         _repair_tlv.type = TLV_TYPE_FEC_REPAIR;
         _repair_tlv.len = sizeof(repair_tlv_t) - 2;
@@ -183,60 +155,149 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
         
         return 1;
     }
-
     return 0;
 }
 
 void
-IP6SRv6FECEncode::rlc_encode_otl(Packet *p)
+IP6SRv6FECEncode::store_source_symbol(Packet *p_in, uint32_t encoding_symbol_id)
 {
-    // Leave room for the IPv6 Header, SRv6 Header (3 segments) and repair TLV
-    uint8_t repair_offset = 40 + 8 + 16 * 3 + sizeof(repair_tlv_t);
-
-    // TODO: cancel varying fields ?
-
-    // Get coefficient for this source symbol
-    uint8_t coef = rlc_get_coef();
-
-    // Encode the packet in the repair symbol
-    symbol_add_scaled(_repair_packet->data() + repair_offset, coef, p->data(), p->length(), _rlc_info.muls);
-
-    // Encode the packet length
-    uint16_t packet_length = p->length(); // Cast in uint16_t because 16 bits for IPv6 packet length
-    symbol_add_scaled(&_repair_tlv.coded_length, coef, &packet_length, sizeof(uint16_t), _rlc_info.muls);
-
-    // Update maximum length = repair payload length
-    _rlc_info.max_length = MAX(_rlc_info.max_length, packet_length);
+    _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = p_in->clone();
 }
 
-// TODO: retirer
-uint8_t
-IP6SRv6FECEncode::rlc_get_coef()
+void
+IP6SRv6FECEncode::rlc_encode_symbols(uint32_t encoding_symbol_id)
 {
-    uint8_t coef = tinymt32_generate_uint32(&_rlc_info.prng);
+    tinymt32_t prng = _rlc_info.prng;
+    tinymt32_init(&prng, _rlc_info.repair_key);
+    // encoding_symbol_id: of the last source symbol (i.e. of the repair symbol)
+    uint32_t start_esid = encoding_symbol_id - _rlc_info.window_size + 1;
+    for (int i = 0; i < _rlc_info.window_size; ++i) {
+        Packet *source_symbol = _rlc_info.source_buffer[(start_esid + i) % SRV6_FEC_BUFFER_SIZE];
+        rlc_encode_one_symbol(source_symbol, _repair_packet, &prng, _rlc_info.muls, &_repair_tlv);
+    }
+}
+
+void
+IP6SRv6FECEncode::rlc_free_out_of_window(uint32_t encoding_symbol_id) {
+    for (int i = 0; i < _rlc_info.window_step; ++i) {
+        uint16_t buffer_idx = encoding_symbol_id - _rlc_info.window_size + i + 1;
+        Packet *p_kill = _rlc_info.source_buffer[buffer_idx % SRV6_FEC_BUFFER_SIZE];
+        if (!p_kill) {
+            click_chatter("SRv6-FEC: empty packet to kill");
+            continue;
+        } 
+        
+        // Clean entry in the buffer
+        _rlc_info.source_buffer[buffer_idx] = 0;
+
+        // Kill packet and free memory
+        p_kill->kill();
+    }
+}
+
+tinymt32_t
+IP6SRv6FECEncode::rlc_reset_coefs() {
+    tinymt32_t prng;
+    prng.mat1 = 0x8f7011ee;
+    prng.mat2 = 0xfc78ff1f;
+    prng.tmat = 0x3793fdff;
+    return prng;
+}
+
+void IP6SRv6FECEncode::rlc_fill_muls(uint8_t muls[256 * 256]) {
+    for (int i = 0; i < 256; ++i) {
+        for (int j = 0; j < 256; ++j) {
+            muls[i * 256 + j] = gf256_mul_formula(i, j);
+        }
+    }
+}
+
+uint8_t IP6SRv6FECEncode::rlc_get_coef(tinymt32_t *prng) {
+    uint8_t coef = tinymt32_generate_uint32(prng);
     if (coef == 0) return 1;
     return coef;
 }
 
-// TODO: retirer
-void
-IP6SRv6FECEncode::rlc_reset_coefs()
-{
-    tinymt32_t new_prng;
-    new_prng.mat1 = 0x8f7011ee;
-    new_prng.mat2 = 0xfc78ff1f;
-    new_prng.tmat = 0x3793fdff;
-    _rlc_info.prng = new_prng;
+void IP6SRv6FECEncode::rlc_encode_one_symbol(Packet *s, WritablePacket *r, tinymt32_t *prng, uint8_t muls[256 * 256 * sizeof(uint8_t)], repair_tlv_t *repair_tlv) {
+    // Leave room for the IPv6 Header, SRv6 Header (3 segments) and repair TLV
+    uint8_t repair_offset = 40 + 8 + 16 * 3 + sizeof(repair_tlv_t);
+
+    // TODO: cancel varying fields?
+
+    // Get coefficient for this source symbol
+    uint8_t coef = rlc_get_coef(prng);
+
+    uint16_t packet_length = s->length(); // Cast in uint16_t because 16 bits for IPv6 packet length
+
+    // Encode the packet in the repair symbol
+    symbol_add_scaled(r->data() + repair_offset, coef, s->data(), packet_length, muls);
+
+    // Encode the packet length
+    uint16_t coded_length = repair_tlv->coded_length;
+    symbol_add_scaled(&coded_length, coef, &packet_length, sizeof(uint16_t), muls);
+    repair_tlv->coded_length = coded_length;
 }
 
-// TODO: retirer
-void IP6SRv6FECEncode::rlc_init_muls()
-{
-    for (int i = 0; i < 256; ++i) {
-        for (int j = 0; j < 256; ++j) {
-            _rlc_info.muls[i * 256 + j] = gf256_mul_formula(i, j);
-        }
-    }
+WritablePacket * IP6SRv6FECEncode::srv6_fec_add_source_tlv(Packet *p_in, source_tlv_t *tlv) {
+    const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
+    const click_ip6_sr *srv6 = reinterpret_cast<const click_ip6_sr *>(p_in->data() + sizeof(click_ip6));
+    
+    // Extend the packet to add the TLV
+    WritablePacket *p = p_in->push(sizeof(source_tlv_t));
+    if (!p)
+        return 0;
+
+    // TODO: currently make two copies to be sure not to override values
+    //       how could we improve the performance?
+    uint16_t srv6_len = 8 + srv6->ip6_hdrlen * 8;
+    uint8_t buffer1[40];
+    uint8_t buffer2[srv6_len];
+
+    // Copy the IPv6 Header and SRv6 Header
+    memcpy(buffer1, ip6, 40);
+    memcpy(buffer2, srv6, srv6_len);
+
+    // Move headers and add TLV
+    memcpy(p->data(), buffer1, 40);
+    memcpy(p->data() + 40, buffer2, srv6_len);
+    memcpy(p->data() + 40 + srv6_len, tlv, sizeof(source_tlv_t));
+
+    // Update the new length of the SRv6 Header
+    click_ip6_sr *srv6_update = reinterpret_cast<click_ip6_sr *>(p->data() + 40);
+    ++srv6_update->ip6_hdrlen;
+    click_ip6 *ip6_update = reinterpret_cast<click_ip6 *>(p->data());
+    ip6_update->ip6_ctlun.ip6_un1.ip6_un1_plen += htons(8);
+
+    return p;
+}
+
+void IP6SRv6FECEncode::encapsulate_repair_payload(WritablePacket *p, repair_tlv_t *tlv, IP6Address *encoder, IP6Address *decoder, uint16_t packet_length) {
+    // IPv6 and SRv6 Header pointers
+    click_ip6 *r_ip6 = reinterpret_cast<click_ip6 *>(p->data());
+    click_ip6_sr *r_srv6 = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
+    repair_tlv_t *r_tlv = reinterpret_cast<repair_tlv_t *>(p->data() + sizeof(click_ip6) + 8 + 32);
+
+    // IPv6 Header
+    memcpy(&r_ip6->ip6_src, encoder->data(), sizeof(IP6Address));
+    memcpy(&r_ip6->ip6_dst, decoder->data(), sizeof(IP6Address));
+    r_ip6->ip6_flow = htonl(6 << IP6_V_SHIFT);
+    r_ip6->ip6_plen = htons(packet_length + sizeof(click_ip6_sr) + sizeof(repair_tlv_t) + 2 * sizeof(IP6Address));
+    r_ip6->ip6_nxt = IPPROTO_ROUTING;
+    r_ip6->ip6_hlim = 53;
+
+    // SRv6 Header
+    r_srv6->type = IP6PROTO_SEGMENT_ROUTING;
+    r_srv6->segment_left = 1;
+    r_srv6->last_entry = 1;
+    r_srv6->flags = 0;
+    r_srv6->tag = 0;
+    r_srv6->ip6_sr_next = 253;
+    r_srv6->ip6_hdrlen = (sizeof(repair_tlv_t) + 2 * sizeof(IP6Address)) / 8;
+    memcpy(&r_srv6->segments[0], encoder->data(), sizeof(IP6Address));
+    memcpy(&r_srv6->segments[1], decoder->data(), sizeof(IP6Address));
+    
+    // Add repair TLV
+    memcpy(r_tlv, tlv, sizeof(repair_tlv_t));
 }
 
 CLICK_ENDDECLS

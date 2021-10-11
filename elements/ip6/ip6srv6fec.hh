@@ -8,9 +8,30 @@
 #include <tinymt32/tinymt32.h>
 #include <swifsymbol/swifsymbol.h>
 
+#define SRV6_FEC_BUFFER_SIZE 32
+
 #define TLV_TYPE_FEC_SOURCE 28
 #define TLV_TYPE_FEC_REPAIR 29
 #define LOCAL_MTU 1500
+
+// SRv6-FEC TLV structures
+struct source_tlv_t {
+  uint8_t type;
+  uint8_t len;
+  uint16_t padding;
+  uint32_t sfpid; // Source FEC Payload ID
+} CLICK_SIZE_PACKED_ATTRIBUTE;
+
+struct repair_tlv_t {
+  uint8_t type;
+  uint8_t len;
+  uint16_t padding;
+  uint32_t rfpid; // Repair FEC Payload ID
+  uint32_t rfi; // Repair FEC Info
+  uint16_t coded_length;
+  uint8_t nss; // Number Source Symbol
+  uint8_t nrs; // Number Repair Symbol
+} CLICK_SIZE_PACKED_ATTRIBUTE;
 
 CLICK_DECLS
 
@@ -34,25 +55,6 @@ Takes the encoder and decoder SIDs
 
 =a IP6Encap */
 
-// SRv6-FEC TLV structures
-struct source_tlv_t {
-  uint8_t type;
-  uint8_t len;
-  uint16_t padding;
-  uint32_t sfpid; // Source FEC Payload ID
-}; // TODO: make them all packet
-
-struct repair_tlv_t {
-  uint8_t type;
-  uint8_t len;
-  uint16_t padding;
-  uint32_t rfpid; // Repair FEC Payload ID
-  uint32_t rfi; // Repair FEC Info
-  uint16_t coded_length;
-  uint8_t nss; // Number Source Symbol
-  uint8_t nrs; // Number Repair Symbol
-};
-
 struct rlc_info_t {
   uint32_t encoding_symbol_id;
   uint16_t repair_key;
@@ -64,6 +66,7 @@ struct rlc_info_t {
   tinymt32_t prng;
   uint16_t max_length; // Seen for this window
   uint8_t muls[256 * 256 * sizeof(uint8_t)];
+  Packet *source_buffer[SRV6_FEC_BUFFER_SIZE]; // Ring buffer
 };
 
 class IP6SRv6FECEncode : public Element { 
@@ -95,13 +98,18 @@ class IP6SRv6FECEncode : public Element {
   static String read_handler(Element *, void *) CLICK_COLD;
   void fec_framework(Packet *p_in) CLICK_COLD;
   int fec_scheme(Packet *p_in) CLICK_COLD;
-  void rlc_encode_otl(Packet *p) CLICK_COLD;
-  
-  uint8_t rlc_get_coef() CLICK_COLD;
-  void rlc_reset_coefs() CLICK_COLD;
-  void rlc_init_muls() CLICK_COLD;
-
+  void store_source_symbol(Packet *p_in, uint32_t encodind_symbol_id) CLICK_COLD;
+  void rlc_encode_symbols(uint32_t encoding_symbol_id) CLICK_COLD;
+  void rlc_free_out_of_window(uint32_t encoding_symbol_id) CLICK_COLD;
+  void encapsulate_repair_payload(WritablePacket *p, repair_tlv_t *tlv, IP6Address *encoder, IP6Address *decoder, uint16_t packet_length) CLICK_COLD;
+  WritablePacket *srv6_fec_add_source_tlv(Packet *p_in, source_tlv_t *tlv) CLICK_COLD;
+  tinymt32_t rlc_reset_coefs() CLICK_COLD;
+  void rlc_fill_muls(uint8_t muls[256 * 256]) CLICK_COLD;
+  uint8_t rlc_get_coef(tinymt32_t *prng) CLICK_COLD;
+  void rlc_encode_one_symbol(Packet *s, WritablePacket *r, tinymt32_t *prng, uint8_t muls[256 * 256 * sizeof(uint8_t)], repair_tlv_t *repair_tlv) CLICK_COLD;
 };
+
+
 
 CLICK_ENDDECLS
 #endif
