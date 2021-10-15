@@ -66,16 +66,16 @@ IP6SREncap::simple_action(Packet *p_in)
    
     click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
     click_ip6_sr *sr = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
-    click_chatter("V1: %u %u %u", _sr->ip6_hdrlen, _sr->segment_left, _sr->last_entry);
     memcpy(ip6, p->data() + _sr_len, sizeof(click_ip6));
     memcpy(sr, _sr, _sr_len);
-    click_chatter("V2: %u %u %u %u", _sr->ip6_hdrlen, _sr->segment_left, _sr->last_entry, _sr_len);
-    click_chatter("V3: %u %u %u", sr->ip6_hdrlen, sr->segment_left, sr->last_entry);
     sr->ip6_sr_next =  ip6->ip6_nxt;
     ip6->ip6_nxt = IP6_EH_ROUTING;
 
     // Also update the IPv6 Header to add the SRH length in the payload
     ip6->ip6_plen += htons(sizeof(click_ip6_sr) + sizeof(IP6Address) * 3);
+
+    // Compute checksum of the new pseudo-header
+    // TODO
 
     return p;
 }
