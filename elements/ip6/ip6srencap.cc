@@ -74,7 +74,8 @@ IP6SREncap::simple_action(Packet *p_in)
     sr->ip6_sr_next =  ip6->ip6_nxt;
     ip6->ip6_nxt = IP6_EH_ROUTING;
 
-    // TODO: update IPv6 header payload length
+    // Also update the IPv6 Header to add the SRH length in the payload
+    ip6->ip6_plen += htons(sizeof(click_ip6_sr) + sizeof(IP6Address) * 3);
 
     return p;
 }
