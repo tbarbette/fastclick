@@ -144,7 +144,7 @@ IP6SRv6FECDecode::fec_scheme_repair(Packet *p_in, repair_tlv_t *tlv)
     store_repair_symbol(p_in, tlv);
 
     // Call RLC recovery
-    // TODO
+    rlc_recover_symbols();
 
     return 0;
 }
@@ -238,6 +238,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
 
     // Init the pseudo random number generator
     tinymt32_t prng;
+    memset(&prng, 0, sizeof(tinymt32_t)),
     prng.mat1 = 0x8f7011ee;
     prng.mat2 = 0xfc78ff1f;
     prng.tmat = 0x3793fdff;
@@ -245,8 +246,8 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     // 1. Detect the size of the system:
     //      - Number of rows (i.e., equations or repair symbols)
     //      - Number of columns (i.e., unknowns or lost source symbols)
-    uint8_t nb_windows; // One window = one repair symbol
-    uint32_t running_esid; // esid = encoding symbol id
+    uint8_t nb_windows = 0; // One window = one repair symbol
+    uint32_t running_esid = encoding_symbol_id; // esid = encoding symbol id
     for (int i = 0; i < RLC_MAX_WINDOWS; ++i) {
         srv6_fec2_repair_t *repair = _rlc_info.repair_buffer[running_esid % SRV6_FEC_BUFFER_SIZE];
         // Did not receive this repair symbol => stop iteration
@@ -254,7 +255,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
             break;
         }
         window_size = repair->tlv.nss;
-        window_step = (repair->tlv.rfi >> 16) & 0xf;
+        window_step = (repair->tlv.rfi >> 16) & 0xff;
         previous_window_step = (repair->tlv.rfi >> 24);
         ++nb_windows;
         nb_source_symbols += previous_window_step;
@@ -290,7 +291,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     }
     memset(rs_array, 0, sizeof(srv6_fec2_repair_t *) * nb_windows);
 
-    uint8_t nb_unknwons;
+    uint8_t nb_unknwons = 0;
     uint8_t *x_to_source = (uint8_t *)CLICK_LALLOC(nb_source_symbols * sizeof(uint8_t));
     uint8_t *source_to_x = (uint8_t *)CLICK_LALLOC(nb_source_symbols * sizeof(uint8_t));
     // TODO: check if fail
@@ -302,8 +303,9 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     memset(protected_symbol, 0, sizeof(bool));
 
     uint32_t id_first_ss_first_window = encoding_symbol_id - nb_source_symbols + 1;
-    uint32_t id_first_rs_first_window = id_first_ss_first_window + window_step - 1; // TODO: check this
-
+    uint32_t id_first_rs_first_window = id_first_ss_first_window + window_size - 1; // TODO: check this
+    click_chatter("Nb window=%u, id_first_ss=%u, first_rs=%u, nb_source=%u", nb_windows, id_first_ss_first_window, id_first_rs_first_window, nb_source_symbols);
+    click_chatter("Window size=%u, encoding symbol id=%u, window_step=%u", window_size, encoding_symbol_id, window_step);
     // Locate the source and repair symbols and store separately
     uint8_t idx = id_first_rs_first_window;
     for (int i = 0; i < nb_windows; ++i) {
@@ -351,8 +353,11 @@ IP6SRv6FECDecode::rlc_recover_symbols()
             x_to_source[nb_unknwons] = i;
             source_to_x[i] = nb_unknwons;
             ++nb_unknwons;
+            click_chatter("Lost symbol is: %u", id_theoric);
         }
     }
+
+    click_chatter("Nb windows: %u, nb_unk", nb_windows, nb_unknwons);
 
     // Maybe no need for recovery?
     if (nb_unknwons == 0) {
@@ -369,6 +374,8 @@ IP6SRv6FECDecode::rlc_recover_symbols()
         CLICK_LFREE(protected_symbol, sizeof(bool) * nb_source_symbols);
         return;
     }
+
+    click_chatter("NEED RECOVERY");
 
     // Construct the system Ax=b
     int n_eq = MIN(nb_unknwons, nb_windows);
@@ -390,12 +397,13 @@ IP6SRv6FECDecode::rlc_recover_symbols()
 
     for (int i = 0; i < nb_unknwons; ++i) {
         unknowns[i] = (srv6_fec2_term_t *)CLICK_LALLOC(sizeof(srv6_fec2_term_t));
-        memset(unknowns, 0, sizeof(srv6_fec2_term_t));
+        memset(unknowns[i], 0, sizeof(srv6_fec2_term_t));
         unknowns[i]->data = (uint8_t *)CLICK_LALLOC(max_packet_length);
     }
 
     int i = 0; // Index of the row in the system
     for (int rs = 0; rs < nb_windows; ++rs) {
+        click_chatter("Passage 2: %u", rs);
         srv6_fec2_repair_t *repair = rs_array[rs];
         bool protect_at_least_one = false;
         // Check if this repair symbol protects at least one lost source symbol
@@ -408,6 +416,8 @@ IP6SRv6FECDecode::rlc_recover_symbols()
                 break; // We know it protects at least one
             }
         }
+        click_chatter("Repair is present: %u", repair->tlv.type);
+        click_chatter("Have %u unk but %u for", nb_unknwons, protect_at_least_one, repair->tlv.rfpid);
         if (!protect_at_least_one) {
             continue; // Ignore this repair symbol if does not protect any lost
         }
@@ -416,9 +426,10 @@ IP6SRv6FECDecode::rlc_recover_symbols()
         // 1) Independent term (b) ith row
         memset(constant_terms[i], 0, sizeof(srv6_fec2_term_t));
         constant_terms[i]->data = (uint8_t *)CLICK_LALLOC(sizeof(uint8_t) * max_packet_length);
+        memset(constant_terms[i]->data, 0, sizeof(uint8_t) * max_packet_length);
         click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(repair->p->data() + sizeof(click_ip6));
         uint16_t repair_offset = sizeof(click_ip6) + sizeof(click_ip6_sr) + srv6->ip6_hdrlen * 8;
-        memcpy(constant_terms[i]->data, repair->p + repair_offset, repair->p->length() - repair_offset);
+        memcpy(constant_terms[i]->data, repair->p->data() + repair_offset, repair->p->length() - repair_offset);
         constant_terms[i]->packet_length = repair->tlv.coded_length;
 
         // 2) Coefficient matric (A) ith row
@@ -447,8 +458,9 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     if (can_recover) {
         // Solve the system
         // TODO
+        click_chatter("GAUSSIAN");
     } else {
-        click_chatter("ERROR 5");
+        click_chatter("ERROR 5: %u eq but %u unk", nb_effective_equations, nb_unknwons);
     }
 
     // Free the entire system
@@ -481,10 +493,167 @@ IP6SRv6FECDecode::symbol_add_scaled_term(srv6_fec2_term_t *symbol1, uint8_t coef
 }
 
 void
+IP6SRv6FECDecode::symbol_add_scaled_term(srv6_fec2_term_t *symbol1, uint8_t coef, srv6_fec2_term_t *symbol2, uint8_t *mul)
+{
+    symbol_add_scaled(symbol1->data, coef, symbol2->data, symbol2->packet_length, mul);
+    uint16_t pl = (uint16_t)symbol2->packet_length;
+    symbol_add_scaled(&symbol1->packet_length, coef, &pl, sizeof(uint16_t), mul);
+}
+
+void
 IP6SRv6FECDecode::symbol_mul_term(srv6_fec2_term_t *symbol1, uint8_t coef, uint8_t *mul, uint16_t size)
 {
     symbol_mul(symbol1->data, coef, size, mul);
     symbol_mul((uint8_t *)&symbol1->packet_length, coef, sizeof(uint16_t), mul);
+}
+
+void
+IP6SRv6FECDecode::swap(uint8_t **a, int i, int j) {
+    uint8_t *tmp = a[j];
+    a[j] = a[i];
+    a[i] = tmp;
+}
+
+void
+IP6SRv6FECDecode::swap_b(srv6_fec2_term_t **a, int i, int j)
+{
+    srv6_fec2_term_t *tmp = a[j];
+    a[j] = a[i];
+    a[i] = tmp;
+}
+
+int
+IP6SRv6FECDecode::cmp_eq_i(uint8_t *a, uint8_t *b, int idx, int n_unknowns)
+{
+    if (a[idx] < b[idx]) return -1;
+    else if (a[idx] > b[idx]) return 1;
+    else if (a[idx] != 0) return 0;
+    return 0;
+}
+
+int
+IP6SRv6FECDecode::cmp_eq(uint8_t *a, uint8_t *b, int idx, int n_unknowns)
+{
+    for (int i = 0 ; i < n_unknowns; i++) {
+        int cmp = 0;
+        if ((cmp = cmp_eq_i(a, b, i, n_unknowns)) != 0) {
+            return cmp;
+        }
+    }
+    return 0;
+}
+
+void
+IP6SRv6FECDecode::sort_system(uint8_t **a, srv6_fec2_term_t **constant_terms, int n_eq, int n_unknowns)
+{
+    for (int i = 0; i < n_eq; ++i) {
+        int max = i;
+        for (int j = i + 1; j < n_eq; ++j) {
+            if (cmp_eq(a[max], a[j], i, n_unknowns) < 0) {
+                max = j;
+            }
+        }
+        swap(a, i, max);
+        swap_b(constant_terms, i, max);
+    }
+}
+
+int
+IP6SRv6FECDecode::first_non_zero_idx(const uint8_t *a, int n_unknowns) {
+    for (int i = 0 ; i < n_unknowns ; i++) {
+        if (a[i] != 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void
+IP6SRv6FECDecode::gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_fec2_term_t **constant_terms, srv6_fec2_term_t **x, bool *undetermined, uint8_t *mul, uint8_t *inv, uint16_t max_packet_length)
+{
+    sort_system(a, constant_terms, n_eq, n_unknowns);
+    for (int i = 0; i < n_eq - 1; ++i) {
+        for (int k = i + 1; k < n_eq; ++k) {
+            uint8_t mul_num = a[k][i];
+            uint8_t mul_den = a[i][i];
+            uint8_t term = gf256_mul(mul_num, inv[mul_den], mul);
+            for (int j = 0; j < n_unknowns; ++j) {
+                a[k][j] = gf256_sub(a[k][j], gf256_mul(term, a[i][j], mul));
+            }
+            symbol_sub_scaled_term(constant_terms[k], term, constant_terms[i], mul);
+        }
+    }
+
+    sort_system(a, constant_terms, n_eq, n_unknowns);
+
+    for (int i = 0; i < n_eq - 1; ++i) {
+        int first_nz_id = first_non_zero_idx(a[i], n_unknowns);
+        if (first_nz_id == -1) {
+            break;
+        }
+        for (int j = first_nz_id + 1; j < n_unknowns && a[i][j] != 0; j++) {
+            for (int k = i + 1; k < n_eq; k++) {
+                int first_nz_id_below = first_non_zero_idx(a[k], n_unknowns);
+                if (j > first_nz_id_below) {
+                    break;
+                } else if (first_nz_id_below == j) {
+                    uint8_t term = gf256_mul(a[i][j], inv[a[k][j]], mul);
+                    for (int l = j; l < n_unknowns; l++) {
+                        a[i][l] = gf256_sub(a[i][l], gf256_mul(term, a[k][l], mul));
+                    }
+                    symbol_sub_scaled_term(constant_terms[i], term, constant_terms[k], mul);
+                    break;
+                }
+            }
+        }
+    }
+
+    int candidate = n_unknowns - 1;
+    for (int i = n_eq - 1; i >= 0; --i) {
+        bool only_zeroes = true;
+        for (int j = 0; j < n_unknowns; ++j) {
+            if (a[i][j] != 0) {
+                only_zeroes = false;
+                break;
+            }
+        }
+        if (!only_zeroes) {
+            while (a[i][candidate] == 0 && candidate >= 0) {
+                undetermined[candidate--] = true;
+            }
+            if (candidate < 0) {
+                fprintf(stderr, "System partially undetermined\n");
+                break;
+            }
+            memcpy(x[candidate], constant_terms[i], sizeof(srv6_fec2_term_t));
+            for (int j = 0; j < candidate; ++j) {
+                if (a[i][j] != 0) {
+                    undetermined[candidate] = true;
+                    break;
+                }
+            }
+            for (int j = candidate + 1; j < n_unknowns; ++j) {
+                if (a[i][j] != 0) {
+                    if (undetermined[j]) {
+                        undetermined[candidate] = true;
+                    } else {
+                        symbol_sub_scaled_term(x[candidate], a[i][j], x[j], mul);
+                        a[i][j] = 0;
+                    }
+                }
+            }
+            if (symbol_is_zero(x[candidate]->data, max_packet_length) || a[i][candidate] == 0) {
+                undetermined[candidate] = true;
+            } else if (!undetermined[candidate]) {
+                symbol_mul_term(x[candidate], inv[a[i][candidate]], mul, max_packet_length);
+                a[i][candidate] = gf256_mul(a[i][candidate], inv[a[i][candidate]], mul);
+            } 
+            candidate--;
+        }
+    }
+    if (candidate >= 0) {
+        memset(undetermined, true, (candidate + 1) * sizeof(bool));
+    }
 }
 
 CLICK_ENDDECLS

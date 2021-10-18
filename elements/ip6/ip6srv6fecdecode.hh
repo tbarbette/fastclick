@@ -127,7 +127,16 @@ class IP6SRv6FECDecode : public Element {
   void rlc_recover_symbols();
   void rlc_get_coefs(tinymt32_t *prng, uint32_t seed, int n, uint8_t *coefs);
   void symbol_add_scaled_term(srv6_fec2_term_t *symbol1, uint8_t coef, srv6_fec2_source_term_t *symbol2, uint8_t *mul);
+  void symbol_add_scaled_term(srv6_fec2_term_t *symbol1, uint8_t coef, srv6_fec2_term_t *symbol2, uint8_t *mul);
   void symbol_mul_term(srv6_fec2_term_t *symbol1, uint8_t coef, uint8_t *mul, uint16_t size);
+
+  void swap(uint8_t **a, int i, int j);
+  void swap_b(srv6_fec2_term_t **a, int i, int j);
+  int cmp_eq_i(uint8_t *a, uint8_t *b, int idx, int n_unknowns);
+  int cmp_eq(uint8_t *a, uint8_t *b, int idx, int n_unknowns);
+  void sort_system(uint8_t **a, srv6_fec2_term_t **constant_terms, int n_eq, int n_unknowns);
+  int first_non_zero_idx(const uint8_t *a, int n_unknowns);
+  void gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_fec2_term_t **constant_terms, srv6_fec2_term_t **x, bool *undetermined, uint8_t *mul, uint8_t *inv, uint16_t max_packet_length);
 
 };
 

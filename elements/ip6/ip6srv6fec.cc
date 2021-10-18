@@ -97,6 +97,7 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in)
         encapsulate_repair_payload(_repair_packet, &_repair_tlv, &enc, &dec, _rlc_info.max_length);
 
         // Send repair packet
+        click_chatter("Send repair symbol");
         output(0).push(_repair_packet);
 
         // Reset parameters of the RLC information
@@ -145,7 +146,7 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
         _repair_tlv.len = sizeof(repair_tlv_t) - 2;
         _repair_tlv.padding = 0;
         _repair_tlv.rfpid = _source_tlv.sfpid;
-        _repair_tlv.rfi = (_rlc_info.window_step << (24) + (_rlc_info.window_step << 16)) + _rlc_info.repair_key;
+        _repair_tlv.rfi = ((_rlc_info.window_step << 24) + (_rlc_info.window_step << 16)) + _rlc_info.repair_key;
         _repair_tlv.nss = _rlc_info.window_size;
         _repair_tlv.nrs = 1;
 
