@@ -51,6 +51,13 @@ def simpleRun():
     # Packet will visit: fc00::a -> fc00::9 -> babe:2::5
     net["h1"].cmd("ip -6 route add babe:2::5/64 encap seg6 mode inline segs fc00::a,fc00::9 dev h1-eth0")
     
+    # Enable SRv6
+    net["h1"].cmd("sysctl net.ipv6.conf.all.seg6_enabled=1")
+    net["h1"].cmd("sysctl net.ipv6.conf.default.seg6_enabled=1")
+    net["h1"].cmd("sysctl net.ipv6.conf.h1-eth0.seg6_enabled=1")
+    net["h2"].cmd("sysctl net.ipv6.conf.all.seg6_enabled=1")
+    net["h2"].cmd("sysctl net.ipv6.conf.default.seg6_enabled=1")
+    net["h2"].cmd("sysctl net.ipv6.conf.h2-eth0.seg6_enabled=1")
     
     CLI(net)
     net.stop()
