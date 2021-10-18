@@ -41,6 +41,9 @@ class IP6SRDecap : public SimpleElement<IP6SRDecap> { public:
 
   Packet *simple_action(Packet *);
 
+private:
+  bool _force;
+
 };
 
 CLICK_ENDDECLS

@@ -23,7 +23,7 @@
 #include <click/glue.hh>
 CLICK_DECLS
 
-IP6SRDecap::IP6SRDecap()
+IP6SRDecap::IP6SRDecap() : _force(false)
 {
 
 }
@@ -37,7 +37,8 @@ IP6SRDecap::configure(Vector<String> &conf, ErrorHandler *errh)
 {
  
     if (Args(conf, this, errh)
-	.complete() < 0)
+        .read("FORCE_DECAP", _force)
+	    .complete() < 0)
         return -1;
 
     
@@ -56,15 +57,39 @@ IP6SRDecap::simple_action(Packet *p_in)
 
     click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
 
-    click_ip6_sr *sr = (click_ip6_sr*)ip6_find_hdr(ip6, IP6_EH_ROUTING, p->end_data());
+    click_ip6_sr *sr = (click_ip6_sr*)ip6_find_header(ip6, IP6_EH_ROUTING, p->end_data());
+
     if (sr == 0)
         return p;
     
-    if (sr->segment_left == 0) {
+    if (_force || sr->segment_left == 1) {
+
+            unsigned char* old_data = p->data();
+            unsigned char nxt = sr->ip6_sr_next;
+            unsigned char *next_ptr = (unsigned char*)ip6_find_header(ip6, nxt, p->end_data());
+            if (next_ptr == 0) {
+                p->kill();
+                click_chatter("Cannot find next header %d. Buggy packet?", nxt);
+                return 0;
+            }
+            unsigned srlen = (unsigned char*)next_ptr-(unsigned char*)sr;
+            click_chatter("Srlen %d, expected %d", srlen, (sizeof(click_ip6_sr) + sizeof(IP6Address) * 3));
+            p->pull(srlen);
+
+
+
+            memmove(p->data(), old_data, (unsigned char*)sr-old_data);
+            ip6 = reinterpret_cast<click_ip6 *>(p->data());
+            ip6->ip6_nxt = nxt;
+            // Also update the IPv6 Header to add the SRH length in the payload
+            ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - srlen);
+
+    } else if (unlikely(sr->segment_left == 0)) {
         click_chatter("Invalid packet with 0 segments left?");
         return p;
-    }
-    sr->segment_left--;
+    } else
+        sr->segment_left--;
+
     
     return p;
 }

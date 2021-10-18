@@ -571,19 +571,19 @@ AddressTranslator::handle_outward(Packet *p)
 	  case 129: {
 	    click_icmp6_echo * icmp6 = (click_icmp6_echo *) (ip6_new+1);
 	    icmp6->icmp6_cksum=0;
-	    icmp6->icmp6_cksum= htons(in6_fast_cksum(&ip6_new->ip6_src, &ip6_new->ip6_dst, ip6_new->ip6_plen, 0x3a, 0, (unsigned char *)icmp6, ip6_new->ip6_plen));
+	    icmp6->icmp6_cksum= htons(in6_fast_cksum(&ip6_new->ip6_src, &ip6_new->ip6_dst, ip6_new->ip6_plen, IP_PROTO_ICMP6, 0, (unsigned char *)icmp6, ip6_new->ip6_plen));
 	  }
 	  break;
 	  case 2: {
 	    click_icmp6_pkttoobig * icmp6 = (click_icmp6_pkttoobig *)(ip6_new +1);
 	    icmp6->icmp6_cksum=0;
-	    icmp6->icmp6_cksum= htons(in6_fast_cksum(&ip6_new->ip6_src, &ip6_new->ip6_dst, ip6_new->ip6_plen, 0x3a, 0, (unsigned char *)icmp6, ip6_new->ip6_plen));
+	    icmp6->icmp6_cksum= htons(in6_fast_cksum(&ip6_new->ip6_src, &ip6_new->ip6_dst, ip6_new->ip6_plen, IP_PROTO_ICMP6, 0, (unsigned char *)icmp6, ip6_new->ip6_plen));
 	  }
 	  break;
 	  case 4: {
 	    click_icmp6_paramprob * icmp6 = (click_icmp6_paramprob *)(ip6_new +1);
 	    icmp6->icmp6_cksum=0;
-	    icmp6->icmp6_cksum= htons(in6_fast_cksum(&ip6_new->ip6_src, &ip6_new->ip6_dst, ip6_new->ip6_plen, 0x3a, 0, (unsigned char *)icmp6, ip6_new->ip6_plen));
+	    icmp6->icmp6_cksum= htons(in6_fast_cksum(&ip6_new->ip6_src, &ip6_new->ip6_dst, ip6_new->ip6_plen, IP_PROTO_ICMP6, 0, (unsigned char *)icmp6, ip6_new->ip6_plen));
 	  }
 	  break;
 	  default: ; break;
