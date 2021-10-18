@@ -12,13 +12,13 @@ class MyTopo(Topo):
         self.h1 = self.addHost("h1",  mac='00:00:00:00:00:01')
         self.h2 = self.addHost("h2",  mac='00:00:00:00:00:04')
         self.sw1 = self.addHost("sw1", ip="babe:1::6/64",  mac='00:00:00:00:00:02')
-        self.sw2 = self.addHost("sw2", ip="babe:1::8/64",  mac='00:00:00:00:00:03')
+        self.sw2 = self.addHost("sw2", ip="babe:2::8/64",  mac='00:00:00:00:00:03')
         self.addLink(self.h1, self.sw1)
         self.addLink(self.h2, self.sw2)
         self.addLink(self.sw1, self.sw2)
 
 
-def simpleRun():
+def simpleRun(doEncap):
     topo = MyTopo()
     net = Mininet(topo)
     net.start()
@@ -35,7 +35,7 @@ def simpleRun():
 
     # Add IPv6 addresses to sw1 and sw2 and their hosts
     net["sw1"].cmd("ifconfig sw1-eth0 add babe:1::6/64")
-    net["sw2"].cmd("ifconfig sw2-eth0 add babe:2::6/64")
+    net["sw2"].cmd("ifconfig sw2-eth0 add babe:2::8/64")
 
     # Add IP addresses to sw1 and sw2 together
     net["sw1"].cmd("ifconfig sw1-eth1 add babe:3::1/64")
@@ -49,19 +49,24 @@ def simpleRun():
     # Add an IPv6 Segment Routing Header to the packets from h1
     # Inline insertion with an intermediate segment
     # Packet will visit: fc00::a -> fc00::9 -> babe:2::5
-    net["h1"].cmd("ip -6 route add babe:2::5/64 encap seg6 mode inline segs fc00::a,fc00::9 dev h1-eth0")
-    
-    # Enable SRv6
-    net["h1"].cmd("sysctl net.ipv6.conf.all.seg6_enabled=1")
-    net["h1"].cmd("sysctl net.ipv6.conf.default.seg6_enabled=1")
-    net["h1"].cmd("sysctl net.ipv6.conf.h1-eth0.seg6_enabled=1")
-    net["h2"].cmd("sysctl net.ipv6.conf.all.seg6_enabled=1")
-    net["h2"].cmd("sysctl net.ipv6.conf.default.seg6_enabled=1")
-    net["h2"].cmd("sysctl net.ipv6.conf.h2-eth0.seg6_enabled=1")
+
+    if doEncap:
+        net["h1"].cmd("ip -6 route add babe:2::5/64 encap seg6 mode inline segs fc00::a,fc00::9 dev h1-eth0")
+
+        # Enable SRv6
+        net["h1"].cmd("sysctl net.ipv6.conf.all.seg6_enabled=1")
+        net["h1"].cmd("sysctl net.ipv6.conf.default.seg6_enabled=1")
+        net["h1"].cmd("sysctl net.ipv6.conf.h1-eth0.seg6_enabled=1")
+        net["h2"].cmd("sysctl net.ipv6.conf.all.seg6_enabled=1")
+        net["h2"].cmd("sysctl net.ipv6.conf.default.seg6_enabled=1")
+        net["h2"].cmd("sysctl net.ipv6.conf.h2-eth0.seg6_enabled=1")
+    else: #Encap is done in Click
+        net["h1"].cmd("ip -6 route add babe:2::/64 via babe:1::6 dev h1-eth0")
+        net["h2"].cmd("ip -6 route add babe:1::/64 via babe:2::8 dev h2-eth0")
     
     CLI(net)
     net.stop()
 
 
 if __name__ == "__main__":
-    simpleRun()
+    simpleRun(len(sys.argv) <= 1)
