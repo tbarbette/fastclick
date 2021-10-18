@@ -43,22 +43,16 @@ Packet *
 IP6SRProcess::simple_action(Packet *p_in)
 {
     
-    WritablePacket *p = p_in->push(0);
-    if (!p)
-        return 0;
+    WritablePacket *p = (WritablePacket *)p_in;
    
     click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
     click_ip6_sr *sr = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
-
-    // Update IPv6 address according to the Segment Routing Header
-    uint16_t address_offset = sizeof(click_ip6_sr) + sr->segment_left * sizeof(IP6Address);
-    struct in6_addr addr;
-    memcpy(&addr, sr + address_offset, sizeof(IP6Address));
-    IP6Address new_addr = IP6Address(addr);
-    SET_DST_IP6_ANNO(p, new_addr);
-
+    
     // Update segment left of the SRH
     --sr->segment_left;
+
+    // Update IPv6 address according to the Segment Routing Header
+    ip6->ip6_dst = sr->segments[sr->segment_left];
 
     // TODO: recompute the checksum with the new pseudo-header (the destination address has changed)
 
