@@ -22,6 +22,7 @@
 #include <click/error.hh>
 #include <click/glue.hh>
 #define MAX(a, b) ((a > b) ? a : b)
+#define MIN(a, b) ((a < b) ? a : b)
 CLICK_DECLS
 
 IP6SRv6FECDecode::IP6SRv6FECDecode()
@@ -29,7 +30,6 @@ IP6SRv6FECDecode::IP6SRv6FECDecode()
     _use_dst_anno = false;
     memset(&_rlc_info, 0, sizeof(rlc_info_decoder_t));
     rlc_fill_muls(_rlc_info.muls);
-    _rlc_info.prng = rlc_reset_coefs();
 }
 
 IP6SRv6FECDecode::~IP6SRv6FECDecode()
@@ -39,6 +39,10 @@ IP6SRv6FECDecode::~IP6SRv6FECDecode()
 int
 IP6SRv6FECDecode::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    if (Args(conf, this, errh)
+	.read_mp("DEC", dec)
+	.complete() < 0)
+        return -1;
     return 0;
 }
 
@@ -74,12 +78,12 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in)
 
     // Find TLV: source or repair symbol
     uint8_t tlv_type = 0;
+    // last_entry is 0-indexed => +1
     uint16_t start_tlv_offset = 8 + (srv6->last_entry + 1) * 16;
-    uint16_t total_tlv_size = srv6->ip6_hdrlen * 8 - start_tlv_offset;
+    // ip6_hdrlen does not include the 8 first bytes => + 1
+    uint16_t total_tlv_size = (srv6->ip6_hdrlen + 1) * 8 - start_tlv_offset;
     uint16_t read_bytes = 0;
     uint8_t *tlv_ptr;
-    click_chatter("encore: %u %u", srv6->ip6_hdrlen, srv6->last_entry);
-    click_chatter("loop: %u %u %u", start_tlv_offset, total_tlv_size, read_bytes);
     while (read_bytes < total_tlv_size) { // Iterate over all TLVs of the SRH
         tlv_ptr = (uint8_t *)srv6 + start_tlv_offset + read_bytes;
         if (tlv_ptr[0] == TLV_TYPE_FEC_SOURCE || tlv_ptr[0] == TLV_TYPE_FEC_REPAIR) {
@@ -104,26 +108,24 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in)
         // Remove the TLV from the source packet
         remove_tlv_source_symbol(p, tlv_ptr - p->data()); // Cleaner way?
 
-        click_chatter("RECEIVED SOURCE SYMBOL");
         // Call FEC Scheme
-        // TODO
+        fec_scheme_source(p, &source_tlv);
     } else {
         // Load TLV locally
         repair_tlv_t repair_tlv;
         memset(&repair_tlv, 0, sizeof(repair_tlv_t));
         memcpy(&repair_tlv, tlv_ptr, sizeof(repair_tlv_t));
 
-        click_chatter("RECEIVED REPAIR SYMBOL");
-
         // Call FEC Scheme
+        fec_scheme_repair(p, &repair_tlv);
     }
 
     // Send the (modified, without TLV) source symbol
     // i.e., do not send the repair symbol out of the tunnel
-    // TODO: really without the TLV? is it really worth it?
     if (tlv_type == TLV_TYPE_FEC_SOURCE) {
         output(0).push(p);
     }
+    click_chatter("Test final call");
 }
 
 int
@@ -141,20 +143,8 @@ IP6SRv6FECDecode::fec_scheme_repair(Packet *p_in, repair_tlv_t *tlv)
     // Store packet as source symbol
     store_repair_symbol(p_in, tlv);
 
-    // TODO: find a more efficient way to trigger FEC recovery
-    // For now: simply check if there is at least one lost source
-    // symbol in the horizon
-    uint32_t encoding_symbol_id = tlv->rfpid;
-    uint8_t lost_symbols = 0;
-    for (int i = 0; i < DECODER_MAX_WINDOWS * tlv->nss; ++i) {
-        srv6_fec2_source_t *symbol = _rlc_info.source_buffer[(encoding_symbol_id - i) % SRV6_FEC_BUFFER_SIZE];
-        if (!symbol | symbol->tlv.sfpid != encoding_symbol_id - i) {
-            ++lost_symbols;
-        }
-    }
-    if (lost_symbols > 0) {
-        click_chatter("GOTTA CALL RECOVERY");
-    }
+    // Call RLC recovery
+    // TODO
 
     return 0;
 }
@@ -189,15 +179,15 @@ IP6SRv6FECDecode::store_repair_symbol(Packet *p_in, repair_tlv_t *tlv)
     // TODO: check if call failed?
     memset(symbol, 0, sizeof(srv6_fec2_repair_t));
     memcpy(&symbol->tlv, tlv, sizeof(repair_tlv_t));
-    symbol->p = p_in->clone();
-
+    symbol->p = (WritablePacket *)p_in->clone();
     // Clean previous symbol in the buffer and replace with current symbol
     srv6_fec2_repair_t *previous_symbol = _rlc_info.repair_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
     if (previous_symbol) {
         previous_symbol->p->kill();
-        free(previous_symbol);
+        CLICK_LFREE(previous_symbol, sizeof(srv6_fec2_repair_t));
     }
     _rlc_info.repair_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = symbol;
+    _rlc_info.encoding_symbol_id = encoding_symbol_id;
 }
 
 void
@@ -214,29 +204,287 @@ IP6SRv6FECDecode::remove_tlv_source_symbol(WritablePacket *p, uint16_t offset_tl
     p->pull(sizeof(source_tlv_t));
 }
 
-uint8_t
-IP6SRv6FECDecode::rlc_get_coef(tinymt32_t *prng)
+void
+IP6SRv6FECDecode::rlc_get_coefs(tinymt32_t *prng, uint32_t seed, int n, uint8_t *coefs)
 {
-    uint8_t coef = tinymt32_generate_uint32(prng);
-    if (coef == 0) return 1;
-    return coef;
+    tinymt32_init(prng, seed);
+    int i;
+    for (i = 0 ; i < n ; i++) {
+        coefs[i] = (uint8_t) tinymt32_generate_uint32(prng);
+        if (coefs[i] == 0)
+            coefs[i] = 1;
+    }
 }
 
-tinymt32_t
-IP6SRv6FECDecode::rlc_reset_coefs() {
-    tinymt32_t prng;
-    prng.mat1 = 0x8f7011ee;
-    prng.mat2 = 0xfc78ff1f;
-    prng.tmat = 0x3793fdff;
-    return prng;
-}
-
-void IP6SRv6FECDecode::rlc_fill_muls(uint8_t muls[256 * 256]) {
+void
+IP6SRv6FECDecode::rlc_fill_muls(uint8_t muls[256 * 256])
+{
     for (int i = 0; i < 256; ++i) {
         for (int j = 0; j < 256; ++j) {
             muls[i * 256 + j] = gf256_mul_formula(i, j);
         }
     }
+}
+
+void
+IP6SRv6FECDecode::rlc_recover_symbols()
+{
+    uint16_t max_packet_length = 0;
+    uint8_t nb_source_symbols = 0;
+    uint8_t window_size = 0;
+    uint8_t window_step = 0;
+    uint8_t previous_window_step = 0;
+    uint32_t encoding_symbol_id = _rlc_info.encoding_symbol_id;
+
+    // Init the pseudo random number generator
+    tinymt32_t prng;
+    prng.mat1 = 0x8f7011ee;
+    prng.mat2 = 0xfc78ff1f;
+    prng.tmat = 0x3793fdff;
+
+    // 1. Detect the size of the system:
+    //      - Number of rows (i.e., equations or repair symbols)
+    //      - Number of columns (i.e., unknowns or lost source symbols)
+    uint8_t nb_windows; // One window = one repair symbol
+    uint32_t running_esid; // esid = encoding symbol id
+    for (int i = 0; i < RLC_MAX_WINDOWS; ++i) {
+        srv6_fec2_repair_t *repair = _rlc_info.repair_buffer[running_esid % SRV6_FEC_BUFFER_SIZE];
+        // Did not receive this repair symbol => stop iteration
+        if (!repair || repair->tlv.rfpid != running_esid) {
+            break;
+        }
+        window_size = repair->tlv.nss;
+        window_step = (repair->tlv.rfi >> 16) & 0xf;
+        previous_window_step = (repair->tlv.rfi >> 24);
+        ++nb_windows;
+        nb_source_symbols += previous_window_step;
+        running_esid -= previous_window_step;
+        // No coding before this step
+        if (previous_window_step == 0) {
+            break;
+        }
+    }
+
+    // Still need to count the symbols at the beginning of the first window
+    nb_source_symbols += window_size - previous_window_step; // TODO: verify this
+
+    // No valid window: no repair symbol received or no FEC applied
+    // Should not happen since this function is triggered by the
+    // reception of a repair symbol
+    if (nb_windows == 0) {
+        return;
+    }
+
+    // Received source symbols array
+    srv6_fec2_source_term_t **ss_array = (srv6_fec2_source_term_t **)CLICK_LALLOC(sizeof(srv6_fec2_source_t *) * nb_source_symbols);
+    if (!ss_array) {
+        return;
+    }
+    memset(ss_array, 0, sizeof(srv6_fec2_source_term_t *) * nb_source_symbols);
+
+    // Received repair symbols array
+    srv6_fec2_repair_t **rs_array = (srv6_fec2_repair_t **)CLICK_LALLOC(sizeof(srv6_fec2_term_t *) * nb_windows);
+    if (!rs_array) {
+        CLICK_LFREE(ss_array, sizeof(srv6_fec2_source_term_t *) * nb_source_symbols);
+        return;
+    }
+    memset(rs_array, 0, sizeof(srv6_fec2_repair_t *) * nb_windows);
+
+    uint8_t nb_unknwons;
+    uint8_t *x_to_source = (uint8_t *)CLICK_LALLOC(nb_source_symbols * sizeof(uint8_t));
+    uint8_t *source_to_x = (uint8_t *)CLICK_LALLOC(nb_source_symbols * sizeof(uint8_t));
+    // TODO: check if fail
+    memset(x_to_source, 0, sizeof(uint8_t) * nb_source_symbols);
+    memset(source_to_x, -1, sizeof(uint8_t) * nb_source_symbols);
+
+    bool *protected_symbol = (bool *)CLICK_LALLOC(nb_source_symbols * sizeof(bool));
+    // TODO: check if fail
+    memset(protected_symbol, 0, sizeof(bool));
+
+    uint32_t id_first_ss_first_window = encoding_symbol_id - nb_source_symbols + 1;
+    uint32_t id_first_rs_first_window = id_first_ss_first_window + window_step - 1; // TODO: check this
+
+    // Locate the source and repair symbols and store separately
+    uint8_t idx = id_first_rs_first_window;
+    for (int i = 0; i < nb_windows; ++i) {
+        srv6_fec2_repair_t *repair = _rlc_info.repair_buffer[idx % SRV6_FEC_BUFFER_SIZE];
+        if (!repair) {
+            click_chatter("ERROR 3");
+            return; // TODO: free all
+        }
+        rs_array[i] = repair;
+    }
+    for (int i = 0; i < nb_source_symbols; ++i) {
+        idx = (id_first_ss_first_window + i) % SRV6_FEC_BUFFER_SIZE;
+        srv6_fec2_source_t *source = _rlc_info.source_buffer[idx];
+        uint32_t id_theoric = id_first_ss_first_window + i;
+        bool is_lost = 0;
+        if (source) {
+            uint32_t id_from_buffer = source->tlv.sfpid;
+            if (id_theoric == id_from_buffer && source->tlv.type == TLV_TYPE_FEC_SOURCE) {
+                // Received symbol, store it in the buffer
+                ss_array[i] = (srv6_fec2_source_term_t *)CLICK_LALLOC(sizeof(srv6_fec2_source_term_t));
+                ss_array[i]->p = source->p;
+                ss_array[i]->encoding_symbol_id = source->tlv.sfpid;
+                max_packet_length = MAX(max_packet_length, source->p->length());
+            } else {
+                is_lost = 1;
+            }
+        } else {
+            is_lost = 1;
+        }
+        if (is_lost) { // Maybe this symbol was recovered earlier
+            srv6_fec2_source_term_t *rec = _rlc_info.recovd_buffer[idx];
+            if (rec) {
+                if (rec->encoding_symbol_id == id_theoric) {
+                    ss_array[i] = (srv6_fec2_source_term_t *)CLICK_LALLOC(sizeof(srv6_fec2_source_term_t));
+                    ss_array[i]->p = rec->p;
+                    ss_array[i]->encoding_symbol_id = rec->encoding_symbol_id;
+                    max_packet_length = MAX(max_packet_length, rec->p->length());
+                    
+                    // Hence the packet is not lost anymore
+                    is_lost = 0;
+                }
+            }
+        }
+        if (is_lost) {
+            x_to_source[nb_unknwons] = i;
+            source_to_x[i] = nb_unknwons;
+            ++nb_unknwons;
+        }
+    }
+
+    // Maybe no need for recovery?
+    if (nb_unknwons == 0) {
+        click_chatter("No need for recovery! TODO: delete this message");
+        
+        // Free all memory
+        for (int i = 0; i < nb_source_symbols; ++i) {
+            if (ss_array[i]) CLICK_LFREE(ss_array[i], sizeof(srv6_fec2_source_term_t *));
+        }
+        CLICK_LFREE(ss_array, sizeof(srv6_fec2_source_term_t **) * nb_source_symbols);
+        CLICK_LFREE(rs_array, sizeof(srv6_fec2_repair_t **) * nb_windows);
+        CLICK_LFREE(x_to_source, sizeof(uint8_t) * nb_source_symbols);
+        CLICK_LFREE(source_to_x, sizeof(uint8_t) * nb_source_symbols);
+        CLICK_LFREE(protected_symbol, sizeof(bool) * nb_source_symbols);
+        return;
+    }
+
+    // Construct the system Ax=b
+    int n_eq = MIN(nb_unknwons, nb_windows);
+    uint8_t *coefs = (uint8_t *)CLICK_LALLOC(sizeof(uint8_t) * window_size); // TODO: adaptive window size?
+    srv6_fec2_term_t **unknowns = (srv6_fec2_term_t **)CLICK_LALLOC(sizeof(srv6_fec2_term_t *) * nb_unknwons); // x
+    uint8_t **system_coefs = (uint8_t **)CLICK_LALLOC(sizeof(uint8_t *) * n_eq); // A
+    srv6_fec2_term_t **constant_terms = (srv6_fec2_term_t **)CLICK_LALLOC(sizeof(srv6_fec2_term_t *) * nb_unknwons); // b
+    bool *undetermined = (bool *)CLICK_LALLOC(sizeof(bool) * nb_unknwons);
+    memset(coefs, 0, window_size);
+    memset(unknowns, 0, sizeof(srv6_fec2_term_t *) * nb_unknwons);
+    memset(system_coefs, 0, sizeof(uint8_t *) * n_eq);
+    memset(constant_terms, 0, sizeof(srv6_fec2_term_t *) * nb_unknwons);
+    memset(undetermined, 0, sizeof(bool) * nb_unknwons);        
+    
+    for (int i = 0; i < n_eq; ++i) {
+        system_coefs[i] = (uint8_t *)CLICK_LALLOC(sizeof(uint8_t) * nb_unknwons);
+        memset(system_coefs[i], 0, sizeof(uint8_t) * nb_unknwons);
+    }
+
+    for (int i = 0; i < nb_unknwons; ++i) {
+        unknowns[i] = (srv6_fec2_term_t *)CLICK_LALLOC(sizeof(srv6_fec2_term_t));
+        memset(unknowns, 0, sizeof(srv6_fec2_term_t));
+        unknowns[i]->data = (uint8_t *)CLICK_LALLOC(max_packet_length);
+    }
+
+    int i = 0; // Index of the row in the system
+    for (int rs = 0; rs < nb_windows; ++rs) {
+        srv6_fec2_repair_t *repair = rs_array[rs];
+        bool protect_at_least_one = false;
+        // Check if this repair symbol protects at least one lost source symbol
+        // TODO: make adaptive
+        for (int k = 0; k < window_size; ++k) {
+            int idx = rs * window_step + k;
+            if (!ss_array[idx] && !protected_symbol[idx]) {
+                protect_at_least_one = true;
+                protected_symbol[idx] = true;
+                break; // We know it protects at least one
+            }
+        }
+        if (!protect_at_least_one) {
+            continue; // Ignore this repair symbol if does not protect any lost
+        }
+        constant_terms[i] = (srv6_fec2_term_t *)CLICK_LALLOC(sizeof(srv6_fec2_term_t));
+
+        // 1) Independent term (b) ith row
+        memset(constant_terms[i], 0, sizeof(srv6_fec2_term_t));
+        constant_terms[i]->data = (uint8_t *)CLICK_LALLOC(sizeof(uint8_t) * max_packet_length);
+        click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(repair->p->data() + sizeof(click_ip6));
+        uint16_t repair_offset = sizeof(click_ip6) + sizeof(click_ip6_sr) + srv6->ip6_hdrlen * 8;
+        memcpy(constant_terms[i]->data, repair->p + repair_offset, repair->p->length() - repair_offset);
+        constant_terms[i]->packet_length = repair->tlv.coded_length;
+
+        // 2) Coefficient matric (A) ith row
+        uint16_t repair_key = repair->tlv.rfi & 0xffff;
+        rlc_get_coefs(&prng, repair_key, window_size, coefs);
+        int current_unknown = 0; // Nb of unknown already discovered
+        for (int j = 0; j < window_size; ++j) {
+            int idx = rs * window_step + j;
+            if (ss_array[idx]) { // This protected symbol is received
+                symbol_sub_scaled_term(constant_terms[i], coefs[j], ss_array[idx], _rlc_info.muls);
+            } else {
+                if (source_to_x[idx] != -1) {
+                    system_coefs[i][source_to_x[idx]] = coefs[j]; // A[i][j] = coefs[j]
+                    ++current_unknown;
+                } else {
+                    click_chatter("ERROR 4");
+                }
+            }
+        }
+        ++i;
+    }
+    CLICK_LFREE(protected_symbol, sizeof(bool) * nb_source_symbols);
+    uint8_t nb_effective_equations = i;
+
+    bool can_recover = nb_effective_equations >= nb_unknwons;
+    if (can_recover) {
+        // Solve the system
+        // TODO
+    } else {
+        click_chatter("ERROR 5");
+    }
+
+    // Free the entire system
+    for (i = 0; i < n_eq; ++i) {
+        CLICK_LFREE(system_coefs[i], sizeof(uint8_t) * nb_unknwons);
+        if (i < nb_effective_equations) {
+            CLICK_LFREE(constant_terms[i], sizeof(srv6_fec2_term_t));
+        }
+    }
+    for (i = 0; i < nb_source_symbols; ++i) {
+        CLICK_LFREE(ss_array[i], sizeof(srv6_fec2_term_t));
+    }
+    CLICK_LFREE(ss_array, sizeof(srv6_fec2_term_t *) * nb_source_symbols);
+    CLICK_LFREE(rs_array, sizeof(srv6_fec2_repair_t) * nb_windows);
+    CLICK_LFREE(system_coefs, sizeof(uint8_t *) * n_eq);
+    CLICK_LFREE(unknowns, sizeof(srv6_fec2_term_t *) * nb_unknwons);
+    CLICK_LFREE(coefs, window_size * sizeof(uint8_t));
+    CLICK_LFREE(undetermined, sizeof(bool) * nb_unknwons);
+    CLICK_LFREE(source_to_x, sizeof(uint8_t) * nb_source_symbols);
+    CLICK_LFREE(x_to_source, sizeof(uint8_t) * nb_source_symbols);
+    return;
+}
+
+void
+IP6SRv6FECDecode::symbol_add_scaled_term(srv6_fec2_term_t *symbol1, uint8_t coef, srv6_fec2_source_term_t *symbol2, uint8_t *mul)
+{
+    symbol_add_scaled(symbol1->data, coef, symbol2->p->data(), symbol2->p->length(), mul);
+    uint16_t pl = (uint16_t)symbol2->p->length();
+    symbol_add_scaled(&symbol1->packet_length, coef, &pl, sizeof(uint16_t), mul);
+}
+
+void
+IP6SRv6FECDecode::symbol_mul_term(srv6_fec2_term_t *symbol1, uint8_t coef, uint8_t *mul, uint16_t size)
+{
+    symbol_mul(symbol1->data, coef, size, mul);
+    symbol_mul((uint8_t *)&symbol1->packet_length, coef, sizeof(uint16_t), mul);
 }
 
 CLICK_ENDDECLS

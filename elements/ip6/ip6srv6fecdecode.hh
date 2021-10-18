@@ -8,13 +8,15 @@
 #include <tinymt32/tinymt32.h>
 #include <swifsymbol/swifsymbol.h>
 
+#define symbol_sub_scaled_term symbol_add_scaled_term
+
 #ifndef SRV6FEC_HH
 #define SRV6FEC_HH
 #define SRV6_FEC_BUFFER_SIZE 32
 
 #define TLV_TYPE_FEC_SOURCE 28
 #define TLV_TYPE_FEC_REPAIR 29
-#define DECODER_MAX_WINDOWS 4
+#define RLC_MAX_WINDOWS 4
 #define LOCAL_MTU 1500
 
 // SRv6-FEC TLV structures
@@ -63,8 +65,19 @@ struct srv6_fec2_source_t {
 };
 
 struct srv6_fec2_repair_t {
-  Packet *p;
+  WritablePacket *p;
   repair_tlv_t tlv;
+};
+
+struct srv6_fec2_source_term_t {
+  Packet *p;
+  uint32_t encoding_symbol_id;
+};
+
+struct srv6_fec2_term_t {
+  uint8_t *data;
+  uint16_t packet_length;
+  uint16_t offset;
 };
 
 struct rlc_info_decoder_t {
@@ -74,6 +87,8 @@ struct rlc_info_decoder_t {
   uint8_t muls[256 * 256 * sizeof(uint8_t)];
   srv6_fec2_source_t *source_buffer[SRV6_FEC_BUFFER_SIZE];
   srv6_fec2_repair_t *repair_buffer[SRV6_FEC_BUFFER_SIZE];
+  srv6_fec2_source_term_t *recovd_buffer[SRV6_FEC_BUFFER_SIZE];
+  uint32_t encoding_symbol_id;
 };
 
 class IP6SRv6FECDecode : public Element { 
@@ -94,6 +109,7 @@ class IP6SRv6FECDecode : public Element {
 
  private:
 
+  IP6Address dec; // Decoder SID
   bool _use_dst_anno;
   rlc_info_decoder_t _rlc_info;
 
@@ -102,13 +118,16 @@ class IP6SRv6FECDecode : public Element {
   int fec_scheme_source(Packet *p_in, source_tlv_t *tlv) CLICK_COLD;
   int fec_scheme_repair(Packet *p_in, repair_tlv_t *tlv) CLICK_COLD;
   
-  tinymt32_t rlc_reset_coefs() CLICK_COLD;
   void rlc_fill_muls(uint8_t muls[256 * 256]) CLICK_COLD;
-  uint8_t rlc_get_coef(tinymt32_t *prng) CLICK_COLD;
 
   void store_source_symbol(Packet *p_in, source_tlv_t *tlv) CLICK_COLD;
   void store_repair_symbol(Packet *p_in, repair_tlv_t *tlv) CLICK_COLD;
   void remove_tlv_source_symbol(WritablePacket *p, uint16_t offset_tlv) CLICK_COLD;
+
+  void rlc_recover_symbols();
+  void rlc_get_coefs(tinymt32_t *prng, uint32_t seed, int n, uint8_t *coefs);
+  void symbol_add_scaled_term(srv6_fec2_term_t *symbol1, uint8_t coef, srv6_fec2_source_term_t *symbol2, uint8_t *mul);
+  void symbol_mul_term(srv6_fec2_term_t *symbol1, uint8_t coef, uint8_t *mul, uint16_t size);
 
 };
 

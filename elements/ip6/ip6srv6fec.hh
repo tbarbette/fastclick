@@ -14,7 +14,7 @@
 
 #define TLV_TYPE_FEC_SOURCE 28
 #define TLV_TYPE_FEC_REPAIR 29
-#define DECODER_MAX_WINDOWS 4
+#define RLC_MAX_WINDOWS 4
 #define LOCAL_MTU 1500
 
 // SRv6-FEC TLV structures
@@ -65,6 +65,7 @@ struct rlc_info_t {
   uint8_t window_size;
   uint8_t window_step;
   uint8_t buffer_size;
+  uint8_t previous_window_step;
 
   // RLC relative information
   tinymt32_t prng;
