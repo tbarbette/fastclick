@@ -3,8 +3,13 @@ elementclass Input { $port |
 	-> c :: Classifier(12/86DD,-)
 	-> Strip(14)
 	-> CheckIP6Header()
+	-> DecIP6HLIM()
 	-> IP6Print("IP6 from port $port")
-	-> Unstrip(14)
+	-> IP6SRDecap()
+	-> Print(DECAPED, -1)
+	-> MarkIP6Header
+	-> IP6Print(IPDECAPED)
+	-> EtherEncap(0x86DD, SRC 0:0:0:0:0:3, DST 0:0:0:0:0:4)
 	-> output;
 
     c[1] -> Print("Non-IPv6") -> Discard;

@@ -18,7 +18,7 @@ class MyTopo(Topo):
         self.addLink(self.sw1, self.sw2)
 
 
-def simpleRun():
+def simpleRun(doEncap):
     topo = MyTopo()
     net = Mininet(topo)
     net.start()
@@ -49,7 +49,11 @@ def simpleRun():
     # Add an IPv6 Segment Routing Header to the packets from h1
     # Inline insertion with an intermediate segment
     # Packet will visit: fc00::a -> fc00::9 -> babe:2::5
-    net["h1"].cmd("ip -6 route add babe:2::5/64 encap seg6 mode inline segs fc00::a,fc00::9 dev h1-eth0")
+
+    if doEncap:
+        net["h1"].cmd("ip -6 route add babe:2::5/64 encap seg6 mode inline segs fc00::a,fc00::9 dev h1-eth0")
+    else:
+        net["h1"].cmd("ip -6 route add babe:2::5/64 dev h1-eth0")
     
     # Enable SRv6
     net["h1"].cmd("sysctl net.ipv6.conf.all.seg6_enabled=1")
@@ -64,4 +68,4 @@ def simpleRun():
 
 
 if __name__ == "__main__":
-    simpleRun()
+    simpleRun(len(sys.args) <= 1)
