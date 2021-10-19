@@ -20,7 +20,7 @@
 #include <click/glue.hh>
 #include <click/args.hh>
 #include <click/error.hh>
-#include <clicknet/ip6.h>
+#include <click/ip6address.hh>
 #include <clicknet/icmp.h>
 
 CLICK_DECLS
@@ -45,7 +45,6 @@ SetICMPChecksumIP6::simple_action(Packet *p_in)
 {
   WritablePacket *p = p_in->uniqueify();
   click_ip6 *ip6 = p->ip6_header();
-  unsigned plen;
   unsigned short icmp_len;
   click_icmp *icmp =  (click_icmp*)ip6_find_header(ip6, IP_PROTO_ICMP6 , p->end_data());
   if (icmp == 0) {

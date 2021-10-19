@@ -2,6 +2,7 @@
 *.o
 Makefile
 click
+packetmill
 elements.cc
 elements.conf
 elements.csmk

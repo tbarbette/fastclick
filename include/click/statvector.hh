@@ -52,8 +52,6 @@ class StatVector {
         case H_N_OBS:
         case H_MEDIAN: {
             Vector<T> sums(fd->stats.get_value(0).size(),0);
-            int max_batch_v = -1;
-            int max_batch_index = -1;
             T total = 0;
             for (unsigned j = 0; j < sums.size(); j++) {
                 for (unsigned i = 0; i < fd->stats.weight(); i++) {
@@ -75,7 +73,7 @@ class StatVector {
             int count = 0;
             int total = 0;
             for (unsigned i = 0; i < fd->stats.weight(); i++) {
-                for (unsigned j = 0; j < fd->stats.get_value(i).size(); j++) {
+                for (unsigned j = 0; j < (unsigned)fd->stats.get_value(i).size(); j++) {
                     total += fd->stats.get_value(i)[j] * j;
                     count += fd->stats.get_value(i)[j];
                 }
@@ -89,7 +87,7 @@ class StatVector {
             StringAccum s;
             Vector<T> sums(fd->stats.get_value(0).size(),0);
             for (unsigned i = 0; i < fd->stats.weight(); i++) {
-                for (unsigned j = 0; j < fd->stats.get_value(i).size(); j++) {
+                for (unsigned j = 0; j < (unsigned)fd->stats.get_value(i).size(); j++) {
                     sums[j] += fd->stats.get_value(i)[j];
                     if (i == fd->stats.weight() - 1 && sums[j] != 0)
                         s << j << ": " << sums[j] << "\n";

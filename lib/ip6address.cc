@@ -232,7 +232,7 @@ in6_fast_cksum(const struct in6_addr *saddr,
 	   csum += carry;
 	}
 
-	//get the sum of other fields:  packet length, protocal
+	//get the sum of other fields:  packet length, protocol
 	ulen = ntohs(len);
 	csum += ulen;
 

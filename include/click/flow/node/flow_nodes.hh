@@ -30,14 +30,16 @@ protected:
     };
     FlowNodePtr _default;
 
-#if FLOW_KEEP_STRUCTURE
-    bool _released;
-#endif
+
     bool _growing;
 
     typedef FlowNodePtr* (*FindFn)(void*,FlowNodeData data,bool &need_grow);
 
     FindFn _find;
+
+#if FLOW_KEEP_STRUCTURE
+    bool _released;
+#endif
 
     void duplicate_internal(FlowNode* node, bool recursive, int use_count, bool duplicate_leaf) {
         assign(node);
@@ -145,7 +147,7 @@ public:
     }
 
 
-    FlowNode() :  num(0),_level(0),_default(),_parent(0), _growing(false), node_data()
+    FlowNode() :  num(0), _level(0), _default(), _parent(0), _growing(false), node_data()
 #if FLOW_KEEP_STRUCTURE
             ,_released(false)
 #endif

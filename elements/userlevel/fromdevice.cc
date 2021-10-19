@@ -771,16 +771,9 @@ FromDevice::dev_set_rss_reta(unsigned* reta, unsigned reta_sz)
 {
 	struct ethtool_rxfh rss_head = {0};
 	struct ethtool_rxfh *rss = NULL;
-	//struct ethtool_rxnfc ring_count;
-	//struct ethtool_gstrings *hfuncs = NULL;
-	char *rxfhindir_key = NULL;
-	char *req_hfunc_name = NULL;
-	char *hfunc_name = NULL;
-	char *hkey = NULL;
 	int err = 0;
 	int i;
-	uint32_t arg_num = 0, indir_bytes = 0;
-	uint32_t req_hfunc = 0;
+	uint32_t indir_bytes = 0;
 	uint32_t entry_size = sizeof(rss_head.rss_config[0]);
 
 	/* Open control socket. */
@@ -823,7 +816,7 @@ FromDevice::dev_set_rss_reta(unsigned* reta, unsigned reta_sz)
 	rss->hfunc = 0;
 	rss->key_size = 0;
 	rss->indir_size = reta_sz;
-	for (i = 0; i < reta_sz; i++) {
+	for (unsigned i = 0; i < reta_sz; i++) {
 		rss->rss_config[i] = reta[i];
 	}
 

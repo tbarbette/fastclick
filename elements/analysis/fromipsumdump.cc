@@ -49,7 +49,7 @@ CLICK_DECLS
 #define GET1(p)        ((p)[0])
 
 FromIPSummaryDump::FromIPSummaryDump()
-    : _work_packet(0), _task(this), _timer(this), _first_packet_pos(0)
+    : _work_packet(0), _first_packet_pos(0), _task(this), _timer(this)
 {
     _ff.set_landmark_pattern("%f:%l");
     in_batch_mode = BATCH_MODE_YES;

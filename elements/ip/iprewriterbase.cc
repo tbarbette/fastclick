@@ -209,12 +209,12 @@ IPRewriterBase::configure(Vector<String> &conf, ErrorHandler *errh)
         Element *e;
         IPRewriterBase *rwb;
         if (IntArg().parse(capacity_word, heapcap)) {
-            for (int i = 0; i < _mem_units_no; i++) {
+            for (unsigned i = 0; i < _mem_units_no; i++) {
                 _heap[i]->_capacity = heapcap;
             }
         } else if ((e = cp_element(capacity_word, this))
              && (rwb = (IPRewriterBase *) e->cast("IPRewriterBase"))) {
-            for (int i = 0; i < _mem_units_no; i++) {
+            for (unsigned i = 0; i < _mem_units_no; i++) {
                 rwb->_heap[i]->use();
                 _heap[i]->unuse();
                 _heap[i] = rwb->_heap[i];
@@ -268,7 +268,7 @@ IPRewriterBase::initialize(ErrorHandler *errh)
 void
 IPRewriterBase::cleanup(CleanupStage)
 {
-    for (int i = 0; i < _mem_units_no; i++)
+    for (unsigned i = 0; i < _mem_units_no; i++)
         shrink_heap(true, i);
     for (int i = 0; i < _input_specs.size(); ++i)
 	if (_input_specs[i].kind == IPRewriterInput::i_pattern)
