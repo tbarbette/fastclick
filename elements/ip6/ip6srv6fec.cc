@@ -84,7 +84,7 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in)
 
     WritablePacket *p = srv6_fec_add_source_tlv(p_in, &_source_tlv);
     if (!p) {
-        output(0).push(p_in); // TODO: simply reject packet ?
+        return; //Memory problem, packet is already destroyed
     } else {
         output(0).push(p);
     }

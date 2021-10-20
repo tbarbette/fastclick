@@ -80,7 +80,7 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in)
     }
     click_chatter("Au cas ou: voici le paquet recu (%u): %x %x %x", p_in->length(), p_in->data()[0], p_in->data()[1], p_in->data()[2]);
     // Manipulate modified packet because we will remove the TLV
-    WritablePacket *p = (WritablePacket *)p_in;
+    WritablePacket *p = p_in->uniqueify();
     click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
     click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
     int err;
@@ -104,7 +104,7 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in)
 
     // Not a source or repair symbol
     if (tlv_type != TLV_TYPE_FEC_SOURCE && tlv_type != TLV_TYPE_FEC_REPAIR) {
-        output(0).push(p_in);
+        output(0).push(p);
         return;
     }
 
@@ -211,7 +211,7 @@ IP6SRv6FECDecode::store_repair_symbol(Packet *p_in, repair_tlv_t *tlv)
     // TODO: check if call failed?
     memset(symbol, 0, sizeof(srv6_fec2_repair_t));
     memcpy(&symbol->tlv, tlv, sizeof(repair_tlv_t));
-    symbol->p = (WritablePacket *)p_in;
+    symbol->p = p_in->uniqueify();
     // Clean previous symbol in the buffer and replace with current symbol
     srv6_fec2_repair_t *previous_symbol = _rlc_info.repair_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
     if (previous_symbol) {
