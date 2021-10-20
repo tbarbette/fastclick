@@ -10,10 +10,7 @@ elementclass IP6Input{
 };
 
 elementclass SetAllChecksumIP6 {
-	input -> e :: ExactPaintSwitch(ANNO 58,ANNO 6,ANNO 17);
-	e[0] -> IP6Print(ICMP) -> SetICMPChecksumIP6() -> output;
-	e[1] -> IP6Print(TCP) -> SetICMPChecksumIP6() -> output;
-	e[2] -> IP6Print(UDP) -> SetICMPChecksumIP6() -> output;
+	input -> SetTransportChecksumIP6 -> output
 
 }
 
@@ -26,14 +23,14 @@ elementclass InputDecap { $port, $src, $dst, $ip6src |
 	-> IP6NDAdvertiser($ip6src $src) -> [1]output;
 
 	c[1]
-    -> Print("IP6 from $port", -1)
+    //-> Print("IP6 from $port", -1)
     -> IP6Input()
 	-> IP6Print("IP6 from port $port")
 	-> IP6SRDecap(FORCE_DECAP true)
 	-> SetAllChecksumIP6
-	-> Print(DECAPED, -1)
+	//-> Print(DECAPED, -1)
 	-> MarkIP6Header
-	-> IP6Print(IPDECAPED)
+	//-> IP6Print(IPDECAPED)
 	-> EtherEncap(0x86DD, SRC $src, DST $dst)
 	-> output;
 
@@ -50,22 +47,22 @@ elementclass InputEncap { $port, $src, $dst, $ip6src |
 	-> IP6NDAdvertiser($ip6src $src) -> [1]output;
 
 	c[1]
-	-> Print("IP6 from $port", -1)
+	//-> Print("IP6 from $port", -1)
 	-> IP6Input()
 	-> IP6Print("IP6 from port $port")
 
-	-> Print(BENCAP, -1)
+	//-> Print(BENCAP, -1)
 	-> IP6SREncap(ADDR babe:2::1, ADDR fc00::9, ADDR fc00::a)
 	-> MarkIP6Header()
-	-> Print(ENCAPED, -1)
-	-> IP6Print(IPENCAPED)
+	//-> Print(ENCAPED, -1)
+	//-> IP6Print(IPENCAPED)
 	-> EtherEncap(0x86DD, SRC $src, DST $dst)
 	-> output;
 
     c[2] -> Print("IPv4 (discarded)")
 	-> Strip(14)
 	-> CheckIPHeader()
-	-> IPPrint()
+	//-> IPPrint()
 	-> Discard;
 
     c[3] -> Print("ARP (discarded)")

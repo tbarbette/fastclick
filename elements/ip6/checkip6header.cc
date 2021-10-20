@@ -109,6 +109,7 @@ CheckIP6Header::simple_action(Packet *p)
     unsigned plen = p->length() - _offset;
     class IP6Address src;
     unsigned short ip6_totallen = 40;
+    unsigned char nxt;
 
     // check if the packet is smaller than ip6 header
     // cast to int so very large plen is interpreted as negative
@@ -140,22 +141,19 @@ CheckIP6Header::simple_action(Packet *p)
     /*
     * discard illegal destinations.
     * We will do this in the IP6 routing table.
-    *
-    *
     */
 
+    nxt = ip->ip6_nxt;
     if (_process_eh) {
-        unsigned char nxt = ip->ip6_nxt;
         ip6_follow_eh(ip, (unsigned char*)p->end_data(), [&nxt,&ip6_totallen,ip](const uint8_t type, unsigned char* hdr){
             nxt = type;
             ip6_totallen = hdr - (unsigned char*)ip;
             return true;
         });
-        SET_PAINT_ANNO(p, nxt);
-        click_chatter("Last %d, total len %d", nxt, ip6_totallen);
     }
 
     p->set_ip6_header(ip, ip6_totallen);
+    SET_IP6_NXT_ANNO(p, nxt);
 
     // shorten packet according to IP6 payload length field
     if(ntohs(ip->ip6_plen) < (plen-ip6_totallen)) {

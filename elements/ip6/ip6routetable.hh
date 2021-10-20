@@ -2,10 +2,10 @@
 #ifndef CLICK_IP6ROUTETABLE_HH
 #define CLICK_IP6ROUTETABLE_HH
 #include <click/glue.hh>
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
-class IP6RouteTable : public Element { public:
+class IP6RouteTable : public BatchElement { public:
 
     void* cast(const char*);
 

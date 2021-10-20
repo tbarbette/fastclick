@@ -156,16 +156,16 @@ class BatchElement : public Element { public:
  * The inherited element cannot be extended further because of CRTP !
  */
 
-template <typename T>
-class ClassifyElement : public BatchElement { public:
+template <typename T, typename Base = BatchElement>
+class ClassifyElement : public Base { public:
 
     void push(int, Packet *p) {
-        checked_output_push(static_cast<T&>(*this).classify(p),p);
+        Base::checked_output_push(static_cast<T&>(*this).classify(p),p);
     }
 
 #if HAVE_BATCH
     void push_batch(int, PacketBatch *batch) {
-          CLASSIFY_EACH_PACKET(noutputs() + 1, static_cast<T&>(*this).classify,batch,checked_output_push_batch);
+          CLASSIFY_EACH_PACKET(Base::noutputs() + 1, static_cast<T&>(*this).classify,batch,Base::checked_output_push_batch);
     }
 #endif
 

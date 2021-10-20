@@ -30,21 +30,26 @@
 #define MIDDLEBOX_INIT_ACK_OFFSET    19
 
 // byte 16-17
-#define PAINT2_ANNO_OFFSET		16
+#define PAINT2_ANNO_OFFSET		    16
 #define PAINT2_ANNO_SIZE			2
-#define PAINT2_ANNO(p)			((p)->anno_u16(PAINT2_ANNO_OFFSET))
+#define PAINT2_ANNO(p)			    ((p)->anno_u16(PAINT2_ANNO_OFFSET))
 #define SET_PAINT2_ANNO(p, v)		((p)->set_anno_u16(PAINT2_ANNO_OFFSET, (v)))
 
 // byte 16
-#define ICMP_PARAMPROB_ANNO_OFFSET	16
-#define ICMP_PARAMPROB_ANNO_SIZE	1
-#define ICMP_PARAMPROB_ANNO(p)		((p)->anno_u8(ICMP_PARAMPROB_ANNO_OFFSET))
+#define ICMP_PARAMPROB_ANNO_OFFSET  	16
+#define ICMP_PARAMPROB_ANNO_SIZE	    1
+#define ICMP_PARAMPROB_ANNO(p)		    ((p)->anno_u8(ICMP_PARAMPROB_ANNO_OFFSET))
 #define SET_ICMP_PARAMPROB_ANNO(p, v)	((p)->set_anno_u8(ICMP_PARAMPROB_ANNO_OFFSET, (v)))
 
+#define IP6_NXT_OFFSET		    16
+#define IP6_NXT_SIZE			1
+#define IP6_NXT_ANNO(p)			    ((p)->anno_u8(IP6_NXT_OFFSET))
+#define SET_IP6_NXT_ANNO(p, v)		((p)->set_anno_u8(IP6_NXT_OFFSET, (v)))
+
 // byte 17 (lower byte of PAINT2)
-#define PAINT_ANNO_OFFSET		17
-#define PAINT_ANNO_SIZE			1
-#define PAINT_ANNO(p)			((p)->anno_u8(PAINT_ANNO_OFFSET))
+#define PAINT_ANNO_OFFSET		    17
+#define PAINT_ANNO_SIZE			    1
+#define PAINT_ANNO(p)			    ((p)->anno_u8(PAINT_ANNO_OFFSET))
 #define SET_PAINT_ANNO(p, v)		((p)->set_anno_u8(PAINT_ANNO_OFFSET, (v)))
 
 // byte 19
@@ -76,20 +81,22 @@
 #define SET_MISC_IP_ANNO(p, v)		((p)->set_anno_u32(MISC_IP_ANNO_OFFSET, (v).addr()))
 
 // bytes 24-27
+#define REV_RATE_ANNO_OFFSET		24
+#define REV_RATE_ANNO_SIZE		4
+#define REV_RATE_ANNO(p)		((p)->anno_s32(REV_RATE_ANNO_OFFSET))
+#define SET_REV_RATE_ANNO(p, v)		((p)->set_anno_s32(REV_RATE_ANNO_OFFSET, (v)))
+
+// bytes 24-25
 #define BATCH_COUNT_ANNO_OFFSET		24
 #define BATCH_COUNT_ANNO_SIZE		2
 #define BATCH_COUNT_ANNO(p)		((p)->anno_u16(BATCH_COUNT_ANNO_OFFSET))
 #define SET_BATCH_COUNT_ANNO(p, v)	((p)->set_anno_u16(BATCH_COUNT_ANNO_OFFSET, (v)))
 
+// byte 26-37
 #define EXTRA_PACKETS_ANNO_OFFSET	26
 #define EXTRA_PACKETS_ANNO_SIZE		2
 #define EXTRA_PACKETS_ANNO(p)		((p)->anno_u16(EXTRA_PACKETS_ANNO_OFFSET))
 #define SET_EXTRA_PACKETS_ANNO(p, v)	((p)->set_anno_u16(EXTRA_PACKETS_ANNO_OFFSET, (v)))
-
-#define REV_RATE_ANNO_OFFSET		24
-#define REV_RATE_ANNO_SIZE		4
-#define REV_RATE_ANNO(p)		((p)->anno_s32(REV_RATE_ANNO_OFFSET))
-#define SET_REV_RATE_ANNO(p, v)		((p)->set_anno_s32(REV_RATE_ANNO_OFFSET, (v)))
 
 // byte 26
 #define SEND_ERR_ANNO_OFFSET		26
