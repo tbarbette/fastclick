@@ -95,11 +95,34 @@ PacketTest::initialize(ErrorHandler *errh)
     p->kill();
 #endif
 
+    p = Packet::make(10);
+    Packet* pref1 = p->clone();
+    CHECK(p->shared());
+    CHECK(pref1->shared());
+    p2 = p->uniqueify();
+    CHECK(p2);
+    CHECK(!p2->shared());
+    CHECK(p2->data() != pref1->data());
+    p1 = Packet::make(10);
+    CHECK(pref1 != p1);
+    CHECK(pref1 != p2);
+    CHECK(p1 != p2);
+    p1->kill();
+    p2->kill();
+    p1 = Packet::make(10);
+    p2 = Packet::make(10);
+    CHECK(pref1 != p1);
+    CHECK(pref1 != p2);
+    pref1->kill();
+    p1->kill();
+    p2->kill();
+
     // test shift_data()
     p = Packet::make(10, lowers, 60, 4);
-    CHECK(p->headroom() == 10 && p->tailroom() == 4);
+    int tail = p->tailroom();
+    CHECK(p->headroom() == 10 && p->tailroom() >= 4);
     p = p->shift_data(-2);
-    CHECK(p->headroom() == 8 && p->tailroom() == 6);
+    CHECK(p->headroom() == 8 && p->tailroom() == tail + 2);
     CHECK(p->length() == 60);
     CHECK_DATA(p->data(), lowers, 60);
     CHECK_ALIGNED(p->data());
@@ -107,7 +130,7 @@ PacketTest::initialize(ErrorHandler *errh)
 
     p = Packet::make(9, lowers, 60, 4);
     p = p->shift_data(3);
-    CHECK(p->headroom() == 12 && p->tailroom() == 1 && p->length() == 60);
+    CHECK(p->headroom() == 12 && p->tailroom() >= 1 && p->length() == 60);
     CHECK_DATA(p->data(), lowers, 60);
     CHECK_ALIGNED(p->data());
     p->kill();
