@@ -81,6 +81,10 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in)
     click_chatter("Au cas ou: voici le paquet recu (%u): %x %x %x", p_in->length(), p_in->data()[0], p_in->data()[1], p_in->data()[2]);
     // Manipulate modified packet because we will remove the TLV
     WritablePacket *p = p_in->uniqueify();
+    if (unlikely(!p)) {
+        click_chatter("oom!");
+        return;
+    }
     click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
     click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
     int err;

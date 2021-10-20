@@ -36,6 +36,7 @@ IP6SRv6FECEncode::IP6SRv6FECEncode()
 
 IP6SRv6FECEncode::~IP6SRv6FECEncode()
 {
+    static_assert(sizeof(source_tlv_t) == 8, "source_tlv_t should be 8 bytes");
 }
 
 int
@@ -170,7 +171,7 @@ IP6SRv6FECEncode::store_source_symbol(Packet *p_in, uint32_t encoding_symbol_id)
     _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = p_in->clone();
     click_chatter("Store at idx=%u", encoding_symbol_id);
     Packet *pp = _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
-    click_chatter("First bytes of stored #%u: %x %x %x", encoding_symbol_id, pp->data()[0], pp->data()[1], pp->data()[2]);
+    click_chatter("First bytes of stored #%u (%p): %x %x %x", encoding_symbol_id, pp, pp->data()[0], pp->data()[1], pp->data()[2]);
 }
 
 void
@@ -259,34 +260,32 @@ void IP6SRv6FECEncode::rlc_encode_one_symbol(Packet *s, WritablePacket *r, tinym
 
 WritablePacket * IP6SRv6FECEncode::srv6_fec_add_source_tlv(Packet *p_in, source_tlv_t *tlv) {
     const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
-    const click_ip6_sr *srv6 = reinterpret_cast<const click_ip6_sr *>(p_in->data() + sizeof(click_ip6));
+    const click_ip6_sr *srv6 = (const click_ip6_sr *)ip6_find_header(ip6, IP6_EH_ROUTING, p_in->end_data());
+    if (!srv6) {
+        p_in->kill();
+        click_chatter("Not an SRv6 packet!");
+        return 0;
+    }
     
+    unsigned srv6_offset = (unsigned char*)srv6 - (unsigned char*)ip6;
+
     // Extend the packet to add the TLV
     WritablePacket *p = p_in->push(sizeof(source_tlv_t));
     if (!p)
         return 0;
 
-    // TODO: currently make two copies to be sure not to override values
-    //       how could we improve the performance?
     uint16_t srv6_len = 8 + srv6->ip6_hdrlen * 8;
-    uint8_t buffer1[40];
-    uint8_t buffer2[srv6_len];
-
-    // Copy the IPv6 Header and SRv6 Header
-    memcpy(buffer1, ip6, 40);
-    memcpy(buffer2, srv6, srv6_len);
 
     // Move headers and add TLV
-    memcpy(p->data(), buffer1, 40);
-    memcpy(p->data() + 40, buffer2, srv6_len);
-    memcpy(p->data() + 40 + srv6_len, tlv, sizeof(source_tlv_t));
+    memmove(p->data(), p->data() + sizeof(source_tlv_t), srv6_len + srv6_offset);
+    memcpy(p->data() + sizeof(click_ip6) + srv6_len, tlv, sizeof(source_tlv_t));
 
     // Update the new length of the SRv6 Header
-    click_ip6_sr *srv6_update = reinterpret_cast<click_ip6_sr *>(p->data() + 40);
-    ++srv6_update->ip6_hdrlen;
+    click_ip6_sr *srv6_update = reinterpret_cast<click_ip6_sr *>(p->data() + srv6_offset);
+    srv6_update->ip6_hdrlen += sizeof(source_tlv_t)/8;
     click_ip6 *ip6_update = reinterpret_cast<click_ip6 *>(p->data());
-    ip6_update->ip6_ctlun.ip6_un1.ip6_un1_plen += htons(8);
-
+    ip6_update->ip6_plen = htons(ntohs(ip6_update->ip6_plen) + sizeof(source_tlv_t));
+    p->set_network_header(p->data(), srv6_offset + srv6_len + sizeof(source_tlv_t));
     return p;
 }
 
@@ -317,6 +316,9 @@ void IP6SRv6FECEncode::encapsulate_repair_payload(WritablePacket *p, repair_tlv_
     
     // Add repair TLV
     memcpy(r_tlv, tlv, sizeof(repair_tlv_t));
+
+    // Set annotations
+    _repair_packet->set_network_header(p->data(), (unsigned char*)(r_tlv + 1) - p->data());
 }
 
 CLICK_ENDDECLS

@@ -443,7 +443,7 @@ inline void ip6_follow_eh(const click_ip6* ip6, const unsigned char* end, const 
 }
 
 
-inline void* ip6_find_header(const click_ip6* ip6, const uint8_t type, unsigned char* end) {
+inline void* ip6_find_header(const click_ip6* ip6, const uint8_t type, const unsigned char* end) {
 	unsigned char* pos = 0;
 	ip6_follow_eh(ip6,end,[&pos,type](const uint8_t next, unsigned char* hdr) -> bool {
 		if (next == type) {
