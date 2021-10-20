@@ -88,8 +88,8 @@ LookupIP6Route::initialize(ErrorHandler *)
   return 0;
 }
 
-void
-LookupIP6Route::push(int, Packet *p)
+int
+LookupIP6Route::classify(Packet *p)
 {
   IP6Address a = DST_IP6_ANNO(p);
   IP6Address gw;
@@ -101,8 +101,7 @@ LookupIP6Route::push(int, Packet *p)
 	{
 	    SET_DST_IP6_ANNO(p, _last_gw);
 	}
-      output(_last_output).push(p);
-      return;
+      return _last_output;
     }
  #ifdef IP_RT_CACHE2
     else if (a == _last_addr2) {
@@ -114,10 +113,9 @@ LookupIP6Route::push(int, Packet *p)
       EXCHANGE(_last_output, _last_output2, tmpi);
 #endif
       if (_last_gw2) {
-	  SET_DST_IP6_ANNO(p, _last_gw2);
+	      SET_DST_IP6_ANNO(p, _last_gw2);
       }
-      output(_last_output2).push(p);
-      return;
+      return _last_output2;
     }
 #endif
   }
@@ -136,10 +134,10 @@ LookupIP6Route::push(int, Packet *p)
     if (gw != IP6Address("::0")) {
 	SET_DST_IP6_ANNO(p, IP6Address(gw));
     }
-    output(ifi).push(p);
+    return ifi;
 
   } else {
-    p->kill();
+    return -1;
   }
 }
 

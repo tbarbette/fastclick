@@ -53,10 +53,8 @@ IP6SRDecap::simple_action(Packet *p_in)
     WritablePacket *p = p_in->uniqueify();
     if (!p)
         return 0;
-    const IP6Address &a = DST_IP6_ANNO(p);
 
     click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
-
     click_ip6_sr *sr = (click_ip6_sr*)ip6_find_header(ip6, IP6_EH_ROUTING, p->end_data());
 
     if (sr == 0)
@@ -67,22 +65,21 @@ IP6SRDecap::simple_action(Packet *p_in)
             unsigned char* old_data = p->data();
             unsigned char nxt = sr->ip6_sr_next;
             unsigned char *next_ptr = (unsigned char*)ip6_find_header(ip6, nxt, p->end_data());
+            unsigned offset = p->transport_header_offset();
             if (next_ptr == 0) {
                 p->kill();
                 click_chatter("Cannot find next header %d. Buggy packet?", nxt);
                 return 0;
             }
             unsigned srlen = (unsigned char*)next_ptr-(unsigned char*)sr;
-            click_chatter("Srlen %d, expected %d", srlen, (sizeof(click_ip6_sr) + sizeof(IP6Address) * 3));
             p->pull(srlen);
 
-
-
             memmove(p->data(), old_data, (unsigned char*)sr-old_data);
-            ip6 = reinterpret_cast<click_ip6 *>(p->data());
+            ip6 = (click_ip6 *)(p->data());
             ip6->ip6_nxt = nxt;
-            // Also update the IPv6 Header to add the SRH length in the payload
             ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - srlen);
+            p->set_network_header(p->data(), offset - srlen);
+
 
     } else if (unlikely(sr->segment_left == 0)) {
         click_chatter("Invalid packet with 0 segments left?");
