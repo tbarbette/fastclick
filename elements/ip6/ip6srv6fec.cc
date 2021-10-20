@@ -28,8 +28,6 @@ IP6SRv6FECEncode::IP6SRv6FECEncode()
 {
     _use_dst_anno = false;
     memset(&_rlc_info, 0, sizeof(rlc_info_t));
-    _rlc_info.window_size = 10; // TODO: dynamically change
-    _rlc_info.window_step = 2; // TODO: dynamically change
     rlc_fill_muls(_rlc_info.muls);
     _rlc_info.prng = rlc_reset_coefs();
 }
@@ -45,6 +43,8 @@ IP6SRv6FECEncode::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
 	.read_mp("ENC", enc)
 	.read_mp("DEC", dec)
+    .read_or_set("WINDOW", _rlc_info.window_size, 10)
+    .read_or_set("STEP", _rlc_info.window_step, 2)
 	.complete() < 0)
         return -1;
 
@@ -100,6 +100,7 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in)
         // Send repair packet
         click_chatter("Send repair symbol");
         output(0).push(_repair_packet);
+        _repair_packet = 0;
 
         // Reset parameters of the RLC information
         _rlc_info.max_length = 0;
@@ -186,6 +187,7 @@ IP6SRv6FECEncode::rlc_encode_symbols(uint32_t encoding_symbol_id)
         uint8_t idx = (start_esid + i) % SRV6_FEC_BUFFER_SIZE;
         click_chatter("Indx=%u", idx);
         Packet *source_symbol = _rlc_info.source_buffer[idx];
+
         // Print data first bytes
         uint8_t *data = (uint8_t *)source_symbol->data();
         fprintf(stderr, "Encode first bytes of %d: %x %x %x\n", i, data[0], data[1], data[2]);
