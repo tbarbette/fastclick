@@ -46,10 +46,10 @@
 # include <sys/socket.h>
 # include <sys/ioctl.h>
 # include <net/if.h>
-# include <net/if_packet.h>
 # include <features.h>
-# if __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1
+#  if HAVE_NETPACKET_PACKET_H && !HAVE_LINUX_IF_PACKET_H
 #  include <netpacket/packet.h>
+ # include <net/if_packet.h>
 # else
 #  include <linux/if_packet.h>
 # endif

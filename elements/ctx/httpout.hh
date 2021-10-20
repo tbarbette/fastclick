@@ -2,7 +2,7 @@
 #define MIDDLEBOX_HTTPOUT_HH
 
 #include <click/element.hh>
-#include "ctxelement.hh"
+#include <click/flow/ctxelement.hh>
 #include <click/tcphelper.hh>
 
 CLICK_DECLS

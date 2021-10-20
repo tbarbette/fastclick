@@ -678,7 +678,7 @@ int FromDPDKDevice::write_handler(
                 fd->get_spawning_threads(b, true, -1);
                 if (fd->_active) { // Activating
                     fd->trigger_thread_reconfiguration(true,[fd,thunk](){
-                        for (int i = 0; i < fd->_thread_state.weight(); i++) {
+                        for (unsigned i = 0; i < fd->_thread_state.weight(); i++) {
                             if (fd->_thread_state.get_value(i).task)
                                 fd->_thread_state.get_value(i).task->reschedule();
                         }
@@ -688,7 +688,7 @@ int FromDPDKDevice::write_handler(
                     }, b);
                 } else { // Deactivating
                     fd->trigger_thread_reconfiguration(false,[fd](){
-                        for (int i = 0; i < fd->_thread_state.weight(); i++) {
+                        for (unsigned i = 0; i < fd->_thread_state.weight(); i++) {
                             if (fd->_thread_state.get_value(i).task)
                                 fd->_thread_state.get_value(i).task->unschedule();
                         }

@@ -113,6 +113,9 @@
 /* Define if you have the <linux/if_tun.h> header file. */
 #undef HAVE_LINUX_IF_TUN_H
 
+/* Define if you have the <linux/if_packet.h> header file. */
+#undef HAVE_LINUX_IF_PACKET_H
+
 /* Define if you have the madvise function. */
 #undef HAVE_MADVISE
 

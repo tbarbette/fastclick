@@ -158,9 +158,6 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
 #endif
     int level_nr = 0;
     (void)level_nr;
-#if HAVE_FLOW_DYNAMIC
-    bool dynamic = false;
-#endif
     do {
         bool need_grow = false;
         FlowNodeData data = parent->level()->get_data(p);

@@ -65,6 +65,18 @@
 # endif
 #endif
 
+#if FROMDEVICE_ALLOW_PCAP
+struct my_pcap_data {
+    FromDevice* fd;
+    PacketBatch* batch;
+    PacketBatch* batch_err;
+    Packet* batch_last;
+    Packet* batch_err_last;
+    int batch_count;
+    int batch_err_count;
+};
+#endif
+
 CLICK_DECLS
 
 #define offset_of_base(base,derived,derived_member) ((unsigned char*)(&(reinterpret_cast<base *>(0)->derived_member)) - (unsigned char*)(base *)0)
@@ -477,18 +489,6 @@ FromDevice::cleanup(CleanupStage stage)
 }
 
 #if FROMDEVICE_ALLOW_PCAP
-struct my_pcap_data {
-    FromDevice* fd;
-    PacketBatch* batch;
-    PacketBatch* batch_err;
-    Packet* batch_last;
-    Packet* batch_err_last;
-    int batch_count;
-    int batch_err_count;
-};
-#endif
-
-#if FROMDEVICE_ALLOW_PCAP
 CLICK_ENDDECLS
 extern "C" {
 void
@@ -772,7 +772,6 @@ FromDevice::dev_set_rss_reta(unsigned* reta, unsigned reta_sz)
 	struct ethtool_rxfh rss_head = {0};
 	struct ethtool_rxfh *rss = NULL;
 	int err = 0;
-	int i;
 	uint32_t indir_bytes = 0;
 	uint32_t entry_size = sizeof(rss_head.rss_config[0]);
 

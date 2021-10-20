@@ -3267,6 +3267,7 @@ as_fn_append ac_header_list " stdlib.h"
 as_fn_append ac_header_list " sys/param.h"
 as_fn_append ac_header_list " ifaddrs.h"
 as_fn_append ac_header_list " linux/if_tun.h"
+as_fn_append ac_header_list " linux/if_packet.h"
 as_fn_append ac_header_list " net/if_dl.h"
 as_fn_append ac_header_list " net/if_tap.h"
 as_fn_append ac_header_list " net/if_tun.h"
@@ -12004,8 +12005,6 @@ main ()
     if (*(data + i) != *(data3 + i))
       return 14;
   close (fd);
-  free (data);
-  free (data3);
   return 0;
 }
 _ACEOF
@@ -12952,6 +12951,8 @@ for i in bin clickdata data dataroot include lib sbin; do
     shell_expand ${i}dir
     shell_mkbuild ${i}dir
 done
+
+
 
 
 

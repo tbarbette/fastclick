@@ -44,7 +44,11 @@ LookupIP6Route::configure(Vector<String> &conf, ErrorHandler *errh)
 
     Vector<String> words;
     cp_spacevec(conf[i], words);
-
+#ifndef __clang__
+//Stupid old GCC raise warning. When is always defined here
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
     if ((words.size()==2 || words.size()==3 )
       && cp_ip6_prefix(words[0], (unsigned char *)&dst, (unsigned char *)&mask, true, this)
 	&& IntArg().parse(words.back(), output_num))
@@ -56,6 +60,9 @@ LookupIP6Route::configure(Vector<String> &conf, ErrorHandler *errh)
 	ok = true;
       }
     }
+#ifndef __clang__
+#pragma GCC diagnostic pop
+#endif
 
   if (ok && output_num>=0) {
     _t.add(dst, mask, gw, output_num);
@@ -170,4 +177,6 @@ LookupIP6Route::add_handlers()
 }
 
 CLICK_ENDDECLS
+
 EXPORT_ELEMENT(LookupIP6Route)
+ELEMENT_REQUIRES(IP6RouteTable)

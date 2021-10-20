@@ -8,7 +8,7 @@ CLICK_DECLS
  * =c
  * ExactPaintSwitch()
  *
- * =s standard
+ * =s paint
  *
  * classifies packets by paint annotation
  *

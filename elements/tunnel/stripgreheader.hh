@@ -25,7 +25,7 @@ CLICK_DECLS
 /*
  * =c
  * StripGREHeader()
- * =s GRE
+ * =s tunnel
  * strips outermost GRE header
  * =d
  * Removes the outermost GRE header from GRE packets.

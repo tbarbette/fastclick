@@ -31,7 +31,7 @@ CLICK_DECLS
 
 GREEncap(PROTOCOL, I<KEYWORDS>)
 
-=s GRE
+=s tunnel
 
 encapsulates packets in static GRE header
 

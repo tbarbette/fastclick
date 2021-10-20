@@ -23,6 +23,8 @@
 #include <stdlib.h>
 #include <regex>
 #include <click/flow/flow.hh>
+#include <click/flow/flowelement.hh>
+#include <click/flow/ctxelement.hh>
 
 CLICK_DECLS
 
@@ -1723,8 +1725,11 @@ FCBPool::init_release(FlowControlBlock* fcb) {
 Spinlock FlowNode::printlock;
 FCBPool* FCBPool::biggest_pool = 0;
 int FCBPool::initialized = 0;
-int NR_SHARED_FLOW = 0;
 
+#endif
+
+#if HAVE_CTX
+CounterInitFuture _ctx_builded_init_future("CTXBuilder", [](){});
 #endif
 
 CLICK_ENDDECLS

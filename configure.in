@@ -1561,7 +1561,7 @@ dnl
 dnl kernel interfaces
 dnl
 
-AC_CHECK_HEADERS_ONCE([ifaddrs.h linux/if_tun.h net/if_dl.h net/if_tap.h net/if_tun.h net/if_types.h net/bpf.h netpacket/packet.h])
+AC_CHECK_HEADERS_ONCE([ifaddrs.h linux/if_tun.h linux/if_packet.h net/if_dl.h net/if_tap.h net/if_tun.h net/if_types.h net/bpf.h netpacket/packet.h])
 
 
 dnl
