@@ -1,18 +1,6 @@
 /*
- * SFMaker.{cc,hh} -- Delay packets for a given time.
- * 
- * Copyright (c) 2021 Tom Barbette
- * Copyright (c) 2021 Hamid Ghasemi
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, subject to the conditions
- * listed in the Click LICENSE file. These conditions include: you must
- * preserve this copyright notice, and you cannot mention the copyright
- * holders in advertising related to the Software without their permission.
- * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
- * notice is a summary of the Click LICENSE file; the license in that file is
- * legally binding.
+ * SFMaker.{cc,hh} -- remove insults in web pages
+ * Tom Barbette
  */
 
 #include <click/config.h>
@@ -115,8 +103,8 @@ int SFMaker::configure(Vector<String> &conf, ErrorHandler *errh)
             .read_or_set("BYPASS_AFTER_FAIL", _bypass_after_fail, 0)
             .read_or_set("MAX_BURST", _max_burst, 1024)
             .read_or_set("MAX_TX_BURST", _max_tx_burst, 32)
-            .read_or_set("MIN_TX_BURST", _min_tx_burst, 1)
-            .read_or_set("MAX_TX_DELAY", _max_tx_delay, 0)
+	    .read_or_set("MIN_TX_BURST", _min_tx_burst, 1)
+	    .read_or_set("MAX_TX_DELAY", _max_tx_delay, 0)
             .read_or_set("ALWAYSUP", _always, false)
             .read_or_set("MAX_CAP", _max_capacity, -1)
             .complete() < 0)
