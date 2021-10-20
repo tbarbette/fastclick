@@ -459,9 +459,9 @@ FromDevice::initialize(ErrorHandler *errh)
 #endif
 
     if (!_sniffer)
-        if (KernelFilter::device_filter(_ifname, true, errh) < 0)
+        if (KernelFilter::device_filter(_ifname, true, errh) < 0 && KernelFilter::device_filter6(_ifname, true, errh) < 0) {
             _sniffer = true;
-
+        }
     }
     return 0;
 }
@@ -469,8 +469,10 @@ FromDevice::initialize(ErrorHandler *errh)
 void
 FromDevice::cleanup(CleanupStage stage)
 {
-    if (stage >= CLEANUP_INITIALIZED && !_sniffer)
+    if (stage >= CLEANUP_INITIALIZED && !_sniffer) {
         KernelFilter::device_filter(_ifname, false, ErrorHandler::default_handler());
+        KernelFilter::device_filter6(_ifname, false, ErrorHandler::default_handler());
+    }
 #if FROMDEVICE_ALLOW_LINUX
     if (_fd >= 0 && _method == method_linux) {
         if (_was_promisc >= 0)
