@@ -75,10 +75,10 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in)
     for (int i = 0; i < SRV6_FEC_BUFFER_SIZE; ++i) {
         srv6_fec2_source_t *source = _rlc_info.source_buffer[i];
         if (source) {
-            click_chatter("Source before1 #%u (%u): %x %x %x", i, source->p->length(), source->p->data()[0], source->p->data()[1], source->p->data()[2]);
+            click_chatter("Source before1 #%u %p (%u): %x %x %x", i, source->p, source->p->length(), source->p->data()[0], source->p->data()[1], source->p->data()[2]);
         }
     }
-    click_chatter("Au cas ou: voici le paquet recu (%u): %x %x %x", p_in->length(), p_in->data()[0], p_in->data()[1], p_in->data()[2]);
+    click_chatter("Au cas ou: voici le paquet recu (%p) (%u): %x %x %x", p_in, p_in->length(), p_in->data()[0], p_in->data()[1], p_in->data()[2]);
     // Manipulate modified packet because we will remove the TLV
     WritablePacket *p = p_in->uniqueify();
     if (unlikely(!p)) {
@@ -142,7 +142,7 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in)
     for (int i = 0; i < SRV6_FEC_BUFFER_SIZE; ++i) {
         srv6_fec2_source_t *source = _rlc_info.source_buffer[i];
         if (source) {
-            click_chatter("Source End #%u (%u): %x %x %x", i, source->p->length(), source->p->data()[0], source->p->data()[1], source->p->data()[2]);
+            click_chatter("Source End #%u (%p) (%u): %x %x %x", i, source->p, source->p->length(), source->p->data()[0], source->p->data()[1], source->p->data()[2]);
         }
     }
 }
