@@ -3,18 +3,18 @@ elementclass Input { $port, $MAC_DST |
 	-> c :: Classifier(12/86DD,-)
 	-> Strip(14)
 	-> CheckIP6Header()
-	-> IP6Print("IP6 from port $port")
+	//-> IP6Print("IP6 from port $port")
 	
 	-> c1 :: Classifier(24/FC00000000000000000000000000000A,-)
 	-> c2 :: Classifier(6/2B,-)
 	-> IP6SRProcess()
 	
-	//-> IP6SRv6FECEncode(ENC fc00::a, DEC fc00::9)
+	-> IP6SRv6FECEncode(ENC fc00::a, DEC fc00::9)
 	-> eth :: EtherEncap(0x86DD, SRC 0:0:0:0:0:2, DST $MAC_DST)	
 	-> output;
 
     c[1] -> Print("Non-IPv6") -> Discard;
-	c1[1] -> Print("Transit packet") -> eth -> output;
+	c1[1] -> eth -> output;
 	c2[1] -> Print("Endhost packet without SRv6") -> Discard;
 }
 

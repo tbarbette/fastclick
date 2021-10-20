@@ -85,6 +85,7 @@ struct rlc_info_decoder_t {
   // RLC relative information
   tinymt32_t prng;
   uint8_t muls[256 * 256 * sizeof(uint8_t)];
+  uint8_t table_inv[256 * sizeof(uint8_t)];
   srv6_fec2_source_t *source_buffer[SRV6_FEC_BUFFER_SIZE];
   srv6_fec2_repair_t *repair_buffer[SRV6_FEC_BUFFER_SIZE];
   srv6_fec2_source_term_t *recovd_buffer[SRV6_FEC_BUFFER_SIZE];
@@ -117,7 +118,8 @@ class IP6SRv6FECDecode : public Element {
   void fec_framework(Packet *p_in) CLICK_COLD;
   int fec_scheme_source(Packet *p_in, source_tlv_t *tlv) CLICK_COLD;
   int fec_scheme_repair(Packet *p_in, repair_tlv_t *tlv) CLICK_COLD;
-  
+  WritablePacket *recover_packet_fom_data(uint8_t *data, uint16_t packet_length);
+
   void rlc_fill_muls(uint8_t muls[256 * 256]) CLICK_COLD;
 
   void store_source_symbol(Packet *p_in, source_tlv_t *tlv) CLICK_COLD;
@@ -137,7 +139,6 @@ class IP6SRv6FECDecode : public Element {
   void sort_system(uint8_t **a, srv6_fec2_term_t **constant_terms, int n_eq, int n_unknowns);
   int first_non_zero_idx(const uint8_t *a, int n_unknowns);
   void gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_fec2_term_t **constant_terms, srv6_fec2_term_t **x, bool *undetermined, uint8_t *mul, uint8_t *inv, uint16_t max_packet_length);
-
 };
 
 CLICK_ENDDECLS

@@ -28,7 +28,7 @@ IP6SRv6FECEncode::IP6SRv6FECEncode()
 {
     _use_dst_anno = false;
     memset(&_rlc_info, 0, sizeof(rlc_info_t));
-    _rlc_info.window_size = 4; // TODO: dynamically change
+    _rlc_info.window_size = 10; // TODO: dynamically change
     _rlc_info.window_step = 2; // TODO: dynamically change
     rlc_fill_muls(_rlc_info.muls);
     _rlc_info.prng = rlc_reset_coefs();
@@ -160,6 +160,7 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
         
         return 1;
     }
+
     return 0;
 }
 
@@ -167,17 +168,30 @@ void
 IP6SRv6FECEncode::store_source_symbol(Packet *p_in, uint32_t encoding_symbol_id)
 {
     _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = p_in->clone();
+    click_chatter("Store at idx=%u", encoding_symbol_id);
+    Packet *pp = _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
+    click_chatter("First bytes of stored #%u: %x %x %x", encoding_symbol_id, pp->data()[0], pp->data()[1], pp->data()[2]);
 }
 
 void
 IP6SRv6FECEncode::rlc_encode_symbols(uint32_t encoding_symbol_id)
 {
+    click_chatter("Repair symbol --- %u", encoding_symbol_id);
     tinymt32_t prng = _rlc_info.prng;
     tinymt32_init(&prng, _rlc_info.repair_key);
     // encoding_symbol_id: of the last source symbol (i.e. of the repair symbol)
     uint32_t start_esid = encoding_symbol_id - _rlc_info.window_size + 1;
     for (int i = 0; i < _rlc_info.window_size; ++i) {
-        Packet *source_symbol = _rlc_info.source_buffer[(start_esid + i) % SRV6_FEC_BUFFER_SIZE];
+        uint8_t idx = (start_esid + i) % SRV6_FEC_BUFFER_SIZE;
+        click_chatter("Indx=%u", idx);
+        Packet *source_symbol = _rlc_info.source_buffer[idx];
+        // Print data first bytes
+        uint8_t *data = (uint8_t *)source_symbol->data();
+        fprintf(stderr, "Encode first bytes of %d: %x %x %x\n", i, data[0], data[1], data[2]);
+        for (int j = 0; j < 16; ++j) {
+            fprintf(stderr, "%x ", data[j]);
+        }
+        click_chatter("");
         rlc_encode_one_symbol(source_symbol, _repair_packet, &prng, _rlc_info.muls, &_repair_tlv);
     }
 }
@@ -225,7 +239,7 @@ uint8_t IP6SRv6FECEncode::rlc_get_coef(tinymt32_t *prng) {
 
 void IP6SRv6FECEncode::rlc_encode_one_symbol(Packet *s, WritablePacket *r, tinymt32_t *prng, uint8_t muls[256 * 256 * sizeof(uint8_t)], repair_tlv_t *repair_tlv) {
     // Leave room for the IPv6 Header, SRv6 Header (3 segments) and repair TLV
-    uint8_t repair_offset = 40 + 8 + 16 * 3 + sizeof(repair_tlv_t);
+    uint8_t repair_offset = 40 + 8 + 16 * 2 + sizeof(repair_tlv_t);
 
     // TODO: cancel varying fields?
 
