@@ -163,7 +163,7 @@ struct SFFlow {
 
 SFMaker()
 
-=s middlebox
+=s flow
 
 Delay packets up to DELAY in the hope that bursts can be merged. Then sends packets by (eventually) merged bursts, reordered by flow priority.
 
