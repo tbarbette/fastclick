@@ -858,10 +858,10 @@ enable_all_elements
 enable_analysis
 enable_app
 enable_aqm
-enable_ctx
 enable_ethernet
 enable_etherswitch
 enable_flow
+enable_ctx
 enable_grid
 enable_icmp
 enable_ip
@@ -1607,10 +1607,10 @@ Optional Features:
   --disable-analysis      do not include elements for network analysis
   --disable-app           do not include application-level elements
   --disable-aqm           do not include active queue management elements
-  --enable-ctx            include Context-based elements for MiddleClick
   --disable-ethernet      do not include Ethernet elements
   --enable-etherswitch    include Ethernet switch elements
   --enable-flow           include Enable flow system and elements
+  --enable-ctx            include Context-based elements
   --enable-grid           include Grid elements (see FAQ)
   --disable-icmp          do not include ICMP elements
   --disable-ip            do not include IP elements
@@ -9055,17 +9055,6 @@ if test "x$enable_aqm" = xyes; then
     :
 
 fi
-# Check whether --enable-ctx was given.
-if test "${enable_ctx+set}" = set; then :
-  enableval=$enable_ctx;
-else
-  enable_ctx=NO
-fi
-test "x$enable_all_elements" = xyes -a \( "x$enable_ctx" = xNO -o "x$enable_ctx" = x \) && enable_ctx=yes
-if test "x$enable_ctx" = xyes; then
-    :
-
-fi
 # Check whether --enable-ethernet was given.
 if test "${enable_ethernet+set}" = set; then :
   enableval=$enable_ethernet;
@@ -9098,6 +9087,17 @@ test "x$enable_all_elements" = xyes -a \( "x$enable_flow" = xNO -o "x$enable_flo
 if test "x$enable_flow" = xyes; then
     :
 
+fi
+# Check whether --enable-ctx was given.
+if test "${enable_ctx+set}" = set; then :
+  enableval=$enable_ctx;
+else
+  enable_ctx=no
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_ctx" = xNO -o "x$enable_ctx" = x \)-a "x$enable_flow" = xyes  && enable_ctx=yes
+if test "x$enable_ctx" = xyes; then
+    :
+    enable_ctx=no
 fi
 # Check whether --enable-grid was given.
 if test "${enable_grid+set}" = set; then :

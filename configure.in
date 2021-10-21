@@ -656,13 +656,13 @@ dnl
 
 AC_ARG_ENABLE([all-elements], [AS_HELP_STRING([--enable-all-elements], [include all provided element groups])])
 
-dnl ELEMENTS_ARG_ENABLE(COLLECTION, HELP-STRING, DEFAULT-VALUE)
+dnl ELEMENTS_ARG_ENABLE(COLLECTION, HELP-STRING, DEFAULT-VALUE, IF_YES, COND)
 element_groups=""
 AC_SUBST(element_groups)
 AC_DEFUN([ELEMENTS_ARG_ENABLE],
 [AC_ARG_ENABLE($1, [  --]builtin(substr, builtin(ifelse, [$3], yes, dis, en)[able-$1              ], 0, 21)[ ]builtin(ifelse, [$3], yes, [do not ], [])[$2], ,
 [enable_]patsubst([$1], -, _)=$3)dnl
-test "x$enable_all_elements" = xyes -a \( ["x$enable_]patsubst([$1], -, _)["] = xNO -o ["x$enable_]patsubst([$1], -, _)["] = x \) && [enable_]patsubst([$1], -, _)[=yes]
+test "x$enable_all_elements" = xyes -a \( ["x$enable_]patsubst([$1], -, _)["] = xNO -o ["x$enable_]patsubst([$1], -, _)["] = x \)$5 && [enable_]patsubst([$1], -, _)[=yes]
 if test ["x$enable_]patsubst([$1], -, _)["] = xyes; then
     :
     $4
@@ -671,10 +671,10 @@ fi])
 ELEMENTS_ARG_ENABLE(analysis, [include elements for network analysis], yes)
 ELEMENTS_ARG_ENABLE(app, [include application-level elements], yes)
 ELEMENTS_ARG_ENABLE(aqm, [include active queue management elements], yes)
-ELEMENTS_ARG_ENABLE(ctx, [include Context-based elements for MiddleClick], NO)
 ELEMENTS_ARG_ENABLE(ethernet, [include Ethernet elements], yes)
 ELEMENTS_ARG_ENABLE(etherswitch, [include Ethernet switch elements], NO)
 ELEMENTS_ARG_ENABLE(flow, [include Enable flow system and elements], NO)
+ELEMENTS_ARG_ENABLE(ctx, [include Context-based elements], no, enable_ctx=no , -a "x$enable_flow" = xyes )
 ELEMENTS_ARG_ENABLE(grid, [include Grid elements (see FAQ)], NO)
 ELEMENTS_ARG_ENABLE(icmp, [include ICMP elements], yes)
 ELEMENTS_ARG_ENABLE(ip, [include IP elements], yes)

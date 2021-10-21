@@ -71,7 +71,7 @@ IP6SRDecap::simple_action(Packet *p_in)
                 click_chatter("Cannot find next header %d. Buggy packet?", nxt);
                 return 0;
             }
-            unsigned srlen = (unsigned char*)next_ptr-(unsigned char*)sr;
+            unsigned srlen = (unsigned char*)next_ptr - (unsigned char*)sr;
             p->pull(srlen);
 
             memmove(p->data(), old_data, (unsigned char*)sr-old_data);

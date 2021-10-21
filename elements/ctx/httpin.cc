@@ -399,7 +399,7 @@ HTTPIn::insertBytes(WritablePacket* packet, uint32_t position, uint32_t length)
     return CTXElement::insertBytes(packet, position, length);
 }
 
-
 CLICK_ENDDECLS
+
 EXPORT_ELEMENT(HTTPIn)
 ELEMENT_MT_SAFE(HTTPIn)
