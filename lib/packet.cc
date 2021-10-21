@@ -1036,7 +1036,7 @@ Packet::clone(bool fast)
     Packet *p = new WritablePacket; // no initialization
 # endif
     if (!p)
-	return 0;
+	    return 0;
     if (unlikely(fast)) {
 
 #ifndef CLICK_NOINDIRECT
@@ -1067,7 +1067,7 @@ Packet::clone(bool fast)
         else
 #endif
         {
-        p->_destructor = empty_destructor;
+            p->_destructor = empty_destructor;
         }
 
 #ifndef CLICK_NOINDIRECT
@@ -1194,7 +1194,9 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
 # endif
 
 # ifndef CLICK_NOINDIRECT
-    if (_use_count > 1) {
+    bool free_whole = false;
+    if (_use_count > 1) { // one of the reference is ours
+
         memcpy(p, this, sizeof(Packet));
 
         # if CLICK_USERLEVEL || CLICK_MINIOS
@@ -1202,6 +1204,9 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
         # else
             p->_m = m;
         # endif
+
+        free_whole = true;
+
     } else
 # endif
     {
@@ -1229,16 +1234,21 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     unsigned char *end_copy = old_end + (extra_tailroom >= 0 ? 0 : extra_tailroom);
     memcpy(p->_head + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
 
-    delete_buffer(old_head, old_end
-#if CLICK_BSDMODULE
-    , old_m
-#endif
+# ifndef CLICK_NOINDIRECT
+    if (free_whole) {
+        kill();
+    } else
+# endif
+    {
+        delete_buffer(old_head, old_end
+# if CLICK_BSDMODULE
+            , old_m
+# endif
             );
+    }
 # if HAVE_DPDK_PACKET_POOL
     p->_destructor = desc;
     p->_destructor_argument = arg;
-# else
-    _destructor = 0;
 # endif
 
 # ifndef CLICK_NOINDIRECT

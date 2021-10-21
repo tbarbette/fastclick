@@ -37,7 +37,37 @@ PacketTest::initialize(ErrorHandler *errh)
     const unsigned char *lowers = (const unsigned char *)"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
     IPAddress addr(String("1.2.3.4"));
 
-    Packet *p = Packet::make(10, lowers, 20, 30);
+    Packet *p;
+    WritablePacket *p1;
+    Packet *p2;
+    WritablePacket *p3;
+
+#ifndef CLICK_NOINDIRECT
+    p = Packet::make(10);
+    Packet* pref1 = p->clone();
+    CHECK(p->shared());
+    CHECK(pref1->shared());
+    p2 = p->uniqueify();
+    CHECK(p2);
+    CHECK(!p2->shared());
+    CHECK(pref1->buffer() != p2->buffer());
+    CHECK(p2->data() != pref1->data());
+    p1 = Packet::make(10);
+    CHECK(pref1 != p1 && pref1->buffer() != p1->buffer());
+    CHECK(pref1 != p2 && pref1->buffer() != p1->buffer());
+    CHECK(p1 != p2 && p1->buffer() != p2->buffer());
+    p1->kill();
+    p2->kill();
+    p1 = Packet::make(10);
+    p2 = Packet::make(10);
+    CHECK(pref1 != p1 && pref1->buffer() != p1->buffer());
+    CHECK(pref1 != p2 && pref1->buffer() != p2->buffer());
+    pref1->kill();
+    p1->kill();
+    p2->kill();
+#endif
+
+    p = Packet::make(10, lowers, 20, 30);
     CHECK(p->headroom() >= 10);
     CHECK(p->tailroom() >= 30);
     CHECK(p->length() == 20);
@@ -50,7 +80,7 @@ PacketTest::initialize(ErrorHandler *errh)
     CHECK(p->network_header() == p->data() + 10);
     p->set_dst_ip_anno(addr);
 
-    WritablePacket *p1 = p->push(5);
+    p1 = p->push(5);
     // p is dead
     CHECK(p == p1);
     CHECK(p1->headroom() >= 5);
@@ -61,8 +91,6 @@ PacketTest::initialize(ErrorHandler *errh)
     CHECK(p1->network_header() == p->data() + 15);
     CHECK(p1->dst_ip_anno() == addr);
 
-    Packet *p2;
-    WritablePacket *p3;
 #ifndef CLICK_NOINDIRECT
     p2 = p1->clone();
     CHECK(p2 != p1);
@@ -97,30 +125,6 @@ PacketTest::initialize(ErrorHandler *errh)
     for (int i = 0; i < 40000000; i++)
 	p->clone()->kill();
     p->kill();
-#endif
-
-#ifndef CLICK_NOINDIRECT
-    p = Packet::make(10);
-    Packet* pref1 = p->clone();
-    CHECK(p->shared());
-    CHECK(pref1->shared());
-    p2 = p->uniqueify();
-    CHECK(p2);
-    CHECK(!p2->shared());
-    CHECK(p2->data() != pref1->data());
-    p1 = Packet::make(10);
-    CHECK(pref1 != p1);
-    CHECK(pref1 != p2);
-    CHECK(p1 != p2);
-    p1->kill();
-    p2->kill();
-    p1 = Packet::make(10);
-    p2 = Packet::make(10);
-    CHECK(pref1 != p1);
-    CHECK(pref1 != p2);
-    pref1->kill();
-    p1->kill();
-    p2->kill();
 #endif
 
     // test shift_data()
