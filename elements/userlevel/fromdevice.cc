@@ -459,7 +459,11 @@ FromDevice::initialize(ErrorHandler *errh)
 #endif
 
     if (!_sniffer)
-        if (KernelFilter::device_filter(_ifname, true, errh) < 0 && KernelFilter::device_filter6(_ifname, true, errh) < 0) {
+        if (KernelFilter::device_filter(_ifname, true, errh) < 0
+#if HAVE_IP6
+                && KernelFilter::device_filter6(_ifname, true, errh) < 0
+#endif
+                ) {
             _sniffer = true;
         }
     }
@@ -471,7 +475,9 @@ FromDevice::cleanup(CleanupStage stage)
 {
     if (stage >= CLEANUP_INITIALIZED && !_sniffer) {
         KernelFilter::device_filter(_ifname, false, ErrorHandler::default_handler());
+#if HAVE_IP6
         KernelFilter::device_filter6(_ifname, false, ErrorHandler::default_handler());
+#endif
     }
 #if FROMDEVICE_ALLOW_LINUX
     if (_fd >= 0 && _method == method_linux) {
