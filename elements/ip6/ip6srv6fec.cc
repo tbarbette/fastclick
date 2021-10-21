@@ -43,7 +43,7 @@ IP6SRv6FECEncode::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
 	.read_mp("ENC", enc)
 	.read_mp("DEC", dec)
-    .read_or_set("WINDOW", _rlc_info.window_size, 10)
+    .read_or_set("WINDOW", _rlc_info.window_size, 4)
     .read_or_set("STEP", _rlc_info.window_step, 2)
 	.complete() < 0)
         return -1;
@@ -137,6 +137,8 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
             return -1;
         }
 
+        memset(_repair_packet->data(), 0, _repair_packet->length());
+
         // Encode the source symbols in repair
         rlc_encode_symbols(_source_tlv.sfpid);
 
@@ -169,10 +171,15 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
 void
 IP6SRv6FECEncode::store_source_symbol(Packet *p_in, uint32_t encoding_symbol_id)
 {
-    _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = p_in->clone();
+    my_packet_t *packet = (my_packet_t *)CLICK_LALLOC(sizeof(my_packet_t));
+    uint8_t *data = (uint8_t *)CLICK_LALLOC(p_in->length());
+    packet->packet_length = p_in->length();
+    packet->data = data;
+    memcpy(data, p_in->data(), packet->packet_length);
+    _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = packet;
     click_chatter("Store at idx=%u", encoding_symbol_id);
-    Packet *pp = _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
-    click_chatter("First bytes of stored #%u (%p): %x %x %x", encoding_symbol_id, pp, pp->data()[0], pp->data()[1], pp->data()[2]);
+    //Packet *pp = _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
+    //click_chatter("First bytes of stored #%u (%p): %x %x %x", encoding_symbol_id, pp->data(), pp->data()[0], pp->data()[1], pp->data()[2]);
 }
 
 void
@@ -180,16 +187,17 @@ IP6SRv6FECEncode::rlc_encode_symbols(uint32_t encoding_symbol_id)
 {
     click_chatter("Repair symbol --- %u", encoding_symbol_id);
     tinymt32_t prng = _rlc_info.prng;
-    tinymt32_init(&prng, _rlc_info.repair_key);
+    // tinymt32_init(&prng, _rlc_info.repair_key);
+    tinymt32_init(&prng, 1);
     // encoding_symbol_id: of the last source symbol (i.e. of the repair symbol)
     uint32_t start_esid = encoding_symbol_id - _rlc_info.window_size + 1;
     for (int i = 0; i < _rlc_info.window_size; ++i) {
         uint8_t idx = (start_esid + i) % SRV6_FEC_BUFFER_SIZE;
         click_chatter("Indx=%u", idx);
-        Packet *source_symbol = _rlc_info.source_buffer[idx];
+        my_packet_t *source_symbol = _rlc_info.source_buffer[idx];
 
         // Print data first bytes
-        uint8_t *data = (uint8_t *)source_symbol->data();
+        uint8_t *data = (uint8_t *)source_symbol->data;
         fprintf(stderr, "Encode first bytes of %d: %x %x %x\n", i, data[0], data[1], data[2]);
         for (int j = 0; j < 16; ++j) {
             fprintf(stderr, "%x ", data[j]);
@@ -203,7 +211,7 @@ void
 IP6SRv6FECEncode::rlc_free_out_of_window(uint32_t encoding_symbol_id) {
     for (int i = 0; i < _rlc_info.window_step; ++i) {
         uint16_t buffer_idx = encoding_symbol_id - _rlc_info.window_size + i + 1;
-        Packet *p_kill = _rlc_info.source_buffer[buffer_idx % SRV6_FEC_BUFFER_SIZE];
+        my_packet_t *p_kill = _rlc_info.source_buffer[buffer_idx % SRV6_FEC_BUFFER_SIZE];
         if (!p_kill) {
             click_chatter("SRv6-FEC: empty packet to kill");
             continue;
@@ -213,7 +221,8 @@ IP6SRv6FECEncode::rlc_free_out_of_window(uint32_t encoding_symbol_id) {
         _rlc_info.source_buffer[buffer_idx] = 0;
 
         // Kill packet and free memory
-        p_kill->kill();
+        CLICK_LFREE(p_kill->data, p_kill->packet_length);
+        CLICK_LFREE(p_kill, sizeof(my_packet_t));
     }
 }
 
@@ -240,7 +249,7 @@ uint8_t IP6SRv6FECEncode::rlc_get_coef(tinymt32_t *prng) {
     return coef;
 }
 
-void IP6SRv6FECEncode::rlc_encode_one_symbol(Packet *s, WritablePacket *r, tinymt32_t *prng, uint8_t muls[256 * 256 * sizeof(uint8_t)], repair_tlv_t *repair_tlv) {
+void IP6SRv6FECEncode::rlc_encode_one_symbol(my_packet_t *s, WritablePacket *r, tinymt32_t *prng, uint8_t muls[256 * 256 * sizeof(uint8_t)], repair_tlv_t *repair_tlv) {
     // Leave room for the IPv6 Header, SRv6 Header (3 segments) and repair TLV
     uint8_t repair_offset = 40 + 8 + 16 * 2 + sizeof(repair_tlv_t);
 
@@ -248,11 +257,12 @@ void IP6SRv6FECEncode::rlc_encode_one_symbol(Packet *s, WritablePacket *r, tinym
 
     // Get coefficient for this source symbol
     uint8_t coef = rlc_get_coef(prng);
+    click_chatter("Encode packet with coef=%u", coef);
 
-    uint16_t packet_length = s->length(); // Cast in uint16_t because 16 bits for IPv6 packet length
+    uint16_t packet_length = s->packet_length; // Cast in uint16_t because 16 bits for IPv6 packet length
 
     // Encode the packet in the repair symbol
-    symbol_add_scaled(r->data() + repair_offset, coef, s->data(), packet_length, muls);
+    symbol_add_scaled(r->data() + repair_offset, coef, s->data, packet_length, muls);
 
     // Encode the packet length
     uint16_t coded_length = repair_tlv->coded_length;

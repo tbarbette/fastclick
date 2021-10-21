@@ -35,6 +35,11 @@ struct repair_tlv_t {
   uint8_t nss; // Number Source Symbol
   uint8_t nrs; // Number Repair Symbol
 } CLICK_SIZE_PACKED_ATTRIBUTE;
+
+struct my_packet_t {
+  uint8_t *data;
+  uint16_t packet_length;
+};
 #endif
 
 CLICK_DECLS
@@ -71,7 +76,7 @@ struct rlc_info_t {
   tinymt32_t prng;
   uint16_t max_length; // Seen for this window
   uint8_t muls[256 * 256 * sizeof(uint8_t)];
-  Packet *source_buffer[SRV6_FEC_BUFFER_SIZE]; // Ring buffer
+  my_packet_t *source_buffer[SRV6_FEC_BUFFER_SIZE]; // Ring buffer
 };
 
 class IP6SRv6FECEncode : public Element { 
@@ -111,7 +116,7 @@ class IP6SRv6FECEncode : public Element {
   tinymt32_t rlc_reset_coefs() CLICK_COLD;
   void rlc_fill_muls(uint8_t muls[256 * 256]) CLICK_COLD;
   uint8_t rlc_get_coef(tinymt32_t *prng) CLICK_COLD;
-  void rlc_encode_one_symbol(Packet *s, WritablePacket *r, tinymt32_t *prng, uint8_t muls[256 * 256 * sizeof(uint8_t)], repair_tlv_t *repair_tlv) CLICK_COLD;
+  void rlc_encode_one_symbol(my_packet_t *s, WritablePacket *r, tinymt32_t *prng, uint8_t muls[256 * 256 * sizeof(uint8_t)], repair_tlv_t *repair_tlv) CLICK_COLD;
 };
 
 

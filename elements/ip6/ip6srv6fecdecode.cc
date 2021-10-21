@@ -68,16 +68,30 @@ IP6SRv6FECDecode::add_handlers()
     add_write_handler("dst", reconfigure_keyword_handler, "2 DST");
 }
 
+my_packet_t *
+IP6SRv6FECDecode::init_clone(Packet *p, uint16_t packet_length)
+{
+    my_packet_t *packet = (my_packet_t *)CLICK_LALLOC(sizeof(my_packet_t));
+    uint8_t *data = (uint8_t *)CLICK_LALLOC(packet_length);
+    memset(packet, 0, sizeof(my_packet_t));
+    memset(data, 0, packet_length);
+    memcpy(data, p->data(), packet_length);
+    packet->packet_length = packet_length;
+    packet->data = data;
+    return packet;
+}
+
+void
+IP6SRv6FECDecode::kill_clone(my_packet_t *p)
+{
+    CLICK_LFREE(p->data, p->packet_length);
+    CLICK_LFREE(p, sizeof(my_packet_t));
+}
+
 void
 IP6SRv6FECDecode::fec_framework(Packet *p_in)
 {
     click_chatter("\n\n----- NEW PACKET -----");
-    for (int i = 0; i < SRV6_FEC_BUFFER_SIZE; ++i) {
-        srv6_fec2_source_t *source = _rlc_info.source_buffer[i];
-        if (source) {
-            click_chatter("Source before1 #%u (%u): %x %x %x", i, source->p->length(), source->p->data()[0], source->p->data()[1], source->p->data()[2]);
-        }
-    }
     click_chatter("Au cas ou: voici le paquet recu (%u): %x %x %x", p_in->length(), p_in->data()[0], p_in->data()[1], p_in->data()[2]);
     // Manipulate modified packet because we will remove the TLV
     WritablePacket *p = p_in->uniqueify();
@@ -115,22 +129,23 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in)
     if (tlv_type == TLV_TYPE_FEC_SOURCE) {
         // Load TLV locally
         source_tlv_t source_tlv;
-        //memset(&source_tlv, 0, sizeof(source_tlv_t));
+        memset(&source_tlv, 0, sizeof(source_tlv_t));
         memcpy(&source_tlv, tlv_ptr, sizeof(source_tlv_t));
+        click_chatter("RECEIVED PACKET WITH ESID=%u", source_tlv.sfpid);
 
         // Remove the TLV from the source packet
-        // remove_tlv_source_symbol(p, tlv_ptr - p->data()); // Cleaner way?
+        remove_tlv_source_symbol(p, tlv_ptr - p->data()); // Cleaner way?
 
         // Call FEC Scheme
         fec_scheme_source(p, &source_tlv);
     } else {
-        /*// Load TLV locally
+        // Load TLV locally
         repair_tlv_t repair_tlv;
         memset(&repair_tlv, 0, sizeof(repair_tlv_t));
         memcpy(&repair_tlv, tlv_ptr, sizeof(repair_tlv_t));
 
         // Call FEC Scheme
-        fec_scheme_repair(p, &repair_tlv);*/
+        fec_scheme_repair(p, &repair_tlv);
     }
 
     // Send the (modified, without TLV) source symbol
@@ -139,12 +154,6 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in)
         output(0).push(p);
     }
     //click_chatter("Test final call");
-    for (int i = 0; i < SRV6_FEC_BUFFER_SIZE; ++i) {
-        srv6_fec2_source_t *source = _rlc_info.source_buffer[i];
-        if (source) {
-            click_chatter("Source End #%u (%u): %x %x %x", i, source->p->length(), source->p->data()[0], source->p->data()[1], source->p->data()[2]);
-        }
-    }
 }
 
 int
@@ -159,22 +168,9 @@ IP6SRv6FECDecode::fec_scheme_source(Packet *p_in, source_tlv_t *tlv)
 int
 IP6SRv6FECDecode::fec_scheme_repair(Packet *p_in, repair_tlv_t *tlv)
 {
-    for (int i = 0; i < SRV6_FEC_BUFFER_SIZE; ++i) {
-        srv6_fec2_source_t *source = _rlc_info.source_buffer[i];
-        if (source) {
-            click_chatter("Source before1 #%u: %x %x %x", i, source->p->data()[0], source->p->data()[1], source->p->data()[2]);
-        }
-    }
 
     // Store packet as source symbol
     store_repair_symbol(p_in, tlv);
-
-    for (int i = 0; i < SRV6_FEC_BUFFER_SIZE; ++i) {
-        srv6_fec2_source_t *source = _rlc_info.source_buffer[i];
-        if (source) {
-            click_chatter("Source before2 #%u: %x %x %x", i, source->p->data()[0], source->p->data()[1], source->p->data()[2]);
-        }
-    }
 
     // Call RLC recovery
     rlc_recover_symbols();
@@ -191,7 +187,7 @@ IP6SRv6FECDecode::store_source_symbol(Packet *p_in, source_tlv_t *tlv) {
     // TODO: check if call failed?
     memset(symbol, 0, sizeof(srv6_fec2_source_t));
     memcpy(&symbol->tlv, tlv, sizeof(source_tlv_t));
-    symbol->p = p_in->clone();
+    symbol->p = init_clone(p_in, p_in->length());
 
     //click_chatter("First few bytes of it stored: %x %x %x", symbol->p->data()[0], symbol->p->data()[1], symbol->p->data()[2]);
 
@@ -199,7 +195,7 @@ IP6SRv6FECDecode::store_source_symbol(Packet *p_in, source_tlv_t *tlv) {
     srv6_fec2_source_t *previous_symbol = _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
     if (previous_symbol) {
         click_chatter("Deleting previous symbol");
-        previous_symbol->p->kill();
+        kill_clone(previous_symbol->p);
         CLICK_LFREE(previous_symbol, sizeof(srv6_fec2_source_t));
     }
     _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = symbol;
@@ -215,11 +211,11 @@ IP6SRv6FECDecode::store_repair_symbol(Packet *p_in, repair_tlv_t *tlv)
     // TODO: check if call failed?
     memset(symbol, 0, sizeof(srv6_fec2_repair_t));
     memcpy(&symbol->tlv, tlv, sizeof(repair_tlv_t));
-    symbol->p = p_in->uniqueify();
+    symbol->p = init_clone(p_in, p_in->length());
     // Clean previous symbol in the buffer and replace with current symbol
     srv6_fec2_repair_t *previous_symbol = _rlc_info.repair_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
     if (previous_symbol) {
-        previous_symbol->p->kill();
+        kill_clone(previous_symbol->p);
         CLICK_LFREE(previous_symbol, sizeof(srv6_fec2_repair_t));
     }
     _rlc_info.repair_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = symbol;
@@ -320,7 +316,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     memset(ss_array, 0, sizeof(srv6_fec2_source_term_t *) * nb_source_symbols);
 
     // Received repair symbols array
-    srv6_fec2_repair_t **rs_array = (srv6_fec2_repair_t **)CLICK_LALLOC(sizeof(srv6_fec2_term_t *) * nb_windows);
+    srv6_fec2_repair_t **rs_array = (srv6_fec2_repair_t **)CLICK_LALLOC(sizeof(srv6_fec2_repair_t *) * nb_windows);
     if (!rs_array) {
         CLICK_LFREE(ss_array, sizeof(srv6_fec2_source_term_t *) * nb_source_symbols);
         return;
@@ -362,15 +358,16 @@ IP6SRv6FECDecode::rlc_recover_symbols()
         bool is_lost = 0;
         if (source) {
             uint32_t id_from_buffer = source->tlv.sfpid;
-            click_chatter("Source #%u: %x %x %x", idx, source->p->data()[0], source->p->data()[1], source->p->data()[2]);
+            //click_chatter("Source #%u: %x %x %x", idx, source->p->data()[0], source->p->data()[1], source->p->data()[2]);
             if (id_theoric == id_from_buffer && source->tlv.type == TLV_TYPE_FEC_SOURCE) {
                 // Received symbol, store it in the buffer
                 ss_array[i] = (srv6_fec2_source_term_t *)CLICK_LALLOC(sizeof(srv6_fec2_source_term_t));
                 ss_array[i]->p = source->p;
                 ss_array[i]->encoding_symbol_id = source->tlv.sfpid;
-                max_packet_length = MAX(max_packet_length, source->p->length());
+                max_packet_length = MAX(max_packet_length, source->p->packet_length);
                 // Bug occuring before that
-                click_chatter("SSARRAY #%u: %x %x %x", idx, ss_array[i]->p->data()[0], ss_array[i]->p->data()[1], ss_array[i]->p->data()[2]);
+                click_chatter("Packet is present: %u", id_from_buffer);
+                //click_chatter("SSARRAY #%u: %x %x %x", idx, ss_array[i]->p->data()[0], ss_array[i]->p->data()[1], ss_array[i]->p->data()[2]);
             } else {
                 is_lost = 1;
             }
@@ -384,10 +381,11 @@ IP6SRv6FECDecode::rlc_recover_symbols()
                     ss_array[i] = (srv6_fec2_source_term_t *)CLICK_LALLOC(sizeof(srv6_fec2_source_term_t));
                     ss_array[i]->p = rec->p;
                     ss_array[i]->encoding_symbol_id = rec->encoding_symbol_id;
-                    max_packet_length = MAX(max_packet_length, rec->p->length());
+                    max_packet_length = MAX(max_packet_length, rec->p->packet_length);
                     
                     // Hence the packet is not lost anymore
                     is_lost = 0;
+                    click_chatter("Packet is recovered: %u", rec->encoding_symbol_id);
                 }
             }
         }
@@ -422,14 +420,14 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     // Construct the system Ax=b
     int n_eq = MIN(nb_unknwons, nb_windows);
     uint8_t *coefs = (uint8_t *)CLICK_LALLOC(sizeof(uint8_t) * window_size); // TODO: adaptive window size?
-    srv6_fec2_term_t **unknowns = (srv6_fec2_term_t **)CLICK_LALLOC(sizeof(srv6_fec2_term_t *) * nb_unknwons); // x
+    my_packet_t **unknowns = (my_packet_t **)CLICK_LALLOC(sizeof(my_packet_t *) * nb_unknwons); // x
     uint8_t **system_coefs = (uint8_t **)CLICK_LALLOC(sizeof(uint8_t *) * n_eq); // A
-    srv6_fec2_term_t **constant_terms = (srv6_fec2_term_t **)CLICK_LALLOC(sizeof(srv6_fec2_term_t *) * nb_unknwons); // b
+    my_packet_t **constant_terms = (my_packet_t **)CLICK_LALLOC(sizeof(my_packet_t *) * nb_unknwons); // b
     bool *undetermined = (bool *)CLICK_LALLOC(sizeof(bool) * nb_unknwons);
     memset(coefs, 0, window_size * sizeof(uint8_t));
-    memset(unknowns, 0, sizeof(srv6_fec2_term_t *) * nb_unknwons);
+    memset(unknowns, 0, sizeof(my_packet_t *) * nb_unknwons);
     memset(system_coefs, 0, sizeof(uint8_t *) * n_eq);
-    memset(constant_terms, 0, sizeof(srv6_fec2_term_t *) * nb_unknwons);
+    memset(constant_terms, 0, sizeof(my_packet_t *) * nb_unknwons);
     memset(undetermined, 0, sizeof(bool) * nb_unknwons);        
     
     for (int i = 0; i < n_eq; ++i) {
@@ -438,8 +436,8 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     }
 
     for (int i = 0; i < nb_unknwons; ++i) {
-        unknowns[i] = (srv6_fec2_term_t *)CLICK_LALLOC(sizeof(srv6_fec2_term_t));
-        memset(unknowns[i], 0, sizeof(srv6_fec2_term_t));
+        unknowns[i] = (my_packet_t *)CLICK_LALLOC(sizeof(my_packet_t));
+        memset(unknowns[i], 0, sizeof(my_packet_t));
         unknowns[i]->data = (uint8_t *)CLICK_LALLOC(max_packet_length);
         memset(unknowns[i]->data, 0, sizeof(uint8_t) * max_packet_length);
     }
@@ -470,32 +468,30 @@ IP6SRv6FECDecode::rlc_recover_symbols()
         if (!protect_at_least_one) {
             continue; // Ignore this repair symbol if does not protect any lost
         }
-        constant_terms[i] = (srv6_fec2_term_t *)CLICK_LALLOC(sizeof(srv6_fec2_term_t));
+        constant_terms[i] = (my_packet_t *)CLICK_LALLOC(sizeof(my_packet_t));
 
         // 1) Independent term (b) ith row
-        memset(constant_terms[i], 0, sizeof(srv6_fec2_term_t));
+        memset(constant_terms[i], 0, sizeof(my_packet_t));
         constant_terms[i]->data = (uint8_t *)CLICK_LALLOC(sizeof(uint8_t) * max_packet_length);
         memset(constant_terms[i]->data, 0, sizeof(uint8_t) * max_packet_length);
-        click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(repair->p->data() + sizeof(click_ip6));
+        click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(repair->p->data + sizeof(click_ip6));
         uint16_t repair_offset = sizeof(click_ip6) + sizeof(click_ip6_sr) + srv6->ip6_hdrlen * 8;
-        memcpy(constant_terms[i]->data, repair->p->data() + repair_offset, repair->p->length() - repair_offset);
-        click_chatter("Some first bytes of repir payload offset=%u", repair_offset);
-        for (int kk = 0; kk < 5; ++kk) {
-            fprintf(stderr, "%x ", constant_terms[i]->data[kk]);
-        }
-        fprintf(stderr, "\n");
+        memcpy(constant_terms[i]->data, repair->p->data + repair_offset, repair->p->packet_length - repair_offset);
+        //click_chatter("Some first bytes of repir payload offset=%u", repair_offset);
         constant_terms[i]->packet_length = repair->tlv.coded_length;
 
         // 2) Coefficient matric (A) ith row
         uint16_t repair_key = repair->tlv.rfi & 0xffff;
-        rlc_get_coefs(&prng, repair_key, window_size, coefs);
+        // rlc_get_coefs(&prng, repair_key, window_size, coefs);
+        rlc_get_coefs(&prng, 1, window_size, coefs);
         // click_chatter("Repair key=%u (%u) and first 4 coefs= %u %u %u %u", repair_key, repair->tlv.rfpid, coefs[0], coefs[1], coefs[2], coefs[3]); 
         int current_unknown = 0; // Nb of unknown already discovered
         for (int j = 0; j < window_size; ++j) {
             int idx = rs * window_step + j;
             if (ss_array[idx]) { // This protected symbol is received
-                click_chatter("Sub scaled %u (esid=%u) with coef=%u", j, ss_array[idx]->encoding_symbol_id, coefs[j]);
-                click_chatter("First few bytes of it: %x %x %x", ss_array[idx]->p->data()[0], ss_array[idx]->p->data()[1], ss_array[idx]->p->data()[2]);
+                click_chatter("Sub scaled %u (esid=%u) with coef=%u to constant term", j, ss_array[idx]->encoding_symbol_id, coefs[j]);
+                //click_chatter("First few bytes of it: %x %x %x", ss_array[idx]->p->data[0], ss_array[idx]->p->data[1], ss_array[idx]->p->data[2]);
+                //print_packet(ss_array[idx]);
                 symbol_sub_scaled_term(constant_terms[i], coefs[j], ss_array[idx], _rlc_info.muls);
             } else {
                 if (source_to_x[idx] != -1) {
@@ -547,11 +543,10 @@ IP6SRv6FECDecode::rlc_recover_symbols()
                 if (!p_rec) {
                     click_chatter("Error from recovery confirmed");
                     continue;
-                }
-                click_chatter("Mothafucka");
+                };
 
                 // Store a local copy of the packet for later recovery?
-                recovered->p = p_rec->clone();
+                recovered->p = init_clone(p_rec, p_rec->length());
 
                 // Send recovered packet on the line
                 output(0).push(p_rec);
@@ -560,7 +555,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
                 srv6_fec2_source_term_t *old_rec = _rlc_info.recovd_buffer[recovered->encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
                 if (old_rec) {
                     click_chatter("Before freeing old red");
-                    old_rec->p->kill();
+                    kill_clone(old_rec->p);
                     CLICK_LFREE(old_rec, sizeof(srv6_fec2_source_term_t));
                     click_chatter("After freeing old rec");
                 }
@@ -568,7 +563,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
                 _rlc_info.recovd_buffer[recovered->encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = recovered;
             }
             click_chatter("Passage 1");
-            CLICK_LFREE(unknowns[current_unknown++], sizeof(srv6_fec2_term_t));
+            CLICK_LFREE(unknowns[current_unknown++], sizeof(my_packet_t));
         }
     } else {
         click_chatter("ERROR 5: %u eq but %u unk", nb_effective_equations, nb_unknwons);
@@ -578,16 +573,16 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     for (i = 0; i < n_eq; ++i) {
         CLICK_LFREE(system_coefs[i], sizeof(uint8_t) * nb_unknwons);
         if (i < nb_effective_equations) {
-            CLICK_LFREE(constant_terms[i], sizeof(srv6_fec2_term_t));
+            CLICK_LFREE(constant_terms[i], sizeof(my_packet_t));
         }
     }
     for (i = 0; i < nb_source_symbols; ++i) {
-        CLICK_LFREE(ss_array[i], sizeof(srv6_fec2_term_t));
+        CLICK_LFREE(ss_array[i], sizeof(my_packet_t));
     }
-    CLICK_LFREE(ss_array, sizeof(srv6_fec2_term_t *) * nb_source_symbols);
+    CLICK_LFREE(ss_array, sizeof(my_packet_t *) * nb_source_symbols);
     CLICK_LFREE(rs_array, sizeof(srv6_fec2_repair_t) * nb_windows);
     CLICK_LFREE(system_coefs, sizeof(uint8_t *) * n_eq);
-    CLICK_LFREE(unknowns, sizeof(srv6_fec2_term_t *) * nb_unknwons);
+    CLICK_LFREE(unknowns, sizeof(my_packet_t *) * nb_unknwons);
     CLICK_LFREE(coefs, window_size * sizeof(uint8_t));
     CLICK_LFREE(undetermined, sizeof(bool) * nb_unknwons);
     CLICK_LFREE(source_to_x, sizeof(uint8_t) * nb_source_symbols);
@@ -595,24 +590,44 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     return;
 }
 
+void 
+IP6SRv6FECDecode::print_packet(my_packet_t *p) {
+    fprintf(stderr, "Print packet: %u:  ", p->packet_length);
+    for (int i = 0; i < 100; ++i) {
+        if (i % 16 == 0) fprintf(stderr, "\n");
+        fprintf(stderr, "%x ", p->data[i]);
+    }
+}
+
+void 
+IP6SRv6FECDecode::print_packet(srv6_fec2_source_term_t *p) {
+    fprintf(stderr, "Print packet: %u:  ", p->p->packet_length);
+    for (int i = 0; i < 100; ++i) {
+        if (i % 16 == 0) fprintf(stderr, "\n");
+        fprintf(stderr, "%x ", p->p->data[i]);
+    }
+}
+
 void
-IP6SRv6FECDecode::symbol_add_scaled_term(srv6_fec2_term_t *symbol1, uint8_t coef, srv6_fec2_source_term_t *symbol2, uint8_t *mul)
+IP6SRv6FECDecode::symbol_add_scaled_term(my_packet_t *symbol1, uint8_t coef, srv6_fec2_source_term_t *symbol2, uint8_t *mul)
 {
-    symbol_add_scaled(symbol1->data, coef, symbol2->p->data(), symbol2->p->length(), mul);
-    uint16_t pl = (uint16_t)symbol2->p->length();
+    click_chatter("Add scaled with %u", symbol2->p->packet_length);
+    symbol_add_scaled(symbol1->data, coef, symbol2->p->data, symbol2->p->packet_length, mul);
+    uint16_t pl = (uint16_t)symbol2->p->packet_length;
     symbol_add_scaled(&symbol1->packet_length, coef, &pl, sizeof(uint16_t), mul);
 }
 
 void
-IP6SRv6FECDecode::symbol_add_scaled_term(srv6_fec2_term_t *symbol1, uint8_t coef, srv6_fec2_term_t *symbol2, uint8_t *mul)
+IP6SRv6FECDecode::symbol_add_scaled_term(my_packet_t *symbol1, uint8_t coef, my_packet_t *symbol2, uint8_t *mul, uint16_t decoding_size)
 {
-    symbol_add_scaled(symbol1->data, coef, symbol2->data, symbol2->packet_length, mul);
+    click_chatter("Add scaled with %u", decoding_size);
+    symbol_add_scaled(symbol1->data, coef, symbol2->data, decoding_size, mul);
     uint16_t pl = (uint16_t)symbol2->packet_length;
     symbol_add_scaled(&symbol1->packet_length, coef, &pl, sizeof(uint16_t), mul);
 }
 
 void
-IP6SRv6FECDecode::symbol_mul_term(srv6_fec2_term_t *symbol1, uint8_t coef, uint8_t *mul, uint16_t size)
+IP6SRv6FECDecode::symbol_mul_term(my_packet_t *symbol1, uint8_t coef, uint8_t *mul, uint16_t size)
 {
     symbol_mul(symbol1->data, coef, size, mul);
     symbol_mul((uint8_t *)&symbol1->packet_length, coef, sizeof(uint16_t), mul);
@@ -626,9 +641,9 @@ IP6SRv6FECDecode::swap(uint8_t **a, int i, int j) {
 }
 
 void
-IP6SRv6FECDecode::swap_b(srv6_fec2_term_t **a, int i, int j)
+IP6SRv6FECDecode::swap_b(my_packet_t **a, int i, int j)
 {
-    srv6_fec2_term_t *tmp = a[j];
+    my_packet_t *tmp = a[j];
     a[j] = a[i];
     a[i] = tmp;
 }
@@ -655,7 +670,7 @@ IP6SRv6FECDecode::cmp_eq(uint8_t *a, uint8_t *b, int idx, int n_unknowns)
 }
 
 void
-IP6SRv6FECDecode::sort_system(uint8_t **a, srv6_fec2_term_t **constant_terms, int n_eq, int n_unknowns)
+IP6SRv6FECDecode::sort_system(uint8_t **a, my_packet_t **constant_terms, int n_eq, int n_unknowns)
 {
     for (int i = 0; i < n_eq; ++i) {
         int max = i;
@@ -680,7 +695,7 @@ IP6SRv6FECDecode::first_non_zero_idx(const uint8_t *a, int n_unknowns) {
 }
 
 void
-IP6SRv6FECDecode::gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_fec2_term_t **constant_terms, srv6_fec2_term_t **x, bool *undetermined, uint8_t *mul, uint8_t *inv, uint16_t max_packet_length)
+IP6SRv6FECDecode::gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, my_packet_t **constant_terms, my_packet_t **x, bool *undetermined, uint8_t *mul, uint8_t *inv, uint16_t max_packet_length)
 {
     sort_system(a, constant_terms, n_eq, n_unknowns);
     for (int i = 0; i < n_eq - 1; ++i) {
@@ -691,7 +706,8 @@ IP6SRv6FECDecode::gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_
             for (int j = 0; j < n_unknowns; ++j) {
                 a[k][j] = gf256_sub(a[k][j], gf256_mul(term, a[i][j], mul));
             }
-            symbol_sub_scaled_term(constant_terms[k], term, constant_terms[i], mul);
+            click_chatter("CALL SUB");
+            symbol_sub_scaled_term(constant_terms[k], term, constant_terms[i], mul, max_packet_length);
         }
     }
 
@@ -712,7 +728,8 @@ IP6SRv6FECDecode::gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_
                     for (int l = j; l < n_unknowns; l++) {
                         a[i][l] = gf256_sub(a[i][l], gf256_mul(term, a[k][l], mul));
                     }
-                    symbol_sub_scaled_term(constant_terms[i], term, constant_terms[k], mul);
+                    click_chatter("CALL SUB 2");
+                    symbol_sub_scaled_term(constant_terms[i], term, constant_terms[k], mul, max_packet_length);
                     break;
                 }
             }
@@ -736,7 +753,7 @@ IP6SRv6FECDecode::gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_
                 fprintf(stderr, "System partially undetermined\n");
                 break;
             }
-            memcpy(x[candidate], constant_terms[i], sizeof(srv6_fec2_term_t));
+            memcpy(x[candidate], constant_terms[i], sizeof(my_packet_t));
             for (int j = 0; j < candidate; ++j) {
                 if (a[i][j] != 0) {
                     undetermined[candidate] = true;
@@ -748,7 +765,8 @@ IP6SRv6FECDecode::gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_
                     if (undetermined[j]) {
                         undetermined[candidate] = true;
                     } else {
-                        symbol_sub_scaled_term(x[candidate], a[i][j], x[j], mul);
+                        click_chatter("CALL SUB 3");
+                        symbol_sub_scaled_term(x[candidate], a[i][j], x[j], mul, max_packet_length);
                         a[i][j] = 0;
                     }
                 }
@@ -756,6 +774,7 @@ IP6SRv6FECDecode::gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_
             if (symbol_is_zero(x[candidate]->data, max_packet_length) || a[i][candidate] == 0) {
                 undetermined[candidate] = true;
             } else if (!undetermined[candidate]) {
+                click_chatter("Just to be sure");
                 symbol_mul_term(x[candidate], inv[a[i][candidate]], mul, max_packet_length);
                 a[i][candidate] = gf256_mul(a[i][candidate], inv[a[i][candidate]], mul);
             } 
@@ -779,28 +798,41 @@ IP6SRv6FECDecode::recover_packet_fom_data(uint8_t *data, uint16_t packet_length)
     memcpy(p->data(), data, packet_length);
 
     // Loop at the packet content a bit
-    for (int i = 0; i < 20; ++i) {
+    for (int i = 0; i < 160; ++i) {
         fprintf(stderr, "%x ", p->data()[i]);
     }
     fprintf(stderr, "\n");
-    return 0; // TODO: remove this
 
     // Recover from varying fields
     click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
     click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
+    uint8_t *segment_list = (uint8_t *)(srv6 + sizeof(click_ip6_sr));
     // 1. Detect the correct new next hop
     uint32_t *dec_ip_32 = dec.data32();
     bool found_next_sid = false;
     struct in6_addr ip6_next;
     int i = srv6->last_entry;
+    uint8_t *dec_8 = (uint8_t *)dec_ip_32;
     click_chatter("Before SRH look, i=%u", i);
+    fprintf(stderr, "SID look for: ");
+    for (int k = 0; k < 16; ++k) {
+        fprintf(stderr, "%x ", dec_8[k]);
+    }
+    fprintf(stderr, "\n");
     while (i >= 0) {
         uint16_t offset = sizeof(click_ip6_sr) + sizeof(struct in6_addr) * i;
-        memcpy(&ip6_next, srv6 + offset, sizeof(struct in6_addr));
+        memcpy(&ip6_next, ((uint8_t *)srv6) + offset, sizeof(struct in6_addr));
         // Compare this SID with the decoder ID
-        uint32_t *in6_32 = (uint32_t *)&ip6_next;
+        uint32_t *in6_32 = (uint32_t *)ip6_next.s6_addr;
+        uint8_t *en_8 = (uint8_t *)&ip6_next;
+        fprintf(stderr, "SID current: %u: ", offset);
+        for (int k = 0; k < 16; ++k) {
+            fprintf(stderr, "%x ", en_8[k]);
+        }
+        fprintf(stderr, "\n");
         if (dec_ip_32[0] == in6_32[0] && dec_ip_32[1] == in6_32[1] && dec_ip_32[2] == in6_32[2] && dec_ip_32[3] == in6_32[3]) {
             found_next_sid = true;
+            click_chatter("I HAVE FOUND THE SID");
             break;
         }
         --i;
@@ -816,10 +848,15 @@ IP6SRv6FECDecode::recover_packet_fom_data(uint8_t *data, uint16_t packet_length)
     uint16_t offset = sizeof(click_ip6_sr) + sizeof(struct in6_addr) * i;
 
     // 2. Replace the destination address with the correct
-    memcpy(&ip6->ip6_dst, srv6 + offset, sizeof(struct in6_addr));
+    memcpy(&ip6->ip6_dst, ((uint8_t *)srv6) + offset, sizeof(struct in6_addr));
+    uint8_t *ddd = (uint8_t *)&ip6->ip6_dst;
+    fprintf(stderr, "SID found: %u: ", offset);
+    for (int k = 0; k < 16; ++k) {
+        fprintf(stderr, "%x ", ddd[k]);
+    }
 
     // 3. Replace the Segment Left pointer
-    srv6->segment_left = i - 1;
+    srv6->segment_left = i;
 
     // 4. New hop limit
     ip6->ip6_hlim = 51;
