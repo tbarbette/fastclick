@@ -1,6 +1,7 @@
 /*
  * ip6encap.{cc,hh} -- element encapsulates packet in IP6 header
- * Roman Chertov
+ * Louis Navarre
+ * Tom Barbette
  *
  * Copyright (c) 2021 IP Networking Lab, UCLouvain
  *
@@ -261,11 +262,12 @@ IP6SRv6FECDecode::rlc_fill_muls(uint8_t muls[256 * 256])
 void
 IP6SRv6FECDecode::rlc_recover_symbols()
 {
-    uint16_t max_packet_length = 0;
+    uint16_t max_packet_length = 0; // decoding size
     uint8_t nb_source_symbols = 0;
     uint8_t window_size = 0;
     uint8_t window_step = 0;
     uint8_t previous_window_step = 0;
+    uint8_t max_seen_window_size = 0;
     uint32_t encoding_symbol_id = _rlc_info.encoding_symbol_id;
 
     // Init the pseudo random number generator
@@ -287,6 +289,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
             break;
         }
         window_size = repair->tlv.nss;
+        max_seen_window_size = MAX(max_seen_window_size, window_size);
         window_step = (repair->tlv.rfi >> 16) & 0xff;
         previous_window_step = (repair->tlv.rfi >> 24);
         ++nb_windows;
@@ -299,7 +302,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     }
 
     // Still need to count the symbols at the beginning of the first window
-    nb_source_symbols += window_size - previous_window_step; // TODO: verify this
+    nb_source_symbols += window_size - previous_window_step; // TODO: verify this: LGTM
 
     // No valid window: no repair symbol received or no FEC applied
     // Should not happen since this function is triggered by the
@@ -335,7 +338,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     memset(protected_symbol, 0, sizeof(bool) * nb_source_symbols);
 
     uint32_t id_first_ss_first_window = encoding_symbol_id - nb_source_symbols + 1;
-    uint32_t id_first_rs_first_window = id_first_ss_first_window + window_size - 1; // TODO: check this
+    uint32_t id_first_rs_first_window = id_first_ss_first_window + window_size - 1; // TODO: check this: LGTM
     // Locate the source and repair symbols and store separately
     uint8_t idx = id_first_rs_first_window;
     for (int i = 0; i < nb_windows; ++i) {
@@ -405,7 +408,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
 
     // Construct the system Ax=b
     int n_eq = MIN(nb_unknwons, nb_windows);
-    uint8_t *coefs = (uint8_t *)CLICK_LALLOC(sizeof(uint8_t) * window_size); // TODO: adaptive window size?
+    uint8_t *coefs = (uint8_t *)CLICK_LALLOC(sizeof(uint8_t) * max_seen_window_size); // DONE: adaptive window size: done, now maximum window size
     my_packet_t **unknowns = (my_packet_t **)CLICK_LALLOC(sizeof(my_packet_t *) * nb_unknwons); // x
     uint8_t **system_coefs = (uint8_t **)CLICK_LALLOC(sizeof(uint8_t *) * n_eq); // A
     my_packet_t **constant_terms = (my_packet_t **)CLICK_LALLOC(sizeof(my_packet_t *) * nb_unknwons); // b
@@ -431,14 +434,17 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     int i = 0; // Index of the row in the system
     for (int rs = 0; rs < nb_windows; ++rs) {
         srv6_fec2_repair_t *repair = rs_array[rs];
+        uint8_t this_window_size = repair->tlv.nss;
+        uint8_t this_window_step = repair->tlv.rlc_rfi.window_step;
+        uint32_t this_encoding_symbol_id = repair->tlv.rfpid;
         bool protect_at_least_one = false;
         // Check if this repair symbol protects at least one lost source symbol
-        // TODO: make adaptive
-        for (int k = 0; k < window_size; ++k) {
-            int idx = rs * window_step + k;
-            if (!ss_array[idx] && !protected_symbol[idx]) {
+        // the following seems correct
+        int idx = this_encoding_symbol_id - id_first_ss_first_window - this_window_size + 1; // TODO: check if correct
+        for (int k = 0; k < this_window_size; ++k) {
+            if (!ss_array[idx + k] && !protected_symbol[idx + k]) {
                 protect_at_least_one = true;
-                protected_symbol[idx] = true;
+                protected_symbol[idx + k] = true;
                 break; // We know it protects at least one
             }
         }
@@ -457,18 +463,19 @@ IP6SRv6FECDecode::rlc_recover_symbols()
         constant_terms[i]->packet_length = repair->tlv.coded_length;
 
         // 2) Coefficient matric (A) ith row
-        uint16_t repair_key = repair->tlv.rfi & 0xffff;
-        // rlc_get_coefs(&prng, repair_key, window_size, coefs);
-        rlc_get_coefs(&prng, 1, window_size, coefs);
+        uint16_t repair_key = repair->tlv.rlc_rfi.repair_key; // TODO
+        // rlc_get_coefs(&prng, repair_key, this_window_size, coefs);
+        rlc_get_coefs(&prng, 1, this_window_size, coefs);
         int current_unknown = 0; // Nb of unknown already discovered
-        for (int j = 0; j < window_size; ++j) {
-            int idx = rs * window_step + j;
-            if (ss_array[idx]) { // This protected symbol is received
-                //print_packet(ss_array[idx]);
-                symbol_sub_scaled_term(constant_terms[i], coefs[j], ss_array[idx], _rlc_info.muls);
+        idx = this_encoding_symbol_id - id_first_ss_first_window - this_window_size + 1; // TODO: check if correct
+        for (int j = 0; j < this_window_size; ++j) {
+            int idx_this_ss = idx + j; // Index of location of this source symbol
+            if (ss_array[idx_this_ss]) { // This protected symbol is received
+                // print_packet(ss_array[idx]);
+                symbol_sub_scaled_term(constant_terms[i], coefs[j], ss_array[idx_this_ss], _rlc_info.muls);
             } else {
-                if (source_to_x[idx] != -1) {
-                    system_coefs[i][source_to_x[idx]] = coefs[j]; // A[i][j] = coefs[j]
+                if (source_to_x[idx_this_ss] != -1) {
+                    system_coefs[i][source_to_x[idx_this_ss]] = coefs[j]; // A[i][j] = coefs[j]
                     ++current_unknown;
                 } else {
                     click_chatter("ERROR 4");
@@ -481,12 +488,12 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     uint8_t nb_effective_equations = i;
 
     // Print system to see what is the fucking problem
-    for (int row = 0; row < n_eq; ++row) {
-        for (int col = 0; col < nb_unknwons; ++col) {
-            fprintf(stderr, "%u ", system_coefs[row][col]);
-        }
-        fprintf(stderr, "\n");
-    }
+    // for (int row = 0; row < n_eq; ++row) {
+    //     for (int col = 0; col < nb_unknwons; ++col) {
+    //         fprintf(stderr, "%u ", system_coefs[row][col]);
+    //     }
+    //     fprintf(stderr, "\n");
+    // }
 
     bool can_recover = nb_effective_equations >= nb_unknwons;
     if (can_recover) {
@@ -546,7 +553,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     CLICK_LFREE(rs_array, sizeof(srv6_fec2_repair_t) * nb_windows);
     CLICK_LFREE(system_coefs, sizeof(uint8_t *) * n_eq);
     CLICK_LFREE(unknowns, sizeof(my_packet_t *) * nb_unknwons);
-    CLICK_LFREE(coefs, window_size * sizeof(uint8_t));
+    CLICK_LFREE(coefs, max_seen_window_size * sizeof(uint8_t)); // Changed to max_seen_window_size
     CLICK_LFREE(undetermined, sizeof(bool) * nb_unknwons);
     CLICK_LFREE(source_to_x, sizeof(uint8_t) * nb_source_symbols);
     CLICK_LFREE(x_to_source, sizeof(uint8_t) * nb_source_symbols);

@@ -33,7 +33,14 @@ struct repair_tlv_t {
   uint8_t len;
   uint16_t padding;
   uint32_t rfpid; // Repair FEC Payload ID
-  uint32_t rfi; // Repair FEC Info
+  union {
+    struct {
+      uint8_t previous_window_size;
+      uint8_t window_step;
+      uint16_t repair_key;
+    } rlc_rfi;
+    uint32_t rfi;
+  }; // Repair FEC Info
   uint16_t coded_length;
   uint8_t nss; // Number Source Symbol
   uint8_t nrs; // Number Repair Symbol

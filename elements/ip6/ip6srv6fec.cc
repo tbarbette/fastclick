@@ -1,6 +1,7 @@
 /*
  * ip6encap.{cc,hh} -- element encapsulates packet in IP6 header
- * Roman Chertov
+ * Louis Navarre
+ * Tom Barbette
  *
  * Copyright (c) 2021 IP Networking Lab, UCLouvain
  *
