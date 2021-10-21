@@ -183,15 +183,11 @@ IP6SRv6FECEncode::store_source_symbol(Packet *p_in, uint32_t encoding_symbol_id)
 {
     my_packet_t *packet = init_clone(p_in, p_in->length());
     _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = packet;
-    // click_chatter("Store at idx=%u", encoding_symbol_id);
-    //Packet *pp = _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
-    //click_chatter("First bytes of stored #%u (%p): %x %x %x", encoding_symbol_id, pp->data(), pp->data()[0], pp->data()[1], pp->data()[2]);
 }
 
 void
 IP6SRv6FECEncode::rlc_encode_symbols(uint32_t encoding_symbol_id)
 {
-    // click_chatter("Repair symbol --- %u", encoding_symbol_id);
     tinymt32_t prng = _rlc_info.prng;
     // tinymt32_init(&prng, _rlc_info.repair_key);
     tinymt32_init(&prng, 1);
@@ -199,16 +195,10 @@ IP6SRv6FECEncode::rlc_encode_symbols(uint32_t encoding_symbol_id)
     uint32_t start_esid = encoding_symbol_id - _rlc_info.window_size + 1;
     for (int i = 0; i < _rlc_info.window_size; ++i) {
         uint8_t idx = (start_esid + i) % SRV6_FEC_BUFFER_SIZE;
-        // click_chatter("Indx=%u", idx);
         my_packet_t *source_symbol = _rlc_info.source_buffer[idx];
 
         // Print data first bytes
         uint8_t *data = (uint8_t *)source_symbol->data;
-        // fprintf(stderr, "Encode first bytes of %d: %x %x %x\n", i, data[0], data[1], data[2]);
-        // for (int j = 0; j < 16; ++j) {
-        //     fprintf(stderr, "%x ", data[j]);
-        // }
-        // click_chatter("");
         rlc_encode_one_symbol(source_symbol, _repair_packet, &prng, _rlc_info.muls, &_repair_tlv);
     }
 }
@@ -262,7 +252,6 @@ void IP6SRv6FECEncode::rlc_encode_one_symbol(my_packet_t *s, WritablePacket *r, 
 
     // Get coefficient for this source symbol
     uint8_t coef = rlc_get_coef(prng);
-    // click_chatter("Encode packet with coef=%u", coef);
 
     uint16_t packet_length = s->packet_length; // Cast in uint16_t because 16 bits for IPv6 packet length
 
