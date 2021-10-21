@@ -9094,7 +9094,7 @@ if test "${enable_ctx+set}" = set; then :
 else
   enable_ctx=no
 fi
-test "x$enable_all_elements" = xyes -a \( "x$enable_ctx" = xNO -o "x$enable_ctx" = x \)-a "x$enable_flow" = xyes  && enable_ctx=yes
+test "x$enable_all_elements" = xyes -a \( "x$enable_ctx" = xNO -o "x$enable_ctx" = x \) -a "x$enable_flow" = xyes   && enable_ctx=yes
 if test "x$enable_ctx" = xyes; then
     :
     enable_ctx=no

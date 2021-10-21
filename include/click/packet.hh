@@ -2067,12 +2067,14 @@ Packet::pull(uint32_t len)
 {
     if (len > length()) {
 	click_chatter("Packet::pull %d > length %d\n", len, length());
-	len = length();
+	    len = length();
     }
 #if CLICK_LINUXMODULE	/* Linux kernel module */
     __skb_pull(skb(), len);
 #elif CLICK_PACKET_USE_DPDK
-    rte_pktmbuf_adj(mb(), len);
+    mb()->data_off += len;
+    mb()->data_len -= len;
+    mb()->pkt_len -= len;
 #else				/* User-space and BSD kernel module */
     _data += len;
 # if CLICK_BSDMODULE
