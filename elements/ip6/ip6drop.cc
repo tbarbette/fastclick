@@ -20,14 +20,11 @@
 #include <click/nameinfo.hh>
 #include <click/confparse.hh>
 #include <click/error.hh>
-#include <clicknet/ip6.h>
-#include <click/ip6address.hh>
 #include <click/glue.hh>
 CLICK_DECLS
 
 IP6Drop::IP6Drop()
 {
-    total_seen = 0;
     _use_dst_anno = false;
 }
 
@@ -44,10 +41,13 @@ IP6Drop::configure(Vector<String> &conf, ErrorHandler *errh)
     .read_or_set("R", r, 0)
     .read_or_set("h", h, 1)
     .read_or_set("K", k, 0)
+    .read_or_set("SEED", seed, 51)
 	.complete() < 0)
         return -1;
 
     total_seen = 0;
+    srand(seed);
+    state = good;
 
     return 0;
 }
