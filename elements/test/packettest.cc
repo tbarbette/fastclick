@@ -61,7 +61,10 @@ PacketTest::initialize(ErrorHandler *errh)
     CHECK(p1->network_header() == p->data() + 15);
     CHECK(p1->dst_ip_anno() == addr);
 
-    Packet *p2 = p1->clone();
+    Packet *p2;
+    WritablePacket *p3;
+#ifndef CLICK_NOINDIRECT
+    p2 = p1->clone();
     CHECK(p2 != p1);
     CHECK(p2->data() == p1->data());
     CHECK(p2->length() == 25);
@@ -69,7 +72,7 @@ PacketTest::initialize(ErrorHandler *errh)
     CHECK(p1->mac_header() == p2->mac_header());
     CHECK(p2->dst_ip_anno() == addr);
 
-    WritablePacket *p3 = p2->push(5);
+    p3 = p2->push(5);
     // p2 is dead
     CHECK(p3 != p1);
     CHECK(p3->length() == 30);
@@ -86,6 +89,7 @@ PacketTest::initialize(ErrorHandler *errh)
 
     p1->kill();
     p3->kill();
+#endif
 
 #if 0
     // time cloning
@@ -95,6 +99,7 @@ PacketTest::initialize(ErrorHandler *errh)
     p->kill();
 #endif
 
+#ifndef CLICK_NOINDIRECT
     p = Packet::make(10);
     Packet* pref1 = p->clone();
     CHECK(p->shared());
@@ -116,13 +121,17 @@ PacketTest::initialize(ErrorHandler *errh)
     pref1->kill();
     p1->kill();
     p2->kill();
+#endif
 
     // test shift_data()
     p = Packet::make(10, lowers, 60, 4);
     int tail = p->tailroom();
+    int head = p->headroom();
+    const unsigned char* data = p->data();
     CHECK(p->headroom() == 10 && p->tailroom() >= 4);
     p = p->shift_data(-2);
-    CHECK(p->headroom() == 8 && p->tailroom() == tail + 2);
+    CHECK(p->data() == data - 2);
+    CHECK(p->headroom() == head - 2 && p->tailroom() == tail + 2);
     CHECK(p->length() == 60);
     CHECK_DATA(p->data(), lowers, 60);
     CHECK_ALIGNED(p->data());
@@ -136,6 +145,8 @@ PacketTest::initialize(ErrorHandler *errh)
     p->kill();
 
     p = Packet::make(1, lowers, 60, 4);
+    tail = p->tailroom();
+    head = p->headroom();
     p = p->shift_data(-5);
     CHECK(p->tailroom() >= 9 && p->length() == 60);
     CHECK_DATA(p->data(), lowers, 60);
@@ -144,7 +155,7 @@ PacketTest::initialize(ErrorHandler *errh)
 
     p = Packet::make(5, lowers, 60, 2);
     p = p->shift_data(3);
-    CHECK(p->headroom() >= 8 && p->length() == 60);
+    CHECK(p->headroom() == 8 && p->length() == 60);
     CHECK_DATA(p->data(), lowers, 60);
     CHECK_ALIGNED(p->data());
     p->kill();

@@ -52,6 +52,8 @@ AC_C_INLINE
 CLICK_PROG_CXX
 AC_PROG_CXXCPP
 
+AX_CHECK_COMPILE_FLAG(-Wno-inconsistent-missing-override,CXXFLAGS="$CXXFLAGS -Wno-inconsistent-missing-override")
+
 case "$target" in
         *x86*)
                 AX_CHECK_X86_FEATURES([CFLAGS="$CFLAGS $X86_FEATURE_CFLAGS";CXXFLAGS="$CXXFLAGS $X86_FEATURE_CFLAGS"])
@@ -674,7 +676,7 @@ ELEMENTS_ARG_ENABLE(aqm, [include active queue management elements], yes)
 ELEMENTS_ARG_ENABLE(ethernet, [include Ethernet elements], yes)
 ELEMENTS_ARG_ENABLE(etherswitch, [include Ethernet switch elements], NO)
 ELEMENTS_ARG_ENABLE(flow, [include Enable flow system and elements], NO)
-ELEMENTS_ARG_ENABLE(ctx, [include Context-based elements], no, enable_ctx=no , -a "x$enable_flow" = xyes )
+ELEMENTS_ARG_ENABLE(ctx, [include Context-based elements], no, enable_ctx=no , [ -a "x$enable_flow" = xyes ] )
 ELEMENTS_ARG_ENABLE(grid, [include Grid elements (see FAQ)], NO)
 ELEMENTS_ARG_ENABLE(icmp, [include ICMP elements], yes)
 ELEMENTS_ARG_ENABLE(ip, [include IP elements], yes)
