@@ -61,7 +61,8 @@ PacketTest::initialize(ErrorHandler *errh)
     CHECK(p1->network_header() == p->data() + 15);
     CHECK(p1->dst_ip_anno() == addr);
 
-    Packet *p2,*p3;
+    Packet *p2;
+    WritablePacket *p3;
 #ifndef CLICK_NOINDIRECT
     p2 = p1->clone();
     CHECK(p2 != p1);
