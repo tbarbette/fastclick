@@ -12,6 +12,7 @@
 
 #ifndef SRV6FEC_HH
 #define SRV6FEC_HH
+#define SRV6_FEC_COPY_PACKET
 #define SRV6_FEC_BUFFER_SIZE 32
 
 #define TLV_TYPE_FEC_SOURCE 28
@@ -39,9 +40,14 @@ struct repair_tlv_t {
 } CLICK_SIZE_PACKED_ATTRIBUTE;
 
 struct my_packet_t {
+#ifdef SRV6_FEC_COPY_PACKET
   uint8_t *data;
   uint16_t packet_length;
+#else
+  WritablePacket *p;
+#endif
 };
+
 #endif
 
 CLICK_DECLS
@@ -115,16 +121,16 @@ class IP6SRv6FECDecode : public Element {
 
   static String read_handler(Element *, void *) CLICK_COLD;
   void fec_framework(Packet *p_in) CLICK_COLD;
-  int fec_scheme_source(Packet *p_in, source_tlv_t *tlv) CLICK_COLD;
-  int fec_scheme_repair(Packet *p_in, repair_tlv_t *tlv) CLICK_COLD;
+  int fec_scheme_source(WritablePacket *p_in, source_tlv_t *tlv) CLICK_COLD;
+  int fec_scheme_repair(WritablePacket *p_in, repair_tlv_t *tlv) CLICK_COLD;
   WritablePacket *recover_packet_fom_data(uint8_t *data, uint16_t packet_length);
 
   void rlc_fill_muls(uint8_t muls[256 * 256]) CLICK_COLD;
   my_packet_t *init_clone(Packet *p, uint16_t packet_length) CLICK_COLD;
   void kill_clone(my_packet_t *p) CLICK_COLD;
 
-  void store_source_symbol(Packet *p_in, source_tlv_t *tlv) CLICK_COLD;
-  void store_repair_symbol(Packet *p_in, repair_tlv_t *tlv) CLICK_COLD;
+  void store_source_symbol(WritablePacket *p_in, source_tlv_t *tlv) CLICK_COLD;
+  void store_repair_symbol(WritablePacket *p_in, repair_tlv_t *tlv) CLICK_COLD;
   void remove_tlv_source_symbol(WritablePacket *p, uint16_t offset_tlv) CLICK_COLD;
 
   void rlc_recover_symbols();
