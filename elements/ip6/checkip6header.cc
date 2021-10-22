@@ -31,7 +31,7 @@
 
 CLICK_DECLS
 
-CheckIP6Header::CheckIP6Header() : _offset(0), _bad_src(0), _n_bad_src(0)
+CheckIP6Header::CheckIP6Header() : _offset(0), _n_bad_src(0), _bad_src(0), _process_eh(false)
 {
     _count = 0;
     _drops = 0;
@@ -55,6 +55,7 @@ CheckIP6Header::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
         .read_p("BADADDRS", badaddrs)
         .read_p("OFFSET", _offset)
+        .read("PROCESS_EH", _process_eh)
         .complete() < 0)
         return -1;
 
@@ -107,6 +108,8 @@ CheckIP6Header::simple_action(Packet *p)
     const click_ip6 *ip = reinterpret_cast <const click_ip6 *>( p->data() + _offset);
     unsigned plen = p->length() - _offset;
     class IP6Address src;
+    unsigned short ip6_totallen = 40;
+    unsigned char nxt;
 
     // check if the packet is smaller than ip6 header
     // cast to int so very large plen is interpreted as negative
@@ -138,15 +141,24 @@ CheckIP6Header::simple_action(Packet *p)
     /*
     * discard illegal destinations.
     * We will do this in the IP6 routing table.
-    *
-    *
     */
 
-    p->set_ip6_header(ip);
+    nxt = ip->ip6_nxt;
+    if (_process_eh) {
+        ip6_follow_eh(ip, (unsigned char*)p->end_data(), [&nxt,&ip6_totallen,ip](const uint8_t type, unsigned char* hdr){
+            nxt = type;
+            ip6_totallen = hdr - (unsigned char*)ip;
+            return true;
+        });
+    }
+
+    p->set_ip6_header(ip, ip6_totallen);
+    SET_IP6_NXT_ANNO(p, nxt);
 
     // shorten packet according to IP6 payload length field
-    if(ntohs(ip->ip6_plen) < (plen-40)) {
-        p->take(plen - 40 - ntohs(ip->ip6_plen));
+    if(ntohs(ip->ip6_plen) < (plen-ip6_totallen)) {
+        click_chatter("take!");
+        p->take(plen - ip6_totallen - ntohs(ip->ip6_plen));
     }
 
     _count++;
