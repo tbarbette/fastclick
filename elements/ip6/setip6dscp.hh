@@ -13,12 +13,12 @@
  * The DSCP is the upper 6 bits of the IP6 TRAFFIC CLASS field.
  */
 
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <clicknet/ip6.h>
 CLICK_DECLS
 
-class SetIP6DSCP : public Element { public:
+class SetIP6DSCP : public SimpleElement<SetIP6DSCP> { public:
 
     SetIP6DSCP();
     ~SetIP6DSCP();

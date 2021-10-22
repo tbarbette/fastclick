@@ -1,6 +1,6 @@
 #ifndef CLICK_DECIP6HLIM_HH
 #define CLICK_DECIP6HLIM_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 CLICK_DECLS
 
@@ -28,7 +28,7 @@ CLICK_DECLS
  * =a ICMP6Error, CheckIP6Header
  */
 
-class DecIP6HLIM : public Element {
+class DecIP6HLIM : public SimpleElement<DecIP6HLIM> {
 
   int _drops;
 

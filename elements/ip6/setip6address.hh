@@ -1,6 +1,6 @@
 #ifndef SETIP6ADDRESS_HH
 #define SETIP6ADDRESS_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/ip6address.hh>
 CLICK_DECLS
 
@@ -16,7 +16,7 @@ CLICK_DECLS
  * =a StoreIP6Address, GetIP6Address
  */
 
-class SetIP6Address : public Element {
+class SetIP6Address : public SimpleElement<SetIP6Address> {
 
   IP6Address _ip6;
 

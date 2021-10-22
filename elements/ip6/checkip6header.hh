@@ -64,6 +64,7 @@ class CheckIP6Header : public SimpleElement<CheckIP6Header> {
         int _offset;
         int _n_bad_src;
         IP6Address *_bad_src; // array of illegal IP6 src addresses.
+        bool _process_eh;
 
         atomic_uint64_t _count;
         atomic_uint64_t _drops;

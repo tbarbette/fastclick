@@ -5,6 +5,7 @@
 #include <clicknet/ip6.h>
 #include <click/ipaddress.hh>
 #include <click/etheraddress.hh>
+#include <functional>
 #if !CLICK_TOOL
 # include <click/packet.hh>
 # include <click/packet_anno.hh>
@@ -399,6 +400,61 @@ class IP6PrefixArg { public:
     }
     bool allow_bare_address;
 };
+
+static int round_up(int num, int factor)
+{
+    return num + factor - 1 - (num + factor - 1) % factor;
+}
+
+
+/**
+ * Call a function for every extension header of an IPv6 EH list
+ */
+inline void ip6_follow_eh(const click_ip6* ip6, const unsigned char* end, const std::function<bool(const uint8_t type, unsigned char* hdr)>fn) {
+	click_ip6_eh* eh = (click_ip6_eh*)(ip6 + 1);
+    uint8_t nxt = ip6->ip6_nxt;
+
+    do {
+        if ((unsigned char*)eh >= end)
+            return;
+		if (!fn(nxt, (unsigned char*)eh))
+			return;
+
+        switch (nxt) {
+            case IP6_EH_HOPBYHOP:
+			case IP6_EH_ROUTING:
+			    nxt = eh->nxt;
+			eh = (click_ip6_eh*)(((unsigned char*)eh) + (eh->len * 8 + 8));
+				break;
+			case IP6_EH_AH:
+				nxt = eh->nxt;
+			eh = (click_ip6_eh*)(((unsigned char*)eh) + round_up((eh->len + 2) * 4, 8));
+				break;
+			case IP6_EH_FRAGMENT:
+				nxt = eh->nxt;
+			eh = (click_ip6_eh*)(((unsigned char*)eh) + 8);
+                break;
+			case IP6_EH_NONXT:
+            default:
+                return;
+        }
+
+    } while (1);
+}
+
+
+inline void* ip6_find_header(const click_ip6* ip6, const uint8_t type, const unsigned char* end) {
+	unsigned char* pos = 0;
+	ip6_follow_eh(ip6,end,[&pos,type](const uint8_t next, unsigned char* hdr) -> bool {
+		if (next == type) {
+			pos = hdr;
+			return 0;
+		}
+		return 1;
+	});
+	return pos;
+}
+
 
 template<> struct DefaultArg<IP6Address> : public IP6AddressArg {};
 template<> struct DefaultArg<struct in6_addr> : public IP6AddressArg {};

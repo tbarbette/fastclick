@@ -1,6 +1,6 @@
 #ifndef CLICK_LOOKUPIP6ROUTE_HH
 #define CLICK_LOOKUPIP6ROUTE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/ip6table.hh>
 #include "ip6routetable.hh"
 CLICK_DECLS
@@ -39,7 +39,7 @@ CLICK_DECLS
  *
  */
 
-class LookupIP6Route : public IP6RouteTable {
+class LookupIP6Route : public ClassifyElement<LookupIP6Route,IP6RouteTable> {
 public:
   LookupIP6Route();
   ~LookupIP6Route();
@@ -48,11 +48,11 @@ public:
   const char *port_count() const override		{ return "1/-"; }
   const char *processing() const override		{ return PUSH; }
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-  int initialize(ErrorHandler *) CLICK_COLD;
-  void add_handlers() CLICK_COLD;
+  int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+  int initialize(ErrorHandler *) override CLICK_COLD;
+  void add_handlers() override CLICK_COLD;
 
-  void push(int port, Packet *p);
+  int classify(Packet *p);
 
   int add_route(IP6Address, IP6Address, IP6Address, int, ErrorHandler *);
   int remove_route(IP6Address, IP6Address, ErrorHandler *);
