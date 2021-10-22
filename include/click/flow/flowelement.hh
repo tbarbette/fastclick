@@ -90,7 +90,7 @@ public:
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     inline void fcb_acquire_timeout(int nmsec) {
         //Do not set a smaller timeout
-        if ((fcb_stack->flags & FLOW_TIMEOUT) && (nmsec <= (fcb_stack->flags >> FLOW_TIMEOUT_SHIFT))) {
+        if ((fcb_stack->flags & FLOW_TIMEOUT) && (nmsec <= (int)(fcb_stack->flags >> FLOW_TIMEOUT_SHIFT))) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
         click_chatter("Acquiring timeout of %p, not changing it, flag %d",this,fcb_stack->flags);
 #endif

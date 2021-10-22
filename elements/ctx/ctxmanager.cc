@@ -16,7 +16,9 @@
 
 CLICK_DECLS
 
-CTXManager::CTXManager(): _aggcache(false), _cache(0),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true),
+CTXManager::CTXManager(): _aggcache(false), _cache(0), _cache_size(4096), _cache_ring_size(8), _pull_burst(0),
+_builder(true), _collision_is_life(false), cache_hit(0), cache_miss(0), cache_sharing(0),
+_clean_timer(5000), _timer(this), _early_drop(true),
     _ordered(true),_nocut(false), _optimize(true), Router::InitFuture(this) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
@@ -569,10 +571,6 @@ inline void CTXManager::push_batch_builder(int, PacketBatch* batch) {
     Builder builder;
 
     Timestamp now = Timestamp::recent_steady();
-    process:
-
-
-    //click_chatter("Builder have %d packets.",batch->count());
 
     while (p != NULL) {
 #if DEBUG_CLASSIFIER > 1
@@ -644,8 +642,6 @@ String CTXManager::read_handler(Element* e, void* thunk) {
     }
 };
 
-CounterInitFuture CTXManager::_ctx_builded_init_future("CTXBuilder", [](){});
-
 void CTXManager::add_handlers() {
     add_read_handler("leaves_count", CTXManager::read_handler, h_leaves_count);
     add_read_handler("leaves_all_count", CTXManager::read_handler, h_leaves_count);
@@ -657,6 +653,6 @@ void CTXManager::add_handlers() {
 //int FlowBufferVisitor::shared_position[NR_SHARED_FLOW] = {-1};
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(flow)
+ELEMENT_REQUIRES(flow ctx)
 EXPORT_ELEMENT(CTXManager)
 ELEMENT_MT_SAFE(CTXManager)

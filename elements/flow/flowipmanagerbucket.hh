@@ -60,7 +60,7 @@ public:
 private:
 
     struct CoreInfo {
-        CoreInfo() : watch(0), count(0), lock(), pending(false) {
+        CoreInfo() : count(0), watch(0), lock(), pending(false) {
 	};
 	uint64_t count;
 	uint64_t watch;

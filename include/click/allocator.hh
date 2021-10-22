@@ -421,7 +421,7 @@ pool_allocator_mt<T,ZERO,POOL_SIZE,POOL_COUNT>::~pool_allocator_mt() {
 
 
 template <typename T,int POOL_SIZE, int POOL_COUNT>
-pool_allocator_aware_mt<T,POOL_SIZE,POOL_COUNT>::pool_allocator_aware_mt() :_global_count(0),_global_pool(0),_pool(Pool()) {
+pool_allocator_aware_mt<T,POOL_SIZE,POOL_COUNT>::pool_allocator_aware_mt() : _pool(Pool()),_global_count(0),_global_pool(0) {
 #if CLICK_DEBUG_ALLOCATOR
     _released = 0;
     _allocated = 0;

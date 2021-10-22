@@ -1,5 +1,5 @@
-#ifndef MIDDLEBOX_CTXElement_HH
-#define MIDDLEBOX_CTXElement_HH
+#ifndef CLICK_CTXELEMENT_HH
+#define CLICK_CTXELEMENT_HH
 #include <click/config.h>
 #include <click/element.hh>
 #include <click/router.hh>
@@ -675,19 +675,20 @@ inline size_t sse2_strstr_anysize(const char* s, size_t n, const char* needle, s
 //Inline functions
 inline char* CTXElement::searchInContent(char *content, const StringRef &pattern, uint32_t length) {
 #ifdef HAVE_AVX2
-    int pos = avx2_strstr_anysize(content, length, pattern.data(), pattern.length());
+    size_t pos = avx2_strstr_anysize(content, length, pattern.data(), pattern.length());
 #elif HAVE_SSE42
-    int pos = sse42_strstr_anysize(content, length, pattern.data(), pattern.length());
-#else 
-    int pos = sse2_strstr_anysize(content, length, pattern.data(), pattern.length());
+    size_t pos = sse42_strstr_anysize(content, length, pattern.data(), pattern.length());
+#else
+    size_t pos = sse2_strstr_anysize(content, length, pattern.data(), pattern.length());
 #endif
     if (pos == std::string::npos)
         return 0;
     else return content + pos;
 }
 
-
-
+#if HAVE_CTX
+extern CounterInitFuture _ctx_builded_init_future;
+#endif
 
 CLICK_ENDDECLS
 
