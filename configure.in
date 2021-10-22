@@ -345,6 +345,12 @@ AC_ARG_ENABLE([dpdk-softqueue],
 
 AC_ARG_ENABLE([flow-api], [AS_HELP_STRING([    --enable-flow-api], [Support for the HW flow classification API. Also needs DPDK>=20.02])], [:], [enable_flow_api=no])
 
+
+AC_ARG_ENABLE([click-pool],
+    [AS_HELP_STRING([    --enable-click-pool], [allow usage of Click Packet pool. It will still only be effectively enabled in specific cases, see packet.hh])],
+    [AC_DEFINE(ALLOW_CLICK_PACKET_POOL)], [enable_click_pool=no])
+
+
 AC_ARG_ENABLE([pool-inlining],
     [AS_HELP_STRING([  --disable-pool-inlining],
                     [Do not optimize pool_prepare_data_burst function before  data structure reordering done at the IR level.])],

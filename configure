@@ -832,6 +832,7 @@ enable_dpdk_xchg
 enable_dpdk_packet
 enable_dpdk_softqueue
 enable_flow_api
+enable_click_pool
 enable_pool_inlining
 enable_inlined_allanno
 enable_zerocopy
@@ -1579,6 +1580,9 @@ Optional Features:
                           packets before flushing.
       --enable-flow-api   Support for the HW flow classification API. Also
                           needs DPDK>=20.02
+      --enable-click-pool allow usage of Click Packet pool. It will still only
+                          be effectively enabled in specific cases, see
+                          packet.hh
     --disable-pool-inlining
                           Do not optimize pool_prepare_data_burst function
                           before data structure reordering done at the IR
@@ -8643,6 +8647,17 @@ else
 fi
 
 
+
+# Check whether --enable-click-pool was given.
+if test "${enable_click_pool+set}" = set; then :
+  enableval=$enable_click_pool; $as_echo "#define ALLOW_CLICK_PACKET_POOL 1" >>confdefs.h
+
+else
+  enable_click_pool=no
+fi
+
+
+
 # Check whether --enable-pool-inlining was given.
 if test "${enable_pool_inlining+set}" = set; then :
   enableval=$enable_pool_inlining; :
@@ -12041,6 +12056,8 @@ main ()
     if (*(data + i) != *(data3 + i))
       return 14;
   close (fd);
+  free (data);
+  free (data3);
   return 0;
 }
 _ACEOF
