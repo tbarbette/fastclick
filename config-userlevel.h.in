@@ -35,6 +35,9 @@
 /* Define if you have the CPU load cycles tracking function. */
 #undef HAVE_CLICK_LOAD
 
+/* Define if Click can use a packet pool */
+#undef ALLOW_CLICK_PACKET_POOL
+
 /* Define if context system is enabled. */
 #undef HAVE_CTX
 

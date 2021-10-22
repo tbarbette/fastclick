@@ -313,11 +313,11 @@ void FromDPDKDevice::clear_buffers() {
     rte_mbuf* pkts[32];
     for (int q = firstqueue; q <= lastqueue; q++) {
         unsigned n;
-        int tot = 0;
+        unsigned tot = 0;
         do {
             n = rte_eth_rx_burst(_dev->port_id, q, pkts, 32);
             tot += n;
-            for (int i = 0; i < n; i ++) {
+            for (unsigned i = 0; i < n; i ++) {
                  rte_pktmbuf_free(pkts[i]);
             }
             if (tot > _dev->get_nb_rxdesc()) {
@@ -678,23 +678,23 @@ int FromDPDKDevice::write_handler(
                 fd->get_spawning_threads(b, true, -1);
                 if (fd->_active) { // Activating
                     fd->trigger_thread_reconfiguration(true,[fd,thunk](){
-                        for (int i = 0; i < fd->_thread_state.weight(); i++) {
+                        for (unsigned i = 0; i < fd->_thread_state.weight(); i++) {
                             if (fd->_thread_state.get_value(i).task)
                                 fd->_thread_state.get_value(i).task->reschedule();
                         }
                         for (int q = 0; q <= fd->n_queues; q++) {
-                            int i = fd->thread_for_queue_offset(q);
+                            fd->thread_for_queue_offset(q);
                         }
                     }, b);
                 } else { // Deactivating
                     fd->trigger_thread_reconfiguration(false,[fd](){
-                        for (int i = 0; i < fd->_thread_state.weight(); i++) {
+                        for (unsigned i = 0; i < fd->_thread_state.weight(); i++) {
                             if (fd->_thread_state.get_value(i).task)
                                 fd->_thread_state.get_value(i).task->unschedule();
                         }
 
                         for (int q = 0; q <= fd->n_queues; q++) {
-                            int i = fd->thread_for_queue_offset(q);
+                            fd->thread_for_queue_offset(q);
                         }
                     }, b);
                 }

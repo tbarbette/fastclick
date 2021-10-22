@@ -828,26 +828,26 @@ Packet::make(uint32_t headroom, const void *data,
 		} else
 		return 0;
 #elif CLICK_PACKET_USE_DPDK
-    struct rte_mbuf *mb = DPDKDevice::get_pkt();
-    if (!mb) {
-        click_chatter("could not alloc pktmbuf");
-        return 0;
-    }
-    if (unlikely(headroom > RTE_PKTMBUF_HEADROOM))
-        rte_pktmbuf_prepend(mb, headroom - RTE_PKTMBUF_HEADROOM);
-    rte_pktmbuf_data_len(mb) = length;
-    rte_pktmbuf_pkt_len(mb) = length;
-    if (data)
-        memcpy(rte_pktmbuf_mtod(mb, void *), data, length);
-    (void) tailroom;
-    WritablePacket* q = reinterpret_cast<WritablePacket *>(mb);
-    if (clear)
-        q->clear_annotations();
+        struct rte_mbuf *mb = DPDKDevice::get_pkt();
+        if (!mb) {
+            click_chatter("could not alloc pktmbuf");
+            return 0;
+        }
+        mb->data_off = headroom;
+        mb->data_len = length;
+        mb->pkt_len = length;
+        if (data)
+            memcpy(rte_pktmbuf_mtod(mb, void *), data, length);
+        (void) tailroom;
+        WritablePacket* q = reinterpret_cast<WritablePacket *>(mb);
+        if (clear) {
+            q->clear_annotations();
+        }
 #if HAVE_FLOW_DYNAMIC
-            if (fcb_stack)
-                fcb_stack->acquire(1);
+        if (fcb_stack)
+            fcb_stack->acquire(1);
 #endif
-    return q;
+        return q;
 
 #else
         # if CLICK_PACKET_INSIDE_DPDK
@@ -1036,7 +1036,7 @@ Packet::clone(bool fast)
     Packet *p = new WritablePacket; // no initialization
 # endif
     if (!p)
-	return 0;
+	    return 0;
     if (unlikely(fast)) {
 
 #ifndef CLICK_NOINDIRECT
@@ -1067,7 +1067,7 @@ Packet::clone(bool fast)
         else
 #endif
         {
-        p->_destructor = empty_destructor;
+            p->_destructor = empty_destructor;
         }
 
 #ifndef CLICK_NOINDIRECT
@@ -1113,10 +1113,12 @@ Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom)
 
     rte_pktmbuf_data_len(nmb) = length();
     rte_pktmbuf_pkt_len(nmb) = length();
-
     WritablePacket *npkt = reinterpret_cast<WritablePacket *>(nmb);
-    memcpy(npkt->buffer(), buffer(), length() + headroom() + tailroom());
     memcpy(npkt->all_anno(), all_anno(), sizeof (AllAnno));
+
+    unsigned char *start_copy = (unsigned char*)buffer() + (extra_headroom >= 0 ? 0 : -extra_headroom);
+    unsigned char *end_copy = (unsigned char*)end_buffer() + (extra_tailroom >= 0 ? 0 : extra_tailroom);
+    memcpy(npkt->buffer() + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
 
     npkt->shift_header_annotations(buffer(), extra_headroom);
 
@@ -1192,7 +1194,9 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
 # endif
 
 # ifndef CLICK_NOINDIRECT
-    if (_use_count > 1) {
+    bool free_whole = false;
+    if (_use_count > 1) { // one of the reference is ours
+
         memcpy(p, this, sizeof(Packet));
 
         # if CLICK_USERLEVEL || CLICK_MINIOS
@@ -1200,6 +1204,9 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
         # else
             p->_m = m;
         # endif
+
+        free_whole = true;
+
     } else
 # endif
     {
@@ -1227,16 +1234,21 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     unsigned char *end_copy = old_end + (extra_tailroom >= 0 ? 0 : extra_tailroom);
     memcpy(p->_head + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
 
-    delete_buffer(old_head, old_end
-#if CLICK_BSDMODULE
-    , old_m
-#endif
+# ifndef CLICK_NOINDIRECT
+    if (free_whole) {
+        kill();
+    } else
+# endif
+    {
+        delete_buffer(old_head, old_end
+# if CLICK_BSDMODULE
+            , old_m
+# endif
             );
+    }
 # if HAVE_DPDK_PACKET_POOL
     p->_destructor = desc;
     p->_destructor_argument = arg;
-# else
-    _destructor = 0;
 # endif
 
 # ifndef CLICK_NOINDIRECT
@@ -1404,8 +1416,7 @@ Packet::shift_data(int offset, bool free_on_failure)
         mskb->data += offset;
         mskb->tail += offset;
 #elif CLICK_PACKET_USE_DPDK
-        rte_pktmbuf_adj(q->mb(), offset);
-        rte_pktmbuf_append(q->mb(), offset);
+        q->mb()->data_off += offset;
 #else				/* User-space and BSD kernel module */
         q->_data += offset;
         q->_tail += offset;

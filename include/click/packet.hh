@@ -22,7 +22,7 @@
 #if CLICK_NS
 # include <click/simclick.h>
 #endif
-#if !CLICK_PACKET_USE_DPDK && (CLICK_USERLEVEL || CLICK_NS || CLICK_MINIOS) && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS) && !(NETMAP_PACKET_POOL)
+#if !CLICK_PACKET_USE_DPDK && (CLICK_USERLEVEL || CLICK_NS || CLICK_MINIOS) && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS) && !(NETMAP_PACKET_POOL) && ALLOW_CLICK_PACKET_POOL
 # define HAVE_CLICK_PACKET_POOL 1
 #endif
 #ifndef CLICK_PACKET_DEPRECATED_ENUM
@@ -2067,12 +2067,14 @@ Packet::pull(uint32_t len)
 {
     if (len > length()) {
 	click_chatter("Packet::pull %d > length %d\n", len, length());
-	len = length();
+	    len = length();
     }
 #if CLICK_LINUXMODULE	/* Linux kernel module */
     __skb_pull(skb(), len);
 #elif CLICK_PACKET_USE_DPDK
-    rte_pktmbuf_adj(mb(), len);
+    mb()->data_off += len;
+    mb()->data_len -= len;
+    mb()->pkt_len -= len;
 #else				/* User-space and BSD kernel module */
     _data += len;
 # if CLICK_BSDMODULE
