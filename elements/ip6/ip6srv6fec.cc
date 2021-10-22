@@ -38,9 +38,9 @@ IP6SRv6FECEncode::~IP6SRv6FECEncode()
     static_assert(sizeof(source_tlv_t) == 8, "source_tlv_t should be 8 bytes");
 
     for (int i = 0; i < SRV6_FEC_BUFFER_SIZE; ++i) {
-        my_packet_t *packet = _rlc_info.source_buffer[i];
+        Packet *packet = _rlc_info.source_buffer[i];
         if (packet) {
-            kill_clone(packet);
+            packet->kill();
         }  
     }
 }
@@ -154,6 +154,9 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
         rlc_encode_symbols(_source_tlv.sfpid);
 
         // Free the out-of-window source symbols
+        // Maybe this will give a problem once we support adaptative RLC
+        // Because we might free data that should be used after if the window
+        // size increases
         rlc_free_out_of_window(_source_tlv.sfpid);
 
         // Complete the Repair FEC Payload ID
@@ -182,8 +185,7 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
 void
 IP6SRv6FECEncode::store_source_symbol(Packet *p_in, uint32_t encoding_symbol_id)
 {
-    my_packet_t *packet = init_clone(p_in, p_in->length());
-    _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = packet;
+    _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = p_in->clone();
 }
 
 void
@@ -196,10 +198,9 @@ IP6SRv6FECEncode::rlc_encode_symbols(uint32_t encoding_symbol_id)
     uint32_t start_esid = encoding_symbol_id - _rlc_info.window_size + 1;
     for (int i = 0; i < _rlc_info.window_size; ++i) {
         uint8_t idx = (start_esid + i) % SRV6_FEC_BUFFER_SIZE;
-        my_packet_t *source_symbol = _rlc_info.source_buffer[idx];
+        Packet *source_symbol = _rlc_info.source_buffer[idx];
 
         // Print data first bytes
-        uint8_t *data = (uint8_t *)source_symbol->data;
         rlc_encode_one_symbol(source_symbol, _repair_packet, &prng, _rlc_info.muls, &_repair_tlv);
     }
 }
@@ -208,7 +209,7 @@ void
 IP6SRv6FECEncode::rlc_free_out_of_window(uint32_t encoding_symbol_id) {
     for (int i = 0; i < _rlc_info.window_step; ++i) {
         uint16_t buffer_idx = encoding_symbol_id - _rlc_info.window_size + i + 1;
-        my_packet_t *p_kill = _rlc_info.source_buffer[buffer_idx % SRV6_FEC_BUFFER_SIZE];
+        Packet *p_kill = _rlc_info.source_buffer[buffer_idx % SRV6_FEC_BUFFER_SIZE];
         if (!p_kill) {
             click_chatter("SRv6-FEC: empty packet to kill");
             continue;
@@ -218,7 +219,7 @@ IP6SRv6FECEncode::rlc_free_out_of_window(uint32_t encoding_symbol_id) {
         _rlc_info.source_buffer[buffer_idx % SRV6_FEC_BUFFER_SIZE] = 0;
 
         // Kill packet and free memory
-        kill_clone(p_kill);
+        p_kill->kill();
     }
 }
 
@@ -245,7 +246,7 @@ uint8_t IP6SRv6FECEncode::rlc_get_coef(tinymt32_t *prng) {
     return coef;
 }
 
-void IP6SRv6FECEncode::rlc_encode_one_symbol(my_packet_t *s, WritablePacket *r, tinymt32_t *prng, uint8_t muls[256 * 256 * sizeof(uint8_t)], repair_tlv_t *repair_tlv) {
+void IP6SRv6FECEncode::rlc_encode_one_symbol(Packet *s, WritablePacket *r, tinymt32_t *prng, uint8_t muls[256 * 256 * sizeof(uint8_t)], repair_tlv_t *repair_tlv) {
     // Leave room for the IPv6 Header, SRv6 Header (3 segments) and repair TLV
     uint8_t repair_offset = 40 + 8 + 16 * 2 + sizeof(repair_tlv_t);
 
@@ -254,10 +255,10 @@ void IP6SRv6FECEncode::rlc_encode_one_symbol(my_packet_t *s, WritablePacket *r, 
     // Get coefficient for this source symbol
     uint8_t coef = rlc_get_coef(prng);
 
-    uint16_t packet_length = s->packet_length; // Cast in uint16_t because 16 bits for IPv6 packet length
+    uint16_t packet_length = s->length(); // Cast in uint16_t because 16 bits for IPv6 packet length
 
     // Encode the packet in the repair symbol
-    symbol_add_scaled(r->data() + repair_offset, coef, s->data, packet_length, muls);
+    symbol_add_scaled(r->data() + repair_offset, coef, s->data(), packet_length, muls);
 
     // Encode the packet length
     uint16_t coded_length = repair_tlv->coded_length;
@@ -326,34 +327,6 @@ void IP6SRv6FECEncode::encapsulate_repair_payload(WritablePacket *p, repair_tlv_
 
     // Set annotations
     _repair_packet->set_network_header(p->data(), (unsigned char*)(r_tlv + 1) - p->data());
-}
-
-my_packet_t *
-IP6SRv6FECEncode::init_clone(Packet *p, uint16_t packet_length)
-{
-    my_packet_t *packet = (my_packet_t *)CLICK_LALLOC(sizeof(my_packet_t));
-#ifdef SRV6_FEC_COPY_PACKET
-    uint8_t *data = (uint8_t *)CLICK_LALLOC(packet_length);
-    memset(packet, 0, sizeof(my_packet_t));
-    memset(data, 0, packet_length);
-    memcpy(data, p->data(), packet_length);
-    packet->packet_length = packet_length;
-    packet->data = data;
-#else
-    packet->p = p->clone();
-#endif
-    return packet;
-}
-
-void
-IP6SRv6FECEncode::kill_clone(my_packet_t *p)
-{
-#ifdef SRV6_FEC_COPY_PACKET
-    CLICK_LFREE(p->data, p->packet_length);
-#else
-    p->p->kill();
-#endif
-    CLICK_LFREE(p, sizeof(my_packet_t));
 }
 
 CLICK_ENDDECLS
