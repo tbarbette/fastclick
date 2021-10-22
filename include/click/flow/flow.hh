@@ -151,16 +151,13 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p, F
 
 
 FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
-    const bool always_dup = false;
     FlowNodePtr* child_ptr = 0;
 #if DEBUG_CLASSIFIER
 
     FlowNode* debug_save_root = parent;
 #endif
     int level_nr = 0;
-#if HAVE_FLOW_DYNAMIC
-    bool dynamic = false;
-#endif
+    (void)level_nr;
     do {
         bool need_grow = false;
         FlowNodeData data = parent->level()->get_data(p);
@@ -283,7 +280,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
                     }
                 } else
 #endif
-                { //There is a default but it is not a dynamic level, nor always_dup is set
+                { //There is a default but it is not a dynamic level
 				flow_assert(child_ptr->node->threads[click_current_cpu_id()]);
                     child_ptr = parent->default_ptr();
                     if (child_ptr->is_leaf()) {

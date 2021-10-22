@@ -1,7 +1,7 @@
 #ifndef CLICK_CTXCRC_HH
 #define CLICK_CTXCRC_HH
 #include <click/batchelement.hh>
-#include "ctxelement.hh"
+#include <click/flow/ctxelement.hh>
 #include <click/flowbuffer.hh>
 #include <click/simpledfa.hh>
 CLICK_DECLS

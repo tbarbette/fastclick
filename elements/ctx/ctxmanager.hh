@@ -6,6 +6,7 @@
 #include <vector>
 #include <click/flow/flow.hh>
 #include <click/flow/flowelement.hh>
+#include <click/flow/ctxelement.hh>
 
 
 CLICK_DECLS
@@ -87,7 +88,7 @@ public:
     void add_handlers() override CLICK_COLD;
 
     virtual void fcb_built();
-    static CounterInitFuture _ctx_builded_init_future;
+
     static CounterInitFuture* ctx_builded_init_future() {
         return &_ctx_builded_init_future;
     }

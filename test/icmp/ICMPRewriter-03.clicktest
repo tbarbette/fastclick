@@ -4,9 +4,9 @@
 $VALGRIND click -e "
 elementclass TPrint { \$x |
 	input -> t :: Tee -> IPPrint(\$x, TIMESTAMP false, PAINT true) -> output;
-	t[1] -> outer_ip::CheckIPHeader(0) -> outer_icmp::CheckICMPHeader
+	t[1] -> outer_ip::CheckIPHeader(OFFSET 0) -> outer_icmp::CheckICMPHeader
 		-> Strip(28)
-		-> inner_ip::CheckIPHeader(0)
+		-> inner_ip::CheckIPHeader(OFFSET 0)
 		-> {
 			input -> c::IPClassifier(tcp, udp)
 			-> inner_tcp::CheckTCPHeader -> output;

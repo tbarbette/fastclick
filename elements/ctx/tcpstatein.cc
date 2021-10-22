@@ -83,7 +83,7 @@ bool TCPStateIN::new_flow(TCPStateEntry* fcb, Packet* p) {
 	if (found) {
 		if (_verbose)
 			click_chatter("Found entry, map has %d entries!",_return->_map.size());
-		auto th = p->tcp_header();
+
 		fcb->common = common;
 		fcb->fin_seen = false;
 //we keep the reference from the table
@@ -97,7 +97,7 @@ bool TCPStateIN::new_flow(TCPStateEntry* fcb, Packet* p) {
 		_established ++;
 		return true;
 	}
-    if (!_accept_nonsyn && !p->tcp_header()->th_flags & TH_SYN) {
+    if (!_accept_nonsyn && !(p->tcp_header()->th_flags & TH_SYN)) {
         click_chatter("Flow does not start with a SYN...");
         return false;
     }

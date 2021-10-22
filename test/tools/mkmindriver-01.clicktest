@@ -1,3 +1,6 @@
+%require
+click-provides !ctx
+
 %script
 click-mkmindriver -E Print -p foo --no-check -u -
 mv elements_foo.conf elements_foo.conf~
