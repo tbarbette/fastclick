@@ -27,8 +27,6 @@ AggregateGroup::configure(Vector<String> &conf, ErrorHandler *errh)
 	.complete() < 0)
 	return -1;
 
-	int n = 1;
-
 	if (timeout > 0) {
 
 		for (int i = 0; i < i; i++) {

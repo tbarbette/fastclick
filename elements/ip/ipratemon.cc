@@ -417,8 +417,16 @@ IPRateMonitor::anno_level_write_handler
     return -1;
   }
 
+#ifndef __clang__
+//Stupid old GCC raise warning. When is always defined here
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
   when *= EWMAParameters::epoch_frequency();
   when += EWMAParameters::epoch();
+#ifndef __clang__
+#pragma GCC diagnostic pop
+#endif
 
   me->_lock->acquire();
   unsigned addr = a.addr();

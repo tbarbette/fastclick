@@ -65,6 +65,18 @@
 # endif
 #endif
 
+#if FROMDEVICE_ALLOW_PCAP
+struct my_pcap_data {
+    FromDevice* fd;
+    PacketBatch* batch;
+    PacketBatch* batch_err;
+    Packet* batch_last;
+    Packet* batch_err_last;
+    int batch_count;
+    int batch_err_count;
+};
+#endif
+
 CLICK_DECLS
 
 #define offset_of_base(base,derived,derived_member) ((unsigned char*)(&(reinterpret_cast<base *>(0)->derived_member)) - (unsigned char*)(base *)0)
@@ -447,9 +459,13 @@ FromDevice::initialize(ErrorHandler *errh)
 #endif
 
     if (!_sniffer)
-        if (KernelFilter::device_filter(_ifname, true, errh) < 0)
+        if (KernelFilter::device_filter(_ifname, true, errh) < 0
+#if HAVE_IP6
+                && KernelFilter::device_filter6(_ifname, true, errh) < 0
+#endif
+                ) {
             _sniffer = true;
-
+        }
     }
     return 0;
 }
@@ -457,8 +473,12 @@ FromDevice::initialize(ErrorHandler *errh)
 void
 FromDevice::cleanup(CleanupStage stage)
 {
-    if (stage >= CLEANUP_INITIALIZED && !_sniffer)
+    if (stage >= CLEANUP_INITIALIZED && !_sniffer) {
         KernelFilter::device_filter(_ifname, false, ErrorHandler::default_handler());
+#if HAVE_IP6
+        KernelFilter::device_filter6(_ifname, false, ErrorHandler::default_handler());
+#endif
+    }
 #if FROMDEVICE_ALLOW_LINUX
     if (_fd >= 0 && _method == method_linux) {
         if (_was_promisc >= 0)
@@ -475,18 +495,6 @@ FromDevice::cleanup(CleanupStage stage)
     _fd = -1;
 #endif
 }
-
-#if FROMDEVICE_ALLOW_PCAP
-struct my_pcap_data {
-    FromDevice* fd;
-    PacketBatch* batch;
-    PacketBatch* batch_err;
-    Packet* batch_last;
-    Packet* batch_err_last;
-    int batch_count;
-    int batch_err_count;
-};
-#endif
 
 #if FROMDEVICE_ALLOW_PCAP
 CLICK_ENDDECLS
@@ -771,16 +779,8 @@ FromDevice::dev_set_rss_reta(unsigned* reta, unsigned reta_sz)
 {
 	struct ethtool_rxfh rss_head = {0};
 	struct ethtool_rxfh *rss = NULL;
-	//struct ethtool_rxnfc ring_count;
-	//struct ethtool_gstrings *hfuncs = NULL;
-	char *rxfhindir_key = NULL;
-	char *req_hfunc_name = NULL;
-	char *hfunc_name = NULL;
-	char *hkey = NULL;
 	int err = 0;
-	int i;
-	uint32_t arg_num = 0, indir_bytes = 0;
-	uint32_t req_hfunc = 0;
+	uint32_t indir_bytes = 0;
 	uint32_t entry_size = sizeof(rss_head.rss_config[0]);
 
 	/* Open control socket. */
@@ -823,7 +823,7 @@ FromDevice::dev_set_rss_reta(unsigned* reta, unsigned reta_sz)
 	rss->hfunc = 0;
 	rss->key_size = 0;
 	rss->indir_size = reta_sz;
-	for (i = 0; i < reta_sz; i++) {
+	for (unsigned i = 0; i < reta_sz; i++) {
 		rss->rss_config[i] = reta[i];
 	}
 

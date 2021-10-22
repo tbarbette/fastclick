@@ -100,6 +100,32 @@ KernelFilter::device_filter(const String &devname, bool add_filter,
     return errh->nerrors() == before ? 0 : -1;
 }
 
+#if HAVE_IP6
+int
+KernelFilter::device_filter6(const String &devname, bool add_filter,
+			    ErrorHandler *errh,
+			    const String &iptables_command)
+{
+    StringAccum cmda;
+    if (iptables_command)
+	cmda << iptables_command;
+    else if (access("/sbin/ip6tables", X_OK) == 0)
+	cmda << "/sbin/iptables";
+    else if (access("/usr/sbin/ip6tables", X_OK) == 0)
+	cmda << "/usr/sbin/ip6tables";
+    else
+	return errh->error("no %<ip6tables%> executable found");
+    cmda << " " << (add_filter ? "-A" : "-D") << " INPUT -i "
+	 << shell_quote(devname) << " -j DROP";
+    String cmd = cmda.take_string();
+    int before = errh->nerrors();
+    String out = shell_command_output_string(cmd, "", errh);
+    if (out)
+	errh->error("%s: %s", cmd.c_str(), out.c_str());
+    return errh->nerrors() == before ? 0 : -1;
+}
+#endif
+
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel)
 EXPORT_ELEMENT(KernelFilter)

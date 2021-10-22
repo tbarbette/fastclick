@@ -29,7 +29,7 @@ CLICK_DECLS
 
 CheckGREHeader([I<keywords> OFFSET, CHECKSUM, KEY, SEQUENCE, VERBOSE, DETAILS])
 
-=s GRE
+=s tunnel
 
 checks GRE header
 

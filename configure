@@ -832,6 +832,7 @@ enable_dpdk_xchg
 enable_dpdk_packet
 enable_dpdk_softqueue
 enable_flow_api
+enable_click_pool
 enable_pool_inlining
 enable_inlined_allanno
 enable_zerocopy
@@ -858,10 +859,10 @@ enable_all_elements
 enable_analysis
 enable_app
 enable_aqm
-enable_ctx
 enable_ethernet
 enable_etherswitch
 enable_flow
+enable_ctx
 enable_grid
 enable_icmp
 enable_ip
@@ -1579,6 +1580,9 @@ Optional Features:
                           packets before flushing.
       --enable-flow-api   Support for the HW flow classification API. Also
                           needs DPDK>=20.02
+      --enable-click-pool allow usage of Click Packet pool. It will still only
+                          be effectively enabled in specific cases, see
+                          packet.hh
     --disable-pool-inlining
                           Do not optimize pool_prepare_data_burst function
                           before data structure reordering done at the IR
@@ -1607,10 +1611,10 @@ Optional Features:
   --disable-analysis      do not include elements for network analysis
   --disable-app           do not include application-level elements
   --disable-aqm           do not include active queue management elements
-  --enable-ctx            include Context-based elements for MiddleClick
   --disable-ethernet      do not include Ethernet elements
   --enable-etherswitch    include Ethernet switch elements
   --enable-flow           include Enable flow system and elements
+  --enable-ctx            include Context-based elements
   --enable-grid           include Grid elements (see FAQ)
   --disable-icmp          do not include ICMP elements
   --disable-ip            do not include IP elements
@@ -3267,6 +3271,7 @@ as_fn_append ac_header_list " stdlib.h"
 as_fn_append ac_header_list " sys/param.h"
 as_fn_append ac_header_list " ifaddrs.h"
 as_fn_append ac_header_list " linux/if_tun.h"
+as_fn_append ac_header_list " linux/if_packet.h"
 as_fn_append ac_header_list " net/if_dl.h"
 as_fn_append ac_header_list " net/if_tap.h"
 as_fn_append ac_header_list " net/if_tun.h"
@@ -5920,6 +5925,42 @@ ac_cpp='$CXXCPP $CPPFLAGS'
 ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -Wno-inconsistent-missing-override" >&5
+$as_echo_n "checking whether C++ compiler accepts -Wno-inconsistent-missing-override... " >&6; }
+if ${ax_cv_check_cxxflags__Werror__Wno_inconsistent_missing_override+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS -Werror -Wno-inconsistent-missing-override"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags__Werror__Wno_inconsistent_missing_override=yes
+else
+  ax_cv_check_cxxflags__Werror__Wno_inconsistent_missing_override=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags__Werror__Wno_inconsistent_missing_override" >&5
+$as_echo "$ax_cv_check_cxxflags__Werror__Wno_inconsistent_missing_override" >&6; }
+if test "x$ax_cv_check_cxxflags__Werror__Wno_inconsistent_missing_override" = xyes; then :
+  CXXFLAGS="$CXXFLAGS -Wno-inconsistent-missing-override"
+else
+  :
+fi
 
 
 case "$target" in
@@ -8606,6 +8647,17 @@ else
 fi
 
 
+
+# Check whether --enable-click-pool was given.
+if test "${enable_click_pool+set}" = set; then :
+  enableval=$enable_click_pool; $as_echo "#define ALLOW_CLICK_PACKET_POOL 1" >>confdefs.h
+
+else
+  enable_click_pool=no
+fi
+
+
+
 # Check whether --enable-pool-inlining was given.
 if test "${enable_pool_inlining+set}" = set; then :
   enableval=$enable_pool_inlining; :
@@ -9054,17 +9106,6 @@ if test "x$enable_aqm" = xyes; then
     :
 
 fi
-# Check whether --enable-ctx was given.
-if test "${enable_ctx+set}" = set; then :
-  enableval=$enable_ctx;
-else
-  enable_ctx=NO
-fi
-test "x$enable_all_elements" = xyes -a \( "x$enable_ctx" = xNO -o "x$enable_ctx" = x \) && enable_ctx=yes
-if test "x$enable_ctx" = xyes; then
-    :
-
-fi
 # Check whether --enable-ethernet was given.
 if test "${enable_ethernet+set}" = set; then :
   enableval=$enable_ethernet;
@@ -9097,6 +9138,17 @@ test "x$enable_all_elements" = xyes -a \( "x$enable_flow" = xNO -o "x$enable_flo
 if test "x$enable_flow" = xyes; then
     :
 
+fi
+# Check whether --enable-ctx was given.
+if test "${enable_ctx+set}" = set; then :
+  enableval=$enable_ctx;
+else
+  enable_ctx=no
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_ctx" = xNO -o "x$enable_ctx" = x \) -a "x$enable_flow" = xyes   && enable_ctx=yes
+if test "x$enable_ctx" = xyes; then
+    :
+    enable_ctx=no
 fi
 # Check whether --enable-grid was given.
 if test "${enable_grid+set}" = set; then :
@@ -12952,6 +13004,8 @@ for i in bin clickdata data dataroot include lib sbin; do
     shell_expand ${i}dir
     shell_mkbuild ${i}dir
 done
+
+
 
 
 

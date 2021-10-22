@@ -101,8 +101,8 @@ class Bypass : public BatchElement { public:
     struct Locator : public RouterVisitor {
         Element* _e;
         int _port;
-        bool _unstack;
         int _from_port;
+        bool _unstack;
         Locator(int from_port);
         bool visit(Element *e, bool isoutput, int port,
                    Element *from_e, int from_port, int distance);
