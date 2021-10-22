@@ -52,15 +52,16 @@ jobs:
                 cd .. &&
                 cd .. ;
             fi
-            if [ "${{matrix.FRAMEWORK}}" = "vanilla-nopool" ] ; then
-                export FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --disable-click-pool";
-            fi
+
             if [ "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then
                 FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --enable-dpdk-packet --disable-clone --disable-task-stats --disable-cpu-load --disable-dpdk-softqueue"
             fi
             echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
             echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
             echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          elif [ "${{matrix.FRAMEWORK}}" = "vanilla-nopool" ] ; then
+              FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --disable-click-pool"
+              echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
           fi
     - name: configure
       run: |

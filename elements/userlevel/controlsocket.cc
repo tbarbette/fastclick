@@ -714,7 +714,14 @@ ControlSocket::parse_command(connection &conn, const String &line)
       if (words.size() != 3)
 	  return conn.message(CSERR_SYNTAX, "Wrong number of arguments");
       int datalen, r;
+#ifndef __clang__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
       if (!IntArg().parse(words[2], datalen) || datalen < 0)
+#ifndef __clang__
+#pragma GCC diagnostic pop
+#endif
 	  return conn.message(CSERR_SYNTAX, "Syntax error in '%s'", command.c_str());
       String data;
       if ((r = conn.read(datalen, data)) != 0)

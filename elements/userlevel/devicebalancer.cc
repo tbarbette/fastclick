@@ -253,7 +253,7 @@ DeviceBalancer::run_timer(Timer* t) {
     std::vector<std::pair<int,float>> load;
     float totload = 0;
     if (_load == LOAD_CPU) {
-        for (int u = 0; u < _used_cpus.size(); u++) {
+        for (unsigned u = 0; u < (unsigned)_used_cpus.size(); u++) {
             int i = _used_cpus[u].id;
             float l = master()->thread(i)->load();
             load.push_back(std::pair<int,float>{i,l});
@@ -269,7 +269,7 @@ DeviceBalancer::run_timer(Timer* t) {
          */
         unsigned long long utotload = 0;
         Vector<unsigned long long> uload;
-        for (int u = 0; u < _used_cpus.size(); u++) {
+        for (unsigned u = 0; u < (unsigned)_used_cpus.size(); u++) {
             int phys_id = _used_cpus[u].id;
             unsigned long long ul = master()->thread(phys_id)->useful_kcycles();
             unsigned long long pl = _used_cpus[u].last_cycles;
@@ -290,7 +290,7 @@ DeviceBalancer::run_timer(Timer* t) {
 
         int overloaded = 0;
 
-        for (int u = 0; u < _used_cpus.size(); u++) {
+        for (unsigned u = 0; u < (unsigned)_used_cpus.size(); u++) {
             int i = _used_cpus[u].id;
             float l;
             if (utotload == 0)
@@ -357,7 +357,7 @@ DeviceBalancer::run_timer(Timer* t) {
         DPDKDevice* fd = (DPDKDevice*)((BalanceMethodDevice*)_method)->_fd;
         int port_id = fd->port_id;
         float rxdesc = fd->get_nb_rxdesc();
-        for (int u = 0; u < _used_cpus.size(); u++) {
+        for (unsigned u = 0; u < _used_cpus.size(); u++) {
             int i = _used_cpus[u].id;
             int v = rte_eth_rx_queue_count(port_id, i);
             float l = (float)v / rxdesc;
@@ -368,7 +368,7 @@ DeviceBalancer::run_timer(Timer* t) {
 
     if (unlikely(_verbose > 1)) {
         String s = "load ";
-        for (int u = 0; u < load.size(); u++) {
+        for (unsigned u = 0; u < load.size(); u++) {
             s += String(load[u].second) + " ";
         }
         s += "\n";
@@ -377,7 +377,7 @@ DeviceBalancer::run_timer(Timer* t) {
 
     if (unlikely(_target == TARGET_BALANCE)) {
         float target = totload / num_max_cpus();
-        for (int i = 0; i < load.size(); i ++) {
+        for (unsigned i = 0; i < (unsigned)load.size(); i ++) {
             if (target < 0.1)
                 load[i].second = 0.5;
             else {
@@ -496,18 +496,19 @@ DeviceBalancer::write_param(const String &in_s, Element *e, void *vparam,
         break;
     }
     case h_force_cpu: {
-    int cpus;
+        int cpus;
         if (!IntArg().parse(s, cpus))
             return errh->error("type mismatch");
         bool moved = false;
-        if (cpus > db->_used_cpus.size())
-        for (int i = 0; i < cpus-db->_used_cpus.size(); i++) {
-            if (db->_available_cpus.size() > 0) {
-                db->addCore();
-                moved = true;
+        if (cpus > (int)db->_used_cpus.size()) {
+            for (unsigned i = 0; i < cpus-db->_used_cpus.size(); i++) {
+                if (db->_available_cpus.size() > 0) {
+                    db->addCore();
+                    moved = true;
+                }
             }
         }
-        else if (cpus < db->_used_cpus.size()) {
+        else if (cpus < (int)db->_used_cpus.size()) {
             //in_s = "UNSUPPORTED";
             return -1;
         //for (int i = 0; i < db->_used_cpus.size() - cpus; i++) {

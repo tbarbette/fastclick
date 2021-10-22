@@ -52,6 +52,8 @@ AC_C_INLINE
 CLICK_PROG_CXX
 AC_PROG_CXXCPP
 
+AX_CHECK_COMPILE_FLAG(-Wno-inconsistent-missing-override,CXXFLAGS="$CXXFLAGS -Wno-inconsistent-missing-override",:,[-Werror])
+
 case "$target" in
         *x86*)
                 AX_CHECK_X86_FEATURES([CFLAGS="$CFLAGS $X86_FEATURE_CFLAGS";CXXFLAGS="$CXXFLAGS $X86_FEATURE_CFLAGS"])
@@ -1567,7 +1569,7 @@ dnl
 dnl kernel interfaces
 dnl
 
-AC_CHECK_HEADERS_ONCE([ifaddrs.h linux/if_tun.h net/if_dl.h net/if_tap.h net/if_tun.h net/if_types.h net/bpf.h netpacket/packet.h])
+AC_CHECK_HEADERS_ONCE([ifaddrs.h linux/if_tun.h linux/if_packet.h net/if_dl.h net/if_tap.h net/if_tun.h net/if_types.h net/bpf.h netpacket/packet.h])
 
 
 dnl

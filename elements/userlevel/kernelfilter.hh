@@ -67,7 +67,11 @@ class KernelFilter : public Element { public:
     static int device_filter(const String &devname, bool add_filter,
 			     ErrorHandler *errh,
 			     const String &iptables_command = String());
-
+#if HAVE_IP6
+    static int device_filter6(const String &devname, bool add_filter,
+			     ErrorHandler *errh,
+			     const String &iptables_command = String());
+#endif
   private:
 
     Vector<String> _drop_devices;
