@@ -28,7 +28,7 @@ class PacketTest : public Element { public:
 
     const char *class_name() const override		{ return "PacketTest"; }
 
-    int initialize(ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler *) override CLICK_COLD;
 
 };
 

@@ -37,7 +37,37 @@ PacketTest::initialize(ErrorHandler *errh)
     const unsigned char *lowers = (const unsigned char *)"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
     IPAddress addr(String("1.2.3.4"));
 
-    Packet *p = Packet::make(10, lowers, 20, 30);
+    Packet *p;
+    WritablePacket *p1;
+    Packet *p2;
+    WritablePacket *p3;
+
+#ifndef CLICK_NOINDIRECT
+    p = Packet::make(10);
+    Packet* pref1 = p->clone();
+    CHECK(p->shared());
+    CHECK(pref1->shared());
+    p2 = p->uniqueify();
+    CHECK(p2);
+    CHECK(!p2->shared());
+    CHECK(pref1->buffer() != p2->buffer());
+    CHECK(p2->data() != pref1->data());
+    p1 = Packet::make(10);
+    CHECK(pref1 != p1 && pref1->buffer() != p1->buffer());
+    CHECK(pref1 != p2 && pref1->buffer() != p1->buffer());
+    CHECK(p1 != p2 && p1->buffer() != p2->buffer());
+    p1->kill();
+    p2->kill();
+    p1 = Packet::make(10);
+    p2 = Packet::make(10);
+    CHECK(pref1 != p1 && pref1->buffer() != p1->buffer());
+    CHECK(pref1 != p2 && pref1->buffer() != p2->buffer());
+    pref1->kill();
+    p1->kill();
+    p2->kill();
+#endif
+
+    p = Packet::make(10, lowers, 20, 30);
     CHECK(p->headroom() >= 10);
     CHECK(p->tailroom() >= 30);
     CHECK(p->length() == 20);
@@ -50,7 +80,7 @@ PacketTest::initialize(ErrorHandler *errh)
     CHECK(p->network_header() == p->data() + 10);
     p->set_dst_ip_anno(addr);
 
-    WritablePacket *p1 = p->push(5);
+    p1 = p->push(5);
     // p is dead
     CHECK(p == p1);
     CHECK(p1->headroom() >= 5);
@@ -61,7 +91,8 @@ PacketTest::initialize(ErrorHandler *errh)
     CHECK(p1->network_header() == p->data() + 15);
     CHECK(p1->dst_ip_anno() == addr);
 
-    Packet *p2 = p1->clone();
+#ifndef CLICK_NOINDIRECT
+    p2 = p1->clone();
     CHECK(p2 != p1);
     CHECK(p2->data() == p1->data());
     CHECK(p2->length() == 25);
@@ -69,7 +100,7 @@ PacketTest::initialize(ErrorHandler *errh)
     CHECK(p1->mac_header() == p2->mac_header());
     CHECK(p2->dst_ip_anno() == addr);
 
-    WritablePacket *p3 = p2->push(5);
+    p3 = p2->push(5);
     // p2 is dead
     CHECK(p3 != p1);
     CHECK(p3->length() == 30);
@@ -86,6 +117,7 @@ PacketTest::initialize(ErrorHandler *errh)
 
     p1->kill();
     p3->kill();
+#endif
 
 #if 0
     // time cloning
@@ -97,9 +129,13 @@ PacketTest::initialize(ErrorHandler *errh)
 
     // test shift_data()
     p = Packet::make(10, lowers, 60, 4);
-    CHECK(p->headroom() == 10 && p->tailroom() == 4);
+    int tail = p->tailroom();
+    int head = p->headroom();
+    const unsigned char* data = p->data();
+    CHECK(p->headroom() == 10 && p->tailroom() >= 4);
     p = p->shift_data(-2);
-    CHECK(p->headroom() == 8 && p->tailroom() == 6);
+    CHECK(p->data() == data - 2);
+    CHECK(p->headroom() == head - 2 && p->tailroom() == tail + 2);
     CHECK(p->length() == 60);
     CHECK_DATA(p->data(), lowers, 60);
     CHECK_ALIGNED(p->data());
@@ -107,12 +143,14 @@ PacketTest::initialize(ErrorHandler *errh)
 
     p = Packet::make(9, lowers, 60, 4);
     p = p->shift_data(3);
-    CHECK(p->headroom() == 12 && p->tailroom() == 1 && p->length() == 60);
+    CHECK(p->headroom() == 12 && p->tailroom() >= 1 && p->length() == 60);
     CHECK_DATA(p->data(), lowers, 60);
     CHECK_ALIGNED(p->data());
     p->kill();
 
     p = Packet::make(1, lowers, 60, 4);
+    tail = p->tailroom();
+    head = p->headroom();
     p = p->shift_data(-5);
     CHECK(p->tailroom() >= 9 && p->length() == 60);
     CHECK_DATA(p->data(), lowers, 60);
@@ -121,7 +159,7 @@ PacketTest::initialize(ErrorHandler *errh)
 
     p = Packet::make(5, lowers, 60, 2);
     p = p->shift_data(3);
-    CHECK(p->headroom() >= 8 && p->length() == 60);
+    CHECK(p->headroom() == 8 && p->length() == 60);
     CHECK_DATA(p->data(), lowers, 60);
     CHECK_ALIGNED(p->data());
     p->kill();
