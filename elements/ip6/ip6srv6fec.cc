@@ -53,6 +53,7 @@ IP6SRv6FECEncode::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read_mp("DEC", dec)
     .read_or_set("WINDOW", _rlc_info.window_size, 4)
     .read_or_set("STEP", _rlc_info.window_step, 2)
+    .read_or_set("SCHEME", _fec_scheme, SRV6_FEC_RLC)
 	.complete() < 0)
         return -1;
 
@@ -151,18 +152,22 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
         memset(_repair_packet->data(), 0, _repair_packet->length());
 
         // Encode the source symbols in repair
-        rlc_encode_symbols(_source_tlv.sfpid);
+        if (_fec_scheme == SRV6_FEC_RLC) {
+            rlc_encode_symbols(_source_tlv.sfpid);
+        } else {
+            xor_encode_symbols(_source_tlv.sfpid);
+        }
 
         // Free the out-of-window source symbols
         // Maybe this will give a problem once we support adaptative RLC
         // Because we might free data that should be used after if the window
         // size increases
-        rlc_free_out_of_window(_source_tlv.sfpid);
+        free_out_of_window(_source_tlv.sfpid);
 
         // Complete the Repair FEC Payload ID
         _repair_tlv.type = TLV_TYPE_FEC_REPAIR;
         _repair_tlv.len = sizeof(repair_tlv_t) - 2;
-        _repair_tlv.padding = 0;
+        _repair_tlv.padding = _fec_scheme;
         _repair_tlv.rfpid = _source_tlv.sfpid;
         _repair_tlv.rfi = ((_rlc_info.window_step << 24) + (_rlc_info.window_step << 16)) + _rlc_info.repair_key;
         _repair_tlv.nss = _rlc_info.window_size;
@@ -172,9 +177,9 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
         _rlc_info.buffer_size -= _rlc_info.window_step;
         ++_rlc_info.repair_key;
 
+        _rlc_info.previous_window_step = _rlc_info.window_step;
         // Update coding rate
         // TODO
-        _rlc_info.previous_window_step = _rlc_info.window_step;
         
         return 1;
     }
@@ -200,13 +205,48 @@ IP6SRv6FECEncode::rlc_encode_symbols(uint32_t encoding_symbol_id)
         uint8_t idx = (start_esid + i) % SRV6_FEC_BUFFER_SIZE;
         Packet *source_symbol = _rlc_info.source_buffer[idx];
 
-        // Print data first bytes
         rlc_encode_one_symbol(source_symbol, _repair_packet, &prng, _rlc_info.muls, &_repair_tlv);
     }
 }
 
 void
-IP6SRv6FECEncode::rlc_free_out_of_window(uint32_t encoding_symbol_id) {
+IP6SRv6FECEncode::xor_encode_symbols(uint32_t encoding_symbol_id)
+{
+    uint32_t start_esid = encoding_symbol_id - _rlc_info.window_size + 1;
+    for (int i = 0; i < _rlc_info.window_size; ++i) {
+        uint8_t idx = (start_esid + i) % SRV6_FEC_BUFFER_SIZE;
+        Packet *source_symbol = _rlc_info.source_buffer[idx];
+
+        xor_encode_one_symbol(source_symbol, _repair_packet, &_repair_tlv);
+    }
+}
+
+void
+IP6SRv6FECEncode::xor_encode_one_symbol(Packet *s, WritablePacket *r, repair_tlv_t *repair_tlv)
+{
+    // Leave room for the IPv6 Header, SRv6 Header (3 segments) and repair TLV
+    uint8_t repair_offset = 40 + 8 + 16 * 2 + sizeof(repair_tlv_t);
+    uint8_t *s_64 = (uint8_t *)s->data();
+    uint8_t *r_64 = (uint8_t *)(r->data() + repair_offset);
+
+    for (uint16_t i = 0; i < s->length() / sizeof(uint8_t); ++i) {
+        r_64[i] ^= s_64[i];
+    }
+
+    // Also code the potential remaining data
+    uint8_t *s_8 = (uint8_t *)s->data();
+    uint8_t *r_8 = (uint8_t *)(r->data() + repair_offset);
+    for (uint16_t i = (s->length() / sizeof(uint8_t)) * sizeof(uint8_t); i < s->length(); ++i) {
+        r_8[i] ^= s_8[i];
+    }
+
+    // Encode the packet length
+    uint16_t coded_length = repair_tlv->coded_length;
+    repair_tlv->coded_length ^= s->length();
+}
+
+void
+IP6SRv6FECEncode::free_out_of_window(uint32_t encoding_symbol_id) {
     for (int i = 0; i < _rlc_info.window_step; ++i) {
         uint16_t buffer_idx = encoding_symbol_id - _rlc_info.window_size + i + 1;
         Packet *p_kill = _rlc_info.source_buffer[buffer_idx % SRV6_FEC_BUFFER_SIZE];

@@ -97,6 +97,9 @@ struct rlc_info_decoder_t {
   uint32_t encoding_symbol_id;
 };
 
+#define SRV6_FEC_RLC 0
+#define SRV6_FEC_XOR 1
+
 class IP6SRv6FECDecode : public Element { 
  
  public:
@@ -146,6 +149,9 @@ class IP6SRv6FECDecode : public Element {
   void sort_system(uint8_t **a, srv6_fec2_term_t **constant_terms, int n_eq, int n_unknowns);
   int first_non_zero_idx(const uint8_t *a, int n_unknowns);
   void gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_fec2_term_t **constant_terms, srv6_fec2_term_t **x, bool *undetermined, uint8_t *mul, uint8_t *inv, uint16_t max_packet_length);
+
+  void xor_recover_symbols() CLICK_COLD;
+  void xor_one_symbol(srv6_fec2_term_t *rec, Packet *s) CLICK_COLD;
 };
 
 CLICK_ENDDECLS

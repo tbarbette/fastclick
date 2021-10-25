@@ -167,7 +167,11 @@ IP6SRv6FECDecode::fec_scheme_repair(WritablePacket *p_in, repair_tlv_t *tlv)
     store_repair_symbol(p_in, tlv);
 
     // Call RLC recovery
-    rlc_recover_symbols();
+    if (tlv->padding == SRV6_FEC_RLC) {
+        rlc_recover_symbols();
+    } else {
+        xor_recover_symbols();
+    }
 
     return 0;
 }
@@ -292,6 +296,9 @@ IP6SRv6FECDecode::rlc_recover_symbols()
         if (!repair || repair->tlv.rfpid != running_esid) {
             break;
         }
+        const click_ip6_sr *srv6 = reinterpret_cast<const click_ip6_sr *>(repair->p->data() + sizeof(click_ip6));
+        uint16_t repair_offset = sizeof(click_ip6) + sizeof(click_ip6_sr) + srv6->ip6_hdrlen * 8;
+        max_packet_length = MAX(max_packet_length, repair->p->length() - repair_offset);
         window_size = repair->tlv.nss;
         max_seen_window_size = MAX(max_seen_window_size, window_size);
         window_step = (repair->tlv.rfi >> 16) & 0xff;
@@ -367,7 +374,6 @@ IP6SRv6FECDecode::rlc_recover_symbols()
             if (id_theoric == id_from_buffer) {
                 // Received symbol, store it in the buffer
                 ss_array[i] = source;
-                max_packet_length = MAX(max_packet_length, source->p->length());
             } else {
                 is_lost = 1;
             }
@@ -379,7 +385,6 @@ IP6SRv6FECDecode::rlc_recover_symbols()
             if (rec) {
                 if (rec->encoding_symbol_id == id_theoric) {
                     ss_array[i] = rec;
-                    max_packet_length = MAX(max_packet_length, rec->p->length());
                     
                     // Hence the packet is not lost anymore
                     is_lost = 0;
@@ -777,6 +782,105 @@ IP6SRv6FECDecode::recover_packet_fom_data(srv6_fec2_term_t *rec)
     // TODO
 
     return p;
+}
+
+void
+IP6SRv6FECDecode::xor_recover_symbols()
+{
+    uint32_t esid = _rlc_info.encoding_symbol_id;
+    srv6_fec2_repair_t *repair = _rlc_info.repair_buffer[esid % SRV6_FEC_BUFFER_SIZE];
+    uint8_t window_size = repair->tlv.nss;
+    const click_ip6_sr *srv6 = reinterpret_cast<const click_ip6_sr *>(repair->p->data() + sizeof(click_ip6));
+    uint16_t repair_offset = sizeof(click_ip6) + sizeof(click_ip6_sr) + srv6->ip6_hdrlen * 8;
+    uint16_t max_packet_length = repair->p->length() - repair_offset;
+
+    // 1. Detect if we can recover a lost source symbol in the window
+    //    If there are more than one lost symbol in the window, we cannot recover it
+    //    Store them in a separate buffer for easier access
+    Packet *xor_buff[window_size];
+    uint8_t nb_source = 0;
+    bool lost_one_symbol = false;
+    uint32_t lost_esid = 0;
+    for (uint32_t i = 0; i < window_size; ++i) {
+        // Iterate from the end but XOR is commutative and associative
+        uint16_t idx = (esid - i) % SRV6_FEC_BUFFER_SIZE;
+        uint32_t theoric_esid = esid - i;
+        srv6_fec2_source_t *source = _rlc_info.source_buffer[idx];
+        srv6_fec2_source_t *rec = _rlc_info.recovd_buffer[idx];
+        if (source && source->encoding_symbol_id == theoric_esid) {
+            xor_buff[nb_source++] = source->p;
+        } else if (rec && rec->encoding_symbol_id == theoric_esid) {
+            // Maybe the symbol was recovered earlier in a previous window
+            xor_buff[nb_source++] = rec->p;
+        } else {
+            if (lost_one_symbol) {
+                return; // More than one lost symbol, cannot recover
+            }
+            lost_one_symbol = true;
+            lost_esid = theoric_esid;
+        }
+    }
+
+    if (!lost_one_symbol) {
+        return;
+    }
+
+    // 2. We know we have lost exactly one source symbol
+    //    We can recover it by XORing the repair and source symbols
+    srv6_fec2_term_t *rec = (srv6_fec2_term_t *)CLICK_LALLOC(sizeof(srv6_fec2_term_t));
+    uint8_t *data = (uint8_t *)CLICK_LALLOC(sizeof(uint8_t) * max_packet_length);
+    rec->length.coded_length = repair->tlv.coded_length;
+    rec->data = data;
+    // Copy data from the repair symbol
+    memcpy(data, repair->p->data() + repair_offset, max_packet_length);
+    for (uint32_t i = 0; i < nb_source; ++i) {
+        xor_one_symbol(rec, xor_buff[i]);
+    }
+
+    // 3. Send the recovered symbol and store it in the recovered buffer
+    //    Also make room if there was a previous recovered buffer
+    WritablePacket *p_rec = recover_packet_fom_data(rec);
+    if (!p_rec) {
+        click_chatter("Error confirmed");
+        CLICK_LFREE(rec, sizeof(srv6_fec2_term_t));
+        return;
+    }
+    srv6_fec2_source_t *prev_rec = _rlc_info.recovd_buffer[lost_esid % SRV6_FEC_BUFFER_SIZE];
+    if (prev_rec) {
+        prev_rec->encoding_symbol_id = lost_esid;
+        prev_rec->p = p_rec->clone();
+    } else {
+        srv6_fec2_source_t *rec = (srv6_fec2_source_t *)CLICK_LALLOC(sizeof(srv6_fec2_source_t));
+        rec->encoding_symbol_id = lost_esid;
+        rec->p = p_rec->clone();
+        _rlc_info.recovd_buffer[lost_esid % SRV6_FEC_BUFFER_SIZE] = rec;
+    }
+    output(0).push(p_rec);
+
+    CLICK_LFREE(data, sizeof(uint8_t) * max_packet_length);
+    CLICK_LFREE(rec, sizeof(srv6_fec2_term_t));
+}
+
+void
+IP6SRv6FECDecode::xor_one_symbol(srv6_fec2_term_t *rec, Packet *s)
+{
+    uint8_t *s_64 = (uint8_t *)s->data();
+    uint8_t *r_64 = (uint8_t *)rec->data;
+
+    for (uint16_t i = 0; i < s->length() / sizeof(uint8_t); ++i) {
+        // click_chatter("XOR with source i=%u  %x, repair before=%x", i, s_64[i], r_64[i]);
+        r_64[i] ^= s_64[i];
+    }
+
+    // Also code the potential remaining data
+    uint8_t *s_8 = (uint8_t *)s->data();
+    uint8_t *r_8 = (uint8_t *)rec->data;
+    for (uint16_t i = (s->length() / sizeof(uint8_t)) * sizeof(uint8_t); i < s->length(); ++i) {
+        r_8[i] ^= s_8[i];
+    }
+
+    // Encode the packet length
+    rec->length.coded_length ^= s->length();
 }
 
 CLICK_ENDDECLS
