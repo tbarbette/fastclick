@@ -39,8 +39,8 @@ IP6Drop::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read_all("ADDR", addrs)
     .read_or_set("P", p, 0)
     .read_or_set("R", r, 0)
-    .read_or_set("h", h, 1)
-    .read_or_set("K", k, 0)
+    .read_or_set("H", h, 0)
+    .read_or_set("K", k, 1)
     .read_or_set("SEED", seed, 51)
 	.complete() < 0)
         return -1;
@@ -56,6 +56,14 @@ IP6Drop::configure(Vector<String> &conf, ErrorHandler *errh)
 Packet *
 IP6Drop::simple_action(Packet *p_in)
 {
+    // // Do not drop the repair symbols
+    // // TODO: adapt if we change and do not use ping anymore
+    // if (p_in->length() > 200) return p_in;
+    // total_seen++;
+    // for (int i = 0; i < idxs.size(); ++i) {
+    //     if (total_seen % 20 == idxs.at(i)) return 0;
+    // }
+    // return p_in;
     const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
     uint32_t *dst_32 = (uint32_t *)&ip6->ip6_dst;
     bool found = false;
@@ -69,8 +77,9 @@ IP6Drop::simple_action(Packet *p_in)
     }
     if (!found) return p_in;
 
-    if (!gemodel())
+    if (!gemodel()) {
         return 0;
+    }
     return p_in;
 }
 
@@ -80,14 +89,14 @@ IP6Drop::gemodel()
     bool keep_packet = true;
     bool change_state = false;
     if (state == good) {
-        keep_packet = (rand() % 100) <= k;
-        change_state = (rand() % 100) <= p;
+        keep_packet = (rand() % 100) <= k * 100;
+        change_state = (rand() % 100) <= p * 100;
         if (change_state) {
             state = bad;
         }
     } else {
-        keep_packet = (rand() % 100) <= h;
-        change_state = (rand() % 100) <= r;
+        keep_packet = (rand() % 100) <= h * 100;
+        change_state = (rand() % 100) <= r * 100;
         if (change_state) {
             state = good;
         }
