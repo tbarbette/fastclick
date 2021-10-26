@@ -43,6 +43,7 @@ class IP6SREncap : public SimpleElement<IP6SREncap> { public:
 
   int _sr_len;
   click_ip6_sr* _sr;
+  bool _do_encap_dst;
 };
 
 CLICK_ENDDECLS

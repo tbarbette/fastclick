@@ -23,7 +23,7 @@
 #include <click/glue.hh>
 CLICK_DECLS
 
-IP6SREncap::IP6SREncap()
+IP6SREncap::IP6SREncap() : _do_encap_dst(true)
 {
 
 }
@@ -39,9 +39,15 @@ IP6SREncap::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (Args(conf, this, errh)
 	.read_all("ADDR", addr)
+    .read("ENCAP_DST", _do_encap_dst)
 	.complete() < 0)
         return -1;
-    assert(sizeof(click_ip6_sr) == 8);
+    if (_do_encap_dst) {
+        addr.push_front(IP6Address());
+    }
+
+    static_assert(sizeof(click_ip6_sr) == 8);
+
     _sr_len = sizeof(click_ip6_sr) + addr.size() * sizeof(IP6Address);
     _sr = (click_ip6_sr*)CLICK_LALLOC(_sr_len);
     _sr->ip6_hdrlen = sizeof(IP6Address) * addr.size() / 8;
@@ -71,6 +77,11 @@ IP6SREncap::simple_action(Packet *p_in)
     sr->ip6_sr_next =  ip6->ip6_nxt;
     ip6->ip6_nxt = IP6_EH_ROUTING;
 
+    if (_do_encap_dst) {
+        sr->segments[0] = ip6->ip6_dst;
+    }
+
+    ip6->ip6_dst = sr->segments[sr->segment_left];
     // Also update the IPv6 Header to add the SRH length in the payload
     ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) + _sr_len);
     p->set_network_header(p->data(), p->network_header_length() + _sr_len);

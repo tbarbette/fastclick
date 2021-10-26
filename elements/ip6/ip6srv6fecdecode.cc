@@ -779,7 +779,10 @@ IP6SRv6FECDecode::recover_packet_fom_data(srv6_fec2_term_t *rec)
     ip6->ip6_vfc &= 0b11111100;
 
     // 6. Compute the checksum
-    // TODO
+    // TODO : utiliser un element si besoin
+
+    // 7. Set annotations
+    p->set_network_header((unsigned char*)ip6, ntohs(ip6->ip6_plen));
 
     return p;
 }
