@@ -43,6 +43,7 @@ FastUDPFlows::FastUDPFlows()
     _first = _last = 0;
     _count = 0;
     _stop = false;
+    _sequential = false;
 }
 
 FastUDPFlows::~FastUDPFlows()
@@ -68,6 +69,7 @@ FastUDPFlows::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("FLOWS", _nflows)
         .read_mp("FLOWSIZE", _flowsize)
         .read_p("CHECKSUM", _cksum)
+        .read_p("SEQUENTIAL", _sequential)
         .read_p("ACTIVE", _active)
         .read_p("STOP", _stop)
         .complete() < 0)
@@ -95,8 +97,8 @@ FastUDPFlows::change_ports(int flow)
     click_ip *ip = reinterpret_cast<click_ip *>(q->data()+14);
     click_udp *udp = reinterpret_cast<click_udp *>(ip + 1);
 
-    udp->uh_sport = (click_random() >> 2) % 0xFFFF;
-    udp->uh_dport = (click_random() >> 2) % 0xFFFF;
+    udp->uh_sport = (_sequential?udp->uh_sport+1:click_random() >> 2) % 0xFFFF;
+    udp->uh_dport = (_sequential?udp->uh_dport+1:click_random() >> 2) % 0xFFFF;
     udp->uh_sum = 0;
     unsigned short len = _len-14-sizeof(click_ip);
     if (_cksum) {
@@ -110,7 +112,7 @@ FastUDPFlows::change_ports(int flow)
 Packet *
 FastUDPFlows::get_packet()
 {
-    int flow = (click_random() >> 2) % _nflows;
+    int flow = (_sequential?(*_last_flow)++ : (click_random() >> 2)) % _nflows;
 
     if (_flows[flow].flow_count == _flowsize) {
         change_ports(flow);
@@ -167,7 +169,6 @@ FastUDPFlows::initialize(ErrorHandler * errh)
         }
         _flows[i].flow_count = 0;
     }
-    _last_flow = 0;
 
     return 0;
 }

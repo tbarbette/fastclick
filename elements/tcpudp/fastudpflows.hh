@@ -98,17 +98,18 @@ class FastUDPFlows : public BatchElement {
         struct in_addr _sipaddr;
         struct in_addr _dipaddr;
         unsigned int _nflows;
-        unsigned int _last_flow;
         unsigned int _flowsize;
         bool _cksum;
+        bool _sequential;
         click_jiffies_t _first;
         click_jiffies_t _last;
-
+        per_thread<unsigned> _last_flow;
         struct flow_t {
             Packet *packet;
             unsigned flow_count;
         };
         flow_t *_flows;
+
         void change_ports(int);
         Packet *get_packet();
 
