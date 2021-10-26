@@ -1,6 +1,6 @@
 #This file is quite deprecated, but we keep it there in case someone has an internal GitLab CI pipeline and wants to reuse this
 variables:
-    DPDK_VERSION: "17.08"
+    DPDK_VERSION: "20.05"
     NETMAP_VERSION: "11.1"
     CONFIG: "--enable-gtp --enable-json"
 
@@ -49,6 +49,7 @@ cache:
         - dpdk-$DPDK_VERSION
         - netmap-$NETMAP_VERSION
 before_script:
+    - apt-get -y install build-essential libnuma-dev
     - gcc -v
     - export RTE_SDK=`pwd`/dpdk-$DPDK_VERSION;
       export RTE_TARGET=x86_64-native-linuxapp-gcc;
