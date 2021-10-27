@@ -1580,9 +1580,10 @@ Optional Features:
                           packets before flushing.
       --enable-flow-api   Support for the HW flow classification API. Also
                           needs DPDK>=20.02
-      --enable-click-pool allow usage of Click Packet pool. It will still only
-                          be effectively enabled in specific cases, see
-                          packet.hh
+      --disable-click-pool
+                          allow usage of Click Packet pool. It will still only
+                          be effectively enabled in specific (but most) cases,
+                          see packet.hh
     --disable-pool-inlining
                           Do not optimize pool_prepare_data_burst function
                           before data structure reordering done at the IR
@@ -8650,10 +8651,10 @@ fi
 
 # Check whether --enable-click-pool was given.
 if test "${enable_click_pool+set}" = set; then :
-  enableval=$enable_click_pool; $as_echo "#define ALLOW_CLICK_PACKET_POOL 1" >>confdefs.h
-
+  enableval=$enable_click_pool; :
 else
-  enable_click_pool=no
+  enable_click_pool=yes;$as_echo "#define ALLOW_CLICK_PACKET_POOL 1" >>confdefs.h
+
 fi
 
 
