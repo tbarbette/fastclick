@@ -1,6 +1,18 @@
 /*
- * SFMaker.{cc,hh} -- remove insults in web pages
- * Tom Barbette
+ * SFMaker.{cc,hh} -- Delay packets for a given time.
+ * 
+ * Copyright (c) 2021 Tom Barbette
+ * Copyright (c) 2021 Hamid Ghasemi
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, subject to the conditions
+ * listed in the Click LICENSE file. These conditions include: you must
+ * preserve this copyright notice, and you cannot mention the copyright
+ * holders in advertising related to the Software without their permission.
+ * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+ * notice is a summary of the Click LICENSE file; the license in that file is
+ * legally binding.
  */
 
 #include <click/config.h>
@@ -73,7 +85,6 @@ int SFMaker::allocate_index() {
         _state->idx_lock.acquire();
         int index = _state->indexes.back();
         _state->indexes.pop_back();
-//        click_chatter("Alloc %d", index);
         _state->idx_lock.release();
         return index;
     }
@@ -107,8 +118,8 @@ int SFMaker::configure(Vector<String> &conf, ErrorHandler *errh)
             .read_or_set("BYPASS_AFTER_FAIL", _bypass_after_fail, 0)
             .read_or_set("MAX_BURST", _max_burst, 1024)
             .read_or_set("MAX_TX_BURST", _max_tx_burst, 32)
-	    .read_or_set("MIN_TX_BURST", _min_tx_burst, 1)
-	    .read_or_set("MAX_TX_DELAY", _max_tx_delay, 0)
+            .read_or_set("MIN_TX_BURST", _min_tx_burst, 1)
+            .read_or_set("MAX_TX_DELAY", _max_tx_delay, 0)
             .read_or_set("ALWAYSUP", _always, false)
             .read_or_set("MAX_CAP", _max_capacity, -1)
             .complete() < 0)
@@ -168,10 +179,6 @@ int SFMaker::solve_initialize(ErrorHandler *errh)
     int tid = t.clz();
 
     click_chatter("SFMaker %s will use thread %d",t.unparse().c_str(), tid);
-/*#if SF_PIPELINE
-    if (tid != home_thread_id())
-        return errh->error("This element must be handled by its only pushing thread %d.",tid);
-#endif*/
 
     for (int i = 0; i < _state.weight(); i ++) {
         auto &s = _state.get_value(i);
@@ -207,7 +214,6 @@ int SFMaker::solve_initialize(ErrorHandler *errh)
 # endif
 #endif
     }
-//    return 0;
     return Router::InitFuture::solve_initialize(errh);
 }
 
@@ -370,9 +376,6 @@ bool SFMaker::schedule_burst_from_flow(SFSlot& f, TSCTimestamp& now, unsigned ma
         s.useless_wait = 0;
     } else {
         s.useless_wait = (now-f.last_seen).usecval();
-/*                if (s.useless_wait > 2*_delay.usecval()) {
-            click_chatter("Too long wait %d/%dus!",s.useless_wait, _state->delay.usecval());
-        }*/
     }
     s.packets = count;
 
@@ -583,14 +586,7 @@ start:
             }
         }
 
-    /*    if (!f.active() && !f.empty()) {
-            click_chatter("WARNING : Flow %d/%d not active but not empty!!!",i,j );
-        }*/
-
         if (likely(f.empty() ||!f.active())) {
-/*            if (f.waiting_since != TSCTimestamp() &&  f.waiting_since + _delay_hard < now)
-                click_chatter("WARNING : flow waiting more than hard timeout but passed %s", (now-(f.waiting_since + _delay_hard)).unparse().c_str());*/
-
             continue;
         }
 
@@ -603,11 +599,6 @@ start:
 
             continue;
         }
-        /*   if (f.lock.owner() != click_get_processor())
-            click_chatter("[%d] ERROR NOT ACQUIRED %d? Owned by %lu, I'm %lu",click_current_cpu_id(), i, f.lock.owner(), click_get_processor());
-        */
-        //click_chatter("[%d] Acquired %d",click_current_cpu_id(), i);
-        //f.lock.acquire();
         if (unlikely(_verbose > 4))
             click_chatter("Flow %d", i);
 
@@ -628,9 +619,6 @@ start:
                 next = exp;
         }
 
-        /*if (f.lock.owner() != click_get_processor())
-            click_chatter("[%d] ERROR Releasing %d? Owned by %lu",click_current_cpu_id(), i, click_current_processor());
-            */
         f.lock.release();
     }
 
@@ -728,15 +716,10 @@ start:
 #endif
     } else {
         if (next != TSCTimestamp()) {
-//            if (unlikely(_verbose > 1))
-//                click_chatter("Schedule in %d usec (delay %d)",(next-now).usecval(), _delay.usecval());
             s.timer->schedule_after((next - TSCTimestamp::now()));
         }
     }
 #endif
-//    if (!sent)
-//        click_chatter("%d: empty run (always %d, next %d)", click_current_cpu_id(),_always,next);
-//    click_chatter("Run task execution_time : %d us", ( TSCTimestamp::now_steady() - loop_start).usecval());
     return sent;
 }
 
@@ -749,8 +732,6 @@ void SFMaker::push_flow(int, SFFlow* flow, PacketBatch* batch)
 #else
     SFSlot &f = *flow;
 #endif
-//    click_chatter("Flow %p, stack %p",flow, fcb_stack);
-    //click_chatter("[%d] Acquire %d",click_current_cpu_id(), flow->index);
     f.lock.acquire();
 
     int existing = 0;
@@ -897,11 +878,6 @@ void SFMaker::push_flow(int, SFFlow* flow, PacketBatch* batch)
 #endif
         if (f.waiting_since == TSCTimestamp())
             f.waiting_since = now;
-#if !SF_LLDS
-        else if (f.waiting_since + _delay_hard > now) {
-            //click_chatter("Enqueuing with hard delay! You're not fast enough, slave (%s)!",(now - f.waiting_since).unparse().c_str());
-        }
-#endif
 
         TSCTimestamp exp = f.expiry(this);
 #if !SF_NO_SCHED
@@ -974,8 +950,6 @@ void SFMaker::push_flow(int, SFFlow* flow, PacketBatch* batch)
         }
     }
 #endif
-    // If not always
-//    click_chatter("push flow execution time: %d us", (TSCTimestamp::now_steady() - now).usecval());
 }
 
 void SFMaker::release_flow(SFFlow* flow) {
@@ -1110,20 +1084,6 @@ SFMaker::read_handler(Element *e, void *thunk)
           return "<error>";
     }
 }
-
-/*
-int
-SFMaker::write_handler(const String &data, Element *e, void *thunk, ErrorHandler *errh)
-{
-    SFMaker *ac = static_cast<SFMaker *>(e);
-    String s = cp_uncomment(data);
-    switch ((intptr_t)thunk) {
-
-      default:
-    return errh->error("internal error");
-    }
-}
-*/
 
 void
 SFMaker::add_handlers()

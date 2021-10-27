@@ -163,22 +163,42 @@ struct SFFlow {
 
 SFMaker()
 
-=s middlebox
+=s flow
 
-Delay packets up to DELAY in the hope that bursts can be merged.
-Then sends packets by (eventually) merged bursts, reordered by flow priority. A set of merged,
-prioritized bursts is called a super frame.
+Delay packets up to DELAY in the hope that bursts can be merged. Then sends packets by (eventually) merged bursts, reordered by flow priority.
 
-In the super frame, each packets has a source mac address rewritten as:
-bit 0-15 : unchanged
-byte 3 : super frame index least significant bits
-byte 4 : burst index least significant bits
-byte 5-6 : packet index (the index of the packet in its burst). The last packet index is always 0xffff
+=d
 
-This allows the destination to wait for all packets of a burst, while the burst index allows to detect a loss of packets,
-and the sf index a lost of super frame. Considering a very unlucky super frame of 1 packet and 1 burst, the SF index is necessary.
+Buffer packets up to DELAY in the hope of receiving multiple packets of the same flow.
+Eventually, sends packets by merged bursts, reordered by flow priority.
+The goal is increasing packets spatial locality to acheive higher performance in next steps/NFs. 
 
-One may ask why the destination/type of packet is not encoded. It's actually already in the IP address. Giving an index to each IP is not really of interest.
+
+Arguments:
+
+=item DELAY
+
+Packets buffering time in micro-seconds.
+
+=item PROTO_COMPRESS
+
+Enables TCP protocol compressor! Default is 0.
+
+=item REORDER
+
+Reorder TCP packets of the same flow if they are not arrived in order! Default is 1.
+
+=item BYPASS_SYN
+
+Bypass SYN packets since the possibility of receiving another packet of the same flow within the buffering time is almost zero! Default is 0.
+
+=item MAX_TX_BURST
+
+The maximum burst size of output. Default is 32.
+
+=item MAX_CAP
+
+Maximum number of packets that Reframer can hold at the same time. If number of saved packets reach the maximum capacity, reframer bypasses incoming packets. Default is -1, which means there is no limitation.
 */
 
 enum Prio {
