@@ -219,6 +219,7 @@ void
 IP6SRv6FECDecode::remove_tlv_source_symbol(WritablePacket *p, uint16_t offset_tlv)
 {
     // Update payload length of IPv6 Header and SRv6 Header
+    unsigned len = p->network_header_length();
     click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
     click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
     ip6->ip6_plen -= htons(sizeof(source_tlv_t));
@@ -227,6 +228,7 @@ IP6SRv6FECDecode::remove_tlv_source_symbol(WritablePacket *p, uint16_t offset_tl
     // Push everything before the TLV, sizeof(tlv) after
     memmove(p->data() + sizeof(source_tlv_t), p->data(), offset_tlv);
     p->pull(sizeof(source_tlv_t));
+    p->set_network_header(p->data(), len - sizeof(source_tlv_t));
 }
 
 void
@@ -782,7 +784,7 @@ IP6SRv6FECDecode::recover_packet_fom_data(srv6_fec2_term_t *rec)
     // TODO : utiliser un element si besoin
 
     // 7. Set annotations
-    p->set_network_header((unsigned char*)ip6, ntohs(ip6->ip6_plen));
+    p->set_network_header((unsigned char*)ip6, sizeof(click_ip6) + sizeof(click_ip6_sr) + sizeof(struct in6_addr) * srv6->last_entry + 8 );
 
     return p;
 }

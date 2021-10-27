@@ -62,6 +62,9 @@ IP6SRDecap::simple_action(Packet *p_in)
     
     if (_force || sr->segment_left == 1) {
 
+
+            IP6Address last = IP6Address(sr->segments[0]);
+
             unsigned char* old_data = p->data();
             unsigned char nxt = sr->ip6_sr_next;
             unsigned char *next_ptr = (unsigned char*)ip6_find_header(ip6, nxt, p->end_data());
@@ -76,6 +79,8 @@ IP6SRDecap::simple_action(Packet *p_in)
 
             memmove(p->data(), old_data, (unsigned char*)sr-old_data);
             ip6 = (click_ip6 *)(p->data());
+
+            ip6->ip6_dst = last;
             ip6->ip6_nxt = nxt;
             ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - srlen);
             p->set_network_header(p->data(), offset - srlen);
@@ -84,8 +89,9 @@ IP6SRDecap::simple_action(Packet *p_in)
     } else if (unlikely(sr->segment_left == 0)) {
         click_chatter("Invalid packet with 0 segments left?");
         return p;
-    } else
-        sr->segment_left--;
+    } else {
+        ip6->ip6_dst = sr->segments[--sr->segment_left];
+    }
 
     
     return p;
