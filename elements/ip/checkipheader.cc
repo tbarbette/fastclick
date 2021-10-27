@@ -113,7 +113,7 @@ CheckIPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (Args(conf, this, errh)
         .read("BADSRC", OldBadSrcArg(), _bad_src)
-        .read_or_set("OFFSET", _offset, 0)
+        .read("OFFSET", _offset)
         .complete() < 0)
         return -1;
 
