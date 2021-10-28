@@ -1,6 +1,6 @@
 #ifndef CLICK_IP6SRv6FECDecode_HH
 #define CLICK_IP6SRv6FECDecode_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
 #include <clicknet/ip6.h>
@@ -100,7 +100,7 @@ struct rlc_info_decoder_t {
 #define SRV6_FEC_RLC 0
 #define SRV6_FEC_XOR 1
 
-class IP6SRv6FECDecode : public Element { 
+class IP6SRv6FECDecode : public BatchElement { 
  
  public:
 
@@ -115,6 +115,9 @@ class IP6SRv6FECDecode : public Element {
   void add_handlers() CLICK_COLD;
 
   void push(int, Packet *p_in) override;
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch * batch_in) override;
+#endif
 
  private:
 
@@ -123,20 +126,21 @@ class IP6SRv6FECDecode : public Element {
   rlc_info_decoder_t _rlc_info;
 
   static String read_handler(Element *, void *) CLICK_COLD;
-  void fec_framework(Packet *p_in) CLICK_COLD;
-  int fec_scheme_source(WritablePacket *p_in, source_tlv_t *tlv) CLICK_COLD;
-  int fec_scheme_repair(WritablePacket *p_in, repair_tlv_t *tlv) CLICK_COLD;
+
+  void fec_framework(Packet *p_in, std::function<void(Packet*)>push);
+  int fec_scheme_source(WritablePacket *p_in, source_tlv_t *tlv);
+  int fec_scheme_repair(WritablePacket *p_in, repair_tlv_t *tlv);
   WritablePacket *recover_packet_fom_data(srv6_fec2_term_t *rec);
   srv6_fec2_term_t *init_term(Packet *p, uint16_t offset, uint16_t max_packet_length);
   void kill_term(srv6_fec2_term_t *t);
 
-  void rlc_fill_muls(uint8_t muls[256 * 256]) CLICK_COLD;
+  void rlc_fill_muls(uint8_t muls[256 * 256]);
 
-  void store_source_symbol(WritablePacket *p_in, source_tlv_t *tlv) CLICK_COLD;
-  void store_repair_symbol(WritablePacket *p_in, repair_tlv_t *tlv) CLICK_COLD;
-  void remove_tlv_source_symbol(WritablePacket *p, uint16_t offset_tlv) CLICK_COLD;
+  void store_source_symbol(WritablePacket *p_in, source_tlv_t *tlv);
+  void store_repair_symbol(WritablePacket *p_in, repair_tlv_t *tlv);
+  void remove_tlv_source_symbol(WritablePacket *p, uint16_t offset_tlv);
 
-  void rlc_recover_symbols();
+  Packet* rlc_recover_symbols();
   void rlc_get_coefs(tinymt32_t *prng, uint32_t seed, int n, uint8_t *coefs);
   void symbol_add_scaled_term(srv6_fec2_term_t *symbol1, uint8_t coef, srv6_fec2_source_t *symbol2, uint8_t *mul);
   void symbol_add_scaled_term(srv6_fec2_term_t *symbol1, uint8_t coef, srv6_fec2_term_t *symbol2, uint8_t *mul, uint16_t decoding_size);
@@ -150,7 +154,7 @@ class IP6SRv6FECDecode : public Element {
   int first_non_zero_idx(const uint8_t *a, int n_unknowns);
   void gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_fec2_term_t **constant_terms, srv6_fec2_term_t **x, bool *undetermined, uint8_t *mul, uint8_t *inv, uint16_t max_packet_length);
 
-  void xor_recover_symbols() CLICK_COLD;
+  Packet* xor_recover_symbols() CLICK_COLD;
   void xor_one_symbol(srv6_fec2_term_t *rec, Packet *s) CLICK_COLD;
 };
 

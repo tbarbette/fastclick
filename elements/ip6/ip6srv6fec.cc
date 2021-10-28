@@ -63,8 +63,18 @@ IP6SRv6FECEncode::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 IP6SRv6FECEncode::push(int, Packet *p_in)
 {
-    fec_framework(p_in);
+    fec_framework(p_in, [this](Packet*p){output(0).push(p);});
 }
+
+#if HAVE_BATCH
+void 
+IP6SRv6FECEncode::push_batch(int, PacketBatch *batch) {
+    EXECUTE_FOR_EACH_PACKET_ADD( fec_framework, batch );
+    if (batch)
+        output_push_batch(0, batch);
+
+}
+#endif
 
 String
 IP6SRv6FECEncode::read_handler(Element *e, void *thunk)
@@ -81,8 +91,8 @@ IP6SRv6FECEncode::add_handlers()
     add_write_handler("dst", reconfigure_keyword_handler, "2 DST");
 }
 
-void
-IP6SRv6FECEncode::fec_framework(Packet *p_in)
+inline void
+IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
 {
     int err;
 
@@ -98,9 +108,8 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in)
             _repair_packet->kill();
         }
         return; //Memory problem, packet is already destroyed
-    } else {
-        output(0).push(p);
     }
+    push(p);
 
     if (err == 1) { // Repair
         if (!_repair_packet) {
@@ -110,14 +119,15 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in)
         encapsulate_repair_payload(_repair_packet, &_repair_tlv, &enc, &dec, _rlc_info.max_length);
 
         // Send repair packet
-        click_chatter("Send repair symbol");
-        output(0).push(_repair_packet);
+//        click_chatter("Send repair symbol");
+        push(_repair_packet);
         _repair_packet = 0;
 
         // Reset parameters of the RLC information
         _rlc_info.max_length = 0;
         memset(&_repair_tlv, 0, sizeof(repair_tlv_t));
         _rlc_info.prng = rlc_reset_coefs();
+
     }
 }
 

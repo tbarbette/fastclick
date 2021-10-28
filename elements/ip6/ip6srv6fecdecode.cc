@@ -65,11 +65,22 @@ IP6SRv6FECDecode::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+
 void
 IP6SRv6FECDecode::push(int, Packet *p_in)
 {
-    fec_framework(p_in);
+    fec_framework(p_in, [this](Packet*p){output(0).push(p);});
 }
+
+#if HAVE_BATCH
+void 
+IP6SRv6FECDecode::push_batch(int, PacketBatch *batch) {
+    EXECUTE_FOR_EACH_PACKET_ADD( fec_framework, batch );
+    if (batch)
+        output_push_batch(0, batch);
+
+}
+#endif
 
 String
 IP6SRv6FECDecode::read_handler(Element *e, void *thunk)
@@ -87,7 +98,7 @@ IP6SRv6FECDecode::add_handlers()
 }
 
 void
-IP6SRv6FECDecode::fec_framework(Packet *p_in)
+IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
 {
     // Manipulate modified packet because we will remove the TLV
     WritablePacket *p = p_in->uniqueify();
@@ -118,7 +129,7 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in)
 
     // Not a source or repair symbol
     if (tlv_type != TLV_TYPE_FEC_SOURCE && tlv_type != TLV_TYPE_FEC_REPAIR) {
-        output(0).push(p);
+        push(p);
         return;
     }
 
@@ -146,7 +157,7 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in)
     // Send the (modified, without TLV) source symbol
     // i.e., do not send the repair symbol out of the tunnel
     if (tlv_type == TLV_TYPE_FEC_SOURCE) {
-        output(0).push(p);
+        push(p);
     }
 }
 
@@ -269,7 +280,7 @@ void kill_term(srv6_fec2_term_t *t)
     CLICK_LFREE(t, sizeof(srv6_fec2_term_t));
 }
 
-void
+Packet*
 IP6SRv6FECDecode::rlc_recover_symbols()
 {
     uint16_t max_packet_length = 0; // decoding size
@@ -279,6 +290,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     uint8_t previous_window_step = 0;
     uint8_t max_seen_window_size = 0;
     uint32_t encoding_symbol_id = _rlc_info.encoding_symbol_id;
+    WritablePacket *p_rec = 0;
 
     // Init the pseudo random number generator
     tinymt32_t prng;
@@ -320,23 +332,23 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     // No valid window: no repair symbol received or no FEC applied
     // Should not happen since this function is triggered by the
     // reception of a repair symbol
-    if (nb_windows == 0) {
+    if (unlikely(nb_windows == 0)) {
         click_chatter("Should not happen empty window");
-        return;
+        return 0;
     }
 
     // Received source symbols array
     srv6_fec2_source_t **ss_array = (srv6_fec2_source_t **)CLICK_LALLOC(sizeof(srv6_fec2_source_t *) * nb_source_symbols);
-    if (!ss_array) {
-        return;
+    if (unlikely(!ss_array)) {
+        return 0;
     }
     memset(ss_array, 0, sizeof(srv6_fec2_source_t *) * nb_source_symbols);
 
     // Received repair symbols array
     srv6_fec2_repair_t **rs_array = (srv6_fec2_repair_t **)CLICK_LALLOC(sizeof(srv6_fec2_repair_t *) * nb_windows);
-    if (!rs_array) {
+    if (unlikely(!rs_array)) {
         CLICK_LFREE(ss_array, sizeof(srv6_fec2_source_t *) * nb_source_symbols);
-        return;
+        return 0;
     }
     memset(rs_array, 0, sizeof(srv6_fec2_repair_t *) * nb_windows);
 
@@ -359,7 +371,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
         srv6_fec2_repair_t *repair = _rlc_info.repair_buffer[idx % SRV6_FEC_BUFFER_SIZE];
         if (!repair) {
             click_chatter("ERROR 3");
-            return; // TODO: free all
+            return 0; // TODO: free all
         }
         rs_array[i] = repair;
         // Update index for the next repair symbol
@@ -410,7 +422,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
         CLICK_LFREE(x_to_source, sizeof(uint8_t) * nb_source_symbols);
         CLICK_LFREE(source_to_x, sizeof(uint8_t) * nb_source_symbols);
         CLICK_LFREE(protected_symbol, sizeof(bool) * nb_source_symbols);
-        return;
+        return 0;
     }
 
     // Construct the system Ax=b
@@ -506,7 +518,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
                     continue;
                 }
                 // Packet from the recovered data
-                WritablePacket *p_rec = recover_packet_fom_data(unknowns[current_unknown]);
+                p_rec = recover_packet_fom_data(unknowns[current_unknown]);
                 if (!p_rec) {
                     click_chatter("Error from recovery confirmed");
                     continue;
@@ -518,9 +530,6 @@ IP6SRv6FECDecode::rlc_recover_symbols()
 
                 // Store a local copy of the packet for later recovery?
                 recovered->p = p_rec->clone();
-
-                // Send recovered packet on the line
-                output(0).push(p_rec);
 
                 // Store the recovered packet in the buffer and clean previous
                 srv6_fec2_source_t *old_rec = _rlc_info.recovd_buffer[recovered->encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
@@ -551,7 +560,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     CLICK_LFREE(undetermined, sizeof(bool) * nb_unknwons);
     CLICK_LFREE(source_to_x, sizeof(uint8_t) * nb_source_symbols);
     CLICK_LFREE(x_to_source, sizeof(uint8_t) * nb_source_symbols);
-    return;
+    return p_rec;
 }
 
 void
@@ -754,7 +763,7 @@ IP6SRv6FECDecode::recover_packet_fom_data(srv6_fec2_term_t *rec)
         uint8_t *en_8 = (uint8_t *)&ip6_next;
         if (dec_ip_32[0] == in6_32[0] && dec_ip_32[1] == in6_32[1] && dec_ip_32[2] == in6_32[2] && dec_ip_32[3] == in6_32[3]) {
             found_next_sid = true;
-            click_chatter("I HAVE FOUND THE SID");
+//            click_chatter("I HAVE FOUND THE SID");
             break;
         }
         --i;
@@ -789,7 +798,7 @@ IP6SRv6FECDecode::recover_packet_fom_data(srv6_fec2_term_t *rec)
     return p;
 }
 
-void
+Packet*
 IP6SRv6FECDecode::xor_recover_symbols()
 {
     uint32_t esid = _rlc_info.encoding_symbol_id;
@@ -819,7 +828,7 @@ IP6SRv6FECDecode::xor_recover_symbols()
             xor_buff[nb_source++] = rec->p;
         } else {
             if (lost_one_symbol) {
-                return; // More than one lost symbol, cannot recover
+                return 0; // More than one lost symbol, cannot recover
             }
             lost_one_symbol = true;
             lost_esid = theoric_esid;
@@ -827,7 +836,7 @@ IP6SRv6FECDecode::xor_recover_symbols()
     }
 
     if (!lost_one_symbol) {
-        return;
+        return 0;
     }
 
     // 2. We know we have lost exactly one source symbol
@@ -848,7 +857,7 @@ IP6SRv6FECDecode::xor_recover_symbols()
     if (!p_rec) {
         click_chatter("Error confirmed");
         CLICK_LFREE(rec, sizeof(srv6_fec2_term_t));
-        return;
+        return 0;
     }
     srv6_fec2_source_t *prev_rec = _rlc_info.recovd_buffer[lost_esid % SRV6_FEC_BUFFER_SIZE];
     if (prev_rec) {
@@ -860,10 +869,11 @@ IP6SRv6FECDecode::xor_recover_symbols()
         rec->p = p_rec->clone();
         _rlc_info.recovd_buffer[lost_esid % SRV6_FEC_BUFFER_SIZE] = rec;
     }
-    output(0).push(p_rec);
-
+    
     CLICK_LFREE(data, sizeof(uint8_t) * max_packet_length);
     CLICK_LFREE(rec, sizeof(srv6_fec2_term_t));
+
+    return p_rec;
 }
 
 void

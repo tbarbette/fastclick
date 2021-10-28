@@ -196,6 +196,32 @@ CLICK_DECLS
 
 
 /**
+ * Execute a function for each packet, passing parameters to easily add multiple packets to the list
+ */
+#define EXECUTE_FOR_EACH_PACKET_ADD(fnt,batch) {\
+            Packet* next = ((batch != 0)? batch->first()->next() : 0 );\
+            Packet* p = batch->first();\
+            Packet* last = 0;\
+            int count = 0;\
+            for (;p != 0;p=next,next=(p==0?0:p->next())) {\
+                auto add = [&batch,&last,&count](Packet*q) {\
+                    if (last) { \
+                        last->set_next(q); \
+                    } else { \
+                        batch = reinterpret_cast<PacketBatch*>(q);\
+                    }\
+                    last = q;\
+                    count++;\
+                };\
+                fnt(p,add);\
+            }\
+            if (last) {\
+                batch->set_count(count);\
+                batch->set_tail(last);\
+            }\
+        }\
+
+/**
  * Split a batch into multiple batch according to a given function which will
  * give the index of an output to choose.
  *

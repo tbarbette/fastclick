@@ -20,7 +20,7 @@ elementclass InputDecap { $port, $src, $dst, $ip6src |
 	c[1]
     //-> Print("IP6 from $port", -1)
     -> IP6Input()
-	-> IP6Print("IP6 from port $port")
+//	-> IP6Print("IP6 from port $port")
 	-> output;
 
     c[2] -> Print("Non-IPv6") -> Discard;
@@ -28,7 +28,7 @@ elementclass InputDecap { $port, $src, $dst, $ip6src |
 
 
 
-elementclass InputEncap { $port, $src, $dst, $ip6src |
+elementclass InputEncap { $port, $src, $dst, $ip6src, $noencap |
     input
 	-> c :: Classifier(12/86dd 54/87, 12/86DD, 12/0800, 12/0806,-);
 
@@ -38,8 +38,12 @@ elementclass InputEncap { $port, $src, $dst, $ip6src |
 	c[1]
 	//-> Print("IP6 from $port", -1)
 	-> IP6Input()
-	-> IP6Print("IP6 from port $port")
-	-> IP6SREncap(ADDR fc00::9, ADDR fc00::a, ENCAP_DST true)
+//	-> IP6Print("IP6 from port $port")
+    -> {
+        [0] -> s :: Switch($noencap);
+            s[0] -> IP6SREncap(ADDR fc00::9, ADDR fc00::a, ENCAP_DST true) -> [0];
+            s[1] -> [0];
+    }	
 	-> output;
 
     c[2] -> Print("IPv4 (discarded)")

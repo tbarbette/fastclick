@@ -1,6 +1,6 @@
 #ifndef CLICK_IP6SRv6FECEncode_HH
 #define CLICK_IP6SRv6FECEncode_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
 #include <clicknet/ip6.h>
@@ -85,7 +85,7 @@ struct rlc_info_t {
 #define SRV6_FEC_RLC 0
 #define SRV6_FEC_XOR 1
 
-class IP6SRv6FECEncode : public Element { 
+class IP6SRv6FECEncode : public BatchElement { 
  
  public:
 
@@ -100,6 +100,9 @@ class IP6SRv6FECEncode : public Element {
   void add_handlers() CLICK_COLD;
 
   void push(int, Packet * p_in) override;
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch * batch_in) override;
+#endif
 
  private:
 
@@ -113,20 +116,20 @@ class IP6SRv6FECEncode : public Element {
   IP6Address dec; // Decoder SID
 
   static String read_handler(Element *, void *) CLICK_COLD;
-  void fec_framework(Packet *p_in) CLICK_COLD;
-  int fec_scheme(Packet *p_in) CLICK_COLD;
-  void store_source_symbol(Packet *p_in, uint32_t encodind_symbol_id) CLICK_COLD;
-  void encapsulate_repair_payload(WritablePacket *p, repair_tlv_t *tlv, IP6Address *encoder, IP6Address *decoder, uint16_t packet_length) CLICK_COLD;
-  WritablePacket *srv6_fec_add_source_tlv(Packet *p_in, source_tlv_t *tlv) CLICK_COLD;
-  void rlc_encode_symbols(uint32_t encoding_symbol_id) CLICK_COLD;
-  void free_out_of_window(uint32_t encoding_symbol_id) CLICK_COLD;
-  tinymt32_t rlc_reset_coefs() CLICK_COLD;
-  void rlc_fill_muls(uint8_t muls[256 * 256]) CLICK_COLD;
-  uint8_t rlc_get_coef(tinymt32_t *prng) CLICK_COLD;
-  void rlc_encode_one_symbol(Packet *s, WritablePacket *r, tinymt32_t *prng, uint8_t muls[256 * 256 * sizeof(uint8_t)], repair_tlv_t *repair_tlv) CLICK_COLD;
+  void fec_framework(Packet *p_in,std::function<void(Packet*)> push);
+  int fec_scheme(Packet *p_in);
+  void store_source_symbol(Packet *p_in, uint32_t encodind_symbol_id);
+  void encapsulate_repair_payload(WritablePacket *p, repair_tlv_t *tlv, IP6Address *encoder, IP6Address *decoder, uint16_t packet_length);
+  WritablePacket *srv6_fec_add_source_tlv(Packet *p_in, source_tlv_t *tlv);
+  void rlc_encode_symbols(uint32_t encoding_symbol_id);
+  void free_out_of_window(uint32_t encoding_symbol_id);
+  tinymt32_t rlc_reset_coefs();
+  void rlc_fill_muls(uint8_t muls[256 * 256]);
+  uint8_t rlc_get_coef(tinymt32_t *prng);
+  void rlc_encode_one_symbol(Packet *s, WritablePacket *r, tinymt32_t *prng, uint8_t muls[256 * 256 * sizeof(uint8_t)], repair_tlv_t *repair_tlv);
 
-  void xor_encode_symbols(uint32_t encoding_symbol_id) CLICK_COLD;
-  void xor_encode_one_symbol(Packet *s, WritablePacket *r, repair_tlv_t *repair_tlv) CLICK_COLD;
+  void xor_encode_symbols(uint32_t encoding_symbol_id);
+  void xor_encode_one_symbol(Packet *s, WritablePacket *r, repair_tlv_t *repair_tlv);
 };
 
 
