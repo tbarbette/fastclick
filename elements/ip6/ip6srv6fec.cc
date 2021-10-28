@@ -51,13 +51,14 @@ IP6SRv6FECEncode::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
 	.read_mp("ENC", enc)
 	.read_mp("DEC", dec)
-    .read_mp("FED", fed)
+    //.read_or_set("FED", fed, "fc00::b");
     .read_or_set("WINDOW", _rlc_info.window_size, 4)
     .read_or_set("STEP", _rlc_info.window_step, 2)
     .read_or_set("SCHEME", _fec_scheme, SRV6_FEC_RLC)
 	.complete() < 0)
         return -1;
 
+    fed = IP6Address("fc00::b");
     return 0;
 }
 
