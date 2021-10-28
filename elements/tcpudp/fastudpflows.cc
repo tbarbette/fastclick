@@ -122,13 +122,16 @@ FastUDPFlows::get_packet()
 }
 
 int
-FastUDPFlows::initialize(ErrorHandler *)
+FastUDPFlows::initialize(ErrorHandler * errh)
 {
     _count = 0;
     _flows = new flow_t[_nflows];
 
     for (unsigned i=0; i<_nflows; i++) {
         WritablePacket *q = Packet::make(_len);
+        if (unlikely(!q)) {
+            return errh->error("Could not initialize packet, out of memory?");
+        }
         _flows[i].packet = q;
         memcpy(q->data(), &_ethh, 14);
         click_ip *ip = reinterpret_cast<click_ip *>(q->data()+14);
@@ -173,7 +176,8 @@ void
 FastUDPFlows::cleanup_flows() {
     if (_flows) {
         for (unsigned i=0; i<_nflows; i++) {
-            _flows[i].packet->kill();
+            if (_flows[i].packet)
+                _flows[i].packet->kill();
             _flows[i].packet=0;
         }
         delete[] _flows;

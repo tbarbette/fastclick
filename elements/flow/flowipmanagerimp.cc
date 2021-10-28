@@ -31,6 +31,7 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
         .CLICK_NEVER_REPLACE(read_or_set)("RESERVE", _reserve, 0)
         .read_or_set("TIMEOUT", _timeout, -1)
         .read_or_set("CACHE", _cache, true)
+        .read_or_set("VERBOSE", _verbose, true)
         .complete() < 0)
         return -1;
 
