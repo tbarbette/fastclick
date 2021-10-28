@@ -62,18 +62,30 @@ IP6SRv6FECEncode::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-IP6SRv6FECEncode::push(int, Packet *p_in)
+IP6SRv6FECEncode::push(int input, Packet *p_in)
 {
+    // if (input == SRV6_FEC_FEEDBACK_INPUT) {
+    //     feedback_message(p_in, [this](Packet*p){output(0).push(p);});
+    // } else {
+    //     fec_framework(p_in, [this](Packet*p){output(0).push(p);});
+    // }$
     fec_framework(p_in, [this](Packet*p){output(0).push(p);});
 }
 
 #if HAVE_BATCH
 void 
-IP6SRv6FECEncode::push_batch(int, PacketBatch *batch) {
+IP6SRv6FECEncode::push_batch(int input, PacketBatch *batch) {
+    // TODO: check if we can still do that for the batching
+    // if (input == SRV6_FEC_FEEDBACK_INPUT) {
+    //     EXECUTE_FOR_EACH_PACKET_ADD(feedback_message, batch);
+    // } else {
+    //     EXECUTE_FOR_EACH_PACKET_ADD( fec_framework, batch );
+    //     if (batch)
+    //         output_push_batch(0, batch);
+    // }
     EXECUTE_FOR_EACH_PACKET_ADD( fec_framework, batch );
     if (batch)
         output_push_batch(0, batch);
-
 }
 #endif
 
@@ -104,11 +116,12 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
     // We know that the packet belongs either to the FEC Framework or the Feedback process
     // The difference between the two SIDs must be located in the last 32 bits of the IPv6 Address
     // to make the following work
-    if (ip_32[3] = fb_32[3]) {
+    if (ip_32[3] == fb_32[3]) {
         // Feedback message
         
         
         // Do not forward a feedback message
+        click_chatter("Feedback message");
         return;
     }
     // This is a source symbol
@@ -397,7 +410,7 @@ void IP6SRv6FECEncode::encapsulate_repair_payload(WritablePacket *p, repair_tlv_
 }
 
 void
-IP6SRv6FECEncode::feedback_message(Packet *p_in)
+IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>push)
 {
     const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
     const click_ip6_sr *srv6 = reinterpret_cast<const click_ip6_sr *>(p_in->data() + sizeof(click_ip6));

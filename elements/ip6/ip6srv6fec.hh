@@ -95,6 +95,7 @@ struct rlc_info_t {
 
 #define SRV6_FEC_RLC 0
 #define SRV6_FEC_XOR 1
+#define SRV6_FEC_FEEDBACK_INPUT 2
 
 class IP6SRv6FECEncode : public BatchElement { 
  
@@ -104,15 +105,15 @@ class IP6SRv6FECEncode : public BatchElement {
   ~IP6SRv6FECEncode();
 
   const char *class_name() const override        { return "IP6SRv6FECEncode"; }
-  const char *port_count() const override        { return PORTS_1_1; }
+  const char *port_count() const override        { return PORTS_1_1; } // Two inputs for the feedback
 
   int  configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const     { return true; }
   void add_handlers() CLICK_COLD;
 
-  void push(int, Packet * p_in) override;
+  void push(int input, Packet * p_in) override;
 #if HAVE_BATCH
-  void push_batch(int, PacketBatch * batch_in) override;
+  void push_batch(int input, PacketBatch * batch_in) override;
 #endif
 
  private:
@@ -128,7 +129,7 @@ class IP6SRv6FECEncode : public BatchElement {
   IP6Address fed; // Feedback SID
 
   static String read_handler(Element *, void *) CLICK_COLD;
-  void fec_framework(Packet *p_in,std::function<void(Packet*)> push);
+  void fec_framework(Packet *p_in, std::function<void(Packet*)> push);
   int fec_scheme(Packet *p_in);
   void store_source_symbol(Packet *p_in, uint32_t encodind_symbol_id);
   void encapsulate_repair_payload(WritablePacket *p, repair_tlv_t *tlv, IP6Address *encoder, IP6Address *decoder, uint16_t packet_length);
@@ -143,7 +144,7 @@ class IP6SRv6FECEncode : public BatchElement {
   void xor_encode_symbols(uint32_t encoding_symbol_id);
   void xor_encode_one_symbol(Packet *s, WritablePacket *r, repair_tlv_t *repair_tlv);
 
-  void feedback_message(Packet *p_in);
+  void feedback_message(Packet *p_in, std::function<void(Packet*)>push);
 };
 
 
