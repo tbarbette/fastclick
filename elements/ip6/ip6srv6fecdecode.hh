@@ -16,6 +16,7 @@
 
 #define TLV_TYPE_FEC_SOURCE 28
 #define TLV_TYPE_FEC_REPAIR 29
+#define TLV_TYPE_FEC_FEEDBACK 30
 #define RLC_MAX_WINDOWS 4
 #define LOCAL_MTU 1500
 
@@ -44,6 +45,14 @@ struct repair_tlv_t {
   uint8_t nss; // Number Source Symbol
   uint8_t nrs; // Number Repair Symbol
 } CLICK_SIZE_PACKED_ATTRIBUTE;
+
+// struct feedback_tlv_t {
+//   uint8_t type;
+//   uint8_t len;
+//   uint16_t padding16;
+//   uint64_t bit_string;
+//   uint32_t padding32;
+// } CLICK_SIZE_PACKED_ATTRIBUTE;
 
 #endif
 
@@ -85,6 +94,11 @@ struct srv6_fec2_term_t {
   } length;
 };
 
+// struct srv6_fec2_feedback {
+//   uint64_t received_string;
+//   uint16_t nb_received;
+// };
+
 struct rlc_info_decoder_t {
 
   // RLC relative information
@@ -118,9 +132,11 @@ class IP6SRv6FECDecode : public Element {
 
  private:
 
+  IP6Address enc; // Encoder SID
   IP6Address dec; // Decoder SID
   bool _use_dst_anno;
   rlc_info_decoder_t _rlc_info;
+  // srv6_fec2_feedback _rlc_feedback;
 
   static String read_handler(Element *, void *) CLICK_COLD;
   void fec_framework(Packet *p_in) CLICK_COLD;
@@ -152,6 +168,8 @@ class IP6SRv6FECDecode : public Element {
 
   void xor_recover_symbols() CLICK_COLD;
   void xor_one_symbol(srv6_fec2_term_t *rec, Packet *s) CLICK_COLD;
+
+  // void rlc_feedback() CLICK_COLD;
 };
 
 CLICK_ENDDECLS

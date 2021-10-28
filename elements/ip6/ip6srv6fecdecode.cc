@@ -59,7 +59,8 @@ int
 IP6SRv6FECDecode::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-	.read_mp("DEC", dec)
+	.read_mp("ENC", enc)
+    .read_mp("DEC", dec)
 	.complete() < 0)
         return -1;
     return 0;
@@ -192,6 +193,9 @@ IP6SRv6FECDecode::store_source_symbol(WritablePacket *p_in, source_tlv_t *tlv) {
         CLICK_LFREE(previous_symbol, sizeof(srv6_fec2_source_t));
     }
     _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = symbol;
+
+    // Update the feedback string bit
+    // _rlc_feedback.received_string |= (1 << _rlc_feedback.nb_received++);
 }
 
 void
@@ -737,7 +741,6 @@ IP6SRv6FECDecode::recover_packet_fom_data(srv6_fec2_term_t *rec)
     // Recover from varying fields
     click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
     click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
-    uint8_t *segment_list = (uint8_t *)(srv6 + sizeof(click_ip6_sr));
     // 1. Detect the correct new next hop
     uint32_t *dec_ip_32 = dec.data32();
     bool found_next_sid = false;
@@ -882,6 +885,57 @@ IP6SRv6FECDecode::xor_one_symbol(srv6_fec2_term_t *rec, Packet *s)
     // Encode the packet length
     rec->length.coded_length ^= s->length();
 }
+
+// void
+// IP6SRv6FECDecode::rlc_feedback()
+// {
+//     uint16_t packet_size = sizeof(click_ip6) + sizeof(click_ip6_sr) + 2 * sizeof(IP6Address) + sizeof(feedback_tlv_t);
+//     WritablePacket *p = Packet::make(packet_size);
+//     if (!p) {
+//         return;
+//     }
+
+//     click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
+//     click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
+//     uint8_t *segment_list = ((uint8_t *)srv6) + sizeof(click_ip6_sr);
+//     feedback_tlv_t *tlv = reinterpret_cast<feedback_tlv_t *>(p->data() + sizeof(click_ip6) + sizeof(click_ip6_sr) + sizeof(IP6Address) * 2);
+
+//     // IPv6 Header
+//     memcpy(&ip6->ip6_src, dec.data(), sizeof(IP6Address));
+//     memcpy(&ip6->ip6_dst, enc.data(), sizeof(IP6Address));
+//     ip6->ip6_flow = htonl(6 << IP6_V_SHIFT);
+//     ip6->ip6_plen = packet_size - sizeof(click_ip6);
+//     ip6->ip6_nxt = IPPROTO_ROUTING;
+//     ip6->ip6_hlim = 51;
+
+//     // SRv6 Header
+//     srv6->type = IP6PROTO_SEGMENT_ROUTING;
+//     srv6->segment_left = 1;
+//     srv6->last_entry = 1;
+//     srv6->flags = 0;
+//     srv6->tag = 0;
+//     srv6->ip6_sr_next = 253;
+//     srv6->ip6_hdrlen = (sizeof(feedback_tlv_t) + 2 * sizeof(IP6Address)) / 8;
+//     memcpy(&srv6->segments[0], enc.data(), sizeof(IP6Address));
+//     memcpy(&srv6->segments[1], dec.data(), sizeof(IP6Address));
+
+//     // Add feedback TLV
+//     tlv->type = TLV_TYPE_FEC_FEEDBACK;
+//     tlv->len = sizeof(feedback_tlv_t) - 2;
+//     tlv->padding16 = 0;
+//     tlv->padding32 = 0;
+//     // tlv->bit_string = _rlc_feedback.received_string;
+
+//     // Set annotations
+//     p->set_network_header(p->data(), (unsigned char*)(tlv + 1) - p->data());
+
+//     // Send packet with feedback
+//     // input(0).push(p);
+
+//     // Reset parameters for next feedback
+//     //, memset(&_rlc_feedback, 0, sizeof(srv6_fec2_feedback));
+
+// }
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IP6SRv6FECDecode)

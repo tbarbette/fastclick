@@ -9,7 +9,7 @@ elementclass Input { $port, $MAC_DST |
 	-> c2 :: Classifier(6/2B,-)
 	-> IP6SRProcess()
 	-> IP6Drop(P 0.05, R 0.8, ADDR fc00::9, ADDR babe:2::5)	
-	-> IP6SRv6FECDecode(DEC fc00::9)
+	-> IP6SRv6FECDecode(DEC fc00::9, ENC fc00::a)
 	-> eth :: EtherEncap(0x86DD, SRC 0:0:0:0:0:3, DST $MAC_DST)	
 	-> output;
 

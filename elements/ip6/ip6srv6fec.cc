@@ -51,6 +51,7 @@ IP6SRv6FECEncode::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
 	.read_mp("ENC", enc)
 	.read_mp("DEC", dec)
+    .read_mp("FED", fed)
     .read_or_set("WINDOW", _rlc_info.window_size, 4)
     .read_or_set("STEP", _rlc_info.window_step, 2)
     .read_or_set("SCHEME", _fec_scheme, SRV6_FEC_RLC)
@@ -85,6 +86,22 @@ void
 IP6SRv6FECEncode::fec_framework(Packet *p_in)
 {
     int err;
+
+    // Check the SID to determine if it is a source symbol or a feedback packet
+    const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
+    uint32_t *ip_32 = (uint32_t *)&ip6->ip6_dst.s6_addr;
+    uint32_t *fb_32 = (uint32_t *)fed.data32();
+    // We know that the packet belongs either to the FEC Framework or the Feedback process
+    // The difference between the two SIDs must be located in the last 32 bits of the IPv6 Address
+    // to make the following work
+    if (ip_32[3] = fb_32[3]) {
+        // Feedback message
+        
+        
+        // Do not forward a feedback message
+        return;
+    }
+    // This is a source symbol
 
     // Call FEC Scheme
     err = IP6SRv6FECEncode::fec_scheme(p_in);
@@ -367,6 +384,71 @@ void IP6SRv6FECEncode::encapsulate_repair_payload(WritablePacket *p, repair_tlv_
 
     // Set annotations
     _repair_packet->set_network_header(p->data(), (unsigned char*)(r_tlv + 1) - p->data());
+}
+
+void
+IP6SRv6FECEncode::feedback_message(Packet *p_in)
+{
+    const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
+    const click_ip6_sr *srv6 = reinterpret_cast<const click_ip6_sr *>(p_in->data() + sizeof(click_ip6));
+    const feedback_tlv_t *tlv = reinterpret_cast<const feedback_tlv_t *>(p_in->data() + sizeof(click_ip6) + sizeof(click_ip6_sr) + (srv6->last_entry + 1) * 16);
+
+    // Hard thresholds defining the algorithm
+    // TODO: put somewhere else
+    double SRV6_FEC_FB_LOST_THRESH = 0.05;
+    double SRV6_FEC_FB_BURST_MIN = 2.0;
+    double SRV6_FEC_FB_ALPHA = 0.5;
+    
+    // No feedback, i.e. no protected traffic since last update
+    // Reset the values by default
+    if (tlv->nb_theoric == 0) {
+        _rlc_info.window_size = 8; // TODO: make auto
+        _rlc_info.window_step = 2; // TODO: make auto
+        click_chatter("Reset the values of the FEC Scheme algorithm");
+        return;
+    }
+    
+    // No lost packet in the window
+    // Increase the window step to generate less repair symbols
+    if (tlv->nb_lost == 0) {
+        _rlc_info.loss_estimation = 0;
+        _rlc_info.generate_repair_symbols = false;
+        return;
+    }
+
+    double lost = _rlc_info.loss_estimation;
+    // Update the lost estimation gradually
+    lost = (tlv->nb_lost / tlv->nb_theoric) * SRV6_FEC_FB_ALPHA + (lost) * (1.0 - SRV6_FEC_FB_ALPHA);
+
+    // Compute the redundancy ratio compared to the data packets
+    double redundancy = 1.0 / _rlc_info.window_step;
+
+    // There are more loss than redundancy packets
+    // Reduce the window step to increase redundancy
+    if (redundancy < lost && _rlc_info.window_step > 1) {
+        --_rlc_info.window_step;
+        // TODO: Also generate immediate repair symbols ?
+    }
+
+    // Update the window size by inspecting the possible burst losses in the data
+    uint8_t max_seen_burst = 0;
+    uint8_t current_burst = 0;
+    uint64_t lost_bitstring = (~tlv->bit_string) & ((1 << tlv->nb_theoric) - 1);
+    while (lost_bitstring > 0) {
+        if (lost_bitstring & 1) {
+            ++current_burst;
+        } else {
+            max_seen_burst = MAX(max_seen_burst, current_burst);
+            current_burst = 0;
+        }
+        lost_bitstring >>=2;
+    }
+    // Compute the maximum burst length we can recover with the current 
+    uint8_t theoric_max_burst = ceil(_rlc_info.window_size / (double)_rlc_info.window_step);
+    
+    if (theoric_max_burst < max_seen_burst) {
+        ++_rlc_info.window_size;
+    }
 }
 
 CLICK_ENDDECLS

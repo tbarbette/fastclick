@@ -43,6 +43,15 @@ struct repair_tlv_t {
   uint8_t nrs; // Number Repair Symbol
 } CLICK_SIZE_PACKED_ATTRIBUTE;
 
+struct feedback_tlv_t {
+  uint8_t type;
+  uint8_t len;
+  uint16_t nb_theoric;
+  uint16_t nb_lost;
+  uint16_t padding;
+  uint64_t bit_string;
+} CLICK_SIZE_PACKED_ATTRIBUTE;
+
 #endif
 
 CLICK_DECLS
@@ -74,6 +83,8 @@ struct rlc_info_t {
   uint8_t window_step;
   uint8_t buffer_size;
   uint8_t previous_window_step;
+  bool generate_repair_symbols;
+  double loss_estimation;
 
   // RLC relative information
   tinymt32_t prng;
@@ -111,6 +122,7 @@ class IP6SRv6FECEncode : public Element {
   bool _use_dst_anno;
   IP6Address enc; // Encoder SID
   IP6Address dec; // Decoder SID
+  IP6Address fed; // Feedback SID
 
   static String read_handler(Element *, void *) CLICK_COLD;
   void fec_framework(Packet *p_in) CLICK_COLD;
@@ -127,6 +139,8 @@ class IP6SRv6FECEncode : public Element {
 
   void xor_encode_symbols(uint32_t encoding_symbol_id) CLICK_COLD;
   void xor_encode_one_symbol(Packet *s, WritablePacket *r, repair_tlv_t *repair_tlv) CLICK_COLD;
+
+  void feedback_message(Packet *p_in) CLICK_COLD;
 };
 
 
