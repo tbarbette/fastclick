@@ -1,8 +1,14 @@
 #This file is quite deprecated, but we keep it there in case someone has an internal GitLab CI pipeline and wants to reuse this
 variables:
-    DPDK_VERSION: "17.08"
+    DPDK_VERSION: "20.05"
     NETMAP_VERSION: "11.1"
     CONFIG: "--enable-gtp --enable-json"
+
+default:
+    tags:
+        - sudo
+        - docker
+    image: ubuntu:20.04
 
 batch:
     script:
@@ -49,6 +55,7 @@ cache:
         - dpdk-$DPDK_VERSION
         - netmap-$NETMAP_VERSION
 before_script:
+    - if [ `whoami` = "root" ] ; then apt-get update && apt-get -y install build-essential libnuma-dev sudo wget linux-headers-$(uname -r) ; fi
     - gcc -v
     - export RTE_SDK=`pwd`/dpdk-$DPDK_VERSION;
       export RTE_TARGET=x86_64-native-linuxapp-gcc;
@@ -62,5 +69,5 @@ before_script:
       fi;
     - if [ ! -e "netmap-$NETMAP_VERSION/sys/net/netmap.h" ] ; then wget https://github.com/luigirizzo/netmap/archive/v$NETMAP_VERSION.tar.gz && tar -xvf v$NETMAP_VERSION.tar.gz && cd netmap-$NETMAP_VERSION && cd LINUX && ./configure --no-drivers && cd .. && cd .. ; fi
     - ls -al
-    - if [ `sudo -n whoami` = "root" ] ; then sudo insmod netmap-$NETMAP_VERSION/LINUX/netmap.ko && sudo chmod 666 /dev/netmap ; fi
+    - if [ `sudo -n whoami` = "root" ] && command -v insmod ; then sudo insmod netmap-$NETMAP_VERSION/LINUX/netmap.ko && sudo chmod 666 /dev/netmap ; fi
     - export CONFIG_NETMAP="--with-netmap=`pwd`/netmap-$NETMAP_VERSION/sys/"

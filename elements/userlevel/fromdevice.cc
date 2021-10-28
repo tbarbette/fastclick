@@ -461,7 +461,7 @@ FromDevice::initialize(ErrorHandler *errh)
     if (!_sniffer)
         if (KernelFilter::device_filter(_ifname, true, errh) < 0
 #if HAVE_IP6
-                && KernelFilter::device_filter6(_ifname, true, errh) < 0
+                || KernelFilter::device_filter6(_ifname, true, errh) < 0
 #endif
                 ) {
             _sniffer = true;

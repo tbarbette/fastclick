@@ -39,7 +39,7 @@ elementclass InputEncap { $port, $src, $dst, $ip6src |
 	//-> Print("IP6 from $port", -1)
 	-> IP6Input()
 	-> IP6Print("IP6 from port $port")
-	-> IP6SREncap(ADDR babe:2::1, ADDR fc00::9, ADDR fc00::a)
+	-> IP6SREncap(ADDR fc00::9, ADDR fc00::a, ENCAP_DST true)
 	-> output;
 
     c[2] -> Print("IPv4 (discarded)")

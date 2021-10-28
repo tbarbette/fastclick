@@ -1,20 +1,25 @@
 require(library common.click)
 
+define( $intif sw2-eth0,
+        $extif sw2-eth1);
+
 //From internal to external
-fd1  :: FromDevice(sw2-eth0, SNIFFER false);
-td1  :: ToDevice(sw2-eth1);
-fd1 -> in1 :: InputEncap(eth0, 0:0:0:0:0:13, 0:0:0:0:0:12, babe:2::8)
+fd1  :: FromDevice($intif, SNIFFER false, PROMISC true);
+td1  :: ToDevice($extif);
+fd1 -> in1 :: InputEncap($intif, 0:0:0:0:0:13, 0:0:0:0:0:12, babe:2::8)
+    -> IP6Print(ENCAPED)
     -> Output(0:0:0:0:0:13, 0:0:0:0:0:12)
     -> q1 :: Queue -> td1 ;
 
 //From external to internal
-fd2  :: FromDevice(sw2-eth1, SNIFFER false);
-td2  :: ToDevice(sw2-eth0);
-fd2 -> in2 :: InputDecap(eth1, 0:0:0:0:0:3, 0:0:0:0:0:4, babe:3::2)
+fd2  :: FromDevice($extif, SNIFFER false, PROMISC true);
+td2  :: ToDevice($intif);
+fd2 -> in2 :: InputDecap($extif, 0:0:0:0:0:3, 0:0:0:0:0:4, babe:3::2)
     -> IP6Print("Before")
 	-> IP6SRProcess()
     -> IP6Print("Process")
-	-> IP6SRv6FECDecode(DEC fc00::9)
+    -> IP6SRv6FECDecode(DEC fc00::9)
+    -> Print(AFTER, -1)
     -> IP6Print("After")
     -> IP6SRDecap(FORCE_DECAP true)
     -> IP6Print("Decaped")
