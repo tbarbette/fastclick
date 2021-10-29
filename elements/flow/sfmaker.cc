@@ -105,7 +105,7 @@ int SFMaker::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if(Args(conf, this, errh)
             .read_or_set_p("DELAY", delay, 100)
-            .read_or_set_p("DELAY_LAST", delay_last, 50)
+            .read_or_set_p("DELAY_LAST", delay_last, 0)
             .read_or_set_p("DELAY_HARD", delay_hard, 0)
             .read_or_set("VERBOSE", _verbose, 0)
             .read_or_set("TAKE_ALL", _take_all, false)
