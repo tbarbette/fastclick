@@ -539,18 +539,11 @@ WritablePacket::check_data_pool_size(PacketPool &packet_pool, unsigned n) {
         if (!global_packet_pool.pdbatch.insert(packet_pool.pd)) {
             while (WritablePacket *pd = packet_pool.pd) {
                 packet_pool.pd = static_cast<WritablePacket *>(pd->next());
-#if HAVE_DPDK_PACKET_POOL
-                rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
-#else
-# if HAVE_NETMAP_PACKET_POOL
-                if (NetmapBufQ::is_valid_netmap_packet(pd))
-                    NetmapBufQ::local_pool()->insert_p(pd->buffer());
-                else
-# endif
-                {
-                    ::operator delete[]((unsigned char *) pd->buffer());
-                }
-#endif
+                #if HAVE_DPDK_PACKET_POOL
+                    rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
+                #else
+                    Packet::release_buffer(pd->buffer());
+                #endif
                 ::operator delete((void *) pd);
             }
         }
@@ -711,8 +704,9 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
     }
 # if CLICK_USERLEVEL || CLICK_MINIOS
     unsigned char *d = 0;
+#  if HAVE_CLICK_PACKET_POOL || HAVE_DPDK_PACKET_POOL
     if (n <= CLICK_PACKET_POOL_BUFSIZ) {
-#  if HAVE_DPDK_PACKET_POOL
+#    if HAVE_DPDK_PACKET_POOL
         struct rte_mbuf *mb = DPDKDevice::get_pkt();
         if (likely(mb)) {
             d = (unsigned char*)mb->buf_addr;
@@ -721,14 +715,15 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
         } else {
             return 0;
         }
-#  elif HAVE_NETMAP_PACKET_POOL
+#    elif HAVE_NETMAP_PACKET_POOL
     d = NetmapBufQ::local_pool()->extract_p();
-#  endif
+#    endif
     } else {
-# if HAVE_DPDK_PACKET_POOL
+#    if HAVE_DPDK_PACKET_POOL
         click_chatter("Warning : buffer of size %d bigger than DPDK buffer size", n);
-# endif
+#    endif
     }
+# endif
     if (!d) {
 # if HAVE_DPDK
       if (dpdk_enabled)
@@ -1172,7 +1167,12 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
 #else /* !CLICK_LINUXMODULE */
 
     int buffer_length = this->buffer_length();
+#if HAVE_CLICK_PACKET_POOL
     WritablePacket* p = WritablePacket::pool_allocate(extra_headroom, buffer_length, extra_tailroom);
+#else
+    WritablePacket* p = new WritablePacket;
+    p->alloc_data(extra_headroom,buffer_length,extra_tailroom);
+#endif
     if (!p) {
         if (free_on_failure)
             kill();
@@ -1216,7 +1216,11 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
         p->_data_packet = NULL; //packet from pool_data_allocate can be dirty
 # endif
         SFCB_STACK(
-        WritablePacket::recycle(p);
+#if HAVE_CLICK_PACKET_POOL
+            WritablePacket::recycle(p);
+#else
+            p->kill();
+#endif
         );
         p = (WritablePacket*)this;
     }
@@ -1444,24 +1448,17 @@ cleanup_pool(PacketPool *pp, int global)
 #else
     unsigned pcount = 0, pdcount = 0;
     while (WritablePacket *p = pp->p) {
-	++pcount;
-	pp->p = static_cast<WritablePacket *>(p->next());
-	::operator delete((void *) p);
+        ++pcount;
+        pp->p = static_cast<WritablePacket *>(p->next());
+        ::operator delete((void *) p);
     }
     while (WritablePacket *pd = pp->pd) {
     ++pdcount;
     pp->pd = static_cast<WritablePacket *>(pd->next());
 # if HAVE_DPDK_PACKET_POOL
     rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
-# elif HAVE_NETMAP_PACKET_POOL
-    NetmapBufQ::local_pool()->insert_p(pd->buffer());
 # else
-#  if HAVE_DPDK
-    if (dpdk_enabled)
-        rte_free(reinterpret_cast<unsigned char *>(pd->buffer()));
-    else
-#  endif
-        delete[] reinterpret_cast<unsigned char *>(pd->buffer());
+    Packet::release_buffer(pd->buffer());
 # endif
     ::operator delete((void *) pd);
     }
@@ -1516,7 +1513,19 @@ Packet::make_similar(Packet* original, uint32_t length)
 {
 #if HAVE_DPDK && !HAVE_DPDK_PACKET_POOL && !CLICK_PACKET_USE_DPDK
     if (DPDKDevice::is_dpdk_buffer(original) && length <= DPDKDevice::MBUF_DATA_SIZE) {
+#if HAVE_CLICK_PACKET_POOL
         WritablePacket* p = WritablePacket::pool_allocate();
+#else
+        WritablePacket *p = new WritablePacket;
+        if (!p)
+            return 0;
+
+        if (!p->alloc_data(original->headroom(), length, original->tailroom())) {
+            p->_head = 0;
+            delete p;
+            return 0;
+        }
+#endif
         if (!p)
             return 0;
 		p->initialize(false);

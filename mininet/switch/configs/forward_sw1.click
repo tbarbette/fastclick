@@ -11,10 +11,11 @@ fd1
     //-> Print(INT) 
     -> in1 :: InputEncap($intif, 0:0:0:0:0:12, 0:0:0:0:0:13, babe:1::6, $noencap)
     //-> IP6Print(Beforeprocess)
+    -> IP6SRDecap(FORCE_DECAP false) 
     -> {
         [0] -> s :: Switch($nofec);
             s[0] -> IP6SRv6FECEncode(ENC fc00::a, DEC fc00::9) -> [0];
-            s[1] -> IP6SRDecap(FORCE_DECAP false) -> [0];
+            s[1] -> [0];
     }
     -> IP6Print(Afterprocess)
     -> o :: Output(0:0:0:0:0:12, 0:0:0:0:0:13)

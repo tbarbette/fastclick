@@ -31,6 +31,7 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
         .CLICK_NEVER_REPLACE(read_or_set)("RESERVE", _reserve, 0)
         .read_or_set("TIMEOUT", _timeout, -1)
         .read_or_set("CACHE", _cache, true)
+        .read_or_set("VERBOSE", _verbose, true)
         .complete() < 0)
         return -1;
 
@@ -188,6 +189,9 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
         batch = b.finish();
         if (batch) {
             fcb_stack->lastseen = recent;
+#if HAVE_FLOW_DYNAMIC
+	    fcb_stack->acquire(batch->count());
+#endif
             output_push_batch(0, batch);
         }
         fcb_stack = fcb;
@@ -210,6 +214,9 @@ void FlowIPManagerIMP::push_batch(int, PacketBatch* batch)
     batch = b.finish();
     if (batch) {
         fcb_stack->lastseen = recent;
+#if HAVE_FLOW_DYNAMIC
+	fcb_stack->acquire(batch->count());
+#endif
         output_push_batch(0, batch);
     }
 }

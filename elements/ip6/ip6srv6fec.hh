@@ -124,6 +124,7 @@ class IP6SRv6FECEncode : public BatchElement {
   rlc_info_t   _rlc_info;
   WritablePacket *_repair_packet; // Or public ?
   bool _use_dst_anno;
+  bool _send_repair;
   IP6Address enc; // Encoder SID
   IP6Address dec; // Decoder SID
   IP6Address fed; // Feedback SID

@@ -9,9 +9,10 @@
 #include "flow/common.hh"
 #if CLICK_LINUXMODULE
 # include <click/skbmgr.hh>
-#elif CLICK_PACKET_USE_DPDK
+#elif CLICK_PACKET_USE_DPDK || HAVE_DPDK
 # include <rte_debug.h>
 # include <rte_mbuf.h>
+# include <rte_malloc.h>
 # include <click/dpdk_glue.hh>
 #else
 # include <click/atomic.hh>
@@ -22,7 +23,7 @@
 #if CLICK_NS
 # include <click/simclick.h>
 #endif
-#if !CLICK_PACKET_USE_DPDK && (CLICK_USERLEVEL || CLICK_NS || CLICK_MINIOS) && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS) && !(NETMAP_PACKET_POOL)
+#if !CLICK_PACKET_USE_DPDK && (CLICK_USERLEVEL || CLICK_NS || CLICK_MINIOS) && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS) && !(NETMAP_PACKET_POOL) && ALLOW_CLICK_PACKET_POOL
 # define HAVE_CLICK_PACKET_POOL 1
 #endif
 #ifndef CLICK_PACKET_DEPRECATED_ENUM
@@ -189,7 +190,8 @@ class Packet { public:
         _destructor_argument = arg;
     }
 
-    void delete_buffer(unsigned char* head, unsigned char* end);
+    static inline void release_buffer(unsigned char* head);
+    inline void delete_buffer(unsigned char* head, unsigned char* end);
 #endif
 
 
@@ -3141,6 +3143,27 @@ WritablePacket::rewrite_seq(tcp_seq_t seq, const int shift) {
 
 
 #if !CLICK_PACKET_USE_DPDK
+/**
+ * Release a buffer that is directly allocated, ie not one that use destructor
+ */
+inline void
+Packet::release_buffer(unsigned char* head) {
+
+# if HAVE_NETMAP_PACKET_POOL
+                if (NetmapBufQ::is_valid_netmap_buffer(head))
+                    NetmapBufQ::local_pool()->insert_p(head);
+                else
+# endif
+                {
+#  if HAVE_DPDK
+                if (dpdk_enabled)
+                    rte_free(head);
+                else
+#  endif
+                    ::operator delete[](head);
+                }
+}
+
 inline void
 Packet::delete_buffer(unsigned char* head, unsigned char* end
 #if CLICK_BSDMODULE
@@ -3149,7 +3172,7 @@ Packet::delete_buffer(unsigned char* head, unsigned char* end
         ) {
 # ifndef CLICK_NOINDIRECT
     if (_data_packet) {
-	_data_packet->kill();
+	    _data_packet->kill();
     }
 # else
   if (false) {}
@@ -3159,14 +3182,7 @@ Packet::delete_buffer(unsigned char* head, unsigned char* end
         if (_destructor != empty_destructor)
             _destructor(head, end - head, _destructor_argument);
     } else
-#  if HAVE_NETMAP_PACKET_POOL
-    if (head && NetmapBufQ::is_valid_netmap_buffer(head)) {
-        NetmapBufQ::local_pool()->insert_p(head);
-    } else
-#  endif
-    if (head) {
-            delete[] head;
-    }
+        release_buffer(head);
 # elif CLICK_BSDMODULE
     if (m)
 	    m_freem(m);
