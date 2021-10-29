@@ -65,28 +65,27 @@ IP6SRv6FECEncode::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 IP6SRv6FECEncode::push(int input, Packet *p_in)
 {
-    // if (input == SRV6_FEC_FEEDBACK_INPUT) {
-    //     feedback_message(p_in, [this](Packet*p){output(0).push(p);});
-    // } else {
-    //     fec_framework(p_in, [this](Packet*p){output(0).push(p);});
-    // }$
-    fec_framework(p_in, [this](Packet*p){output(0).push(p);});
+    if (input == SRV6_FEC_FEEDBACK_INPUT) {
+        feedback_message(p_in, [this](Packet*p){output(0).push(p);});
+    } else {
+        fec_framework(p_in, [this](Packet*p){output(0).push(p);});
+    }
+    //fec_framework(p_in, [this](Packet*p){output(0).push(p);});
 }
 
 #if HAVE_BATCH
 void 
 IP6SRv6FECEncode::push_batch(int input, PacketBatch *batch) {
-    // TODO: check if we can still do that for the batching
-    // if (input == SRV6_FEC_FEEDBACK_INPUT) {
-    //     EXECUTE_FOR_EACH_PACKET_ADD(feedback_message, batch);
-    // } else {
-    //     EXECUTE_FOR_EACH_PACKET_ADD( fec_framework, batch );
-    //     if (batch)
-    //         output_push_batch(0, batch);
-    // }
-    EXECUTE_FOR_EACH_PACKET_ADD( fec_framework, batch );
-    if (batch)
-        output_push_batch(0, batch);
+    if (input == SRV6_FEC_FEEDBACK_INPUT) {
+        EXECUTE_FOR_EACH_PACKET_ADD(feedback_message, batch);
+    } else {
+        EXECUTE_FOR_EACH_PACKET_ADD( fec_framework, batch );
+        if (batch)
+            output_push_batch(0, batch);
+    }
+    // EXECUTE_FOR_EACH_PACKET_ADD( fec_framework, batch );
+    // if (batch)
+    //     output_push_batch(0, batch);
 }
 #endif
 
@@ -182,7 +181,8 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
     ++_rlc_info.encoding_symbol_id;
 
     // Generate a repair symbol if full window
-    if (_rlc_info.buffer_size == _rlc_info.window_size) {
+    if (_rlc_info.buffer_size >= _rlc_info.window_size) {
+        click_chatter("Before segmentation fault?");
         // Create new repair packet with correct size
         _repair_packet = Packet::make(_rlc_info.max_length + sizeof(click_ip6) + sizeof(click_ip6_sr) + sizeof(repair_tlv_t) + 2 * sizeof(IP6Address));
         if (!_repair_packet) {
@@ -199,11 +199,15 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
             xor_encode_symbols(_source_tlv.sfpid);
         }
 
+        click_chatter("After 1?");
+
         // Free the out-of-window source symbols
         // Maybe this will give a problem once we support adaptative RLC
         // Because we might free data that should be used after if the window
         // size increases
         free_out_of_window(_source_tlv.sfpid);
+
+        click_chatter("After 2?");
 
         // Complete the Repair FEC Payload ID
         _repair_tlv.type = TLV_TYPE_FEC_REPAIR;
@@ -413,6 +417,7 @@ void IP6SRv6FECEncode::encapsulate_repair_payload(WritablePacket *p, repair_tlv_
 void
 IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>push)
 {
+    click_chatter("GETTING A FEEDBACK MESSAGE");
     const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
     const click_ip6_sr *srv6 = reinterpret_cast<const click_ip6_sr *>(p_in->data() + sizeof(click_ip6));
     const feedback_tlv_t *tlv = reinterpret_cast<const feedback_tlv_t *>(p_in->data() + sizeof(click_ip6) + sizeof(click_ip6_sr) + (srv6->last_entry + 1) * 16);
@@ -426,7 +431,7 @@ IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>pus
     // No feedback, i.e. no protected traffic since last update
     // Reset the values by default
     if (tlv->nb_theoric == 0) {
-        _rlc_info.window_size = 8; // TODO: make auto
+        _rlc_info.window_size = 4; // TODO: make auto
         _rlc_info.window_step = 2; // TODO: make auto
         click_chatter("Reset the values of the FEC Scheme algorithm");
         return;
@@ -434,15 +439,16 @@ IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>pus
     
     // No lost packet in the window
     // Increase the window step to generate less repair symbols
-    if (tlv->nb_lost == 0) {
-        _rlc_info.loss_estimation = 0;
-        _rlc_info.generate_repair_symbols = false;
-        return;
-    }
+    // if (tlv->nb_lost == 0) {
+    //     _rlc_info.loss_estimation = 0;
+    //     _rlc_info.generate_repair_symbols = false;
+    //     return;
+    // }
 
     double lost = _rlc_info.loss_estimation;
     // Update the lost estimation gradually
     lost = (tlv->nb_lost / tlv->nb_theoric) * SRV6_FEC_FB_ALPHA + (lost) * (1.0 - SRV6_FEC_FB_ALPHA);
+    _rlc_info.loss_estimation = lost;
 
     // Compute the redundancy ratio compared to the data packets
     double redundancy = 1.0 / _rlc_info.window_step;
@@ -473,6 +479,8 @@ IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>pus
     if (theoric_max_burst < max_seen_burst) {
         ++_rlc_info.window_size;
     }
+
+    click_chatter("loss=%f, size=%u, step=%u", _rlc_info.loss_estimation, _rlc_info.window_size, _rlc_info.window_step);
 }
 
 CLICK_ENDDECLS

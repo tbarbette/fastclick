@@ -36,6 +36,7 @@ IP6SRv6FECDecode::IP6SRv6FECDecode()
 
 IP6SRv6FECDecode::~IP6SRv6FECDecode()
 {
+    click_chatter("Before the segmentation fault");
     for (int i = 0; i < SRV6_FEC_BUFFER_SIZE; ++i) {
         srv6_fec2_source_t *packet = _rlc_info.source_buffer[i];
         if (packet) {
@@ -160,6 +161,14 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
     if (tlv_type == TLV_TYPE_FEC_SOURCE) {
         push(p);
     }
+
+    if (_rlc_info.esid_last_feedback > SRV6_FEC_BUFFER_SIZE) {
+        click_chatter("Show last: %u", _rlc_info.esid_last_feedback);
+        rlc_feedback();
+        _rlc_info.esid_last_feedback = 0;
+    } else {
+        ++_rlc_info.esid_last_feedback;
+    }
 }
 
 int
@@ -200,13 +209,19 @@ IP6SRv6FECDecode::store_source_symbol(WritablePacket *p_in, source_tlv_t *tlv) {
     // Clean previous symbol in the buffer and replace with current symbol
     srv6_fec2_source_t *previous_symbol = _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
     if (previous_symbol) {
-        previous_symbol->p->kill();
+        if (previous_symbol->p) {
+            previous_symbol->p->kill();
+        }
         CLICK_LFREE(previous_symbol, sizeof(srv6_fec2_source_t));
     }
     _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = symbol;
 
     // Update the feedback string bit
-    // _rlc_feedback.received_string |= (1 << _rlc_feedback.nb_received++);
+    // TODO: this line generates a segmentation fault when we exit the program
+    // Not the only one apparently
+    // Fow now, assume that we receive all packets
+    // _rlc_feedback.received_string = -1;
+    _rlc_feedback.received_string |= (1 << _rlc_feedback.nb_received++);
 }
 
 void
@@ -228,6 +243,7 @@ IP6SRv6FECDecode::store_repair_symbol(WritablePacket *p_in, repair_tlv_t *tlv)
     }
     _rlc_info.repair_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = symbol;
     _rlc_info.encoding_symbol_id = encoding_symbol_id;
+    click_chatter("Encoding symbol id=%u", _rlc_info.encoding_symbol_id);
 }
 
 void
@@ -416,6 +432,8 @@ IP6SRv6FECDecode::rlc_recover_symbols()
         }
     }
 
+    click_chatter("ESID=%u, NB_UNK=%u", encoding_symbol_id, nb_unknwons);
+
     // Maybe no need for recovery?
     if (nb_unknwons == 0) {
         // Free all memory
@@ -477,7 +495,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
         // 2) Coefficient matrix (A) ith row
         uint16_t repair_key = repair->tlv.rlc_rfi.repair_key; // TODO
         // rlc_get_coefs(&prng, repair_key, this_window_size, coefs);
-        rlc_get_coefs(&prng, 1, this_window_size, coefs);
+        rlc_get_coefs(&prng, 1, this_window_size, coefs); // TODO: put real coefficients
         int current_unknown = 0; // Nb of unknown already discovered
         idx = this_encoding_symbol_id - id_first_ss_first_window - this_window_size + 1; // TODO: check if correct
         for (int j = 0; j < this_window_size; ++j) {
@@ -527,6 +545,8 @@ IP6SRv6FECDecode::rlc_recover_symbols()
                     click_chatter("Error from recovery confirmed");
                     continue;
                 };
+
+                click_chatter("Recovered the packet with esid=%u", id_first_ss_first_window + idx);
                 
                 // New pointer for the recovered values
                 srv6_fec2_source_t *recovered = (srv6_fec2_source_t *)CLICK_LALLOC(sizeof(srv6_fec2_source_t));
@@ -534,6 +554,8 @@ IP6SRv6FECDecode::rlc_recover_symbols()
 
                 // Store a local copy of the packet for later recovery?
                 recovered->p = p_rec->clone();
+
+                output(0).push(recovered->p);
 
                 // Store the recovered packet in the buffer and clean previous
                 srv6_fec2_source_t *old_rec = _rlc_info.recovd_buffer[recovered->encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
@@ -901,56 +923,55 @@ IP6SRv6FECDecode::xor_one_symbol(srv6_fec2_term_t *rec, Packet *s)
     rec->length.coded_length ^= s->length();
 }
 
-// void
-// IP6SRv6FECDecode::rlc_feedback()
-// {
-//     uint16_t packet_size = sizeof(click_ip6) + sizeof(click_ip6_sr) + 2 * sizeof(IP6Address) + sizeof(feedback_tlv_t);
-//     WritablePacket *p = Packet::make(packet_size);
-//     if (!p) {
-//         return;
-//     }
+void
+IP6SRv6FECDecode::rlc_feedback()
+{
+    uint16_t packet_size = sizeof(click_ip6) + sizeof(click_ip6_sr) + 2 * sizeof(IP6Address) + sizeof(feedback_tlv_t);
+    WritablePacket *p = Packet::make(packet_size);
+    if (!p) {
+        return;
+    }
 
-//     click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
-//     click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
-//     uint8_t *segment_list = ((uint8_t *)srv6) + sizeof(click_ip6_sr);
-//     feedback_tlv_t *tlv = reinterpret_cast<feedback_tlv_t *>(p->data() + sizeof(click_ip6) + sizeof(click_ip6_sr) + sizeof(IP6Address) * 2);
+    click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
+    click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
+    feedback_tlv_t *tlv = reinterpret_cast<feedback_tlv_t *>(p->data() + sizeof(click_ip6) + sizeof(click_ip6_sr) + sizeof(IP6Address) * 2);
 
-//     // IPv6 Header
-//     memcpy(&ip6->ip6_src, dec.data(), sizeof(IP6Address));
-//     memcpy(&ip6->ip6_dst, enc.data(), sizeof(IP6Address));
-//     ip6->ip6_flow = htonl(6 << IP6_V_SHIFT);
-//     ip6->ip6_plen = packet_size - sizeof(click_ip6);
-//     ip6->ip6_nxt = IPPROTO_ROUTING;
-//     ip6->ip6_hlim = 51;
+    // IPv6 Header
+    memcpy(&ip6->ip6_src, dec.data(), sizeof(IP6Address));
+    memcpy(&ip6->ip6_dst, enc.data(), sizeof(IP6Address));
+    ip6->ip6_flow = htonl(6 << IP6_V_SHIFT);
+    ip6->ip6_plen = htons(packet_size - sizeof(click_ip6));
+    ip6->ip6_nxt = IPPROTO_ROUTING;
+    ip6->ip6_hlim = 51;
 
-//     // SRv6 Header
-//     srv6->type = IP6PROTO_SEGMENT_ROUTING;
-//     srv6->segment_left = 1;
-//     srv6->last_entry = 1;
-//     srv6->flags = 0;
-//     srv6->tag = 0;
-//     srv6->ip6_sr_next = 253;
-//     srv6->ip6_hdrlen = (sizeof(feedback_tlv_t) + 2 * sizeof(IP6Address)) / 8;
-//     memcpy(&srv6->segments[0], enc.data(), sizeof(IP6Address));
-//     memcpy(&srv6->segments[1], dec.data(), sizeof(IP6Address));
+    // SRv6 Header
+    srv6->type = IP6PROTO_SEGMENT_ROUTING;
+    srv6->segment_left = 1;
+    srv6->last_entry = 1;
+    srv6->flags = 0;
+    srv6->tag = 0;
+    srv6->ip6_sr_next = 253;
+    srv6->ip6_hdrlen = (sizeof(feedback_tlv_t) + 2 * sizeof(IP6Address)) / 8;
+    memcpy(&srv6->segments[0], dec.data(), sizeof(IP6Address));
+    memcpy(&srv6->segments[1], enc.data(), sizeof(IP6Address));
 
-//     // Add feedback TLV
-//     tlv->type = TLV_TYPE_FEC_FEEDBACK;
-//     tlv->len = sizeof(feedback_tlv_t) - 2;
-//     tlv->padding16 = 0;
-//     tlv->padding32 = 0;
-//     // tlv->bit_string = _rlc_feedback.received_string;
+    // Add feedback TLV
+    tlv->type = TLV_TYPE_FEC_FEEDBACK;
+    tlv->len = sizeof(feedback_tlv_t) - 2;
+    tlv->padding16 = 0;
+    tlv->padding32 = 0;
+    tlv->bit_string = _rlc_feedback.received_string;
 
-//     // Set annotations
-//     p->set_network_header(p->data(), (unsigned char*)(tlv + 1) - p->data());
+    // Set annotations
+    p->set_network_header(p->data(), (unsigned char*)(tlv + 1) - p->data());
 
-//     // Send packet with feedback
-//     // input(0).push(p);
+    // Send packet with feedback
+    output(1).push(p);
 
-//     // Reset parameters for next feedback
-//     //, memset(&_rlc_feedback, 0, sizeof(srv6_fec2_feedback));
+    // Reset parameters for next feedback
+    memset(&_rlc_feedback, 0, sizeof(srv6_fec2_feedback));
 
-// }
+}
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IP6SRv6FECDecode)

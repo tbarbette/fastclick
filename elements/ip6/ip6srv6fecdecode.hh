@@ -46,13 +46,13 @@ struct repair_tlv_t {
   uint8_t nrs; // Number Repair Symbol
 } CLICK_SIZE_PACKED_ATTRIBUTE;
 
-// struct feedback_tlv_t {
-//   uint8_t type;
-//   uint8_t len;
-//   uint16_t padding16;
-//   uint64_t bit_string;
-//   uint32_t padding32;
-// } CLICK_SIZE_PACKED_ATTRIBUTE;
+struct feedback_tlv_t {
+  uint8_t type;
+  uint8_t len;
+  uint16_t padding16;
+  uint64_t bit_string;
+  uint32_t padding32;
+} CLICK_SIZE_PACKED_ATTRIBUTE;
 
 #endif
 
@@ -94,10 +94,10 @@ struct srv6_fec2_term_t {
   } length;
 };
 
-// struct srv6_fec2_feedback {
-//   uint64_t received_string;
-//   uint16_t nb_received;
-// };
+struct srv6_fec2_feedback {
+  uint64_t received_string;
+  uint16_t nb_received;
+};
 
 struct rlc_info_decoder_t {
 
@@ -109,6 +109,7 @@ struct rlc_info_decoder_t {
   srv6_fec2_repair_t *repair_buffer[SRV6_FEC_BUFFER_SIZE];
   srv6_fec2_source_t *recovd_buffer[SRV6_FEC_BUFFER_SIZE];
   uint32_t encoding_symbol_id;
+  uint32_t esid_last_feedback;
 };
 
 #define SRV6_FEC_RLC 0
@@ -122,7 +123,7 @@ class IP6SRv6FECDecode : public BatchElement {
   ~IP6SRv6FECDecode();
 
   const char *class_name() const override        { return "IP6SRv6FECDecode"; }
-  const char *port_count() const override        { return PORTS_1_1; }
+  const char *port_count() const override        { return "1/2"; }
 
   int  configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const     { return true; }
@@ -139,7 +140,7 @@ class IP6SRv6FECDecode : public BatchElement {
   IP6Address dec; // Decoder SID
   bool _use_dst_anno;
   rlc_info_decoder_t _rlc_info;
-  // srv6_fec2_feedback _rlc_feedback;
+  srv6_fec2_feedback _rlc_feedback;
 
   static String read_handler(Element *, void *) CLICK_COLD;
 
@@ -170,10 +171,10 @@ class IP6SRv6FECDecode : public BatchElement {
   int first_non_zero_idx(const uint8_t *a, int n_unknowns);
   void gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_fec2_term_t **constant_terms, srv6_fec2_term_t **x, bool *undetermined, uint8_t *mul, uint8_t *inv, uint16_t max_packet_length);
 
-  Packet* xor_recover_symbols() CLICK_COLD;
-  void xor_one_symbol(srv6_fec2_term_t *rec, Packet *s) CLICK_COLD;
+  Packet* xor_recover_symbols();
+  void xor_one_symbol(srv6_fec2_term_t *rec, Packet *s);
 
-  // void rlc_feedback() CLICK_COLD;
+  void rlc_feedback();
 };
 
 CLICK_ENDDECLS

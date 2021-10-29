@@ -95,7 +95,7 @@ struct rlc_info_t {
 
 #define SRV6_FEC_RLC 0
 #define SRV6_FEC_XOR 1
-#define SRV6_FEC_FEEDBACK_INPUT 2
+#define SRV6_FEC_FEEDBACK_INPUT 1
 
 class IP6SRv6FECEncode : public BatchElement { 
  
@@ -105,7 +105,7 @@ class IP6SRv6FECEncode : public BatchElement {
   ~IP6SRv6FECEncode();
 
   const char *class_name() const override        { return "IP6SRv6FECEncode"; }
-  const char *port_count() const override        { return PORTS_1_1; } // Two inputs for the feedback
+  const char *port_count() const override        { return "2/1"; } // Two inputs for the feedback
 
   int  configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const     { return true; }

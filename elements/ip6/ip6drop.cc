@@ -56,31 +56,32 @@ IP6Drop::configure(Vector<String> &conf, ErrorHandler *errh)
 Packet *
 IP6Drop::simple_action(Packet *p_in)
 {
-    // // Do not drop the repair symbols
-    // // TODO: adapt if we change and do not use ping anymore
-    // if (p_in->length() > 200) return p_in;
-    // total_seen++;
-    // for (int i = 0; i < idxs.size(); ++i) {
-    //     if (total_seen % 20 == idxs.at(i)) return 0;
-    // }
-    // return p_in;
-    const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
-    uint32_t *dst_32 = (uint32_t *)&ip6->ip6_dst;
-    bool found = false;
-    for (int i = 0; i < addrs.size(); ++i) {
-        IP6Address addr = addrs.at(i);
-        uint32_t *addr_32 = (uint32_t *)addr.data32();
-        if (addr_eq(addr_32, dst_32)) {
-            found = true;
-            break;
-        }
-    }
-    if (!found) return p_in;
-
-    if (!gemodel()) {
-        return 0;
+    // Do not drop the repair symbols
+    // TODO: adapt if we change and do not use ping anymore
+    int idxs[] = {2, 3, 7};
+    if (p_in->length() > 200) return p_in;
+    total_seen++;
+    for (int i = 0; i < 3; ++i) {
+        if (total_seen % 20 == idxs[i]) return 0;
     }
     return p_in;
+    // const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
+    // uint32_t *dst_32 = (uint32_t *)&ip6->ip6_dst;
+    // bool found = false;
+    // for (int i = 0; i < addrs.size(); ++i) {
+    //     IP6Address addr = addrs.at(i);
+    //     uint32_t *addr_32 = (uint32_t *)addr.data32();
+    //     if (addr_eq(addr_32, dst_32)) {
+    //         found = true;
+    //         break;
+    //     }
+    // }
+    // if (!found) return p_in;
+
+    // if (!gemodel()) {
+    //     return 0;
+    // }
+    // return p_in;
 }
 
 bool
