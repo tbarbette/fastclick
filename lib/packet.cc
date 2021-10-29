@@ -539,18 +539,11 @@ WritablePacket::check_data_pool_size(PacketPool &packet_pool, unsigned n) {
         if (!global_packet_pool.pdbatch.insert(packet_pool.pd)) {
             while (WritablePacket *pd = packet_pool.pd) {
                 packet_pool.pd = static_cast<WritablePacket *>(pd->next());
-#if HAVE_DPDK_PACKET_POOL
-                rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
-#else
-# if HAVE_NETMAP_PACKET_POOL
-                if (NetmapBufQ::is_valid_netmap_packet(pd))
-                    NetmapBufQ::local_pool()->insert_p(pd->buffer());
-                else
-# endif
-                {
-                    ::operator delete[]((unsigned char *) pd->buffer());
-                }
-#endif
+                #if HAVE_DPDK_PACKET_POOL
+                    rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
+                #else
+                    Packet::release_buffer(pd->buffer());
+                #endif
                 ::operator delete((void *) pd);
             }
         }
@@ -1455,24 +1448,17 @@ cleanup_pool(PacketPool *pp, int global)
 #else
     unsigned pcount = 0, pdcount = 0;
     while (WritablePacket *p = pp->p) {
-	++pcount;
-	pp->p = static_cast<WritablePacket *>(p->next());
-	::operator delete((void *) p);
+        ++pcount;
+        pp->p = static_cast<WritablePacket *>(p->next());
+        ::operator delete((void *) p);
     }
     while (WritablePacket *pd = pp->pd) {
     ++pdcount;
     pp->pd = static_cast<WritablePacket *>(pd->next());
 # if HAVE_DPDK_PACKET_POOL
     rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
-# elif HAVE_NETMAP_PACKET_POOL
-    NetmapBufQ::local_pool()->insert_p(pd->buffer());
 # else
-#  if HAVE_DPDK
-    if (dpdk_enabled)
-        rte_free(reinterpret_cast<unsigned char *>(pd->buffer()));
-    else
-#  endif
-        delete[] reinterpret_cast<unsigned char *>(pd->buffer());
+    Packet::release_buffer(pd->buffer());
 # endif
     ::operator delete((void *) pd);
     }
