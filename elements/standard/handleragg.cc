@@ -48,7 +48,7 @@ HandlerAggregate::initialize(ErrorHandler *errh)
     return 0;
 }
 
-enum {h_add = 0, h_avg};
+enum {h_add = 0, h_avg, h_write};
 
 int
 HandlerAggregate::handler(int operation, String &data, Element *e,
@@ -58,22 +58,43 @@ HandlerAggregate::handler(int operation, String &data, Element *e,
 
     double d = 0;
 
-    int f = (intptr_t)handler->read_user_data();
-    for (int i = 0; i < c->_elements.size(); i++) {
-        HandlerCall h(data);
-        h.initialize_read(c->_elements[i], errh);
-        d += atof(h.call_read().c_str());
-    }
-    switch (f) {
-        case h_add:
-            data = String( d );
-            break;
-        case h_avg:
-            data = String( d / c->_elements.size() );
-            break;
-        default:
-            data = "<error function "+String(f)+">" ;
-            return 1;
+    if (operation == Handler::f_read) {
+
+        int f = (intptr_t)handler->read_user_data();
+        for (int i = 0; i < c->_elements.size(); i++) {
+            HandlerCall h(data);
+            h.initialize_read(c->_elements[i], errh);
+            d += atof(h.call_read().c_str());
+        }
+        switch (f) {
+            case h_add:
+                data = String( d );
+                break;
+            case h_avg:
+                data = String( d / c->_elements.size() );
+                break;
+            default:
+                data = "<error function "+String(f)+">" ;
+                return 1;
+        }
+    } else {
+
+        int f = (intptr_t)handler->write_user_data();
+        for (int i = 0; i < c->_elements.size(); i++) {
+            HandlerCall h(data);
+            h.initialize_write(c->_elements[i], errh);
+            h.call_write();
+        }
+        switch (f) {
+
+            case h_write:
+                data = "";
+                break;
+            default:
+                data = "<error function "+String(f)+">" ;
+                return 1;
+        }
+
     }
     return 0;
 }
@@ -83,6 +104,7 @@ HandlerAggregate::add_handlers()
 {
     set_handler("add", Handler::f_read | Handler::f_read_param, handler, h_add);
     set_handler("avg", Handler::f_read | Handler::f_read_param, handler, h_avg);
+    set_handler("write", Handler::f_write, handler, h_write);
 }
 
 CLICK_ENDDECLS

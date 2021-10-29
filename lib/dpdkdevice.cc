@@ -1472,7 +1472,7 @@ int DPDKDevice::DEFAULT_NB_MBUF = 32*4096*2 - 1;
 #else
 int DPDKDevice::DEFAULT_NB_MBUF = 65536 - 1;
 #endif
-Vector<int> DPDKDevice::NB_MBUF;
+Vector<int> DPDKDevice::NB_MBUF = Vector<int>();
 #ifdef RTE_MBUF_DEFAULT_BUF_SIZE
 int DPDKDevice::MBUF_DATA_SIZE = RTE_MBUF_DEFAULT_BUF_SIZE + DPDK_ANNO_SIZE;
 #else
