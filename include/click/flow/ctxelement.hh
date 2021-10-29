@@ -4,6 +4,7 @@
 #include <click/element.hh>
 #include <click/router.hh>
 #include <click/flowbuffer.hh>
+#include <click/flow/common.hh>
 #include <click/routervisitor.hh>
 #ifdef HAVE_AVX2
 #include <immintrin.h>
