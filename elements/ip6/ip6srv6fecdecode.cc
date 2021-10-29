@@ -60,7 +60,8 @@ IP6SRv6FECDecode::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
 	.read_mp("ENC", enc)
-    .read_mp("DEC", dec)
+	.read_mp("DEC", dec)
+	.read_or_set("RECOVER", _do_recover, true)
 	.complete() < 0)
         return -1;
     return 0;
@@ -77,8 +78,9 @@ IP6SRv6FECDecode::push(int, Packet *p_in)
 void 
 IP6SRv6FECDecode::push_batch(int, PacketBatch *batch) {
     EXECUTE_FOR_EACH_PACKET_ADD( fec_framework, batch );
-    if (batch)
+    if (batch) {
         output_push_batch(0, batch);
+    }
 
 }
 #endif
@@ -152,7 +154,9 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
         memcpy(&repair_tlv, tlv_ptr, sizeof(repair_tlv_t));
 
         // Call FEC Scheme
-        fec_scheme_repair(p, &repair_tlv);
+        Packet* p_rec = fec_scheme_repair(p, &repair_tlv);
+	if (p_rec)
+		push(p_rec);
     }
 
     // Send the (modified, without TLV) source symbol
@@ -171,21 +175,23 @@ IP6SRv6FECDecode::fec_scheme_source(WritablePacket *p_in, source_tlv_t *tlv)
     return 0;
 }
 
-int
+Packet*
 IP6SRv6FECDecode::fec_scheme_repair(WritablePacket *p_in, repair_tlv_t *tlv)
 {
 
     // Store packet as source symbol
     store_repair_symbol(p_in, tlv);
 
+    Packet* p;
+
     // Call RLC recovery
     if (tlv->padding == SRV6_FEC_RLC) {
-        rlc_recover_symbols();
+        p = rlc_recover_symbols();
     } else {
-        xor_recover_symbols();
+        p = xor_recover_symbols();
     }
 
-    return 0;
+    return p;
 }
 
 void
@@ -200,6 +206,7 @@ IP6SRv6FECDecode::store_source_symbol(WritablePacket *p_in, source_tlv_t *tlv) {
     // Clean previous symbol in the buffer and replace with current symbol
     srv6_fec2_source_t *previous_symbol = _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
     if (previous_symbol) {
+	assert(previous_symbol->p);
         previous_symbol->p->kill();
         CLICK_LFREE(previous_symbol, sizeof(srv6_fec2_source_t));
     }
@@ -508,7 +515,7 @@ IP6SRv6FECDecode::rlc_recover_symbols()
     // }
 
     bool can_recover = nb_effective_equations >= nb_unknwons;
-    if (can_recover) {
+    if (can_recover && _do_recover) {
         // Solve the system
         gauss_elimination(nb_effective_equations, nb_unknwons, system_coefs, constant_terms, unknowns, undetermined, _rlc_info.muls, _rlc_info.table_inv, max_packet_length);
         uint8_t current_unknown = 0;

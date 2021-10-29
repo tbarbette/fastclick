@@ -18,18 +18,16 @@ fd2  :: FromDevice($extif, SNIFFER false, PROMISC true);
 td2  :: ToDevice($intif);
 fd2 -> in2 :: InputDecap($extif, 0:0:0:0:0:3, 0:0:0:0:0:4, babe:3::2)
 //    -> IP6Print("Before")
-//-> IP6SRProcess()
-//    -> IP6Print("Process")
     -> {
         [0] -> s :: Switch($nofec);
             s[0] -> IP6SRv6FECDecode(DEC fc00::9) -> [0];
             s[1] -> [0];
     }
-    -> IP6Print("After")
+//    -> IP6Print("After")
     -> IP6SRDecap(FORCE_DECAP true)
-    -> IP6Print("Decaped")
+//    -> IP6Print("Decaped")
     -> Output(0:0:0:0:0:3, 0:0:0:0:0:4)
-    -> Print(OUT)
+//    -> Print(OUT)
     -> q2 :: Queue -> td2 ;
 
 in1[1] -> q2;

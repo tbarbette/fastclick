@@ -51,10 +51,10 @@ IP6SRv6FECEncode::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
 	.read_mp("ENC", enc)
 	.read_mp("DEC", dec)
-    //.read_or_set("FED", fed, "fc00::b");
-    .read_or_set("WINDOW", _rlc_info.window_size, 4)
-    .read_or_set("STEP", _rlc_info.window_step, 2)
-    .read_or_set("SCHEME", _fec_scheme, SRV6_FEC_RLC)
+        .read_or_set("WINDOW", _rlc_info.window_size, 4)
+        .read_or_set("STEP", _rlc_info.window_step, 2)
+        .read_or_set("SCHEME", _fec_scheme, SRV6_FEC_RLC)
+        .read_or_set("REPAIR", _send_repair, true)
 	.complete() < 0)
         return -1;
 
@@ -135,14 +135,14 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
     
     WritablePacket *p = srv6_fec_add_source_tlv(p_in, &_source_tlv);
     if (!p) {
-        if (err == 1) {
+        if (err == 1 && _send_repair) {
             _repair_packet->kill();
         }
         return; //Memory problem, packet is already destroyed
     }
     push(p);
 
-    if (err == 1) { // Repair
+    if (err == 1 && _send_repair) { // Repair
         if (!_repair_packet) {
             click_chatter("No repair packet TODO");
             return;
