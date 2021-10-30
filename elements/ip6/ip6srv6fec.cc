@@ -23,6 +23,7 @@
 #include <click/error.hh>
 #include <click/glue.hh>
 #define MAX(a, b) ((a > b) ? a : b)
+#define MIN(a, b) ((a < b) ? a : b)
 CLICK_DECLS
 
 IP6SRv6FECEncode::IP6SRv6FECEncode()
@@ -182,7 +183,6 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
 
     // Generate a repair symbol if full window
     if (_rlc_info.buffer_size >= _rlc_info.window_size) {
-        click_chatter("Before segmentation fault?");
         // Create new repair packet with correct size
         _repair_packet = Packet::make(_rlc_info.max_length + sizeof(click_ip6) + sizeof(click_ip6_sr) + sizeof(repair_tlv_t) + 2 * sizeof(IP6Address));
         if (!_repair_packet) {
@@ -198,16 +198,6 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
         } else {
             xor_encode_symbols(_source_tlv.sfpid);
         }
-
-        click_chatter("After 1?");
-
-        // Free the out-of-window source symbols
-        // Maybe this will give a problem once we support adaptative RLC
-        // Because we might free data that should be used after if the window
-        // size increases
-        free_out_of_window(_source_tlv.sfpid);
-
-        click_chatter("After 2?");
 
         // Complete the Repair FEC Payload ID
         _repair_tlv.type = TLV_TYPE_FEC_REPAIR;
@@ -235,12 +225,19 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
 void
 IP6SRv6FECEncode::store_source_symbol(Packet *p_in, uint32_t encoding_symbol_id)
 {
+    // Free previous packet at the same place in the buffer
+    Packet *previous_packet = _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
+    if (previous_packet) {
+        previous_packet->kill();
+    }
+
     _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = p_in->clone();
 }
 
 void
 IP6SRv6FECEncode::rlc_encode_symbols(uint32_t encoding_symbol_id)
 {
+    click_chatter("ENCODE SYMBOLS ---");
     tinymt32_t prng = _rlc_info.prng;
     // tinymt32_init(&prng, _rlc_info.repair_key);
     tinymt32_init(&prng, 1);
@@ -249,6 +246,7 @@ IP6SRv6FECEncode::rlc_encode_symbols(uint32_t encoding_symbol_id)
     for (int i = 0; i < _rlc_info.window_size; ++i) {
         uint8_t idx = (start_esid + i) % SRV6_FEC_BUFFER_SIZE;
         Packet *source_symbol = _rlc_info.source_buffer[idx];
+        click_chatter("Encode %u", start_esid + i);
 
         rlc_encode_one_symbol(source_symbol, _repair_packet, &prng, _rlc_info.muls, &_repair_tlv);
     }
@@ -288,24 +286,6 @@ IP6SRv6FECEncode::xor_encode_one_symbol(Packet *s, WritablePacket *r, repair_tlv
     // Encode the packet length
     uint16_t coded_length = repair_tlv->coded_length;
     repair_tlv->coded_length ^= s->length();
-}
-
-void
-IP6SRv6FECEncode::free_out_of_window(uint32_t encoding_symbol_id) {
-    for (int i = 0; i < _rlc_info.window_step; ++i) {
-        uint16_t buffer_idx = encoding_symbol_id - _rlc_info.window_size + i + 1;
-        Packet *p_kill = _rlc_info.source_buffer[buffer_idx % SRV6_FEC_BUFFER_SIZE];
-        if (!p_kill) {
-            click_chatter("SRv6-FEC: empty packet to kill");
-            continue;
-        }
-        
-        // Clean entry in the buffer
-        _rlc_info.source_buffer[buffer_idx % SRV6_FEC_BUFFER_SIZE] = 0;
-
-        // Kill packet and free memory
-        p_kill->kill();
-    }
 }
 
 tinymt32_t
@@ -417,7 +397,7 @@ void IP6SRv6FECEncode::encapsulate_repair_payload(WritablePacket *p, repair_tlv_
 void
 IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>push)
 {
-    click_chatter("GETTING A FEEDBACK MESSAGE");
+    // click_chatter("GETTING A FEEDBACK MESSAGE");
     const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
     const click_ip6_sr *srv6 = reinterpret_cast<const click_ip6_sr *>(p_in->data() + sizeof(click_ip6));
     const feedback_tlv_t *tlv = reinterpret_cast<const feedback_tlv_t *>(p_in->data() + sizeof(click_ip6) + sizeof(click_ip6_sr) + (srv6->last_entry + 1) * 16);
@@ -445,6 +425,8 @@ IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>pus
     //     return;
     // }
 
+    click_chatter("lost=%u theoric=%u", tlv->nb_lost, tlv->nb_theoric);
+
     double lost = _rlc_info.loss_estimation;
     // Update the lost estimation gradually
     lost = (tlv->nb_lost / tlv->nb_theoric) * SRV6_FEC_FB_ALPHA + (lost) * (1.0 - SRV6_FEC_FB_ALPHA);
@@ -455,9 +437,13 @@ IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>pus
 
     // There are more loss than redundancy packets
     // Reduce the window step to increase redundancy
-    if (redundancy < lost && _rlc_info.window_step > 1) {
-        --_rlc_info.window_step;
+    if (redundancy < lost) {
+        if (_rlc_info.window_step > 1) {
+            --_rlc_info.window_step;
+        }
         // TODO: Also generate immediate repair symbols ?
+    } else {
+        _rlc_info.window_step = MIN(_rlc_info.window_step, RLC_MAX_STEP);
     }
 
     // Update the window size by inspecting the possible burst losses in the data
@@ -477,7 +463,15 @@ IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>pus
     uint8_t theoric_max_burst = ceil(_rlc_info.window_size / (double)_rlc_info.window_step);
     
     if (theoric_max_burst < max_seen_burst) {
-        ++_rlc_info.window_size;
+        _rlc_info.window_size = MIN(_rlc_info.window_size, RLC_MAX_WINDOW);
+    } else if (theoric_max_burst > max_seen_burst) {
+        _rlc_info.window_size = MAX(1, _rlc_info.window_size);
+    }
+
+    if (_rlc_info.window_size == RLC_MAX_WINDOW && _rlc_info.window_step == RLC_MAX_STEP && _rlc_info.loss_estimation < 0.0001) {
+        _rlc_info.generate_repair_symbols = false;
+    } else {
+        _rlc_info.generate_repair_symbols = true;
     }
 
     click_chatter("loss=%f, size=%u, step=%u", _rlc_info.loss_estimation, _rlc_info.window_size, _rlc_info.window_step);

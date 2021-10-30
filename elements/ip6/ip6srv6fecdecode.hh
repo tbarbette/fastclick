@@ -49,9 +49,10 @@ struct repair_tlv_t {
 struct feedback_tlv_t {
   uint8_t type;
   uint8_t len;
-  uint16_t padding16;
+  uint16_t nb_theoric;
+  uint16_t nb_lost;
+  uint16_t padding;
   uint64_t bit_string;
-  uint32_t padding32;
 } CLICK_SIZE_PACKED_ATTRIBUTE;
 
 #endif
@@ -94,9 +95,11 @@ struct srv6_fec2_term_t {
   } length;
 };
 
-struct srv6_fec2_feedback {
+struct srv6_fec2_feedback_t {
   uint64_t received_string;
-  uint16_t nb_received;
+  uint32_t nb_received;
+  uint32_t esid_last_feedback;
+  uint32_t last_received_esid;
 };
 
 struct rlc_info_decoder_t {
@@ -141,13 +144,13 @@ class IP6SRv6FECDecode : public BatchElement {
   bool _use_dst_anno;
   bool _do_recover;
   rlc_info_decoder_t _rlc_info;
-  srv6_fec2_feedback _rlc_feedback;
+  srv6_fec2_feedback_t _rlc_feedback;
 
   static String read_handler(Element *, void *) CLICK_COLD;
 
   void fec_framework(Packet *p_in, std::function<void(Packet*)>push);
   int fec_scheme_source(WritablePacket *p_in, source_tlv_t *tlv);
-  Packet* fec_scheme_repair(WritablePacket *p_in, repair_tlv_t *tlv);
+  void fec_scheme_repair(WritablePacket *p_in, repair_tlv_t *tlv, std::function<void(Packet*)>push);
   WritablePacket *recover_packet_fom_data(srv6_fec2_term_t *rec);
   srv6_fec2_term_t *init_term(Packet *p, uint16_t offset, uint16_t max_packet_length);
   void kill_term(srv6_fec2_term_t *t);
@@ -158,7 +161,7 @@ class IP6SRv6FECDecode : public BatchElement {
   void store_repair_symbol(WritablePacket *p_in, repair_tlv_t *tlv);
   void remove_tlv_source_symbol(WritablePacket *p, uint16_t offset_tlv);
 
-  Packet* rlc_recover_symbols();
+  void rlc_recover_symbols(std::function<void(Packet*)>push);
   void rlc_get_coefs(tinymt32_t *prng, uint32_t seed, int n, uint8_t *coefs);
   void symbol_add_scaled_term(srv6_fec2_term_t *symbol1, uint8_t coef, srv6_fec2_source_t *symbol2, uint8_t *mul);
   void symbol_add_scaled_term(srv6_fec2_term_t *symbol1, uint8_t coef, srv6_fec2_term_t *symbol2, uint8_t *mul, uint16_t decoding_size);
@@ -172,7 +175,7 @@ class IP6SRv6FECDecode : public BatchElement {
   int first_non_zero_idx(const uint8_t *a, int n_unknowns);
   void gauss_elimination(int n_eq, int n_unknowns, uint8_t **a, srv6_fec2_term_t **constant_terms, srv6_fec2_term_t **x, bool *undetermined, uint8_t *mul, uint8_t *inv, uint16_t max_packet_length);
 
-  Packet* xor_recover_symbols();
+  void xor_recover_symbols(std::function<void(Packet*)>push);
   void xor_one_symbol(srv6_fec2_term_t *rec, Packet *s);
 
   void rlc_feedback();

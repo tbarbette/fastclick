@@ -61,8 +61,11 @@ IP6Drop::simple_action(Packet *p_in)
     int idxs[] = {2, 3, 7};
     if (p_in->length() > 200) return p_in;
     total_seen++;
-    for (int i = 0; i < 3; ++i) {
-        if (total_seen % 20 == idxs[i]) return 0;
+    for (int i = 0; i < 1; ++i) {
+        if (total_seen % 20 == idxs[i]) {
+            click_chatter("Drop packet");
+            return 0;
+            }
     }
     return p_in;
     // const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
