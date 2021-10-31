@@ -14,7 +14,7 @@
 
 #define TLV_TYPE_FEC_SOURCE 28
 #define TLV_TYPE_FEC_REPAIR 29
-#define RLC_MAX_WINDOWS 4
+#define RLC_MAX_WINDOWS 8
 #define RLC_MAX_WINDOW 30
 #define RLC_MAX_STEP 10
 #define LOCAL_MTU 1500
@@ -125,6 +125,8 @@ class IP6SRv6FECEncode : public BatchElement {
   repair_tlv_t _repair_tlv;
   rlc_info_t   _rlc_info;
   WritablePacket *_repair_packet;
+  click_ip6 _repair_ip6;
+  click_ip6_sr _repair_srv6;
   bool _use_dst_anno;
   bool _send_repair;
   IP6Address enc; // Encoder SID
@@ -135,7 +137,7 @@ class IP6SRv6FECEncode : public BatchElement {
   void fec_framework(Packet *p_in, std::function<void(Packet*)> push);
   int fec_scheme(Packet *p_in);
   void store_source_symbol(Packet *p_in, uint32_t encodind_symbol_id);
-  void encapsulate_repair_payload(WritablePacket *p, repair_tlv_t *tlv, IP6Address *encoder, IP6Address *decoder, uint16_t packet_length);
+  void encapsulate_repair_payload(WritablePacket *p, repair_tlv_t *tlv, uint16_t packet_length);
   WritablePacket *srv6_fec_add_source_tlv(Packet *p_in, source_tlv_t *tlv);
   void rlc_encode_symbols(uint32_t encoding_symbol_id);
   tinymt32_t rlc_reset_coefs();

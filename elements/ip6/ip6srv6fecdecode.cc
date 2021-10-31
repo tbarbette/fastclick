@@ -30,7 +30,7 @@ IP6SRv6FECDecode::IP6SRv6FECDecode()
 {
     _use_dst_anno = false;
     memset(&_rlc_info, 0, sizeof(rlc_info_decoder_t));
-    memset(&_rlc_feedback, 0, sizeof(rlc_feedback));
+    memset(&_rlc_feedback, 0, sizeof(srv6_fec2_feedback_t));
     assign_inv(_rlc_info.table_inv);
     rlc_fill_muls(_rlc_info.muls);
 }
@@ -141,7 +141,7 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
     if (tlv_type == TLV_TYPE_FEC_SOURCE) {
         // Load TLV locally
         source_tlv_t source_tlv;
-        memset(&source_tlv, 0, sizeof(source_tlv_t));
+        //memset(&source_tlv, 0, sizeof(source_tlv_t));
         memcpy(&source_tlv, tlv_ptr, sizeof(source_tlv_t));
         
         // Remove the TLV from the source packet
@@ -152,7 +152,7 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
     } else {
         // Load TLV locally
         repair_tlv_t repair_tlv;
-        memset(&repair_tlv, 0, sizeof(repair_tlv_t));
+        //memset(&repair_tlv, 0, sizeof(repair_tlv_t));
         memcpy(&repair_tlv, tlv_ptr, sizeof(repair_tlv_t));
 
         // Call FEC Scheme
@@ -166,7 +166,7 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
     }
 
     if (_rlc_info.esid_last_feedback >= 2) {
-        click_chatter("Show last: %u", _rlc_info.esid_last_feedback);
+        //click_chatter("Show last: %u", _rlc_info.esid_last_feedback);
         //rlc_feedback();
         _rlc_info.esid_last_feedback = 0;
     } else {
@@ -224,13 +224,13 @@ IP6SRv6FECDecode::store_source_symbol(WritablePacket *p_in, source_tlv_t *tlv) {
     // Not the only one apparently
     // Fow now, assume that we receive all packets
     // _rlc_feedback.received_string = -1;
-    click_chatter("Storing %u", symbol->encoding_symbol_id);
+    //click_chatter("Storing %u", symbol->encoding_symbol_id);
     _rlc_feedback.received_string |= (1 << _rlc_feedback.nb_received++);
 
     // Update the most recent encoding symbol ID
     // TODO: wrap up
     _rlc_feedback.last_received_esid = tlv->sfpid;
-    click_chatter("MALLOC: %u", _rlc_feedback.last_received_esid);
+    //click_chatter("MALLOC: %u", _rlc_feedback.last_received_esid);
 }
 
 void
@@ -562,7 +562,6 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
 
                 // Store a local copy of the packet for later recovery?
                 recovered->p = p_rec->clone();
-                click_chatter("Recover packet %u", recovered->encoding_symbol_id);
                 push(p_rec);
 
                 // Store the recovered packet in the buffer and clean previous
@@ -967,7 +966,7 @@ IP6SRv6FECDecode::rlc_feedback()
     tlv->type = TLV_TYPE_FEC_FEEDBACK;
     tlv->len = sizeof(feedback_tlv_t) - 2;
     tlv->nb_theoric = _rlc_feedback.last_received_esid - _rlc_feedback.esid_last_feedback;
-    click_chatter("esid=%u last_esid=%u nb_received=%u", _rlc_feedback.last_received_esid, _rlc_feedback.esid_last_feedback, _rlc_feedback.nb_received);
+    //("esid=%u last_esid=%u nb_received=%u", _rlc_feedback.last_received_esid, _rlc_feedback.esid_last_feedback, _rlc_feedback.nb_received);
     tlv->nb_lost = tlv->nb_theoric - _rlc_feedback.nb_received;
     tlv->bit_string = _rlc_feedback.received_string;
     tlv->padding = 0;

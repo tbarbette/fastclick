@@ -58,8 +58,27 @@ IP6SRv6FECEncode::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_or_set("REPAIR", _send_repair, true)
 	.complete() < 0)
         return -1;
-
     fed = IP6Address("fc00::b");
+
+    // Preset the IPv6 Header
+    memset(&_repair_ip6, 0, sizeof(click_ip6));
+    memcpy(&_repair_ip6.ip6_src, enc.data(), sizeof(IP6Address));
+    memcpy(&_repair_ip6.ip6_dst, dec.data(), sizeof(IP6Address));
+    _repair_ip6.ip6_flow = htonl(6 << IP6_V_SHIFT);
+    _repair_ip6.ip6_plen = 0; // Will be completed by the repair FEC Scheme
+    _repair_ip6.ip6_nxt = IPPROTO_ROUTING;
+    _repair_ip6.ip6_hlim = 53;
+
+    // Preset the SRv6 Header
+    memset(&_repair_srv6, 0, sizeof(click_ip6_sr));
+    _repair_srv6.type = IP6PROTO_SEGMENT_ROUTING;
+    _repair_srv6.segment_left = 1;
+    _repair_srv6.last_entry = 1;
+    _repair_srv6.flags = 0;
+    _repair_srv6.tag = 0;
+    _repair_srv6.ip6_sr_next = 253;
+    _repair_srv6.ip6_hdrlen = (sizeof(repair_tlv_t) + 2 * sizeof(IP6Address)) / 8;
+
     return 0;
 }
 
@@ -108,31 +127,36 @@ IP6SRv6FECEncode::add_handlers()
 inline void
 IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
 {
+    // Timestamp t_framework_s = Timestamp::now();
     int err;
 
     // Check the SID to determine if it is a source symbol or a feedback packet
-    const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
-    uint32_t *ip_32 = (uint32_t *)&ip6->ip6_dst.s6_addr;
-    uint32_t *fb_32 = (uint32_t *)fed.data32();
-    // We know that the packet belongs either to the FEC Framework or the Feedback process
-    // The difference between the two SIDs must be located in the last 32 bits of the IPv6 Address
-    // to make the following work
-    if (ip_32[3] == fb_32[3]) {
-        // Feedback message
+    // const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
+    // uint32_t *ip_32 = (uint32_t *)&ip6->ip6_dst.s6_addr;
+    // uint32_t *fb_32 = (uint32_t *)fed.data32();
+    // // We know that the packet belongs either to the FEC Framework or the Feedback process
+    // // The difference between the two SIDs must be located in the last 32 bits of the IPv6 Address
+    // // to make the following work
+    // if (ip_32[3] == fb_32[3]) {
+    //     // Feedback message
         
         
-        // Do not forward a feedback message
-        click_chatter("Feedback message");
-        return;
-    }
+    //     // Do not forward a feedback message
+    //     // click_chatter("Feedback message");
+    //     return;
+    // }
     // This is a source symbol
 
     // Call FEC Scheme
+    // Timestamp t_scheme_s = Timestamp::now();
     err = IP6SRv6FECEncode::fec_scheme(p_in);
     if (err < 0) { 
         return; 
     }
+    // Timestamp t_scheme_e = Timestamp::now();
+    // click_chatter("FEC Scheme: %u", t_scheme_e.usec() - t_scheme_s.usec());
     
+    //t_scheme_s = Timestamp::now();
     WritablePacket *p = srv6_fec_add_source_tlv(p_in, &_source_tlv);
     if (!p) {
         if (err == 1 && _send_repair) {
@@ -140,17 +164,20 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
         }
         return; //Memory problem, packet is already destroyed
     }
+    //t_scheme_e = Timestamp::now();
+    // click_chatter("Add TLV: %u", t_scheme_e.usec() - t_scheme_s.usec());
     push(p);
 
     if (err == 1 && _send_repair) { // Repair
+        //t_scheme_s = Timestamp::now();
         if (!_repair_packet) {
-            click_chatter("No repair packet TODO");
+            // click_chatter("No repair packet TODO");
             return;
         }
-        encapsulate_repair_payload(_repair_packet, &_repair_tlv, &enc, &dec, _rlc_info.max_length);
+        encapsulate_repair_payload(_repair_packet, &_repair_tlv, _rlc_info.max_length);
 
         // Send repair packet
-//        click_chatter("Send repair symbol");
+//        // click_chatter("Send repair symbol");
         push(_repair_packet);
         _repair_packet = 0;
 
@@ -158,8 +185,12 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
         _rlc_info.max_length = 0;
         memset(&_repair_tlv, 0, sizeof(repair_tlv_t));
         _rlc_info.prng = rlc_reset_coefs();
-
+        //t_scheme_e = Timestamp::now();
+        // click_chatter("FEC Repair encapsulate: %u", t_scheme_e.usec() - t_scheme_s.usec());
     }
+
+    // Timestamp t_framework_e = Timestamp::now();
+    // click_chatter("Framework spent time: %u\n\n", t_framework_e.usec() - t_framework_s.usec());
 }
 
 int
@@ -172,7 +203,10 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
     _source_tlv.sfpid = _rlc_info.encoding_symbol_id;
 
     // Store packet as source symbol
+    // Timestamp t_s = Timestamp::now();
     store_source_symbol(p_in, _rlc_info.encoding_symbol_id);
+    // Timestamp t_e = Timestamp::now();
+    // click_chatter("Store source symbol: %u", t_e.usec() - t_s.usec());
 
     // Store the maximum length = length of the repair packet
     _rlc_info.max_length = MAX(_rlc_info.max_length, p_in->length());
@@ -186,18 +220,21 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
         // Create new repair packet with correct size
         _repair_packet = Packet::make(_rlc_info.max_length + sizeof(click_ip6) + sizeof(click_ip6_sr) + sizeof(repair_tlv_t) + 2 * sizeof(IP6Address));
         if (!_repair_packet) {
-            click_chatter("Cannot get repair packet TODO");
+            // click_chatter("Cannot get repair packet TODO");
             return -1;
         }
 
         memset(_repair_packet->data(), 0, _repair_packet->length());
 
         // Encode the source symbols in repair
+        //t_s = Timestamp::now();
         if (_fec_scheme == SRV6_FEC_RLC) {
             rlc_encode_symbols(_source_tlv.sfpid);
         } else {
             xor_encode_symbols(_source_tlv.sfpid);
         }
+        //t_e = Timestamp::now();
+        // click_chatter("Encode symbols: %u", t_e.usec() - t_s.usec());
 
         // Complete the Repair FEC Payload ID
         _repair_tlv.type = TLV_TYPE_FEC_REPAIR;
@@ -237,7 +274,6 @@ IP6SRv6FECEncode::store_source_symbol(Packet *p_in, uint32_t encoding_symbol_id)
 void
 IP6SRv6FECEncode::rlc_encode_symbols(uint32_t encoding_symbol_id)
 {
-    click_chatter("ENCODE SYMBOLS ---");
     tinymt32_t prng = _rlc_info.prng;
     // tinymt32_init(&prng, _rlc_info.repair_key);
     tinymt32_init(&prng, 1);
@@ -246,7 +282,6 @@ IP6SRv6FECEncode::rlc_encode_symbols(uint32_t encoding_symbol_id)
     for (int i = 0; i < _rlc_info.window_size; ++i) {
         uint8_t idx = (start_esid + i) % SRV6_FEC_BUFFER_SIZE;
         Packet *source_symbol = _rlc_info.source_buffer[idx];
-        click_chatter("Encode %u", start_esid + i);
 
         rlc_encode_one_symbol(source_symbol, _repair_packet, &prng, _rlc_info.muls, &_repair_tlv);
     }
@@ -336,7 +371,7 @@ WritablePacket * IP6SRv6FECEncode::srv6_fec_add_source_tlv(Packet *p_in, source_
     const click_ip6_sr *srv6 = (const click_ip6_sr *)ip6_find_header(ip6, IP6_EH_ROUTING, p_in->end_data());
     if (!srv6) {
         p_in->kill();
-        click_chatter("Not an SRv6 packet!");
+        // click_chatter("Not an SRv6 packet!");
         return 0;
     }
     
@@ -362,30 +397,20 @@ WritablePacket * IP6SRv6FECEncode::srv6_fec_add_source_tlv(Packet *p_in, source_
     return p;
 }
 
-void IP6SRv6FECEncode::encapsulate_repair_payload(WritablePacket *p, repair_tlv_t *tlv, IP6Address *encoder, IP6Address *decoder, uint16_t packet_length) {
+void IP6SRv6FECEncode::encapsulate_repair_payload(WritablePacket *p, repair_tlv_t *tlv, uint16_t packet_length) {
     // IPv6 and SRv6 Header pointers
     click_ip6 *r_ip6 = reinterpret_cast<click_ip6 *>(p->data());
     click_ip6_sr *r_srv6 = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
     repair_tlv_t *r_tlv = reinterpret_cast<repair_tlv_t *>(p->data() + sizeof(click_ip6) + 8 + 32);
 
     // IPv6 Header
-    memcpy(&r_ip6->ip6_src, encoder->data(), sizeof(IP6Address));
-    memcpy(&r_ip6->ip6_dst, decoder->data(), sizeof(IP6Address));
-    r_ip6->ip6_flow = htonl(6 << IP6_V_SHIFT);
+    memcpy(r_ip6, &_repair_ip6, sizeof(click_ip6));
     r_ip6->ip6_plen = htons(packet_length + sizeof(click_ip6_sr) + sizeof(repair_tlv_t) + 2 * sizeof(IP6Address));
-    r_ip6->ip6_nxt = IPPROTO_ROUTING;
-    r_ip6->ip6_hlim = 53;
 
     // SRv6 Header
-    r_srv6->type = IP6PROTO_SEGMENT_ROUTING;
-    r_srv6->segment_left = 1;
-    r_srv6->last_entry = 1;
-    r_srv6->flags = 0;
-    r_srv6->tag = 0;
-    r_srv6->ip6_sr_next = 253;
-    r_srv6->ip6_hdrlen = (sizeof(repair_tlv_t) + 2 * sizeof(IP6Address)) / 8;
-    memcpy(&r_srv6->segments[0], encoder->data(), sizeof(IP6Address));
-    memcpy(&r_srv6->segments[1], decoder->data(), sizeof(IP6Address));
+    memcpy(r_srv6, &_repair_srv6, sizeof(click_ip6_sr));
+    memcpy(&r_srv6->segments[0], enc.data(), sizeof(IP6Address));
+    memcpy(&r_srv6->segments[1], dec.data(), sizeof(IP6Address));
     
     // Add repair TLV
     memcpy(r_tlv, tlv, sizeof(repair_tlv_t));
@@ -397,7 +422,7 @@ void IP6SRv6FECEncode::encapsulate_repair_payload(WritablePacket *p, repair_tlv_
 void
 IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>push)
 {
-    // click_chatter("GETTING A FEEDBACK MESSAGE");
+    // // click_chatter("GETTING A FEEDBACK MESSAGE");
     const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
     const click_ip6_sr *srv6 = reinterpret_cast<const click_ip6_sr *>(p_in->data() + sizeof(click_ip6));
     const feedback_tlv_t *tlv = reinterpret_cast<const feedback_tlv_t *>(p_in->data() + sizeof(click_ip6) + sizeof(click_ip6_sr) + (srv6->last_entry + 1) * 16);
@@ -413,7 +438,7 @@ IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>pus
     if (tlv->nb_theoric == 0) {
         _rlc_info.window_size = 4; // TODO: make auto
         _rlc_info.window_step = 2; // TODO: make auto
-        click_chatter("Reset the values of the FEC Scheme algorithm");
+        // click_chatter("Reset the values of the FEC Scheme algorithm");
         return;
     }
     
@@ -425,7 +450,7 @@ IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>pus
     //     return;
     // }
 
-    click_chatter("lost=%u theoric=%u", tlv->nb_lost, tlv->nb_theoric);
+    // click_chatter("lost=%u theoric=%u", tlv->nb_lost, tlv->nb_theoric);
 
     double lost = _rlc_info.loss_estimation;
     // Update the lost estimation gradually
@@ -474,7 +499,7 @@ IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>pus
         _rlc_info.generate_repair_symbols = true;
     }
 
-    click_chatter("loss=%f, size=%u, step=%u", _rlc_info.loss_estimation, _rlc_info.window_size, _rlc_info.window_step);
+    // click_chatter("loss=%f, size=%u, step=%u", _rlc_info.loss_estimation, _rlc_info.window_size, _rlc_info.window_step);
 }
 
 CLICK_ENDDECLS
