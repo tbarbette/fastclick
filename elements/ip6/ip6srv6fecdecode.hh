@@ -17,7 +17,7 @@
 #define TLV_TYPE_FEC_SOURCE 28
 #define TLV_TYPE_FEC_REPAIR 29
 #define TLV_TYPE_FEC_FEEDBACK 30
-#define RLC_MAX_WINDOWS 4
+#define RLC_MAX_WINDOWS 10
 #define LOCAL_MTU 1500
 
 // SRv6-FEC TLV structures
@@ -115,6 +115,21 @@ struct rlc_info_decoder_t {
   uint32_t esid_last_feedback;
 };
 
+#define SRV6_RLC_MAX_SYMBOLS 32
+
+struct rlc_recover_utils_t {
+  srv6_fec2_source_t **ss_array;
+  srv6_fec2_repair_t **rs_array;
+  uint8_t *x_to_source;
+  uint8_t *source_to_x;
+  bool *protected_symbols;
+  uint8_t *coefs;
+  srv6_fec2_term_t **unknowns;
+  uint8_t **system_coefs;
+  srv6_fec2_term_t **constant_terms;
+  bool *undetermined;
+};
+
 #define SRV6_FEC_RLC 0
 #define SRV6_FEC_XOR 1
 
@@ -145,6 +160,7 @@ class IP6SRv6FECDecode : public BatchElement {
   bool _do_recover;
   rlc_info_decoder_t _rlc_info;
   srv6_fec2_feedback_t _rlc_feedback;
+  rlc_recover_utils_t _rlc_utils;
 
   static String read_handler(Element *, void *) CLICK_COLD;
 

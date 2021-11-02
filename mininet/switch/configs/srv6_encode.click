@@ -13,7 +13,7 @@ elementclass Input { $port |
 	c[1] -> Discard;
 };
 
-fec  :: IP6SRv6FECEncode(ENC fc00::a, DEC fc00::9, WINDOW 20, STEP 2, SCHEME 0);
+fec  :: IP6SRv6FECEncode(ENC fc00::a, DEC fc00::9, WINDOW 10, STEP 2, SCHEME 0);
 
 fd1  :: FromDevice(sw1-eth0, SNIFFER false);
 td1  :: ToDevice(sw1-eth1);
