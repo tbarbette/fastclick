@@ -51,15 +51,21 @@ IP6SRv6FECDecode::IP6SRv6FECDecode()
 
     // This is not optimal as it should be the "maximum window size"
     _rlc_utils.coefs = (uint8_t *)CLICK_LALLOC(sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
+    memset(_rlc_utils.coefs, 0, sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
     // Are memset really usefull at this stage?
 
     _rlc_utils.unknowns = (srv6_fec2_term_t **)CLICK_LALLOC(sizeof(srv6_fec2_term_t *) * SRV6_RLC_MAX_SYMBOLS);
+    memset(_rlc_utils.unknowns, 0, sizeof(srv6_fec2_term_t *) * SRV6_RLC_MAX_SYMBOLS);
     _rlc_utils.system_coefs = (uint8_t **)CLICK_LALLOC(sizeof(uint8_t *) * RLC_MAX_WINDOWS);
-    _rlc_utils.constant_terms = (srv6_fec2_term_t **)CLICK_LALLOC(sizeof(srv6_fec2_term_t *) * RLC_MAX_WINDOWS);
+    memset(_rlc_utils.system_coefs, 0, sizeof(uint8_t *) * RLC_MAX_WINDOWS);
+    _rlc_utils.constant_terms = (srv6_fec2_term_t **)CLICK_LALLOC(sizeof(srv6_fec2_term_t *) * SRV6_RLC_MAX_SYMBOLS);
+    memset(_rlc_utils.constant_terms, 0, sizeof(srv6_fec2_term_t *) * RLC_MAX_WINDOWS);
     _rlc_utils.undetermined = (bool *)CLICK_LALLOC(sizeof(bool) * SRV6_RLC_MAX_SYMBOLS);
+    memset(_rlc_utils.undetermined, 0, sizeof(bool) * SRV6_RLC_MAX_SYMBOLS);
 
     for (int i = 0; i < RLC_MAX_WINDOWS; ++i) {
         _rlc_utils.system_coefs[i] = (uint8_t *)CLICK_LALLOC(sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
+        memset(_rlc_utils.system_coefs[i], 0, sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
     }
 
     // TODO: init the terms of "constant terms" but requires to know the maximum packet length...
@@ -67,7 +73,7 @@ IP6SRv6FECDecode::IP6SRv6FECDecode()
 
 IP6SRv6FECDecode::~IP6SRv6FECDecode()
 {
-    click_chatter("Before the segmentation fault");
+    click_chatter("Before the segmentation fault: %u", _rlc_info.encoding_symbol_id);
     for (int i = 0; i < SRV6_FEC_BUFFER_SIZE; ++i) {
         srv6_fec2_source_t *packet = _rlc_info.source_buffer[i];
         if (packet) {
@@ -87,20 +93,26 @@ IP6SRv6FECDecode::~IP6SRv6FECDecode()
     }
 
     // Free all utils from RLC system
-    CLICK_LFREE(_rlc_utils.ss_array, sizeof(srv6_fec2_source_t) * SRV6_RLC_MAX_SYMBOLS);
-    CLICK_LFREE(_rlc_utils.rs_array, sizeof(srv6_fec2_repair_t) * RLC_MAX_WINDOWS);
+    click_chatter("P1");
+    CLICK_LFREE(_rlc_utils.ss_array, sizeof(srv6_fec2_source_t *) * SRV6_RLC_MAX_SYMBOLS);
+    CLICK_LFREE(_rlc_utils.rs_array, sizeof(srv6_fec2_repair_t *) * RLC_MAX_WINDOWS);
     CLICK_LFREE(_rlc_utils.x_to_source, sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
     CLICK_LFREE(_rlc_utils.source_to_x, sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
     CLICK_LFREE(_rlc_utils.protected_symbols, sizeof(bool) * SRV6_RLC_MAX_SYMBOLS);
+    click_chatter("P2");
     CLICK_LFREE(_rlc_utils.coefs, sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
+    click_chatter("P21");
     CLICK_LFREE(_rlc_utils.unknowns, sizeof(srv6_fec2_term_t *) * SRV6_RLC_MAX_SYMBOLS);
-    CLICK_LFREE(_rlc_utils.constant_terms, sizeof(srv6_fec2_term_t *) * RLC_MAX_WINDOWS);
+    click_chatter("P22");
+    CLICK_LFREE(_rlc_utils.constant_terms, sizeof(srv6_fec2_term_t *) * SRV6_RLC_MAX_SYMBOLS);
+    click_chatter("P23");
     CLICK_LFREE(_rlc_utils.undetermined, sizeof(bool) * SRV6_RLC_MAX_SYMBOLS);
-
+    click_chatter("P3");
     for (int i = 0; i < RLC_MAX_WINDOWS; ++i) {
         CLICK_LFREE(_rlc_utils.system_coefs[i], sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
     }
     CLICK_LFREE(_rlc_utils.system_coefs, sizeof(uint8_t *) * RLC_MAX_WINDOWS);
+    click_chatter("P4");
 }
 
 int
@@ -371,6 +383,23 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
     uint8_t max_seen_window_size = 0;
     uint32_t encoding_symbol_id = _rlc_info.encoding_symbol_id;
 
+    // Heuristic: we avoid to look for lost packets to recover if the current
+    // repair symbol does not protect any lost source symbol
+    bool useful_repair = false;
+    srv6_fec2_repair_t *repair_tmp = _rlc_info.repair_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
+    uint8_t window_size_tmp = (repair_tmp->tlv.rfi >> 16) & 0xff;
+    for (int i = 0; i < window_size_tmp; ++i) {
+        uint32_t source_esid = encoding_symbol_id - i;
+        srv6_fec2_source_t *source = _rlc_info.source_buffer[source_esid % SRV6_FEC_BUFFER_SIZE];
+        if (!source || source->encoding_symbol_id != (source_esid - i)) {
+            useful_repair = true;
+            break;
+        }
+    }
+    if (!useful_repair) {
+        return;
+    }
+
     // Init the pseudo random number generator
     tinymt32_t prng;
     memset(&prng, 0, sizeof(tinymt32_t)),
@@ -396,6 +425,10 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
         max_seen_window_size = MAX(max_seen_window_size, window_size);
         window_step = (repair->tlv.rfi >> 16) & 0xff;
         previous_window_step = (repair->tlv.rfi >> 24);
+        // Constrain a bit the system
+        if (nb_source_symbols + window_size > SRV6_RLC_MAX_SYMBOLS) {
+            break; // Too much symbols otherwise
+        }
         ++nb_windows;
         nb_source_symbols += previous_window_step;
         running_esid -= previous_window_step;
@@ -499,6 +532,7 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
     memset(unknowns, 0, sizeof(srv6_fec2_term_t *) * nb_unknwons);
     memset(constant_terms, 0, sizeof(srv6_fec2_term_t *) * nb_unknwons);
     memset(undetermined, 0, sizeof(bool) * nb_unknwons); 
+
     // click_chatter("Nbunk=%u neq=%u alors que RLCMAXWINDOW=%u nbwind=%u", nb_unknwons, n_eq, RLC_MAX_WINDOWS, nb_windows);
     for (int i = 0; i < n_eq; ++i) {
         memset(system_coefs[i], 0, sizeof(uint8_t) * nb_unknwons);
@@ -609,6 +643,15 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
             ++current_unknown;
         }
     }
+
+    // Free memory for the terms
+    for (int j = 0; j < i; ++j) {
+        if (constant_terms[j]) {
+            CLICK_LFREE(constant_terms[j]->data, max_packet_length);
+            CLICK_LFREE(constant_terms[j], sizeof(srv6_fec2_term_t));
+        }
+    }
+
     return;
 }
 

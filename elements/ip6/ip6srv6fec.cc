@@ -26,6 +26,14 @@
 #define MIN(a, b) ((a < b) ? a : b)
 CLICK_DECLS
 
+uint16_t inline my_min(uint16_t a, uint16_t b) {
+    return ((a < b) ? a : b);
+}
+
+uint16_t inline my_max(uint16_t a, uint16_t b) {
+    return ((a > b) ? a : b);
+}
+
 IP6SRv6FECEncode::IP6SRv6FECEncode()
 {
     _use_dst_anno = false;
@@ -326,6 +334,7 @@ IP6SRv6FECEncode::xor_encode_one_symbol(Packet *s, WritablePacket *r, repair_tlv
 tinymt32_t
 IP6SRv6FECEncode::rlc_reset_coefs() {
     tinymt32_t prng;
+    memset(&prng, 0, sizeof(tinymt32_t));
     prng.mat1 = 0x8f7011ee;
     prng.mat2 = 0xfc78ff1f;
     prng.tmat = 0x3793fdff;
@@ -468,7 +477,7 @@ IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>pus
         }
         // TODO: Also generate immediate repair symbols ?
     } else {
-        _rlc_info.window_step = MIN(_rlc_info.window_step, RLC_MAX_STEP);
+        _rlc_info.window_step = my_min(_rlc_info.window_step, RLC_MAX_STEP);
     }
 
     // Update the window size by inspecting the possible burst losses in the data
@@ -479,7 +488,7 @@ IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>pus
         if (lost_bitstring & 1) {
             ++current_burst;
         } else {
-            max_seen_burst = MAX(max_seen_burst, current_burst);
+            max_seen_burst = my_max(max_seen_burst, current_burst);
             current_burst = 0;
         }
         lost_bitstring >>=2;
@@ -488,9 +497,9 @@ IP6SRv6FECEncode::feedback_message(Packet *p_in, std::function<void(Packet*)>pus
     uint8_t theoric_max_burst = ceil(_rlc_info.window_size / (double)_rlc_info.window_step);
     
     if (theoric_max_burst < max_seen_burst) {
-        _rlc_info.window_size = MIN(_rlc_info.window_size, RLC_MAX_WINDOW);
+        _rlc_info.window_size = my_min(_rlc_info.window_size, RLC_MAX_WINDOW);
     } else if (theoric_max_burst > max_seen_burst) {
-        _rlc_info.window_size = MAX(1, _rlc_info.window_size);
+        _rlc_info.window_size = my_max(1, _rlc_info.window_size);
     }
 
     if (_rlc_info.window_size == RLC_MAX_WINDOW && _rlc_info.window_step == RLC_MAX_STEP && _rlc_info.loss_estimation < 0.0001) {
