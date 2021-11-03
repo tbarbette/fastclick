@@ -937,15 +937,18 @@ void Packet::empty_destructor(unsigned char *, size_t, void *) {
 
 inline
 void Packet::copy_headers(const Packet* p) {
-    set_mac_header(p->mac_header() ? data() + p->mac_header_offset() : 0);
-    set_network_header(p->network_header() ? data() + p->network_header_offset() : 0);
+    if (p->has_mac_header()) {
+	    set_mac_header(data() + p->mac_header_offset());
+    }
+    set_network_header(p->has_network_header() ? data() + p->network_header_offset() : 0);
     if (p->has_transport_header())
         set_transport_header(data() + p->transport_header_offset());
 }
 
-/** @brief Copy the content and annotations of another packet (userlevel).
+/** @brief Copy the content and annotations of another packet (userlevel) into this packet
  * @param source packet
  * @param headroom for the new packet
+ * @return True of the copy was successfull
  */
 bool
 Packet::copy(Packet* p, int headroom)
