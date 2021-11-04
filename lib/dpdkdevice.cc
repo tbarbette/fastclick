@@ -328,6 +328,10 @@ int DPDKDevice::alloc_pktmbufs(ErrorHandler* errh)
         // Create a pktmbuf pool for each active socket
         for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
                 if (!_pktmbuf_pools[i]) {
+                        if (get_nb_mbuf(i) <= 0) {
+                            continue;
+                        }
+
                         String mempool_name = DPDKDevice::MEMPOOL_PREFIX + String(i);
                         const char* name = mempool_name.c_str();
                         _pktmbuf_pools[i] =
