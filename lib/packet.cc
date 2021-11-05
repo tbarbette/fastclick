@@ -1078,7 +1078,7 @@ Packet::clone(bool fast)
         Packet* origin = this;
         if (origin->_data_packet)
             origin = origin->_data_packet;
-        memcpy(p, this, sizeof(Packet));
+        memcpy((void*)p, (void*)this, sizeof(Packet));
         p->_use_count = 1;
         p->_data_packet = origin;
 	# if CLICK_USERLEVEL || CLICK_MINIOS

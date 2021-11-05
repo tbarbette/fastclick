@@ -39,8 +39,8 @@ CLICK_DECLS
 FromFile::FromFile()
     : _fd(-1),
 #if !CLICK_PACKET_USE_DPDK
-     _buffer(0),
-    _data_packet(0),
+      _data_packet(0),
+      _buffer(0),
 #endif
 #ifdef ALLOW_MMAP
       _mmap(true),
