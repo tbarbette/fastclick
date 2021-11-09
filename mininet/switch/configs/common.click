@@ -15,7 +15,10 @@ elementclass InputDecap { $port, $src, $dst, $ip6src |
 	-> c :: Classifier(12/86dd 20/3a 54/87, 12/86DD, -);
 
 	c[0]
-	-> IP6NDAdvertiser($ip6src $src) -> [1]output;
+	-> MarkIP6Header(OFFSET 14)
+	-> IP6Print("NDP")
+	-> IP6NDAdvertiser($ip6src $src)
+	-> [1]output;
 
 	c[1]
     //-> Print("IP6 from $port", -1)
@@ -33,6 +36,8 @@ elementclass InputEncap { $port, $src, $dst, $ip6src, $noencap |
 	-> c :: Classifier(12/86dd 20/3a 54/87, 12/86DD, 12/0800, 12/0806,-);
 
 	c[0]
+	-> MarkIP6Header(OFFSET 14)
+	-> IP6Print("NDP")
 	-> IP6NDAdvertiser($ip6src $src) -> [1]output;
 
 	c[1]
