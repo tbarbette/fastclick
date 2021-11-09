@@ -168,7 +168,11 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
     WritablePacket *p = srv6_fec_add_source_tlv(p_in, &_source_tlv);
     if (!p) {
         if (err == 1 && _send_repair) {
-            _repair_packet->kill();
+		click_chatter("Could not build RP");
+		if (_repair_packet) {
+            	_repair_packet->kill();
+               _repair_packet = 0;
+               }
         }
         return; //Memory problem, packet is already destroyed
     }
@@ -176,12 +180,19 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
     // click_chatter("Add TLV: %u", t_scheme_e.usec() - t_scheme_s.usec());
     push(p);
 
-    if (err == 1 && _send_repair) { // Repair
+    if (err == 1) { // Repair
         //t_scheme_s = Timestamp::now();
         if (!_repair_packet) {
             // click_chatter("No repair packet TODO");
             return;
         }
+
+
+	if (!_send_repair) {
+		_repair_packet->kill();
+		return;
+	}
+	
         encapsulate_repair_payload(_repair_packet, &_repair_tlv, _rlc_info.max_length);
 
         // Send repair packet

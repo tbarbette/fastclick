@@ -68,3 +68,5 @@ elementclass Output { $src, $dst |
 		-> EtherEncap(0x86DD, SRC $src, DST $dst)
 		-> output;
 }
+
+HTTPServer(PORT 8080)
