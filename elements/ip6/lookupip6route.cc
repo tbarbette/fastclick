@@ -138,7 +138,7 @@ LookupIP6Route::classify(Packet *p)
     _last_addr = a;
     _last_gw = gw;
     _last_output = ifi;
-    if (gw != IP6Address("::0")) {
+    if (gw != IP6Address::make_zero()) {
 	SET_DST_IP6_ANNO(p, IP6Address(gw));
     }
     return ifi;

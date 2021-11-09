@@ -89,6 +89,9 @@ class IP6Address { public:
     int mask_to_prefix_len() const;
     inline bool matches_prefix(const IP6Address &addr, const IP6Address &mask) const;
     inline bool mask_as_specific(const IP6Address &) const;
+    static inline IP6Address make_zero() {
+	    return IP6Address();
+    }
 
     /** @brief Test if this address contains an embedded Ethernet address.
      *
@@ -410,7 +413,8 @@ static int round_up(int num, int factor)
 /**
  * Call a function for every extension header of an IPv6 EH list
  */
-inline void ip6_follow_eh(const click_ip6* ip6, const unsigned char* end, const std::function<bool(const uint8_t type, unsigned char* hdr)>fn) {
+template <typename F>
+inline void ip6_follow_eh(const click_ip6* ip6, const unsigned char* end, F fn) {
 	click_ip6_eh* eh = (click_ip6_eh*)(ip6 + 1);
     uint8_t nxt = ip6->ip6_nxt;
 
@@ -445,13 +449,14 @@ inline void ip6_follow_eh(const click_ip6* ip6, const unsigned char* end, const 
 
 inline void* ip6_find_header(const click_ip6* ip6, const uint8_t type, const unsigned char* end) {
 	unsigned char* pos = 0;
-	ip6_follow_eh(ip6,end,[&pos,type](const uint8_t next, unsigned char* hdr) -> bool {
+	auto fnt = [&pos,type] (const uint8_t next, unsigned char* hdr) __attribute__((always_inline)) -> bool {
 		if (next == type) {
 			pos = hdr;
 			return 0;
 		}
 		return 1;
-	});
+	};
+	ip6_follow_eh<decltype(fnt)>(ip6,end,fnt);
 	return pos;
 }
 
