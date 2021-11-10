@@ -157,35 +157,18 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
 
     // Call FEC Scheme
     // Timestamp t_scheme_s = Timestamp::now();
-    err = IP6SRv6FECEncode::fec_scheme(p_in);
+    err = IP6SRv6FECEncode::fec_scheme(p_in, push);
     if (err < 0) { 
         return; 
     }
-    // Timestamp t_scheme_e = Timestamp::now();
-    // click_chatter("FEC Scheme: %u", t_scheme_e.usec() - t_scheme_s.usec());
-    
-    //t_scheme_s = Timestamp::now();
-    WritablePacket *p = srv6_fec_add_source_tlv(p_in, &_source_tlv);
-    if (!p) {
-        if (err == 1 && _send_repair) {
-            _repair_packet->kill();
-        }
-        return; //Memory problem, packet is already destroyed
-    }
-    //t_scheme_e = Timestamp::now();
-    // click_chatter("Add TLV: %u", t_scheme_e.usec() - t_scheme_s.usec());
-    push(p);
 
     if (err == 1 && _send_repair) { // Repair
-        //t_scheme_s = Timestamp::now();
         if (!_repair_packet) {
-            // click_chatter("No repair packet TODO");
             return;
         }
         encapsulate_repair_payload(_repair_packet, &_repair_tlv, _rlc_info.max_length);
 
         // Send repair packet
-//        // click_chatter("Send repair symbol");
         push(_repair_packet);
         _repair_packet = 0;
 
@@ -193,16 +176,11 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
         _rlc_info.max_length = 0;
         memset(&_repair_tlv, 0, sizeof(repair_tlv_t));
         _rlc_info.prng = rlc_reset_coefs();
-        //t_scheme_e = Timestamp::now();
-        // click_chatter("FEC Repair encapsulate: %u", t_scheme_e.usec() - t_scheme_s.usec());
     }
-
-    // Timestamp t_framework_e = Timestamp::now();
-    // click_chatter("Framework spent time: %u\n\n", t_framework_e.usec() - t_framework_s.usec());
 }
 
 int
-IP6SRv6FECEncode::fec_scheme(Packet *p_in)
+IP6SRv6FECEncode::fec_scheme(Packet *p_in, std::function<void(Packet*)>push)
 {
     // Complete the source TLV
     _source_tlv.type = TLV_TYPE_FEC_SOURCE;
@@ -210,14 +188,16 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
     _source_tlv.padding = 0;
     _source_tlv.sfpid = _rlc_info.encoding_symbol_id;
 
+    WritablePacket *p = srv6_fec_add_source_tlv(p_in, &_source_tlv);
+    if (!p) {
+        return -1; //Memory problem, packet is already destroyed
+    }
+
     // Store packet as source symbol
-    // Timestamp t_s = Timestamp::now();
-    store_source_symbol(p_in, _rlc_info.encoding_symbol_id);
-    // Timestamp t_e = Timestamp::now();
-    // click_chatter("Store source symbol: %u", t_e.usec() - t_s.usec());
+    store_source_symbol(p, _rlc_info.encoding_symbol_id);
 
     // Store the maximum length = length of the repair packet
-    _rlc_info.max_length = MAX(_rlc_info.max_length, p_in->length());
+    _rlc_info.max_length = MAX(_rlc_info.max_length, p->length());
 
     // Update RLC information
     ++_rlc_info.buffer_size;
@@ -260,9 +240,13 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in)
         _rlc_info.previous_window_step = _rlc_info.window_step;
         // Update coding rate
         // TODO
+
+        push(p);
         
         return 1;
     }
+
+    push(p);
 
     return 0;
 }

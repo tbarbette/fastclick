@@ -93,26 +93,19 @@ IP6SRv6FECDecode::~IP6SRv6FECDecode()
     }
 
     // Free all utils from RLC system
-    click_chatter("P1");
     CLICK_LFREE(_rlc_utils.ss_array, sizeof(srv6_fec2_source_t *) * SRV6_RLC_MAX_SYMBOLS);
     CLICK_LFREE(_rlc_utils.rs_array, sizeof(srv6_fec2_repair_t *) * RLC_MAX_WINDOWS);
     CLICK_LFREE(_rlc_utils.x_to_source, sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
     CLICK_LFREE(_rlc_utils.source_to_x, sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
     CLICK_LFREE(_rlc_utils.protected_symbols, sizeof(bool) * SRV6_RLC_MAX_SYMBOLS);
-    click_chatter("P2");
     CLICK_LFREE(_rlc_utils.coefs, sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
-    click_chatter("P21");
     CLICK_LFREE(_rlc_utils.unknowns, sizeof(srv6_fec2_term_t *) * SRV6_RLC_MAX_SYMBOLS);
-    click_chatter("P22");
     CLICK_LFREE(_rlc_utils.constant_terms, sizeof(srv6_fec2_term_t *) * SRV6_RLC_MAX_SYMBOLS);
-    click_chatter("P23");
     CLICK_LFREE(_rlc_utils.undetermined, sizeof(bool) * SRV6_RLC_MAX_SYMBOLS);
-    click_chatter("P3");
     for (int i = 0; i < RLC_MAX_WINDOWS; ++i) {
         CLICK_LFREE(_rlc_utils.system_coefs[i], sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
     }
     CLICK_LFREE(_rlc_utils.system_coefs, sizeof(uint8_t *) * RLC_MAX_WINDOWS);
-    click_chatter("P4");
 }
 
 int
@@ -137,7 +130,7 @@ IP6SRv6FECDecode::push(int, Packet *p_in)
 #if HAVE_BATCH
 void 
 IP6SRv6FECDecode::push_batch(int, PacketBatch *batch) {
-    EXECUTE_FOR_EACH_PACKET_ADD( fec_framework, batch );
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE( fec_framework, batch, [](Packet *){} );
     if (batch) {
         output_push_batch(0, batch);
     }
@@ -160,17 +153,26 @@ IP6SRv6FECDecode::add_handlers()
     add_write_handler("dst", reconfigure_keyword_handler, "2 DST");
 }
 
+#if HAVE_BATCH
+Packet *
+#else
 void
+#endif
+IP6SRv6FECDecode::fec_framework(Packet *p_in)
+{
+    return fec_framework(p_in, [this](Packet*p){output(0).push(p);});
+}
+
+
+#if HAVE_BATCH
+Packet *
+#else
+void
+#endif
 IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
 {
-    // Manipulate modified packet because we will remove the TLV
-    WritablePacket *p = p_in->uniqueify();
-    if (unlikely(!p)) {
-        click_chatter("oom!");
-        return;
-    }
-    click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
-    click_ip6_sr *srv6 = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
+    const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
+    const click_ip6_sr *srv6 = reinterpret_cast<const click_ip6_sr *>(p_in->data() + sizeof(click_ip6));
     int err;
 
     // Find TLV: source or repair symbol
@@ -192,8 +194,11 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
 
     // Not a source or repair symbol
     if (tlv_type != TLV_TYPE_FEC_SOURCE && tlv_type != TLV_TYPE_FEC_REPAIR) {
-        push(p);
-        return;
+#if HAVE_BATCH
+        return p_in;
+#else
+        push(p_in);
+#endif
     }
 
     if (tlv_type == TLV_TYPE_FEC_SOURCE) {
@@ -203,10 +208,11 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
         memcpy(&source_tlv, tlv_ptr, sizeof(source_tlv_t));
         
         // Remove the TLV from the source packet
-        remove_tlv_source_symbol(p, tlv_ptr - p->data()); // Cleaner way?
+        // We do not remove the TLV anymore to remain efficient
+        // remove_tlv_source_symbol(p, tlv_ptr - p->data()); // Cleaner way?
 
         // Call FEC Scheme
-        fec_scheme_source(p, &source_tlv);
+        fec_scheme_source(p_in, &source_tlv);
     } else {
         // Load TLV locally
         repair_tlv_t repair_tlv;
@@ -214,26 +220,32 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
         memcpy(&repair_tlv, tlv_ptr, sizeof(repair_tlv_t));
 
         // Call FEC Scheme
-        fec_scheme_repair(p, &repair_tlv, push);
+        fec_scheme_repair(p_in, &repair_tlv, push);
     }
 
     // Send the (modified, without TLV) source symbol
     // i.e., do not send the repair symbol out of the tunnel
     if (tlv_type == TLV_TYPE_FEC_SOURCE) {
-        push(p);
+#if HAVE_BATCH
+        return p_in;
+    } else {
+        return 0;
+#else
+        push(p_in);
+#endif
     }
 
-    if (_rlc_info.esid_last_feedback >= 2) {
-        //click_chatter("Show last: %u", _rlc_info.esid_last_feedback);
-        //rlc_feedback();
-        _rlc_info.esid_last_feedback = 0;
-    } else {
-        ++_rlc_info.esid_last_feedback;
-    }
+    // if (_rlc_info.esid_last_feedback >= 2) {
+    //     //click_chatter("Show last: %u", _rlc_info.esid_last_feedback);
+    //     //rlc_feedback();
+    //     _rlc_info.esid_last_feedback = 0;
+    // } else {
+    //     ++_rlc_info.esid_last_feedback;
+    // }
 }
 
 int
-IP6SRv6FECDecode::fec_scheme_source(WritablePacket *p_in, source_tlv_t *tlv)
+IP6SRv6FECDecode::fec_scheme_source(Packet *p_in, source_tlv_t *tlv)
 {
     // Store packet as source symbol
     store_source_symbol(p_in, tlv);
@@ -242,7 +254,7 @@ IP6SRv6FECDecode::fec_scheme_source(WritablePacket *p_in, source_tlv_t *tlv)
 }
 
 void
-IP6SRv6FECDecode::fec_scheme_repair(WritablePacket *p_in, repair_tlv_t *tlv, std::function<void(Packet*)>push)
+IP6SRv6FECDecode::fec_scheme_repair(Packet *p_in, repair_tlv_t *tlv, std::function<void(Packet*)>push)
 {
 
     // Store packet as source symbol
@@ -259,7 +271,7 @@ IP6SRv6FECDecode::fec_scheme_repair(WritablePacket *p_in, repair_tlv_t *tlv, std
 }
 
 void
-IP6SRv6FECDecode::store_source_symbol(WritablePacket *p_in, source_tlv_t *tlv) {
+IP6SRv6FECDecode::store_source_symbol(Packet *p_in, source_tlv_t *tlv) {
     uint32_t encoding_symbol_id = tlv->sfpid;
     // Store the source symbol
     srv6_fec2_source_t *symbol;
@@ -294,7 +306,7 @@ IP6SRv6FECDecode::store_source_symbol(WritablePacket *p_in, source_tlv_t *tlv) {
 }
 
 void
-IP6SRv6FECDecode::store_repair_symbol(WritablePacket *p_in, repair_tlv_t *tlv)
+IP6SRv6FECDecode::store_repair_symbol(Packet *p_in, repair_tlv_t *tlv)
 {
     uint32_t encoding_symbol_id = tlv->rfpid;
 
@@ -391,7 +403,7 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
     for (int i = 0; i < window_size_tmp; ++i) {
         uint32_t source_esid = encoding_symbol_id - i;
         srv6_fec2_source_t *source = _rlc_info.source_buffer[source_esid % SRV6_FEC_BUFFER_SIZE];
-        if (!source || source->encoding_symbol_id != (source_esid - i)) {
+        if (!source || source->encoding_symbol_id != (source_esid)) {
             useful_repair = true;
             break;
         }
@@ -399,6 +411,7 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
     if (!useful_repair) {
         return;
     }
+
 
     // Init the pseudo random number generator
     tinymt32_t prng;
@@ -961,6 +974,8 @@ IP6SRv6FECDecode::xor_recover_symbols(std::function<void(Packet*)>push)
         _rlc_info.recovd_buffer[lost_esid % SRV6_FEC_BUFFER_SIZE] = rec;
     }
 
+    click_chatter("No pas ici");
+
     push(p_rec);
     
     CLICK_LFREE(data, sizeof(uint8_t) * max_packet_length);
@@ -1034,6 +1049,7 @@ IP6SRv6FECDecode::rlc_feedback()
     p->set_network_header(p->data(), (unsigned char*)(tlv + 1) - p->data());
 
     // Send packet with feedback
+    click_chatter("Pas ici nn plus");
     output(1).push(p);
 
     // Reset parameters for next feedback

@@ -135,7 +135,7 @@ class IP6SRv6FECEncode : public BatchElement {
 
   static String read_handler(Element *, void *) CLICK_COLD;
   void fec_framework(Packet *p_in, std::function<void(Packet*)> push);
-  int fec_scheme(Packet *p_in);
+  int fec_scheme(Packet *p_in, std::function<void(Packet*)>push);
   void store_source_symbol(Packet *p_in, uint32_t encodind_symbol_id);
   void encapsulate_repair_payload(WritablePacket *p, repair_tlv_t *tlv, uint16_t packet_length);
   WritablePacket *srv6_fec_add_source_tlv(Packet *p_in, source_tlv_t *tlv);
