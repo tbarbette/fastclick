@@ -130,7 +130,7 @@ IP6SRv6FECDecode::push(int, Packet *p_in)
 #if HAVE_BATCH
 void 
 IP6SRv6FECDecode::push_batch(int, PacketBatch *batch) {
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE( fec_framework, batch, [](Packet *){} );
+    EXECUTE_FOR_EACH_PACKET_ADD( fec_framework, batch);
     if (batch) {
         output_push_batch(0, batch);
     }
@@ -153,22 +153,14 @@ IP6SRv6FECDecode::add_handlers()
     add_write_handler("dst", reconfigure_keyword_handler, "2 DST");
 }
 
-#if HAVE_BATCH
-Packet *
-#else
 void
-#endif
 IP6SRv6FECDecode::fec_framework(Packet *p_in)
 {
     return fec_framework(p_in, [this](Packet*p){output(0).push(p);});
 }
 
 
-#if HAVE_BATCH
-Packet *
-#else
 void
-#endif
 IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
 {
     const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
@@ -194,11 +186,7 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
 
     // Not a source or repair symbol
     if (tlv_type != TLV_TYPE_FEC_SOURCE && tlv_type != TLV_TYPE_FEC_REPAIR) {
-#if HAVE_BATCH
-        return p_in;
-#else
         push(p_in);
-#endif
     }
 
     if (tlv_type == TLV_TYPE_FEC_SOURCE) {
@@ -226,13 +214,7 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
     // Send the (modified, without TLV) source symbol
     // i.e., do not send the repair symbol out of the tunnel
     if (tlv_type == TLV_TYPE_FEC_SOURCE) {
-#if HAVE_BATCH
-        return p_in;
-    } else {
-        return 0;
-#else
         push(p_in);
-#endif
     }
 
     // if (_rlc_info.esid_last_feedback >= 2) {
@@ -399,7 +381,7 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
     // repair symbol does not protect any lost source symbol
     bool useful_repair = false;
     srv6_fec2_repair_t *repair_tmp = _rlc_info.repair_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE];
-    uint8_t window_size_tmp = (repair_tmp->tlv.rfi >> 16) & 0xff;
+    uint8_t window_size_tmp = repair_tmp->tlv.nss;
     for (int i = 0; i < window_size_tmp; ++i) {
         uint32_t source_esid = encoding_symbol_id - i;
         srv6_fec2_source_t *source = _rlc_info.source_buffer[source_esid % SRV6_FEC_BUFFER_SIZE];
