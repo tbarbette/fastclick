@@ -241,7 +241,9 @@ IP6SRv6FECDecode::fec_scheme_repair(Packet *p_in, repair_tlv_t *tlv, std::functi
 
     // Store packet as source symbol
     store_repair_symbol(p_in, tlv);
-
+	if (!_do_recover) {
+		return;	
+	}
     Packet* p;
 
     // Call RLC recovery
@@ -592,7 +594,8 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
     // }
 
     bool can_recover = nb_effective_equations >= nb_unknwons;
-    if (can_recover && _do_recover) {
+    if (can_recover) {	
+
         // Solve the system
         gauss_elimination(nb_effective_equations, nb_unknwons, system_coefs, constant_terms, unknowns, undetermined, _rlc_info.muls, _rlc_info.table_inv, max_packet_length);
         uint8_t current_unknown = 0;
@@ -1031,7 +1034,8 @@ IP6SRv6FECDecode::rlc_feedback()
     p->set_network_header(p->data(), (unsigned char*)(tlv + 1) - p->data());
 
     // Send packet with feedback
-    click_chatter("Pas ici nn plus");
+    abort();
+    //In batch mode this will FAILç
     output(1).push(p);
 
     // Reset parameters for next feedback

@@ -166,6 +166,13 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
         if (!_repair_packet) {
             return;
         }
+
+
+	if (!_send_repair) {
+		_repair_packet->kill();
+		return;
+	}
+	
         encapsulate_repair_payload(_repair_packet, &_repair_tlv, _rlc_info.max_length);
 
         // Send repair packet
