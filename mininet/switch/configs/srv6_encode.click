@@ -1,3 +1,7 @@
+define( $window_size 1,
+        $window_step 1,
+		$no_fec 0);
+
 elementclass Input { $port |
     input
 	-> CheckIP6Header()
@@ -9,7 +13,7 @@ elementclass Input { $port |
 	c1[2] -> [2]output;
 };
 
-fec  :: IP6SRv6FECEncode(ENC fc00::a, DEC fc00::9, WINDOW 10, STEP 2, SCHEME 0);
+fec  :: IP6SRv6FECEncode(ENC fc00::a, DEC fc00::9, WINDOW $window_size, STEP $window_step, SCHEME 0);
 
 fd1  :: FromDevice(sw1-eth0, SNIFFER false);
 td1  :: ToDevice(sw1-eth1);
@@ -20,9 +24,11 @@ fd1 -> c :: Classifier(12/86DD,-)
     -> inp :: Input(1);
 inp[0] -> c2 :: Classifier(6/2B,-)
 	-> IP6SRProcess()
+	-> sFEC :: Switch($no_fec)
 	-> [0]fec
 	-> eth :: EtherEncap(0x86DD, SRC 0:0:0:0:0:2, DST 0:0:0:0:0:3)	
 	-> q  :: Queue; 
+sFEC[1] -> eth;
 inp[1] -> Print("WTF") -> Discard;
 inp[2] -> eth -> q;
 c2[1] -> Discard;

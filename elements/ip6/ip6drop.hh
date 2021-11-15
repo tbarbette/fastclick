@@ -1,5 +1,6 @@
 #ifndef CLICK_IP6_DROP_HH
 #define CLICK_IP6_DROP_HH
+#include <click/batchelement.hh>
 #include <click/element.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
@@ -31,7 +32,7 @@ enum state_e {
   bad
 };
 
-class IP6Drop : public Element { 
+class IP6Drop : public BatchElement { 
  
  public:
 
@@ -46,7 +47,14 @@ class IP6Drop : public Element {
   void add_handlers() CLICK_COLD;
   String read_handler(Element *e, void *thunk) CLICK_COLD;
 
-  Packet *simple_action(Packet *p_in);
+  void push(int, Packet *p_in) override;
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch * batch_in) override;
+  Packet *drop_model(Packet *p_in);
+  Packet *drop_model(Packet *p_in, std::function<void(Packet*)>push);
+#else
+  void drop_model(Packet *p_in, std::function<void(Packet*)>push);
+#endif
   bool gemodel() CLICK_COLD;
   bool addr_eq(uint32_t *a1, uint32_t *a2) CLICK_COLD;
 

@@ -52,25 +52,69 @@ IP6Drop::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-
-Packet *
-IP6Drop::simple_action(Packet *p_in)
+void
+IP6Drop::push(int input, Packet *p_in)
 {
-    // // Do not drop the repair symbols
-    // // TODO: adapt if we change and do not use ping anymore
-    // int idxs[] = {2, 3, 7};
-    // if (p_in->length() > 200) return p_in;
-    // total_seen++;
-    // for (int i = 0; i < 1; ++i) {
-    //     if (total_seen % 20 == idxs[i]) {
-    //         click_chatter("Drop packet");
-    //         return 0;
-    //         }
-    // }
-    // return p_in;
+    drop_model(p_in, [this](Packet*p){output(0).push(p);});
+}
+
+#if HAVE_BATCH
+void
+IP6Drop::push_batch(int input, PacketBatch *batch) {
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(drop_model, batch, [](Packet *){});
+    if (batch) {
+        output_push_batch(0, batch);
+    }
+}
+#endif
+
+#if HAVE_BATCH
+Packet *
+#else
+void
+#endif
+IP6Drop::drop_model(Packet *p_in)
+{
+    return drop_model(p_in, [this](Packet*p){output(0).push(p);});
+}
+
+#if HAVE_BATCH
+Packet *
+#else
+void
+#endif
+IP6Drop::drop_model(Packet *p_in, std::function<void(Packet*)>push)
+{
+//     // Do not drop the repair symbols
+//     // TODO: adapt if we change and do not use ping anymore
+//     int idxs[] = {2, 3, 7};
+//     if (p_in->length() < 200) {
+// #if HAVE_BATCH
+//         return p_in;
+// #else
+//         push(p_in);
+// #endif
+//     }
+//     total_seen++;
+//     for (int i = 0; i < 3; ++i) {
+//         if (total_seen % 20 == idxs[i]) {
+//             // click_chatter("Drop packet");
+// #if HAVE_BATCH
+//             return 0;
+// #else
+//             return;
+// #endif
+//             }
+//     }
+// #if HAVE_BATCH
+//     return p_in;
+// #else
+//     push(p_in);
+// #endif
+
+
     const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
     uint32_t *dst_32 = (uint32_t *)&ip6->ip6_dst;
-    total_seen++;
     bool found = false;
     for (int i = 0; i < addrs.size(); ++i) {
         IP6Address addr = addrs.at(i);
@@ -80,13 +124,30 @@ IP6Drop::simple_action(Packet *p_in)
             break;
         }
     }
-    if (!found) return p_in;
+    if (!found) {
+#if HAVE_BATCH
+        return p_in;
+#else
+        push(p_in);
+#endif
+    }
+    
+    total_seen++;
+    // Do not drop the first packets to ensure a connection between the client and the broker
+    if (total_seen < 20) {
+        return p_in;
+    }
 
     if (!gemodel()) {
         click_chatter("Drop packet #%u", total_seen);
+#if HAVE_BATCH
         return 0;
     }
     return p_in;
+#else
+    }
+    push(p_in);
+#endif
 }
 
 bool
@@ -94,15 +155,22 @@ IP6Drop::gemodel()
 {
     bool keep_packet = true;
     bool change_state = false;
+    // click_chatter("State is %u", state);
     if (state == good) {
-        keep_packet = (rand() % 100) <= k * 100;
-        change_state = (rand() % 100) <= p * 100;
+        double rand_val1 = rand() / (RAND_MAX + 1.);
+        // click_chatter("Generated value: %f", rand_val1);
+        keep_packet = rand_val1 < k;
+        rand_val1 = rand() / (RAND_MAX + 1.);
+        change_state = rand_val1 < p;
+        // click_chatter("K and keep packet: %f, %u change state=%u (p=%u)", k * 100, keep_packet, change_state, p * 100);
         if (change_state) {
             state = bad;
         }
     } else {
-        keep_packet = (rand() % 100) <= h * 100;
-        change_state = (rand() % 100) <= r * 100;
+        double rand_val1 = rand() / (RAND_MAX + 1.);
+        keep_packet = rand_val1 < h;
+        rand_val1 = rand() / (RAND_MAX + 1.);
+        change_state = rand_val1 < r;
         if (change_state) {
             state = good;
         }

@@ -1,0 +1,37 @@
+{
+    "nb_points": 95,
+
+    "use_fec": true,
+
+    "output": "results_13_11",
+
+    "design": "uniform",
+
+    "encoder": {
+        "scheme": "rlc",
+        "window_size": 20,
+        "window_step": 2
+    },
+
+    "decoder": {
+        "ge": {
+            "k": {
+                "min": 0.98,
+                "max": 1.0
+            },
+            "p": {
+                "min": 0.01,
+                "max": 0.1
+            },
+            "h": {
+                "min": 0.0,
+                "max": 0.1
+            },
+            "r": {
+                "min": 0.5,
+                "max": 0.99
+            }
+        }
+    }
+
+}

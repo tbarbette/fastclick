@@ -129,6 +129,7 @@ class IP6SRv6FECEncode : public BatchElement {
   click_ip6_sr _repair_srv6;
   bool _use_dst_anno;
   bool _send_repair;
+  bool _do_fec;
   IP6Address enc; // Encoder SID
   IP6Address dec; // Decoder SID
   IP6Address fed; // Feedback SID

@@ -58,9 +58,14 @@ SetTransportChecksumIP6::simple_action(Packet *p_in)
     return 0;
   }
 
+  click_chatter("ENTER");
+
+  click_chatter("Next anno: %u", IP6_NXT_ANNO(p));
+
   switch (IP6_NXT_ANNO(p)) {
-    case IP_PROTO_TCP: {
+    case 43: {
       click_tcp *tcp = (click_tcp *)p->transport_header();
+      click_chatter("TCP");
 
       if (unlikely(!p->has_transport_header() || plen < sizeof(click_tcp))) {
         click_chatter("SetTransportChecksumIP6: bad lengths (got %d that should be higher than %d", plen, sizeof(click_tcp));

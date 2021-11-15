@@ -3,6 +3,7 @@ from mininet.net import Mininet
 from mininet.util import dumpNodeConnections
 from mininet.cli import CLI
 from mininet.link import TCLink
+import subprocess
 
 import sys
 import time
@@ -16,7 +17,7 @@ class MyTopo(Topo):
         self.sw2 = self.addHost("sw2", ip="babe:2::8/64",  mac='00:00:00:00:00:03')
         self.addLink(self.h1, self.sw1)
         self.addLink(self.h2, self.sw2)
-        self.addLink(self.sw1, self.sw2, cls=TCLink, delay="10ms")
+        self.addLink(self.sw1, self.sw2, cls=TCLink, delay="10ms", bw=300)
 
 
 def run_cli(net):
@@ -80,6 +81,16 @@ def simpleRun():
     net["sw2"].cmd("ethtool --offload sw2-eth0 rx off tx off")
 
     net["h2"].cmd("ethtool --offload h2-eth0 rx off tx off")
+
+    MTU = 1300
+    net["h1"].cmd("ifconfig h1-eth0 mtu {}".format(MTU))
+    #net["h2"].cmd("ifconfig h2-eth0 mtu {}".format(MTU))
+
+    net["sw1"].cmd("ifconfig sw1-eth0 mtu {}".format(MTU))
+    #net["sw1"].cmd("ifconfig sw1-eth1 mtu {}".format(MTU))
+
+    #net["sw2"].cmd("ifconfig sw2-eth0 mtu {}".format(MTU))
+    #net["sw2"].cmd("ifconfig sw2-eth1 mtu {}".format(MTU))
 
     return net
 

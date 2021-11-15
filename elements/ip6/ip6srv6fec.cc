@@ -203,15 +203,21 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in, std::function<void(Packet*)>push)
     // Store packet as source symbol
     store_source_symbol(p, _rlc_info.encoding_symbol_id);
 
-    // Store the maximum length = length of the repair packet
-    _rlc_info.max_length = MAX(_rlc_info.max_length, p->length());
-
     // Update RLC information
     ++_rlc_info.buffer_size;
     ++_rlc_info.encoding_symbol_id;
+    
+    push(p);
 
     // Generate a repair symbol if full window
     if (_rlc_info.buffer_size >= _rlc_info.window_size) {
+        // Compute maximum payload length (TODO: improve)
+        uint32_t start_esid = _source_tlv.sfpid - _rlc_info.window_size + 1;
+        for (int i = 0; i < _rlc_info.window_size; ++i) {
+            uint8_t idx = (start_esid + i) % SRV6_FEC_BUFFER_SIZE;
+            _rlc_info.max_length = MAX(_rlc_info.max_length, _rlc_info.source_buffer[idx]->length());
+        }
+
         // Create new repair packet with correct size
         _repair_packet = Packet::make(_rlc_info.max_length + sizeof(click_ip6) + sizeof(click_ip6_sr) + sizeof(repair_tlv_t) + 2 * sizeof(IP6Address));
         if (!_repair_packet) {
@@ -248,12 +254,10 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in, std::function<void(Packet*)>push)
         // Update coding rate
         // TODO
 
-        push(p);
         
         return 1;
     }
 
-    push(p);
 
     return 0;
 }

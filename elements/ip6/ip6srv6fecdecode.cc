@@ -59,7 +59,7 @@ IP6SRv6FECDecode::IP6SRv6FECDecode()
     _rlc_utils.system_coefs = (uint8_t **)CLICK_LALLOC(sizeof(uint8_t *) * RLC_MAX_WINDOWS);
     memset(_rlc_utils.system_coefs, 0, sizeof(uint8_t *) * RLC_MAX_WINDOWS);
     _rlc_utils.constant_terms = (srv6_fec2_term_t **)CLICK_LALLOC(sizeof(srv6_fec2_term_t *) * SRV6_RLC_MAX_SYMBOLS);
-    memset(_rlc_utils.constant_terms, 0, sizeof(srv6_fec2_term_t *) * RLC_MAX_WINDOWS);
+    memset(_rlc_utils.constant_terms, 0, sizeof(srv6_fec2_term_t *) * SRV6_RLC_MAX_SYMBOLS);
     _rlc_utils.undetermined = (bool *)CLICK_LALLOC(sizeof(bool) * SRV6_RLC_MAX_SYMBOLS);
     memset(_rlc_utils.undetermined, 0, sizeof(bool) * SRV6_RLC_MAX_SYMBOLS);
 
@@ -73,7 +73,7 @@ IP6SRv6FECDecode::IP6SRv6FECDecode()
 
 IP6SRv6FECDecode::~IP6SRv6FECDecode()
 {
-    click_chatter("Before the segmentation fault: %u", _rlc_info.encoding_symbol_id);
+    //click_chatter("Before the segmentation fault: %u", _rlc_info.encoding_symbol_id);
     for (int i = 0; i < SRV6_FEC_BUFFER_SIZE; ++i) {
         srv6_fec2_source_t *packet = _rlc_info.source_buffer[i];
         if (packet) {
@@ -187,6 +187,7 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
     // Not a source or repair symbol
     if (tlv_type != TLV_TYPE_FEC_SOURCE && tlv_type != TLV_TYPE_FEC_REPAIR) {
         push(p_in);
+        return;
     }
 
     if (tlv_type == TLV_TYPE_FEC_SOURCE) {
@@ -218,7 +219,7 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
     }
 
     // if (_rlc_info.esid_last_feedback >= 2) {
-    //     //click_chatter("Show last: %u", _rlc_info.esid_last_feedback);
+    //     ////click_chatter("Show last: %u", _rlc_info.esid_last_feedback);
     //     //rlc_feedback();
     //     _rlc_info.esid_last_feedback = 0;
     // } else {
@@ -280,13 +281,13 @@ IP6SRv6FECDecode::store_source_symbol(Packet *p_in, source_tlv_t *tlv) {
     // Not the only one apparently
     // Fow now, assume that we receive all packets
     // _rlc_feedback.received_string = -1;
-    //click_chatter("Storing %u", symbol->encoding_symbol_id);
+    ////click_chatter("Storing %u", symbol->encoding_symbol_id);
     _rlc_feedback.received_string |= (1 << _rlc_feedback.nb_received++);
 
     // Update the most recent encoding symbol ID
     // TODO: wrap up
     _rlc_feedback.last_received_esid = tlv->sfpid;
-    //click_chatter("MALLOC: %u", _rlc_feedback.last_received_esid);
+    ////click_chatter("MALLOC: %u", _rlc_feedback.last_received_esid);
 }
 
 void
@@ -364,8 +365,10 @@ IP6SRv6FECDecode::init_term(Packet *p, uint16_t offset, uint16_t max_packet_leng
 }
 void kill_term(srv6_fec2_term_t *t)
 {
+    //click_chatter("Before kill term");
     CLICK_LFREE(t->data, t->length.data_length);
     CLICK_LFREE(t, sizeof(srv6_fec2_term_t));
+    //click_chatter("After kill term");
 }
 
 void
@@ -378,6 +381,7 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
     uint8_t previous_window_step = 0;
     uint8_t max_seen_window_size = 0;
     uint32_t encoding_symbol_id = _rlc_info.encoding_symbol_id;
+    ////click_chatter("TEST 1");
 
     // Heuristic: we avoid to look for lost packets to recover if the current
     // repair symbol does not protect any lost source symbol
@@ -395,6 +399,7 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
     if (!useful_repair) {
         return;
     }
+    ////click_chatter("TEST 2");
 
 
     // Init the pseudo random number generator
@@ -442,26 +447,28 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
     // Should not happen since this function is triggered by the
     // reception of a repair symbol
     if (unlikely(nb_windows == 0)) {
-        click_chatter("Should not happen empty window");
+        //click_chatter("Should not happen empty window");
         return;
     }
 
+    ////click_chatter("TEST 3");
+
     // Received source symbols array
     srv6_fec2_source_t **ss_array = _rlc_utils.ss_array;
-    memset(ss_array, 0, sizeof(srv6_fec2_source_t *) * nb_source_symbols);
+    memset(ss_array, 0, sizeof(srv6_fec2_source_t *) * SRV6_RLC_MAX_SYMBOLS);
 
     // Received repair symbols array
     srv6_fec2_repair_t **rs_array = _rlc_utils.rs_array;
-    memset(rs_array, 0, sizeof(srv6_fec2_repair_t *) * nb_windows);
+    memset(rs_array, 0, sizeof(srv6_fec2_repair_t *) * RLC_MAX_WINDOWS);
 
     uint8_t nb_unknwons = 0;
     uint8_t *x_to_source = _rlc_utils.x_to_source;
     uint8_t *source_to_x = _rlc_utils.source_to_x;
-    memset(x_to_source, 0, sizeof(uint8_t) * nb_source_symbols);
-    memset(source_to_x, -1, sizeof(uint8_t) * nb_source_symbols);
+    memset(x_to_source, 0, sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
+    memset(source_to_x, -1, sizeof(uint8_t) * SRV6_RLC_MAX_SYMBOLS);
 
     bool *protected_symbol = _rlc_utils.protected_symbols;
-    memset(protected_symbol, 0, sizeof(bool) * nb_source_symbols);
+    memset(protected_symbol, 0, sizeof(bool) * SRV6_RLC_MAX_SYMBOLS);
 
     uint32_t id_first_ss_first_window = encoding_symbol_id - nb_source_symbols + 1;
     uint32_t id_first_rs_first_window = id_first_ss_first_window + window_size - 1; // TODO: check this: LGTM
@@ -470,14 +477,15 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
     for (int i = 0; i < nb_windows; ++i) {
         srv6_fec2_repair_t *repair = _rlc_info.repair_buffer[idx % SRV6_FEC_BUFFER_SIZE];
         if (!repair) {
-            click_chatter("ERROR 3");
+            //click_chatter("ERROR 3");
             return; // TODO: free all
         }
         rs_array[i] = repair;
         // Update index for the next repair symbol
         idx += (repair->tlv.rfi >> 16) & 0xff;
-        // click_chatter("RFI=%x, window_step=%u, window_step=%u", repair->tlv.rfi, (repair->tlv.rfi >> 16) & 0xff, repair->tlv.rlc_rfi.window_step);
+        // //click_chatter("RFI=%x, window_step=%u, window_step=%u", repair->tlv.rfi, (repair->tlv.rfi >> 16) & 0xff, repair->tlv.rlc_rfi.window_step);
     }
+    ////click_chatter("TEST 4");
     for (int i = 0; i < nb_source_symbols; ++i) {
         idx = (id_first_ss_first_window + i) % SRV6_FEC_BUFFER_SIZE;
         srv6_fec2_source_t *source = _rlc_info.source_buffer[idx];
@@ -488,6 +496,7 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
             if (id_theoric == id_from_buffer) {
                 // Received symbol, store it in the buffer
                 ss_array[i] = source;
+                // //click_chatter("Source length=%u", source->p->length());
             } else {
                 is_lost = 1;
             }
@@ -499,6 +508,7 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
             if (rec) {
                 if (rec->encoding_symbol_id == id_theoric) {
                     ss_array[i] = rec;
+                    // //click_chatter("Rec length=%u", rec->p->length());
                     
                     // Hence the packet is not lost anymore
                     is_lost = 0;
@@ -511,13 +521,17 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
             ++nb_unknwons;
         }
     }
+    //click_chatter("TEST 5 - possible no unk");
 
     // Maybe no need for recovery
     if (nb_unknwons == 0) {
         return;
     }
 
+    //click_chatter("TEST 6");
+
     // Construct the system Ax=b
+    // click_chatter("Max seen window size=%u, SRV6 RLC MAX SYMBOLS=%u, nb unk=%u", max_seen_window_size, SRV6_RLC_MAX_SYMBOLS, nb_unknwons);
     int n_eq = MIN(nb_unknwons, nb_windows);
     uint8_t *coefs = _rlc_utils.coefs;
     // TODO: directly make packets with maximum length ? See if legit but would be faster
@@ -530,10 +544,12 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
     memset(constant_terms, 0, sizeof(srv6_fec2_term_t *) * nb_unknwons);
     memset(undetermined, 0, sizeof(bool) * nb_unknwons); 
 
-    // click_chatter("Nbunk=%u neq=%u alors que RLCMAXWINDOW=%u nbwind=%u", nb_unknwons, n_eq, RLC_MAX_WINDOWS, nb_windows);
+    // //click_chatter("Nbunk=%u neq=%u alors que RLCMAXWINDOW=%u nbwind=%u", nb_unknwons, n_eq, RLC_MAX_WINDOWS, nb_windows);
     for (int i = 0; i < n_eq; ++i) {
         memset(system_coefs[i], 0, sizeof(uint8_t) * nb_unknwons);
     }
+
+    //click_chatter("TEST 7");
 
     int i = 0; // Index of the row in the system
     for (int rs = 0; rs < nb_windows; ++rs) {
@@ -571,13 +587,21 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
             int idx_this_ss = idx + j; // Index of location of this source symbol
             if (ss_array[idx_this_ss]) { // This protected symbol is received
                 // print_packet(ss_array[idx]);
+                // click_chatter("SUB %u %u", max_packet_length, ss_array[idx_this_ss]->p->length());
+                // if (ss_array[idx_this_ss]->p->length() > max_packet_length) {
+                //     click_chatter("ERREUR ICI CEST CA: %u %u", ss_array[idx_this_ss]->p->length(), max_packet_length);
+                //     click_chatter("ESID=%u and repair=%u", ss_array[idx_this_ss]->encoding_symbol_id, repair->tlv.rfpid);
+                //     break;
+                // }
+                // click_chatter("Taille de data de constant terms: %u", max_packet_length);
                 symbol_sub_scaled_term(constant_terms[i], coefs[j], ss_array[idx_this_ss], _rlc_info.muls);
+                // click_chatter("After sub");
             } else {
                 if (source_to_x[idx_this_ss] != -1) {
                     system_coefs[i][source_to_x[idx_this_ss]] = coefs[j]; // A[i][j] = coefs[j]
                     ++current_unknown;
                 } else {
-                    click_chatter("ERROR 4");
+                    //click_chatter("ERROR 4");
                 }
             }
         }
@@ -600,22 +624,23 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
         gauss_elimination(nb_effective_equations, nb_unknwons, system_coefs, constant_terms, unknowns, undetermined, _rlc_info.muls, _rlc_info.table_inv, max_packet_length);
         uint8_t current_unknown = 0;
         int err = 0;
+        //click_chatter("TEST 9");
         for (int j = 0; j < nb_unknwons; ++j) {
             int idx = x_to_source[j];
             if (!ss_array[idx] && !undetermined[current_unknown]) {
                 // Avoid stupid errors
                 if (unknowns[current_unknown]->length.data_length > max_packet_length) {
-                    click_chatter("Wrong size");
+                    //click_chatter("Wrong size");
                     continue;
                 }
                 // Packet from the recovered data
                 WritablePacket *p_rec = recover_packet_fom_data(unknowns[current_unknown]);
                 if (!p_rec) {
-                    click_chatter("Error from recovery confirmed");
+                    //click_chatter("Error from recovery confirmed");
                     continue;
                 };
 
-                // click_chatter("Recovered the packet with esid=%u", id_first_ss_first_window + idx);
+                // //click_chatter("Recovered the packet with esid=%u", id_first_ss_first_window + idx);
                 // New pointer for the recovered values
                 srv6_fec2_source_t *recovered;
                 // Optimization: reuse the previous recovered symbol if present in the buffer
@@ -634,21 +659,30 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
 
                 // Store a local copy of the packet for later recovery?
                 recovered->p = p_rec->clone();
+                // //click_chatter("Recovered packet %u", recovered->encoding_symbol_id);
                 push(p_rec);
+                // click_chatter("Recovered packet %u", recovered->encoding_symbol_id);
 
                 _rlc_info.recovd_buffer[recovered->encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = recovered;
             }
             ++current_unknown;
         }
+        //click_chatter("TEST 10");
     }
+
+    //click_chatter("TEST 11 max packet length=%u", max_packet_length);
 
     // Free memory for the terms
     for (int j = 0; j < i; ++j) {
         if (constant_terms[j]) {
-            CLICK_LFREE(constant_terms[j]->data, max_packet_length);
+            if (constant_terms[j]->data) {
+                CLICK_LFREE(constant_terms[j]->data, max_packet_length);
+            }
             CLICK_LFREE(constant_terms[j], sizeof(srv6_fec2_term_t));
         }
     }
+
+    //click_chatter("TEST 12");
 
     return;
 }
@@ -852,13 +886,13 @@ IP6SRv6FECDecode::recover_packet_fom_data(srv6_fec2_term_t *rec)
         uint8_t *en_8 = (uint8_t *)&ip6_next;
         if (dec_ip_32[0] == in6_32[0] && dec_ip_32[1] == in6_32[1] && dec_ip_32[2] == in6_32[2] && dec_ip_32[3] == in6_32[3]) {
             found_next_sid = true;
-//            click_chatter("I HAVE FOUND THE SID");
+//            //click_chatter("I HAVE FOUND THE SID");
             break;
         }
         --i;
     }
     if (!found_next_sid || i == 0) {
-        click_chatter("Did not find the SID => error");
+        //click_chatter("Did not find the SID => error");
         p->kill();
         return 0;
     }
@@ -944,7 +978,7 @@ IP6SRv6FECDecode::xor_recover_symbols(std::function<void(Packet*)>push)
     //    Also make room if there was a previous recovered buffer
     WritablePacket *p_rec = recover_packet_fom_data(rec);
     if (!p_rec) {
-        click_chatter("Error confirmed");
+        //click_chatter("Error confirmed");
         CLICK_LFREE(rec, sizeof(srv6_fec2_term_t));
         return;
     }
@@ -959,7 +993,7 @@ IP6SRv6FECDecode::xor_recover_symbols(std::function<void(Packet*)>push)
         _rlc_info.recovd_buffer[lost_esid % SRV6_FEC_BUFFER_SIZE] = rec;
     }
 
-    click_chatter("No pas ici");
+    //click_chatter("No pas ici");
 
     push(p_rec);
     
@@ -974,7 +1008,7 @@ IP6SRv6FECDecode::xor_one_symbol(srv6_fec2_term_t *rec, Packet *s)
     uint8_t *r_64 = (uint8_t *)rec->data;
 
     for (uint16_t i = 0; i < s->length() / sizeof(uint8_t); ++i) {
-        // click_chatter("XOR with source i=%u  %x, repair before=%x", i, s_64[i], r_64[i]);
+        // //click_chatter("XOR with source i=%u  %x, repair before=%x", i, s_64[i], r_64[i]);
         r_64[i] ^= s_64[i];
     }
 

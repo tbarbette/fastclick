@@ -158,6 +158,7 @@ class IP6SRv6FECDecode : public BatchElement {
   IP6Address dec; // Decoder SID
   bool _use_dst_anno;
   bool _do_recover;
+  bool _do_fec;
   rlc_info_decoder_t _rlc_info;
   srv6_fec2_feedback_t _rlc_feedback;
   rlc_recover_utils_t _rlc_utils;
