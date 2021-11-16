@@ -180,6 +180,7 @@ FlowHyperScan::configure(Vector<String> &conf, ErrorHandler *errh)
       .read("VERBOSE", _verbose)
       .read("FLAGS", flags_s)
       .read("FILE", file)
+      .read_or_set("KILL", _kill, false)
       .consume() < 0)
       return -1;
 
@@ -266,22 +267,37 @@ void FlowHyperScan::push_flow(int port, FlowHyperScanState* flowdata, PacketBatc
             click_chatter("Cannot alloc stream!");
             goto err;
         }
+    } else if (unlikely(flowdata->found)) {
+        if (kill)
+            goto err;
+        output_push_batch(0, batch);
+        return;
     }
 
     FOR_EACH_PACKET(batch, p) {
         if (p->length() == 0) continue;
         size_t matchCount = 0;
+
         hs_error_t err = hs_scan_stream(flowdata->stream,
         reinterpret_cast<const char*>(p->data()), p->length(), 0,
         _state->scratch, onMatch, &matchCount);
-        if (err != HS_SUCCESS) {
+        if (unlikely(err != HS_SUCCESS)) {
+            if (err == HS_SCAN_TERMINATED) {
+                flowdata->found = true;
+                goto m;
+            }
             click_chatter("Matching error");
+            hs_reset_stream(flowdata->stream, 0, _state->scratch, 0, 0);
+
         }
+    m:
         if (matchCount > 0) {
             if (_verbose)
                 click_chatter("MATCHED");
             _state->matches++;
         }
+        if (_kill)
+            goto err;
 
     }
     output_push_batch(0, batch);

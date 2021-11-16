@@ -14,6 +14,7 @@ enum Lexemes {
     lexVariable,
     lexArrow,
     lex2Arrow,
+    lexContextArrow,
     lex2Colon,
     lex2Bar,
     lex3Dot,
@@ -226,7 +227,7 @@ class Lexer { public:
     void yconnection_check_useless(const Vector<int> &x, bool isoutput);
     static void yconnection_analyze_ports(const Vector<int> &x, bool isoutput,
 					  int &min_ports, int &expandable);
-    void yconnection_connect_all(Vector<int> &outputs, Vector<int> &inputs, int connector);
+    void yconnection_connect_all(Vector<int> &outputs, Vector<int> &inputs, int connector, String context);
 
     void ycompound_arguments(Compound *ct);
     void ycompound();

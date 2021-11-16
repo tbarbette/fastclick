@@ -121,6 +121,8 @@ class RouterT : public ElementClassT { public:
 
     // ARCHIVE
     void add_archive(const ArchiveElement &);
+    const String filename() const { return _filename; }
+    void set_filename(const String &f) {_filename = f; }
     int narchive() const			{ return _archive.size(); }
     int archive_index(const String &s) const	{ return _archive_map[s]; }
     const Vector<ArchiveElement> &archive() const{ return _archive; }
@@ -255,6 +257,7 @@ class RouterT : public ElementClassT { public:
 
     StringMap _archive_map;
     Vector<ArchiveElement> _archive;
+    String _filename;
 
     RouterT *_declaration_scope;
     int _declaration_scope_cookie;

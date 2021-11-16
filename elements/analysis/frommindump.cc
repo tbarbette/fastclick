@@ -288,8 +288,9 @@ inline Packet *FromMinDump::get_packet(bool push) {
       ret = read_binary_line(data);
       if (ret < LINE_LEN)
         return 0;
-    } else
+    } else {
       return 0;
+    }
 
   Packet *p = read_packet(0, data);
 
@@ -328,7 +329,7 @@ bool FromMinDump::run_task(Task *) {
     if (likely(p)) {
       if (unlikely(head == NULL)) {
         head = PacketBatch::start_head(p);
-        last = head;
+        last = p;
       } else {
         last->set_next(p);
         last = last->next();
@@ -339,8 +340,9 @@ bool FromMinDump::run_task(Task *) {
   if (likely(head))
     output_push_batch(0, head->make_tail(last, _burst));
 #else
+  Packet *p = 0;
   for (int i = 0; i < _burst; i++) {
-    Packet *p = get_packet(1);
+    p = get_packet(1);
     output(0).push(p);
   }
 #endif

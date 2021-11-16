@@ -28,7 +28,7 @@ CrossRSS([I<KEYWORDS>])
 
 =s flow
 
-Simulator for CrossRSS
+Simulator for CrossRSS. See the CoNEXT Poster.
 
 =d
 
@@ -64,7 +64,7 @@ struct CPUMachineLoad {
 };
 
 class CrossRSS : public FlowStateElement<CrossRSS,CrossRSSEntry>,
-                           public TCPHelper, public LoadBalancer {
+                           public TCPHelper, public LoadBalancer<IPAddress> {
     public:
         CrossRSS() CLICK_COLD;
         ~CrossRSS() CLICK_COLD;

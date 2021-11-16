@@ -5,6 +5,9 @@ received.
 %script
 /bin/sh THING
 
+%require
+not click-buildtool provides dpdk-packet
+
 %file THING
 click -e "
   Script(TYPE SIGNAL INT, print >>OUT 'Hello', stop);

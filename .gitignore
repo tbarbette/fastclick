@@ -5,9 +5,11 @@
 .*.cmd
 .dotest
 .vimhistory
+.vscode
 Makefile
 autom4te*
 bin
+build
 click-buildtool
 click-compile
 config.cache
@@ -30,3 +32,8 @@ stamp-h
 cscope.*
 **/.nfs*
 compile_commands.json
+*.bc
+*.ll
+*.resolution.txt
+*.lto.o
+build/*

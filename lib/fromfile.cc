@@ -24,6 +24,9 @@
 #include <click/element.hh>
 #include <click/straccum.hh>
 #include <click/userutils.hh>
+#if CLICK_PACKET_USE_DPDK
+#include <click/dpdkdevice.hh>
+#endif
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -36,8 +39,8 @@ CLICK_DECLS
 FromFile::FromFile()
     : _fd(-1),
 #if !CLICK_PACKET_USE_DPDK
-     _buffer(0),
-    _data_packet(0),
+      _data_packet(0),
+      _buffer(0),
 #endif
 #ifdef ALLOW_MMAP
       _mmap(true),
@@ -220,12 +223,12 @@ FromFile::read_buffer(ErrorHandler *errh)
 
     while (_len < BUFFER_SIZE) {
 	ssize_t got = ::read(_fd, data + _len, BUFFER_SIZE - _len);
-	if (got > 0)
-	    _len += got;
-	else if (got == 0)	// premature end of file
-	    return _len;
-	else if (got < 0 && errno != EINTR && errno != EAGAIN)
-	    return error(errh, strerror(errno));
+        if (got > 0)
+            _len += got;
+        else if (got == 0)	// premature end of file
+            return _len;
+        else if (got < 0 && errno != EINTR && errno != EAGAIN)
+            return error(errh, strerror(errno));
     }
 
     return _len;
@@ -411,6 +414,9 @@ FromFile::set_data(const String& data, ErrorHandler* errh)
 int
 FromFile::initialize(ErrorHandler *errh, bool allow_nonexistent)
 {
+#if CLICK_PACKET_USE_DPDK
+    assert(BUFFER_SIZE <= DPDKDevice::MBUF_DATA_SIZE);
+#endif
     // if set_data, initialize is noop
     if (_fd == -2)
         return 0;

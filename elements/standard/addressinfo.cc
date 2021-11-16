@@ -44,8 +44,10 @@
 #  if HAVE_NET_IF_DL_H
 #   include <net/if_dl.h>
 #  endif
-#  if HAVE_NETPACKET_PACKET_H
+#  if HAVE_NETPACKET_PACKET_H && !HAVE_LINUX_IF_PACKET_H
 #   include <netpacket/packet.h>
+#  else
+#   include <linux/if_packet.h>
 #  endif
 #  include <ifaddrs.h>
 # elif defined(__linux__)

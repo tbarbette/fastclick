@@ -69,13 +69,16 @@ class UDPIPEncap : public BatchElement { public:
 #if HAVE_BATCH
 	PacketBatch* simple_action_batch(PacketBatch *);
 #endif
-  private:
 
+  protected:
     struct in_addr _saddr;
     struct in_addr _daddr;
     uint16_t _sport;
     uint16_t _dport;
     bool _cksum;
+
+  private:
+
     bool _use_dst_anno;
 #if HAVE_FAST_CHECKSUM && FAST_CHECKSUM_ALIGNED
     bool _aligned;
@@ -86,6 +89,15 @@ class UDPIPEncap : public BatchElement { public:
     static String read_handler(Element *, void *) CLICK_COLD;
 
 };
+
+class RandomUDPIPEncap : public UDPIPEncap { public:
+
+
+    const char *class_name() const  { return "RandomUDPIPEncap"; }
+
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+};
+
 
 CLICK_ENDDECLS
 #endif

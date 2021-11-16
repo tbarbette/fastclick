@@ -46,13 +46,16 @@ SimpleQueue::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     unsigned new_capacity = 1000;
     bool nouseless = false;
+    bool blocking = false;
     if (Args(conf, this, errh)
             .read_p("CAPACITY", new_capacity)
+            .read("BLOCKING", blocking)
             .read("NOUSELESS", nouseless)
             .complete() < 0)
 	return -1;
     _capacity = new_capacity;
     _nouseless = nouseless;
+    _blocking = blocking;
     return 0;
 }
 
@@ -201,6 +204,7 @@ PacketBatch* SimpleQueue::pull_batch(int port, unsigned max) {
 inline void
 SimpleQueue::push(int, Packet *p)
 {
+tagain:
     // If you change this code, also change NotifierQueue::push()
     // and FullNoteQueue::push().
     Storage::index_type h = head(), t = tail(), nt = next_i(t);
@@ -217,8 +221,11 @@ SimpleQueue::push(int, Packet *p)
     } else {
 	// if (!(_drops % 100))
 	if (_drops == 0 && _capacity > 0)
-	    click_chatter("%p{element}: overflow", this);
-	_drops++;
+	        click_chatter("%p{element}: overflow", this);
+	    _drops++;
+
+        if (_blocking)
+            goto tagain;
 	checked_output_push(1, p);
     }
 }

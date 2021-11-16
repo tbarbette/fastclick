@@ -1,6 +1,9 @@
 %info
 Test MulticastSocket (with loop filtering).
 
+%require -q
+not click-buildtool provides dpdk-packet
+
 %script
 {
     # Run two click instances in parallel.

@@ -221,25 +221,11 @@ Packet::~Packet()
 #elif CLICK_PACKET_USE_DPDK
     rte_panic("Packet destructor");
 #else
-    if (_data_packet)
-	_data_packet->kill();
-# if CLICK_USERLEVEL || CLICK_MINIOS
-    else if (_head && _destructor) {
-        if (_destructor != empty_destructor)
-            _destructor(_head, _end - _head, _destructor_argument);
-    } else
-#  if HAVE_NETMAP_PACKET_POOL
-    if (_head && NetmapBufQ::is_valid_netmap_packet(this)) {
-        NetmapBufQ::local_pool()->insert_p(_head);
-    } else
-#  endif
-    if (_head) {
-            delete[] _head;
-    }
-# elif CLICK_BSDMODULE
-    if (_m)
-	m_freem(_m);
-# endif
+    delete_buffer(_head, _end
+#if CLICK_BSDMODULE
+            , _m
+#endif
+            );
     _head = _data = 0;
 #endif
 }
@@ -274,8 +260,13 @@ Packet::~Packet()
 #  if HAVE_MULTITHREAD
 static __thread PacketPool *thread_packet_pool;
 
+#if HAVE_VECTOR_PACKET_POOL
+typedef MPMCRing<WritablePacket**,CLICK_GLOBAL_PACKET_POOL_COUNT> BatchPRing;
+typedef MPMCRing<WritablePacket**,CLICK_GLOBAL_PACKET_DATA_POOL_COUNT> BatchPDRing;
+#else
 typedef MPMCRing<WritablePacket*,CLICK_GLOBAL_PACKET_POOL_COUNT> BatchPRing;
 typedef MPMCRing<WritablePacket*,CLICK_GLOBAL_PACKET_DATA_POOL_COUNT> BatchPDRing;
+#endif
 
 struct GlobalPacketPool {
     BatchPRing pbatch;     // batches of free packets, linked by p->prev()
@@ -292,8 +283,8 @@ static PacketPool global_packet_pool = {0,0,0,0};
 #  endif
 
 /** @brief Return the local packet pool for this thread.
-    @pre make_local_packet_pool() has succeeded on this thread. */
-static inline PacketPool& local_packet_pool() {
+    @pre initialize_local_packet_pool() has succeeded on this thread. */
+static CLICK_ALWAYS_INLINE inline PacketPool& local_packet_pool() {
 #  if HAVE_MULTITHREAD
     return *thread_packet_pool;
 #  else
@@ -303,22 +294,19 @@ static inline PacketPool& local_packet_pool() {
 }
 
 /** @brief Create and return a local packet pool for this thread. */
-PacketPool* WritablePacket::make_local_packet_pool() {
+void WritablePacket::initialize_local_packet_pool() {
 #  if HAVE_MULTITHREAD
     PacketPool *pp = thread_packet_pool;
-    if (unlikely(!pp && (pp = new PacketPool))) {
-	memset(pp, 0, sizeof(PacketPool));
-	while (atomic_uint32_t::swap(global_packet_pool.lock, 1) == 1)
-	    /* do nothing */;
-	pp->thread_pool_next = global_packet_pool.thread_pools;
-	global_packet_pool.thread_pools = pp;
-	thread_packet_pool = pp;
-	click_compiler_fence();
-	global_packet_pool.lock = 0;
+    if (!pp) {
+        pp = new PacketPool();
+        while (atomic_uint32_t::swap(global_packet_pool.lock, 1) == 1)
+            /* do nothing */;
+        pp->thread_pool_next = global_packet_pool.thread_pools;
+        global_packet_pool.thread_pools = pp;
+        thread_packet_pool = pp;
+        click_compiler_fence();
+        global_packet_pool.lock = 0;
     }
-    return pp;
-#  else
-    return &global_packet_pool;
 #  endif
 }
 
@@ -329,8 +317,11 @@ PacketPool* WritablePacket::make_local_packet_pool() {
 WritablePacket *
 WritablePacket::pool_batch_allocate(uint16_t count)
 {
-        PacketPool& packet_pool = *make_local_packet_pool();
-
+        PacketPool& packet_pool = local_packet_pool();
+#if HAVE_VECTOR_PACKET_POOL
+        assert(false);
+        return 0;
+#else
         WritablePacket *p = 0;
         WritablePacket *head = 0;
         int taken_from_pool = 0;
@@ -355,13 +346,53 @@ WritablePacket::pool_batch_allocate(uint16_t count)
         p->set_next(0);
 
         return head;
+#endif
+}
+
+/**
+ * Allocate a batch of packets with buffer
+ */
+#if POOL_INLINING
+CLICK_ALWAYS_INLINE WritablePacket *
+#else
+CLICK_OPTNONE WritablePacket *
+#endif
+WritablePacket::pool_prepare_data_burst(uint16_t count)
+{
+        PacketPool& packet_pool = local_packet_pool();
+        while (unlikely(packet_pool.pdcount < count)) {
+            //TODO : check from global pool
+            WritablePacket* p = new WritablePacket;
+            p->alloc_data(0,CLICK_PACKET_POOL_BUFSIZ,0);
+#if HAVE_DPDK_PACKET_POOL
+           buffer_destructor_type type = p->_destructor;
+#endif
+            p->initialize(false);
+#if HAVE_DPDK_PACKET_POOL
+            p->_destructor = type;
+#endif
+            p->set_next(packet_pool.pd);
+            packet_pool.pd = p;
+            packet_pool.pdcount++;
+        }
+
+        return packet_pool.pd;
+}
+
+CLICK_ALWAYS_INLINE void
+WritablePacket::pool_consumed_data_burst(uint16_t n, WritablePacket* tail) {
+        PacketPool& packet_pool = local_packet_pool();
+        packet_pool.pdcount -= n;
+        packet_pool.pd = tail;
 }
 
 inline WritablePacket *
 WritablePacket::pool_allocate()
 {
-    PacketPool& packet_pool = *make_local_packet_pool();
-
+    PacketPool& packet_pool = local_packet_pool();
+#if HAVE_VECTOR_PACKET_POOL
+        assert(false);
+#else
 #  if HAVE_MULTITHREAD
     if (!packet_pool.p) {
         WritablePacket *pp = global_packet_pool.pbatch.extract();
@@ -375,12 +406,13 @@ WritablePacket::pool_allocate()
 
         WritablePacket *p = packet_pool.p;
         if (p) {
-        packet_pool.p = static_cast<WritablePacket*>(p->next());
-        --packet_pool.pcount;
+            packet_pool.p = static_cast<WritablePacket*>(p->next());
+            --packet_pool.pcount;
         } else {
         p = new WritablePacket;
         }
         return p;
+#endif
 
 }
 
@@ -390,8 +422,10 @@ WritablePacket::pool_allocate()
 WritablePacket *
 WritablePacket::pool_data_allocate()
 {
-    PacketPool& packet_pool = *make_local_packet_pool();
-
+    PacketPool& packet_pool = local_packet_pool();
+#if HAVE_VECTOR_PACKET_POOL
+        assert(false);
+#else
 #  if HAVE_MULTITHREAD
     if (unlikely(!packet_pool.pd)) {
         WritablePacket *pd = global_packet_pool.pdbatch.extract();
@@ -411,7 +445,7 @@ WritablePacket::pool_data_allocate()
         pd->alloc_data(0,CLICK_PACKET_POOL_BUFSIZ,0);
     }
     return pd;
-
+#endif
 }
 
 /**
@@ -419,7 +453,7 @@ WritablePacket::pool_data_allocate()
  */
 inline  WritablePacket *
 WritablePacket::pool_allocate(uint32_t headroom, uint32_t length,
-			      uint32_t tailroom)
+			      uint32_t tailroom, bool clear)
 {
     uint32_t n = headroom + length + tailroom;
 
@@ -432,23 +466,51 @@ WritablePacket::pool_allocate(uint32_t headroom, uint32_t length,
 #if HAVE_DPDK_PACKET_POOL
        buffer_destructor_type type = p->_destructor;
 #endif
-        p->initialize();
+        p->initialize(clear);
 #if HAVE_DPDK_PACKET_POOL
         p->_destructor = type;
 #endif
     } else {
+#if HAVE_DPDK_PACKET_POOL
+        click_chatter("Allocating huge (and therefore non-DPDK) packets is inefficient in dpdk-pool mode");
+#endif
         p = pool_allocate();
         p->alloc_data(headroom,length,tailroom);
-        p->initialize();
+        p->initialize(clear);
     }
 
 	return p;
 }
 
+#if HAVE_VECTOR_PACKET_POOL
+/**
+ * @pre n <= CLICK_PACKET_POOL_SIZE / 2
+ */
 inline void
-WritablePacket::check_packet_pool_size(PacketPool &packet_pool) {
+WritablePacket::check_packet_pool_size(PacketPool &packet_pool, unsigned n) {
+    if (unlikely(packet_pool.p.count() + n >= CLICK_PACKET_POOL_SIZE)) {
+        WritablePacket** ps = new WritablePacket*[CLICK_PACKET_POOL_SIZE / 2];
+        memcpy(ps, packet_pool.p.extract_burst(CLICK_PACKET_POOL_SIZE / 2), sizeof(WritablePacket*) * CLICK_PACKET_POOL_SIZE / 2);
+        global_packet_pool.pbatch.insert(ps);
+    }
+}
+
+/**
+ * @pre n <= CLICK_PACKET_POOL_SIZE / 2
+ */
+inline void
+WritablePacket::check_data_pool_size(PacketPool &packet_pool, unsigned n) {
+    if (unlikely(packet_pool.pd.count() + n >= CLICK_PACKET_DATA_POOL_SIZE)) {
+        WritablePacket** ps = new WritablePacket*[CLICK_PACKET_POOL_SIZE / 2];
+        memcpy(ps, packet_pool.pd.extract_burst(CLICK_PACKET_POOL_SIZE / 2), sizeof(WritablePacket*) * CLICK_PACKET_POOL_SIZE / 2);
+        global_packet_pool.pdbatch.insert(ps);
+    }
+}
+#else
+inline void
+WritablePacket::check_packet_pool_size(PacketPool &packet_pool, unsigned n) {
 #  if HAVE_MULTITHREAD
-    if (unlikely(packet_pool.p && packet_pool.pcount >= CLICK_PACKET_POOL_SIZE)) {
+    if (unlikely(packet_pool.p && packet_pool.pcount + n > CLICK_PACKET_POOL_SIZE)) {
         packet_pool.p->set_anno_u32(0, packet_pool.pcount);
         if (!global_packet_pool.pbatch.insert(packet_pool.p)) { //Si le nombre de batch est au max -> delete
             while (WritablePacket *p = packet_pool.p) { //On supprime le batch
@@ -470,25 +532,18 @@ WritablePacket::check_packet_pool_size(PacketPool &packet_pool) {
 }
 
 inline void
-WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
+WritablePacket::check_data_pool_size(PacketPool &packet_pool, unsigned n) {
 #  if HAVE_MULTITHREAD
-    if (unlikely(packet_pool.pd && packet_pool.pdcount >= CLICK_PACKET_DATA_POOL_SIZE)) {
+    if (unlikely(packet_pool.pd && packet_pool.pdcount + n > CLICK_PACKET_DATA_POOL_SIZE)) {
         packet_pool.pd->set_anno_u32(0, packet_pool.pdcount);
         if (!global_packet_pool.pdbatch.insert(packet_pool.pd)) {
             while (WritablePacket *pd = packet_pool.pd) {
                 packet_pool.pd = static_cast<WritablePacket *>(pd->next());
-#if HAVE_DPDK_PACKET_POOL
-                rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
-#else
-# if HAVE_NETMAP_PACKET_POOL
-                if (NetmapBufQ::is_valid_netmap_packet(pd))
-                    NetmapBufQ::local_pool()->insert_p(pd->buffer());
-                else
-# endif
-                {
-                    ::operator delete[]((unsigned char *) pd->buffer());
-                }
-#endif
+                #if HAVE_DPDK_PACKET_POOL
+                    rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
+                #else
+                    Packet::release_buffer(pd->buffer());
+                #endif
                 ::operator delete((void *) pd);
             }
         }
@@ -505,13 +560,22 @@ WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
     }
 #  endif /* HAVE_MULTITHREAD */
 }
+#endif
 
 inline bool WritablePacket::is_from_data_pool(WritablePacket *p) {
 #if HAVE_DPDK_PACKET_POOL
-	return likely(!p->_data_packet && p->_head
+	return likely(
+# ifndef CLICK_NOINDIRECT
+            !p->_data_packet &&
+# endif
+            p->_head
 			&& (p->_destructor == DPDKDevice::free_pkt));
 #else
-    if (likely(!p->_data_packet && p->_head && !p->_destructor)) {
+    if (likely(
+# ifndef CLICK_NOINDIRECT
+                !p->_data_packet &&
+# endif
+                p->_head && !p->_destructor)) {
 # if HAVE_NETMAP_PACKET_POOL
         return NetmapBufQ::is_valid_netmap_packet(p);
 # else
@@ -533,26 +597,38 @@ inline bool WritablePacket::is_from_data_pool(WritablePacket *p) {
 void
 WritablePacket::recycle(WritablePacket *p)
 {
-    PacketPool& packet_pool = *make_local_packet_pool();
+#if HAVE_FLOW_DYNAMIC
+        if (fcb_stack) {
+            fcb_stack->release(1);
+        }
+#endif
+    PacketPool& packet_pool = local_packet_pool();
     bool data = is_from_data_pool(p);
 
     if (likely(data)) {
-        check_data_pool_size(packet_pool);
+        check_data_pool_size(packet_pool, 1);
+#if HAVE_VECTOR_PACKET_POOL
+        packet_pool.pd.insert(p);
+#else
         ++packet_pool.pdcount;
         p->set_next(packet_pool.pd);
         packet_pool.pd = p;
-#if !HAVE_BATCH_RECYCLE
+# if !HAVE_BATCH_RECYCLE
         assert(packet_pool.pdcount <= CLICK_PACKET_DATA_POOL_SIZE);
+# endif
 #endif
     } else {
-
         p->~WritablePacket();
-        check_packet_pool_size(packet_pool);
+        check_packet_pool_size(packet_pool, 1);
+#if HAVE_VECTOR_PACKET_POOL
+        packet_pool.p.insert(p);
+#else
         ++packet_pool.pcount;
         p->set_next(packet_pool.p);
         packet_pool.p = p;
-#if !HAVE_BATCH_RECYCLE
+# if !HAVE_BATCH_RECYCLE
         assert(packet_pool.pcount <= CLICK_PACKET_POOL_SIZE);
+# endif
 #endif
     }
 
@@ -564,17 +640,29 @@ WritablePacket::recycle(WritablePacket *p)
 void
 WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
-    PacketPool& packet_pool = *make_local_packet_pool();
-
+#if HAVE_FLOW_DYNAMIC
+    if (fcb_stack) {
+        fcb_stack->release(count);
+    } else {
+#if DEBUG_CLASSIFIER_RELEASE > 1
+        click_chatter("Warning : kill in recycle_packet_batch without FCB");
+#endif
+    }
+#endif
+    PacketPool& packet_pool = local_packet_pool();
+#if HAVE_VECTOR_PACKET_POOL
+    assert(false);
+#else
     Packet* next = ((head != 0)? head->next() : 0 );
     Packet* p = head;
     for (;p != 0;p=next,next=(p==0?0:p->next())) {
         ((WritablePacket*)p)->~WritablePacket();
     }
-    check_packet_pool_size(packet_pool);
+    check_packet_pool_size(packet_pool, count);
     packet_pool.pcount += count;
     tail->set_next(packet_pool.p);
     packet_pool.p = head;
+#endif
 }
 
 /**
@@ -583,11 +671,25 @@ WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigne
 void
 WritablePacket::recycle_data_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
-    PacketPool& packet_pool = *make_local_packet_pool();
-    check_data_pool_size(packet_pool);
+#if HAVE_FLOW_DYNAMIC
+    if (fcb_stack) {
+        fcb_stack->release(count);
+    } else {
+# if DEBUG_CLASSIFIER_RELEASE > 1
+        click_chatter("Warning : kill in recycle_data_batch without FCB");
+# endif
+    }
+#endif
+    PacketPool& packet_pool = local_packet_pool();
+#if HAVE_VECTOR_PACKET_POOL
+    assert(false);
+#else
+    check_data_pool_size(packet_pool, count);
     packet_pool.pdcount += count;
     tail->set_next(packet_pool.pd);
+
     packet_pool.pd = head;
+#endif
 }
 
 # endif /* HAVE_CLICK_PACKET_POOL */
@@ -602,24 +704,26 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
     }
 # if CLICK_USERLEVEL || CLICK_MINIOS
     unsigned char *d = 0;
-    if (n <= CLICK_PACKET_DATA_POOL_SIZE) {
-#  if HAVE_DPDK_PACKET_POOL
+#  if HAVE_CLICK_PACKET_POOL || HAVE_DPDK_PACKET_POOL
+    if (n <= CLICK_PACKET_POOL_BUFSIZ) {
+#    if HAVE_DPDK_PACKET_POOL
         struct rte_mbuf *mb = DPDKDevice::get_pkt();
         if (likely(mb)) {
-          d = (unsigned char*)mb->buf_addr;
-          _destructor = DPDKDevice::free_pkt;
-          _destructor_argument = mb;
+            d = (unsigned char*)mb->buf_addr;
+            _destructor = DPDKDevice::free_pkt;
+            _destructor_argument = mb;
         } else {
             return 0;
         }
-#  elif HAVE_NETMAP_PACKET_POOL
+#    elif HAVE_NETMAP_PACKET_POOL
     d = NetmapBufQ::local_pool()->extract_p();
-#  endif
+#    endif
     } else {
-# if HAVE_DPDK_PACKET_POOL
+#    if HAVE_DPDK_PACKET_POOL
         click_chatter("Warning : buffer of size %d bigger than DPDK buffer size", n);
-# endif
+#    endif
     }
+# endif
     if (!d) {
 # if HAVE_DPDK
       if (dpdk_enabled)
@@ -696,10 +800,10 @@ void WritablePacket::pool_transfer(int from, int to) {
  * null. */
 WritablePacket *
 Packet::make(uint32_t headroom, const void *data,
-	     uint32_t length, uint32_t tailroom)
+	     uint32_t length, uint32_t tailroom, bool clear)
 {
 
-	#if CLICK_LINUXMODULE
+#if CLICK_LINUXMODULE
 		int want = 1;
 		if (struct sk_buff *skb = skbmgr_allocate_skbs(headroom, length + tailroom, &want)) {
 		assert(want == 1);
@@ -713,44 +817,68 @@ Packet::make(uint32_t headroom, const void *data,
 			skb->pkt_type = HOST;
 		# endif
 		WritablePacket *q = reinterpret_cast<WritablePacket *>(skb);
+        if (clear)
 		q->clear_annotations();
 		return q;
 		} else
 		return 0;
 #elif CLICK_PACKET_USE_DPDK
-    struct rte_mbuf *mb = DPDKDevice::get_pkt();
-    if (!mb) {
-        click_chatter("could not alloc pktmbuf");
-        return 0;
-    }
-    //rte_pktmbuf_prepend(mb, rte_pktmbuf_headroom(mb)); : Already done
-    rte_pktmbuf_data_len(mb) = length;
-    rte_pktmbuf_pkt_len(mb) = length;
-    if (data)
-        memcpy(rte_pktmbuf_mtod(mb, void *), data, length);
-    (void) tailroom;
-    return reinterpret_cast<WritablePacket *>(mb);
-#else
+        struct rte_mbuf *mb = DPDKDevice::get_pkt();
+        if (!mb) {
+            click_chatter("could not alloc pktmbuf");
+            return 0;
+        }
+        mb->data_off = headroom;
+        mb->data_len = length;
+        mb->pkt_len = length;
+        if (data)
+            memcpy(rte_pktmbuf_mtod(mb, void *), data, length);
+        (void) tailroom;
+        WritablePacket* q = reinterpret_cast<WritablePacket *>(mb);
+        if (clear) {
+            q->clear_annotations();
+        }
+#if HAVE_FLOW_DYNAMIC
+        if (fcb_stack)
+            fcb_stack->acquire(1);
+#endif
+        return q;
 
-		# if HAVE_CLICK_PACKET_POOL
-			WritablePacket *p = WritablePacket::pool_allocate(headroom, length, tailroom);
-			if (!p)
-			return 0;
-		# else
-			WritablePacket *p = new WritablePacket;
-			if (!p)
-			return 0;
-			p->initialize();
-			if (!p->alloc_data(headroom, length, tailroom)) {
-			p->_head = 0;
-			delete p;
-			return 0;
-			}
-		# endif
-			if (data)
-			memcpy(p->data(), data, length);
-			return p;
-		#endif
+#else
+        # if CLICK_PACKET_INSIDE_DPDK
+            struct rte_mbuf *mb = DPDKDevice::get_pkt();
+            if (!mb) {
+                click_chatter("could not alloc pktmbuf");
+                return 0;
+            }
+            WritablePacket *p = (WritablePacket*)(mb + 1);
+            p->initialize(clear);
+            p->set_buffer_destructor(DPDKDevice::free_pkt);
+            p->set_destructor_argument(mb);
+        # elif HAVE_CLICK_PACKET_POOL
+            WritablePacket *p = WritablePacket::pool_allocate(headroom, length, tailroom, clear);
+            if (!p)
+                return 0;
+        # else
+            WritablePacket *p = new WritablePacket;
+            if (!p)
+                return 0;
+
+            p->initialize(clear);
+            if (!p->alloc_data(headroom, length, tailroom)) {
+                p->_head = 0;
+                delete p;
+                return 0;
+            }
+        # endif
+            if (data)
+                memcpy(p->data(), data, length);
+#if HAVE_FLOW_DYNAMIC
+			if (fcb_stack)
+			    fcb_stack->acquire(1);
+#endif
+            return p;
+        #endif
 
 }
 
@@ -776,7 +904,7 @@ Packet::make(uint32_t headroom, const void *data,
  * null. */
 WritablePacket *
 Packet::make(unsigned char *data, uint32_t length,
-	     buffer_destructor_type destructor, void* argument, int headroom, int tailroom)
+	     buffer_destructor_type destructor, void* argument, int headroom, int tailroom, bool clear)
 {
 #if CLICK_PACKET_USE_DPDK
 assert(false); //TODO
@@ -787,13 +915,17 @@ assert(false); //TODO
     WritablePacket *p = new WritablePacket;
 # endif
     if (p) {
-	p->initialize();
+	p->initialize(clear);
 	p->_head = data - headroom;
 	p->_data = data;
 	p->_tail = data + length;
 	p->_end = p->_tail + tailroom;
 	p->_destructor = destructor;
 	p->_destructor_argument = argument;
+#if HAVE_FLOW_DYNAMIC
+    if (fcb_stack)
+        fcb_stack->acquire(1);
+#endif
     }
     return p;
 # endif
@@ -803,9 +935,20 @@ void Packet::empty_destructor(unsigned char *, size_t, void *) {
 
 }
 
-/** @brief Copy the content and annotations of another packet (userlevel).
+inline
+void Packet::copy_headers(const Packet* p) {
+    if (p->has_mac_header()) {
+	    set_mac_header(data() + p->mac_header_offset());
+    }
+    set_network_header(p->has_network_header() ? data() + p->network_header_offset() : 0);
+    if (p->has_transport_header())
+        set_transport_header(data() + p->transport_header_offset());
+}
+
+/** @brief Copy the content and annotations of another packet (userlevel) into this packet
  * @param source packet
  * @param headroom for the new packet
+ * @return True of the copy was successfull
  */
 bool
 Packet::copy(Packet* p, int headroom)
@@ -821,10 +964,8 @@ Packet::copy(Packet* p, int headroom)
     _tail = _data + p->length();
 #endif
     copy_annotations(p);
-    set_mac_header(p->mac_header() ? data() + p->mac_header_offset() : 0);
-    set_network_header(p->network_header() ? data() + p->network_header_offset() : 0);
-    if (p->has_transport_header())
-        set_transport_header(data() + p->transport_header_offset());
+    copy_headers(p);
+
     return true;
 }
 
@@ -840,7 +981,7 @@ Packet::copy(Packet* p, int headroom)
  * empty destructor will be set. It is usefull if you won't release this packet
  * before you're sure that the clone will be killed and plan on managing the
  * buffer yourself. This is usefull for pktgen applications where it would
- * be hard to achieve good performances.
+ * be hard to achieve good performances with (useless) reference counting.
  * If the packet is a DPDK packet, it will be referenced as a DPDK packet and
  * the DPDK buffer counter will be updated.
  *
@@ -857,15 +998,16 @@ Packet::clone(bool fast)
     return reinterpret_cast<Packet *>(nskb);
     
 #elif CLICK_PACKET_USE_DPDK
+
+# ifdef CLICK_NOINDIRECT
+    if (!fast) {
+        return duplicate(0,0);
+    }
+# endif
     Packet* p = reinterpret_cast<Packet *>(
-        rte_pktmbuf_clone(mb(), DPDKDevice::get_mpool(rte_socket_id())));
+    rte_pktmbuf_clone(mb(), DPDKDevice::get_mpool(rte_socket_id())));
     p->copy_annotations(this,true);
-    p->shift_header_annotations(buffer(), 0);
-    click_chatter("Clone %p %p",this->mb(),p->mb());
-    click_chatter("Headroom %d %d",headroom(),p->headroom());
-    click_chatter("Tailroom %d %d",tailroom(),p->tailroom());
-    click_chatter("Length %d %d",length(),p->length());
-    click_chatter("Shared %d %d",shared(),p->shared());
+    p->copy_headers(this);
     return p;
 #elif CLICK_USERLEVEL || CLICK_BSDMODULE || CLICK_MINIOS
 # if CLICK_BSDMODULE
@@ -892,9 +1034,12 @@ Packet::clone(bool fast)
     Packet *p = new WritablePacket; // no initialization
 # endif
     if (!p)
-	return 0;
+	    return 0;
     if (unlikely(fast)) {
+
+#ifndef CLICK_NOINDIRECT
         p->_use_count = 1;
+#endif
         p->_head = _head;
         p->_data = _data;
         p->_tail = _tail;
@@ -907,21 +1052,33 @@ Packet::clone(bool fast)
           p->_destructor = DPDKDevice::free_pkt;
           p->_destructor_argument = destructor_argument();
           rte_mbuf_refcnt_update((rte_mbuf*)p->_destructor_argument, 1);
-        } else if (data_packet() && DPDKDevice::is_dpdk_packet(data_packet())) {
+        }
+
+#ifndef CLICK_NOINDIRECT
+        else if (
+                data_packet() && DPDKDevice::is_dpdk_packet(data_packet())) {
            p->_destructor = DPDKDevice::free_pkt;
            p->_destructor_argument = data_packet()->destructor_argument();
            rte_mbuf_refcnt_update((rte_mbuf*)p->_destructor_argument, 1);
-        } else
+        }
+#endif
+        else
 #endif
         {
-        p->_destructor = empty_destructor;
+            p->_destructor = empty_destructor;
         }
+
+#ifndef CLICK_NOINDIRECT
         p->_data_packet = 0;
+#endif
     } else {
+
+#ifndef CLICK_NOINDIRECT
+
         Packet* origin = this;
         if (origin->_data_packet)
             origin = origin->_data_packet;
-        memcpy(p, this, sizeof(Packet));
+        memcpy((void*)p, (void*)this, sizeof(Packet));
         p->_use_count = 1;
         p->_data_packet = origin;
 	# if CLICK_USERLEVEL || CLICK_MINIOS
@@ -931,10 +1088,44 @@ Packet::clone(bool fast)
 	# endif
 		// increment our reference count because of _data_packet reference
 		origin->_use_count++;
+#else
+        assert(false);
+#endif
     }
     return p;
 
 #endif /* CLICK_LINUXMODULE */
+}
+
+inline WritablePacket *
+Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom)
+{
+#if CLICK_PACKET_USE_DPDK
+    struct rte_mbuf *mb = this->mb();
+    struct rte_mbuf *nmb = DPDKDevice::get_pkt();
+    if (unlikely(!nmb)) {
+        click_chatter("cannot allocate new pktmbuf");
+        return 0;
+    }
+    nmb->data_off = mb->data_off + extra_headroom;
+
+    rte_pktmbuf_data_len(nmb) = length();
+    rte_pktmbuf_pkt_len(nmb) = length();
+    WritablePacket *npkt = reinterpret_cast<WritablePacket *>(nmb);
+    memcpy(npkt->all_anno(), all_anno(), sizeof (AllAnno));
+
+    unsigned char *start_copy = (unsigned char*)buffer() + (extra_headroom >= 0 ? 0 : -extra_headroom);
+    unsigned char *end_copy = (unsigned char*)end_buffer() + (extra_tailroom >= 0 ? 0 : extra_tailroom);
+    memcpy(npkt->buffer() + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
+
+    npkt->shift_header_annotations(buffer(), extra_headroom);
+
+    return npkt;
+#else
+    (void)extra_headroom;
+    (void)extra_tailroom;
+    abort();
+#endif
 }
 
 WritablePacket *
@@ -968,52 +1159,47 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     return reinterpret_cast<WritablePacket *>(nskb);
 
 #elif CLICK_PACKET_USE_DPDK /* !CLICK_LINUXMODULE */
-    struct rte_mbuf *mb = this->mb();
-    struct rte_mbuf *nmb = DPDKDevice::get_pkt();
-    click_chatter("Expensive uniqueify %p %p, exh = %d, ext = %d",mb,nmb,extra_headroom,extra_tailroom);
-    if (!nmb) {
-        click_chatter("cannot allocate new pktmbuf");
+    auto npkt = duplicate(extra_headroom, extra_tailroom);
+    if (unlikely(!npkt)) {
         if (free_on_failure)
             kill();
         return 0;
     }
-    nmb->data_off = mb->data_off + extra_headroom;
-
-    rte_pktmbuf_data_len(nmb) = length();
-    rte_pktmbuf_pkt_len(nmb) = length();
-
-    WritablePacket *npkt = reinterpret_cast<WritablePacket *>(nmb);
-    memcpy(npkt->buffer(), buffer(), length() + headroom() + tailroom());
-    memcpy(npkt->all_anno(), all_anno(), sizeof (AllAnno));
-
-    npkt->shift_header_annotations(buffer(), extra_headroom);
-
-    click_chatter("Headroom %d %d",headroom(),npkt->headroom());
-    click_chatter("Tailroom %d %d",tailroom(),npkt->tailroom());
-    click_chatter("Length %d %d",length(),npkt->length());
-    click_chatter("Shared %d %d",shared(),npkt->shared());
-    kill(); // Release old mbuf
+    kill();
     return npkt;
 #else /* !CLICK_LINUXMODULE */
 
     int buffer_length = this->buffer_length();
+#if HAVE_CLICK_PACKET_POOL
     WritablePacket* p = WritablePacket::pool_allocate(extra_headroom, buffer_length, extra_tailroom);
+#else
+    WritablePacket* p = new WritablePacket;
+    p->alloc_data(extra_headroom,buffer_length,extra_tailroom);
+#endif
     if (!p) {
         if (free_on_failure)
             kill();
         return 0;
     }
+#if HAVE_FLOW_DYNAMIC
+    if (likely(fcb_stack))
+        fcb_stack->acquire(1);
+#endif
 
     uint8_t *old_head = _head, *old_end = _end;
     int headroom = this->headroom();
     int length = this->length();
     uint8_t* new_head = p->_head;
     uint8_t* new_end = p->_end;
-#if HAVE_DPDK_PACKET_POOL
+# if HAVE_DPDK_PACKET_POOL
     buffer_destructor_type desc = p->_destructor;
     void* arg = p->_destructor_argument;
-#endif
-    if (_use_count > 1) {
+# endif
+
+# ifndef CLICK_NOINDIRECT
+    bool free_whole = false;
+    if (_use_count > 1) { // one of the reference is ours
+
         memcpy(p, this, sizeof(Packet));
 
         # if CLICK_USERLEVEL || CLICK_MINIOS
@@ -1021,10 +1207,24 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
         # else
             p->_m = m;
         # endif
-    } else {
+
+        free_whole = true;
+
+    } else
+# endif
+    {
         p->_head = NULL;
+
+# ifndef CLICK_NOINDIRECT
         p->_data_packet = NULL; //packet from pool_data_allocate can be dirty
-        WritablePacket::recycle(p);
+# endif
+        SFCB_STACK(
+#if HAVE_CLICK_PACKET_POOL
+            WritablePacket::recycle(p);
+#else
+            p->kill();
+#endif
+        );
         p = (WritablePacket*)this;
     }
 
@@ -1033,48 +1233,39 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     p->_tail = p->_data + length;
     p->_end = new_end;
 
-	# if CLICK_BSDMODULE
-		struct mbuf *old_m = _m;
-	# endif
+#if CLICK_BSDMODULE
+    struct mbuf *old_m = _m;
+# endif
 
     unsigned char *start_copy = old_head + (extra_headroom >= 0 ? 0 : -extra_headroom);
     unsigned char *end_copy = old_end + (extra_tailroom >= 0 ? 0 : extra_tailroom);
     memcpy(p->_head + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
 
-    // free old data
-    if (_data_packet) {
-      _data_packet->kill();
-    }
-# if CLICK_USERLEVEL || CLICK_MINIOS
-    else if (_destructor) {
-      _destructor(old_head, old_end - old_head, _destructor_argument);
-    } else {
-#  if HAVE_NETMAP_PACKET_POOL
-      if (NetmapBufQ::is_valid_netmap_buffer(old_head)) {
-        NetmapBufQ::local_pool()->insert_p(old_head);
-      } else
-#  endif
-      {
-        delete[] old_head;
-      }
+# ifndef CLICK_NOINDIRECT
+    if (free_whole) {
+        kill();
+    } else
+# endif
+    {
+        delete_buffer(old_head, old_end
+# if CLICK_BSDMODULE
+            , old_m
+# endif
+            );
     }
 # if HAVE_DPDK_PACKET_POOL
     p->_destructor = desc;
     p->_destructor_argument = arg;
-#  else
-    _destructor = 0;
 # endif
 
-# elif CLICK_BSDMODULE
-    m_freem(old_m); // alloc_data() created a new mbuf, so free the old one
-# endif
-
+# ifndef CLICK_NOINDIRECT
     p->_use_count = 1;
     p->_data_packet = 0;
+# endif
     p->shift_header_annotations(old_head, extra_headroom);
     return p;
 
-#endif /* CLICK_LINUXMODULE */
+#endif /* !CLICK_LINUXMODULE */
 }
 
 
@@ -1207,11 +1398,6 @@ Packet::expensive_put(uint32_t nbytes)
 Packet *
 Packet::shift_data(int offset, bool free_on_failure)
 {
-#if CLICK_PACKET_USE_DPDK
-    assert(false);
-#endif
-
-
     if (offset == 0)
 	return this;
 
@@ -1228,25 +1414,24 @@ Packet::shift_data(int offset, bool free_on_failure)
 	dp = network_header();
 
     if (!shared()
-	&& (offset < 0 ? (dp - buffer()) >= (ptrdiff_t)(-offset)
+	    && (offset < 0 ? (dp - buffer()) >= (ptrdiff_t)(-offset)
 	    : tailroom() >= (uint32_t)offset)) {
 	WritablePacket *q = static_cast<WritablePacket *>(this);
 	memmove((unsigned char *) dp + offset, dp, q->end_data() - dp);
 #if CLICK_LINUXMODULE
-	struct sk_buff *mskb = q->skb();
-	mskb->data += offset;
-	mskb->tail += offset;
+        struct sk_buff *mskb = q->skb();
+        mskb->data += offset;
+        mskb->tail += offset;
 #elif CLICK_PACKET_USE_DPDK
-        rte_pktmbuf_adj(q->mb(), offset);
-        rte_pktmbuf_append(q->mb(), offset);
+        q->mb()->data_off += offset;
 #else				/* User-space and BSD kernel module */
-	q->_data += offset;
-	q->_tail += offset;
+        q->_data += offset;
+        q->_tail += offset;
 # if CLICK_BSDMODULE
-	q->m()->m_data += offset;
+        q->m()->m_data += offset;
 # endif
 #endif
-	shift_header_annotations(q->buffer(), offset);
+        shift_header_annotations(q->buffer(), offset);
 	return this;
     } else {
 	int tailroom_offset = (offset < 0 ? -offset : 0);
@@ -1262,34 +1447,30 @@ Packet::shift_data(int offset, bool free_on_failure)
 static void
 cleanup_pool(PacketPool *pp, int global)
 {
+#if HAVE_VECTOR_PACKET_POOL
+#else
     unsigned pcount = 0, pdcount = 0;
     while (WritablePacket *p = pp->p) {
-	++pcount;
-	pp->p = static_cast<WritablePacket *>(p->next());
-	::operator delete((void *) p);
+        ++pcount;
+        pp->p = static_cast<WritablePacket *>(p->next());
+        ::operator delete((void *) p);
     }
     while (WritablePacket *pd = pp->pd) {
     ++pdcount;
     pp->pd = static_cast<WritablePacket *>(pd->next());
-#if HAVE_DPDK_PACKET_POOL
+# if HAVE_DPDK_PACKET_POOL
     rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
-#elif HAVE_NETMAP_PACKET_POOL
-    NetmapBufQ::local_pool()->insert_p(pd->buffer());
-#else
-# if HAVE_DPDK
-    if (dpdk_enabled)
-        rte_free(reinterpret_cast<unsigned char *>(pd->buffer()));
-    else
+# else
+    Packet::release_buffer(pd->buffer());
 # endif
-        delete[] reinterpret_cast<unsigned char *>(pd->buffer());
-#endif
     ::operator delete((void *) pd);
     }
-#if !HAVE_BATCH_RECYCLE
+# if !HAVE_BATCH_RECYCLE
     assert(pcount <= CLICK_PACKET_POOL_SIZE);
     assert(pdcount <= CLICK_PACKET_DATA_POOL_SIZE);
-#endif
+# endif
     assert(global || (pcount == pp->pcount && pdcount == pp->pdcount));
+#endif
 }
 #endif
 
@@ -1313,7 +1494,8 @@ Packet::static_cleanup()
 		cleanup_pool(pp, 0);
 		delete pp;
 		}
-
+    #  if HAVE_VECTOR_PACKET_POOL
+    #  else
 		PacketPool fake_pool;
 		do {
 			fake_pool.p = global_packet_pool.pbatch.extract();
@@ -1321,12 +1503,56 @@ Packet::static_cleanup()
 			if (!fake_pool.p && !fake_pool.pd) break;
 			cleanup_pool(&fake_pool, 1);
 		} while(true);
+
+    #  endif
 	# else
 		cleanup_pool(&global_packet_pool, 0);
 	# endif
 #endif
 }
 
+WritablePacket *
+Packet::make_similar(Packet* original, uint32_t length)
+{
+#if HAVE_DPDK && !HAVE_DPDK_PACKET_POOL && !CLICK_PACKET_USE_DPDK
+    if (DPDKDevice::is_dpdk_buffer(original) && length <= DPDKDevice::MBUF_DATA_SIZE) {
+#if HAVE_CLICK_PACKET_POOL
+        WritablePacket* p = WritablePacket::pool_allocate();
+#else
+        WritablePacket *p = new WritablePacket;
+        if (!p)
+            return 0;
+
+        if (!p->alloc_data(original->headroom(), length, original->tailroom())) {
+            p->_head = 0;
+            delete p;
+            return 0;
+        }
+#endif
+        if (!p)
+            return 0;
+		p->initialize(false);
+
+#if HAVE_FLOW_DYNAMIC
+            if (fcb_stack)
+                fcb_stack->acquire(1);
+#endif
+        rte_mbuf* mbuf = DPDKDevice::get_pkt();
+	    p->_head = (unsigned char*)mbuf->buf_addr;
+        p->_data = rte_pktmbuf_mtod(mbuf, unsigned char*);
+	    p->_tail = p->_data + length;
+	    p->_end = p->_head + DPDKDevice::MBUF_DATA_SIZE;
+        p->_destructor = DPDKDevice::free_pkt;
+        p->_destructor_argument = mbuf;
+        return p;
+    }
+#else
+        (void)original;
+#endif
+    {
+        return make(default_headroom, (const unsigned char *) 0, length, 0);
+    }
+}
 
 #if HAVE_STATIC_ANNO
 unsigned int Packet::clean_offset = 0;

@@ -76,6 +76,10 @@ class AverageCounterBase : public BatchElement { public:
 
 template <typename T>
 struct AverageCounterStats {
+    AverageCounterStats() {
+        reset();
+    }
+
     T _count;
     T _byte_count;
     T _first;
@@ -145,7 +149,7 @@ struct AverageCounterStatsIMP {
 
     inline void reset()
     {
-        for (int i =0; i < _counts.weight(); i++) {
+        for (unsigned i =0; i < _counts.weight(); i++) {
             _counts.get_value(i).count = 0;
             _counts.get_value(i).byte_count = 0;
             _counts.get_value(i).first = 0;
@@ -157,7 +161,7 @@ struct AverageCounterStatsIMP {
     inline uint64_t byte_count() const  { PER_THREAD_MEMBER_SUM(uint64_t,total,_counts,byte_count);return total; };
     inline uint64_t first() const {
         uint64_t min = UINT64_MAX;
-        for (int i =0; i < _counts.weight(); i++) {
+        for (unsigned i =0; i < _counts.weight(); i++) {
             if (_counts.get_value(i).first != 0 && _counts.get_value(i).first < min)
                 min = _counts.get_value(i).first;
         }
@@ -165,7 +169,7 @@ struct AverageCounterStatsIMP {
     }
     inline uint64_t last() const {
         uint64_t max = 0;
-        for (int i =0; i < _counts.weight(); i++) {
+        for (unsigned i =0; i < _counts.weight(); i++) {
             if (_counts.get_value(i).last != 0 && _counts.get_value(i).last > max)
                 max = _counts.get_value(i).last;
         }

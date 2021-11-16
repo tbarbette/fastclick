@@ -37,6 +37,13 @@ netmap_nopool:
 netmap_nopool_nozc:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --disable-netmap-pool --disable-zerocopy $CONFIG --disable-verbose-batch && make && make check
+fbatch:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --enable-flow --enable-batch  $CONFIG --disable-verbose-batch && make
+fnetmap:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --enable-flow --enable-batch  --enable-netmap-pool --enable-zerocopy $CONFIG --disable-verbose-batch && make
+
 cache:
     paths:
         - dpdk-$DPDK_VERSION

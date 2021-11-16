@@ -49,7 +49,7 @@ CLICK_DECLS
 #define GET1(p)        ((p)[0])
 
 FromIPSummaryDump::FromIPSummaryDump()
-    : _work_packet(0), _task(this), _timer(this), _first_packet_pos(0)
+    : _work_packet(0), _first_packet_pos(0), _task(this), _timer(this)
 {
     _ff.set_landmark_pattern("%f:%l");
     in_batch_mode = BATCH_MODE_YES;
@@ -76,6 +76,7 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
     _sampling_prob = (1 << SAMPLING_SHIFT);
     String default_contents, default_flowid, data;
     unsigned burst = 1;
+    bool migrate = false;
     bool timestamp = true;
 
     if (_ff.configure_keywords(conf, this, errh) < 0)
@@ -100,15 +101,16 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("ALLOW_NONEXISTENT", allow_nonexistent)
         .read("DATA", data)
         .read("BURST", burst)
+        .read("MIGRATE", migrate)
         .read("TIMESTAMP", timestamp)
 	    .read_or_set("TIMES", _times, 1)
     .complete() < 0)
     return -1;
     if (_sampling_prob > (1 << SAMPLING_SHIFT)) {
-    errh->warning("SAMPLE probability reduced to 1");
-    _sampling_prob = (1 << SAMPLING_SHIFT);
+		errh->warning("SAMPLE probability reduced to 1");
+		_sampling_prob = (1 << SAMPLING_SHIFT);
     } else if (_sampling_prob == 0)
-    errh->warning("SAMPLE probability is 0; emitting no packets");
+	errh->warning("SAMPLE probability is 0; emitting no packets");
 
     _default_proto = default_proto;
     _stop = stop;
@@ -121,6 +123,7 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
     _multipacket = multipacket;
     _have_flowid = _have_aggregate = _binary = false;
     _burst = burst;
+    _migrate = migrate;
     _set_timestamp = timestamp;
 
     _times--; // It's like a do...while
@@ -428,7 +431,7 @@ FromIPSummaryDump::read_packet(ErrorHandler *errh)
     }
 
     // read packet data
-    WritablePacket *q = Packet::make(16, (const unsigned char *) 0, 0, 1000);
+    WritablePacket *q = Packet::make(16, (const unsigned char *) 0, 0, 1000, true); //inject_ip assumes cleared annotations
     if (!q) {
         _ff.error(errh, strerror(ENOMEM));
         return 0;
@@ -740,7 +743,7 @@ FromIPSummaryDump::run_task(Task *)
     return true;
 }
 
-inline Packet *
+Packet *
 FromIPSummaryDump::get_packet(bool push) {
     Packet* p;
     while (1) {
@@ -824,9 +827,18 @@ FromIPSummaryDump::write_handler(const String &s_in, Element *e, void *thunk, Er
       bool active;
       if (BoolArg().parse(s, active)) {
           fd->_active = active;
-          if (fd->output_is_push(0) && active && !fd->_task.scheduled())
-          fd->_task.reschedule();
-          else if (!fd->output_is_push(0))
+          if (fd->output_is_push(0)) {
+              if (active) {
+                  if (fd->_migrate)
+                      fd->_task.reschedule_notify(fd);
+                   else if (!fd->_task.scheduled())
+                      fd->_task.reschedule();
+              } else {
+                  if (fd->_migrate) {
+                      fd->_task.unschedule_notify(fd);
+                  }
+              }
+          } else if (!fd->output_is_push(0))
           fd->_notifier.set_active(active, true);
           return 0;
       } else

@@ -106,7 +106,9 @@ class String { public:
     String trim() const;
     String trim_space() const;
     String trim_space_left() const;
+    String remove(char c) const;
     String replace(char from, char to) const;
+    String replace(String from, String to) const;
 
     inline bool equals(const String &x) const;
     inline bool equals(const char *s, int len) const;
@@ -324,6 +326,7 @@ class StringRef {
     inline StringRef(const StringRef &x);
     inline StringRef(const char *cstr);
     inline StringRef(const char *s, int len);
+    inline StringRef(const char *b, const char* end);
     inline StringRef(const String &x);
 
     inline const char *data() const;
@@ -334,10 +337,18 @@ class StringRef {
 
     inline uint32_t hashcode() const;
 
+    inline bool operator==(const StringRef &o) {
+        return o.len_ == len_ && memcmp(data_, o.data_, len_) == 0;
+    }
+
   private:
     const char *data_;
     int len_;
 };
+
+inline StringRef operator "" _s(const char *str, std::size_t len) {
+    return StringRef(str, len);
+}
 
 /** @brief Construct an empty String (with length 0). */
 inline String::String() {
@@ -874,6 +885,9 @@ inline StringRef::StringRef(const char *cstr)
 
 inline StringRef::StringRef(const char *s, int len)
     : data_(s), len_(len) {
+}
+
+inline StringRef::StringRef(const char *b, const char* end) : data_(b), len_(end - b) {
 }
 
 inline StringRef::StringRef(const String &x)

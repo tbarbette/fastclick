@@ -19,8 +19,11 @@
 #include <click/config.h>
 #include "stringtest.hh"
 #include <click/glue.hh>
+#include <click/string.hh>
 #include <click/straccum.hh>
 #include <click/error.hh>
+#include <click/vector.hh>
+
 CLICK_DECLS
 
 
@@ -44,12 +47,33 @@ StringTest::initialize(ErrorHandler *errh)
     CHECK(String("HELLO;YOU").split(';')[0] == "HELLO");
     CHECK(String("HELLO;YOU").split(';')[1] == "YOU");
 
-    String s = String("HELLO YOU !");
+    String s;
+    CHECK(s.length() == 0);
+
+    s = "a simple string";
+    Vector<String> v = s.split(' ');
+    CHECK(v.size() == 3);
+    CHECK(v[0] == "a");
+    CHECK(v[1] == "simple");
+    CHECK(v[2] == "string");
+
+    CHECK(s.replace("simple", "complex") == "a complex string");
+    CHECK(String("").replace("a", "b") == "");
+
+    s = String("HELLO YOU !");
     CHECK(s.search("HELLO") == s.data());
     CHECK(s.search("YOU") == s.data() + 6);
     CHECK(s.search("ME") == 0);
     CHECK(s.search("!") == s.data() + s.length() - 1);
     CHECK(String("").search("!") == 0);
+
+    char buf[25];
+    int n;
+    n = sprintf(buf, "%d", 12);
+    CHECK(StringRef(buf,n) == "12");
+    n = sprintf(buf, "%d", 0);
+    CHECK(StringRef(buf,n) == "0");
+
 
     if (!errh->nerrors()) {
     	errh->message("All tests pass!");

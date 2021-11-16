@@ -98,9 +98,9 @@ class TCPRewriter : public IPRewriterBase { public:
 
 	TCPFlow(IPRewriterInput *owner, const IPFlowID &flowid,
 		const IPFlowID &rewritten_flowid,
-		bool guaranteed, click_jiffies_t expiry_j)
+		bool guaranteed, click_jiffies_t expiry_j, uint8_t input)
 	    : IPRewriterFlow(owner, flowid, rewritten_flowid,
-			     IP_PROTO_TCP, guaranteed, expiry_j), _dt(0) {
+			     IP_PROTO_TCP, guaranteed, expiry_j, input), _dt(0) {
 	}
 
 	~TCPFlow() {
@@ -166,13 +166,13 @@ class TCPRewriter : public IPRewriterBase { public:
 			      const IPFlowID &rewritten_flowid, int input);
     void destroy_flow(IPRewriterFlow *flow);
     click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
-	return flow->expiry() + tcp_flow_timeout(static_cast<const TCPFlow *>(flow)) -
+	    return flow->expiry() + tcp_flow_timeout(static_cast<const TCPFlow *>(flow)) -
                _timeouts[click_current_cpu_id()][1];
     }
 
     void push(int, Packet *);
 #if HAVE_BATCH
-     void push_batch(int port, PacketBatch *batch);
+    void push_batch(int port, PacketBatch *batch);
 #endif
 
     void add_handlers() CLICK_COLD;
@@ -207,7 +207,7 @@ class TCPRewriter : public IPRewriterBase { public:
 inline void
 TCPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map[click_current_cpu_id()]);
+    unmap_flow(flow, _state->map);
     static_cast<TCPFlow *>(flow)->~TCPFlow();
     _allocator->deallocate(flow);
 }

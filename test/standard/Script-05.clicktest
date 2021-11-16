@@ -1,6 +1,9 @@
 %script
 click CONFIG
 
+%require
+not click-buildtool provides dpdk-packet
+
 %file CONFIG
 FromIPSummaryDump(STOP true, DATA "!data ip_dst timestamp
 1.0.0.1 1

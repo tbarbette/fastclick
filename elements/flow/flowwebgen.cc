@@ -1,0 +1,694 @@
+/*
+ * FlowWebGen.{cc,hh} -- toy TCP implementation
+ * Based on Robert Morris packet-based TCP WebGen
+ * Tom Barbette
+ *
+ *
+ * Copyright (c) 1999-2001 Massachusetts Institute of Technology
+ * Copyright (c) 2007 University of Liege
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, subject to the conditions
+ * listed in the Click LICENSE file. These conditions include: you must
+ * preserve this copyright notice, and you cannot mention the copyright
+ * holders in advertising related to the Software without their permission.
+ * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+ * notice is a summary of the Click LICENSE file; the license in that file is
+ * legally binding.
+ */
+
+#include <click/config.h>
+#include <clicknet/tcp.h>
+#include <clicknet/ip.h>
+#include <click/ipaddress.hh>
+#include <click/args.hh>
+#include <click/error.hh>
+#include <click/glue.hh>
+#include <click/routervisitor.hh>
+#include <click/router.hh>
+#include <click/standard/scheduleinfo.hh>
+#include "flowwebgen.hh"
+#include "tcpclientack.hh"
+CLICK_DECLS
+
+static int
+timestamp_diff(const Timestamp &t1, const Timestamp &t2)
+{
+    return (t1.sec() - t2.sec()) * 1000000 + (t1.usec() - t2.usec());
+}
+
+FlowWebGen::FlowWebGen()
+  : _timer(this), _limit(-1), _active(false), _verbose(false), _task(this)
+{
+  _parallel = 16;
+  cbfree = NULL;
+
+  _url = "";
+
+  memset (cbhash, 0, sizeof (cbhash));
+  memset (&perfcnt, 0, sizeof (perfcnt));
+}
+
+FlowWebGen::~FlowWebGen()
+{
+}
+
+int
+FlowWebGen::configure (Vector<String> &conf, ErrorHandler *errh)
+{
+  int ret;
+  int cps;
+
+  ret = Args(conf, this, errh)
+          .read_mp("PREFIX", IPPrefixArg(true), _src_prefix, _mask)
+          .read_mp("DST", _dst)
+          .read_mp("RATE", cps)
+          .read_p("PARALLEL", _parallel)
+          .read("LIMIT", _limit)
+          .read("ACTIVE", _active)
+          .read("URL", _url)
+          .read("VERBOSE", _verbose)
+      .complete();
+
+  ElementCastTracker tr(router(),"TCPClientAck");
+  router()->visit_upstream(this, -1, &tr);
+  if (tr.size() != 1) {
+      return errh->error("FlowWebGen must be preceded by one TCPClientAck");
+  }
+  _tcp_client_ack = static_cast<TCPClientAck*>(tr[0]);
+
+  if (cps == 0) {
+    start_interval = 0;
+  } else {
+    start_interval = 1000000 / cps;
+  }
+  return ret;
+}
+
+IPAddress
+FlowWebGen::pick_src ()
+{
+  uint32_t x;
+  uint32_t mask = (uint32_t) _mask;
+
+  x = (click_random() & ~mask) | ((uint32_t) _src_prefix & mask);
+
+  return IPAddress (x);
+}
+
+int
+FlowWebGen::connhash (unsigned src, unsigned short sport)
+{
+  return (src ^ sport) & htmask;
+}
+
+int
+FlowWebGen::initialize (ErrorHandler *errh)
+{
+
+
+
+ int ncbs;
+ if (start_interval) {
+     ncbs = 2 * (resend_dt / start_interval) * resend_max;
+  _timer.initialize (this);
+  if (_active)
+    _timer.schedule_now ();
+
+
+ } else {
+  ScheduleInfo::initialize_task(this, &_task, _active, errh);
+    ncbs = _parallel;
+ }
+  for (int i = 0; i < ncbs; i++) {
+    CB *cb = new CB;
+    if (!cb) {
+      click_chatter ("Not enough memory for CBs\n");
+      return ENOMEM;
+    }
+    cb->add_to_list (&cbfree);
+  }
+  click_chatter ("Allocated %d CBs\n", ncbs);
+
+  Timestamp now = Timestamp::now();
+  perf_tv = now;
+  start_tv = now;
+
+/*  rexmit_head = new CB;
+  rexmit_tail = new CB;
+  if (!rexmit_head || !rexmit_tail) {
+    click_chatter ("Not enough memory for dummy elements\n");
+    return ENOMEM;
+  }
+  rexmit_head->rexmit_next = rexmit_tail;
+  rexmit_head->rexmit_prev = NULL;
+  rexmit_tail->rexmit_next = NULL;
+  rexmit_tail->rexmit_prev = rexmit_head;*/
+
+  return 0;
+}
+
+void
+FlowWebGen::cleanup (CleanupStage stage)
+{
+  int i = 0;
+  CB *c = cbfree;
+
+  do {
+    while (c) {
+      CB *tc = c;
+      c = tc->next;
+      delete tc;
+    }
+
+    c = cbhash[i++];
+  } while (i <= htsize);
+
+/*  delete rexmit_head;
+  delete rexmit_tail;*/
+
+  if (stage >= CLEANUP_INITIALIZED)
+    do_perf_stats ();
+}
+
+void
+FlowWebGen::recycle (CB *cb)
+{
+/*  cb->rexmit_unlink ();*/
+  cb->remove_from_list ();
+  cb->add_to_list (&cbfree);
+  if (start_interval == 0)
+    _task.reschedule();
+}
+
+void
+FlowWebGen::do_perf_stats ()
+{
+  Timestamp now = Timestamp::now();
+
+  //double td = ((double) perf_diff) / 1000000.0;
+  //double ips = perfcnt.initiated / td;
+  //double cps = perfcnt.completed / td;
+  //double tps = perfcnt.timeout / td;
+  //double rps = perfcnt.reset / td;
+  //click_chatter ("Init: %5d  Comp: %5d  Tmo: %5d  RST: %5d\n",
+  //               (int) ips, (int) cps, (int) tps, (int) rps);
+  click_chatter ("init: %d  comp: %5d  tmo: %5d  rst: %5d\n",
+                 perfcnt.initiated, perfcnt.completed,
+                 perfcnt.timeout, perfcnt.reset);
+  perf_tv = now;
+  memset (&perfcnt, 0, sizeof (perfcnt));
+}
+
+void
+FlowWebGen::run_timer (Timer *)
+{
+  CB *cb;
+  Timestamp now = Timestamp::now();
+  if (start_interval) {
+  while (timestamp_diff(now, start_tv) > start_interval) {
+    start_tv += Timestamp::make_usec(start_interval);
+    cb = cbfree;
+
+    if (cb) {
+      cb->remove_from_list ();
+      cb->reset (pick_src (), _url);
+
+      int hv = connhash (cb->_src, cb->_sport);
+      cb->add_to_list (&cbhash[hv]);
+      Packet* np = tcp_send(cb, 0);
+      output_push_batch(0,PacketBatch::make_from_packet(np));
+      perfcnt.initiated++;
+        if (_limit > 0 && perfcnt.initiated >= _limit) {
+            set_active(false);
+            return;
+        }
+    } else {
+      click_chatter ("out of available CBs\n");
+    }
+  }
+  }
+
+/*  CB *lrxcb = rexmit_tail->rexmit_prev;
+  do {
+    cb = rexmit_head->rexmit_next;
+
+    if (cb == rexmit_tail)
+      break;
+
+    if (timestamp_diff(now, cb->last_send) > resend_dt) {
+      if (cb->_resends++ > resend_max) {
+	    perfcnt.timeout++;
+        if (_verbose > 1) {
+            click_chatter("Resend dt passed");
+        }
+	recycle (cb);
+      } else {
+	tcp_send (cb, 0);
+      }
+    } else {
+      break;
+    }
+  } while (cb != lrxcb);
+*/
+  if (timestamp_diff(now, perf_tv) > perf_dt)
+    do_perf_stats ();
+
+  _timer.schedule_after_msec(1);
+}
+
+bool
+FlowWebGen::run_task(Task *)
+{
+  CB *cb;
+
+  while(cbfree) {
+      cb = cbfree;
+
+      cb->remove_from_list ();
+      cb->reset (pick_src (), _url);
+
+      int hv = connhash (cb->_src, cb->_sport);
+      if (_verbose > 0)
+          click_chatter("%p{element} CREATE %d %d",this, cb->_sport, cb->_dport);
+      cb->add_to_list (&cbhash[hv]);
+
+      Packet* np = tcp_send(cb, 0);
+      output_push_batch(0,PacketBatch::make_from_packet(np));
+      perfcnt.initiated++;
+        if (_limit > 0 && perfcnt.initiated >= _limit) {
+            set_active(false);
+            return false;
+        }
+  }
+  return true;
+}
+
+
+
+FlowWebGen::CB *
+FlowWebGen::find_cb (unsigned src, unsigned short sport, unsigned short dport)
+{
+  int hv = connhash (src, sport);
+  CB *cb = cbhash[hv];
+
+  while (cb) {
+    if (sport == cb->_sport &&
+	dport == cb->_dport &&
+	src == (uint32_t) cb->_src)
+      return cb;
+    cb = cb->next;
+  }
+  return NULL;
+}
+
+PacketBatch *
+FlowWebGen::simple_action_batch (PacketBatch *batch)
+{
+  EXECUTE_FOR_EACH_PACKET_DROPPABLE(tcp_input, batch,[](Packet* p){});
+  return batch;
+}
+
+
+Packet*
+FlowWebGen::tcp_input (Packet *p)
+{
+  unsigned seq, ack;
+  unsigned plen = p->length ();
+
+  if (plen < sizeof(click_ip) + sizeof(click_tcp)) {
+    p->kill();
+    return 0;
+  }
+
+  click_ip *ip = (click_ip *) p->data();
+  unsigned iplen = ntohs(ip->ip_len);
+  unsigned hlen = ip->ip_hl << 2;
+  if (hlen < sizeof(click_ip) || hlen > iplen || iplen > plen) {
+    p->kill();
+    return 0;
+  }
+
+  click_tcp *th = (click_tcp *) (((char *)ip) + hlen);
+  unsigned off = th->th_off << 2;
+  int dlen = iplen - hlen - off;
+
+  CB *cb = find_cb(ip->ip_dst.s_addr, th->th_dport, th->th_sport);
+  if (cb == 0) {
+    unsigned plen = sizeof (click_ip) + sizeof (click_tcp);
+
+    WritablePacket *wp = fixup_packet (p, plen);
+    click_chatter("Received packet for unknown cb? Sending RST");
+    return tcp_output (wp,
+		ip->ip_dst, th->th_dport,
+		ip->ip_src, th->th_sport,
+		th->th_ack, th->th_seq, TH_RST,
+		NULL, 0);
+  }
+
+  seq = ntohl(th->th_seq);
+  ack = ntohl(th->th_ack);
+
+  if ((th->th_flags & (TH_ACK|TH_RST)) == TH_ACK &&
+     ack == cb->_iss + 1 &&
+     cb->_connected == 0) {
+    cb->_snd_nxt = cb->_iss + 1;
+    cb->_snd_una = cb->_snd_nxt;
+    cb->_irs = seq;
+    cb->_rcv_nxt = cb->_irs + 1;
+    cb->_connected = 1;
+    cb->_do_send = 1;
+      if (_verbose > 0)
+    click_chatter("FlowWebGen connected %d %d",
+                  ntohs(cb->_sport),
+                  ntohs(cb->_dport));
+  } else if (dlen > 0) {
+    cb->_do_send = 1;
+    if (seq + dlen > cb->_rcv_nxt) {
+      if (_verbose > 0)
+          click_chatter("_rcv_nxt %d + %d -> %d\n", cb->_rcv_nxt, dlen, seq+dlen);
+      cb->_rcv_nxt = seq + dlen;
+    }
+  }
+
+  if (th->th_flags & TH_ACK) {
+    if (_verbose > 0)
+     click_chatter("%p{element} ACK %d %d",this, ntohs (th->th_sport), ntohs (th->th_dport));
+
+    if (ack > cb->_snd_una) {
+      cb->_snd_una = ack;
+    }
+  }
+
+  if ((th->th_flags & TH_FIN) &&
+      seq + dlen == cb->_rcv_nxt &&
+      cb->_got_fin == 0) {
+    if (_verbose > 0)
+         click_chatter("%p{element} FIN %d %d",this, ntohs (th->th_sport), ntohs (th->th_dport));
+
+    cb->_got_fin = 1;
+    cb->_rcv_nxt += 1;
+    cb->_do_send = 1;
+  }
+
+  if (th->th_flags & TH_RST) {
+      if (_verbose > 0)
+         click_chatter("%p{element} RST %d %d",this, ntohs (th->th_sport), ntohs (th->th_dport));
+    p->kill ();
+    recycle (cb);
+    perfcnt.reset++;
+    return 0;
+  }
+
+  p = tcp_send (cb, p);
+
+  if (cb->_closed) {
+      if (_verbose > 1) {
+          click_chatter("Connection closed, recycling");
+      }
+    recycle (cb);
+  }
+  return p;
+}
+
+WritablePacket *
+FlowWebGen::fixup_packet (Packet *xp, unsigned plen)
+{
+  unsigned int headroom = 34;
+  WritablePacket *p;
+
+  if (xp == 0 ||
+      xp->shared () ||
+      xp->headroom () < headroom ||
+      xp->length () + xp->tailroom() < plen) {
+    if (xp)
+      xp->kill ();
+    p = Packet::make (headroom, NULL, plen, 0);
+  } else {
+    p = xp->uniqueify ();
+    if (p->length () < plen)
+      p = p->put (plen - p->length ());
+    else if (p->length () > plen)
+      p->take (p->length () - plen);
+  }
+
+  return p;
+}
+
+// Send a suitable TCP packet.
+// xp is a candidate packet buffer, to be re-used or freed.
+Packet*
+FlowWebGen::tcp_send (CB *cb, Packet *xp)
+{
+  int paylen;
+  unsigned int plen;
+  unsigned int seq;
+  WritablePacket *p = 0;
+
+//click_chatter ("connected %d snd_una %d iss %d sndlen %d\n",
+//	cb->_connected, cb->_snd_una, cb->_iss, cb->sndlen);
+  if (cb->_connected && cb->_snd_una - cb->_iss - 1 < cb->sndlen) {
+    paylen = cb->sndlen;
+    seq = cb->_iss + 1;
+    cb->_snd_nxt = seq + paylen;
+  } else {
+    paylen = 0;
+    seq = cb->_snd_nxt + cb->_sent_fin;
+  }
+  plen = sizeof(click_ip) + sizeof(click_tcp) + paylen;
+
+//  cb->rexmit_update (rexmit_tail);
+//click_chatter ("dosend %d paylen %d snd_nxt %d seq %d sfin %d\n", cb->_do_send, paylen, plen, cb->_snd_nxt, seq, cb->_sent_fin);
+  if (cb->_got_fin) {
+    // Other side has sent the FIN too -- we ack and close.
+    cb->_closed = 1;
+    perfcnt.completed++;
+  }
+
+  if (cb->_connected == 1 && paylen == 0) {
+    if (xp)
+      xp->kill ();
+    return 0;
+  }
+  cb->_do_send = 0;
+
+  p = fixup_packet (xp, plen);
+
+  char flags = 0;
+  int ack = 0;
+
+  if (cb->_connected == 0) {
+    flags = TH_SYN;
+  } else {
+    flags = TH_ACK;
+    if (paylen)
+      flags |= TH_PUSH | TH_FIN;
+    if (cb->_got_fin)
+      flags |= TH_FIN;
+    ack = cb->_rcv_nxt;
+  }
+
+  if (flags & TH_FIN)
+    cb->_sent_fin = 1;
+
+
+  if (fcb_stack)
+      _tcp_client_ack->setSeqAcked(ack,seq + paylen + (flags & TH_FIN? 1 : 0));
+  return tcp_output (p, cb->_src, cb->_sport, _dst, cb->_dport,
+	      htonl (seq), htonl (ack), flags,
+	      cb->sndbuf, paylen);
+}
+
+WritablePacket*
+FlowWebGen::tcp_output (WritablePacket *p,
+	IPAddress src, unsigned short sport,
+	IPAddress dst, unsigned short dport,
+	int seq, int ack, char tcpflags,
+	char *payload, int paylen)
+{
+  unsigned plen = p->length ();
+
+  click_ip *ip = (click_ip *) p->data ();
+  ip->ip_v = 4;
+  ip->ip_hl = sizeof (click_ip) >> 2;
+  ip->ip_id = htons (_id.fetch_and_add (1));
+  ip->ip_p = 6;
+  ip->ip_src = src;
+  ip->ip_dst = dst;
+  ip->ip_tos = 0;
+  ip->ip_off = 0;
+  ip->ip_ttl = 250;
+  p->set_dst_ip_anno (IPAddress (ip->ip_dst));
+  p->set_ip_header (ip, sizeof (click_ip));
+
+  click_tcp *th = (click_tcp *) (ip + 1);
+
+  memset (th, '\0', sizeof(*th));
+
+  if (paylen > 0)
+    memcpy (th + 1, payload, paylen);
+
+  th->th_sport = sport;
+  th->th_dport = dport;
+  th->th_seq = seq;
+  th->th_ack = ack;
+  th->th_off = sizeof (click_tcp) >> 2;
+  th->th_flags = tcpflags;
+  th->th_win = htons (60*1024);
+
+  char itmp[9];
+  memcpy (itmp, ip, 9);
+  memset (ip, '\0', 9);
+  ip->ip_sum = 0;
+  ip->ip_len = htons (plen - 20);
+
+  th->th_sum = 0;
+  th->th_sum = click_in_cksum ((unsigned char *) ip, plen);
+
+  memcpy (ip, itmp, 9);
+  ip->ip_len = htons (plen);
+
+  ip->ip_sum = 0;
+  ip->ip_sum = click_in_cksum ((unsigned char *) ip, sizeof (click_ip));
+
+  return p;
+}
+void
+FlowWebGen::set_active(bool active) {
+    _active = active;
+    if (start_interval) {
+        if (active)
+            _timer.schedule_now();
+        else
+            _timer.unschedule();
+    } else {
+        if (active)
+            _task.reschedule();
+        else
+            _task.unschedule();
+    }
+}
+
+int
+FlowWebGen::write_handler(const String & s_in, Element *e, void *thunk, ErrorHandler *errh)
+{
+    FlowWebGen *q = static_cast<FlowWebGen *>(e);
+    int which = reinterpret_cast<intptr_t>(thunk);
+    String s = cp_uncomment(s_in);
+    switch (which) {
+        case 0: {
+            bool active;
+            if (BoolArg().parse(s, active)) {
+                q->set_active(active);
+                return 0;
+            } else
+                return errh->error("type mismatch");
+        }
+            return 0;
+        default:
+            return errh->error("internal error");
+    }
+}
+
+
+void
+FlowWebGen::add_handlers()
+{
+    add_write_handler("active", write_handler, 0, Handler::BUTTON);
+    add_data_handlers("active", Handler::OP_READ, &_active);
+}
+
+FlowWebGen::CB::CB ()
+{
+  next = NULL;
+  pprev = NULL;
+
+/*  rexmit_next = NULL;
+  rexmit_prev = NULL;*/
+
+  last_send.assign_now();
+}
+
+void
+FlowWebGen::CB::reset (IPAddress src, String url)
+{
+  _src = src;
+  _dport = htons (80);
+  _iss = click_random() & 0x0fffffff;
+  _irs = 0;
+  _snd_nxt = _iss;
+  _snd_una = _iss;
+  _sport = htons (1024 + (click_random() % 60000));
+  _do_send = 0;
+  _connected = 0;
+  _got_fin = 0;
+  _sent_fin = 0;
+  _closed = 0;
+  _resends = 0;
+
+  if (url) {
+      sprintf (sndbuf, "GET %s HTTP/1.0\r\n\r\n",url.c_str());
+  } else {
+      int dir = click_random(0, 9);
+      int file = click_random(0, 8);    // 0 .. 8 exist
+      int c = click_random(0, 2);       // 0 .. 3 exist
+      sprintf (sndbuf, "GET /spec/%d/%d-%d-%d HTTP/1.0\r\n\r\n",
+               dir, dir, c, file);
+  }
+  sndlen = strlen (sndbuf);
+}
+
+void
+FlowWebGen::CB::remove_from_list ()
+{
+  if (next)
+    next->pprev = pprev;
+  if (pprev)
+    *pprev = next;
+
+  next = NULL;
+  pprev = NULL;
+}
+
+void
+FlowWebGen::CB::add_to_list (CB **phead)
+{
+  assert (!next && !pprev);
+
+  next = *phead;
+  if (next)
+    next->pprev = &next;
+
+  pprev = phead;
+  *phead = this;
+}
+/*
+void
+FlowWebGen::CB::rexmit_unlink ()
+{
+  if (rexmit_next)
+    rexmit_next->rexmit_prev = rexmit_prev;
+  if (rexmit_prev)
+    rexmit_prev->rexmit_next = rexmit_next;
+
+  rexmit_next = NULL;
+  rexmit_prev = NULL;
+}
+
+void
+FlowWebGen::CB::rexmit_update (CB *tail)
+{
+  last_send.assign_now();
+
+  rexmit_unlink ();
+
+  rexmit_next = tail;
+  rexmit_prev = tail->rexmit_prev;
+
+  rexmit_prev->rexmit_next = this;
+  rexmit_next->rexmit_prev = this;
+}
+*/
+CLICK_ENDDECLS
+EXPORT_ELEMENT(FlowWebGen)

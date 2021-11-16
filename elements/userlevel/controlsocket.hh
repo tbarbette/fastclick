@@ -229,14 +229,14 @@ class ControlSocket : public Element { public:
 
     const char *class_name() const override	{ return "ControlSocket"; }
 
-    int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *) CLICK_COLD;
-    void cleanup(CleanupStage) CLICK_COLD;
-    Element *hotswap_element() const;
-    void take_state(Element *, ErrorHandler *);
-    void add_handlers() CLICK_COLD;
+    int configure(Vector<String> &conf, ErrorHandler *) override CLICK_COLD;
+    int initialize(ErrorHandler *) override CLICK_COLD;
+    void cleanup(CleanupStage) override CLICK_COLD;
+    Element *hotswap_element() const override;
+    void take_state(Element *, ErrorHandler *) override CLICK_COLD;
+    void add_handlers() override CLICK_COLD;
 
-    void selected(int fd, int mask);
+    void selected(int fd, int mask) override;
 
     enum {
 	CSERR_OK			= HandlerProxy::CSERR_OK,	       // 200

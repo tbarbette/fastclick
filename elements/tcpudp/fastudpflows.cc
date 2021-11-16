@@ -43,6 +43,7 @@ FastUDPFlows::FastUDPFlows()
     _first = _last = 0;
     _count = 0;
     _stop = false;
+    _sequential = false;
 }
 
 FastUDPFlows::~FastUDPFlows()
@@ -68,6 +69,7 @@ FastUDPFlows::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("FLOWS", _nflows)
         .read_mp("FLOWSIZE", _flowsize)
         .read_p("CHECKSUM", _cksum)
+        .read_p("SEQUENTIAL", _sequential)
         .read_p("ACTIVE", _active)
         .read_p("STOP", _stop)
         .complete() < 0)
@@ -95,8 +97,8 @@ FastUDPFlows::change_ports(int flow)
     click_ip *ip = reinterpret_cast<click_ip *>(q->data()+14);
     click_udp *udp = reinterpret_cast<click_udp *>(ip + 1);
 
-    udp->uh_sport = (click_random() >> 2) % 0xFFFF;
-    udp->uh_dport = (click_random() >> 2) % 0xFFFF;
+    udp->uh_sport = (_sequential?udp->uh_sport+1:click_random() >> 2) % 0xFFFF;
+    udp->uh_dport = (_sequential?udp->uh_dport+1:click_random() >> 2) % 0xFFFF;
     udp->uh_sum = 0;
     unsigned short len = _len-14-sizeof(click_ip);
     if (_cksum) {
@@ -110,7 +112,7 @@ FastUDPFlows::change_ports(int flow)
 Packet *
 FastUDPFlows::get_packet()
 {
-    int flow = (click_random() >> 2) % _nflows;
+    int flow = (_sequential?(*_last_flow)++ : (click_random() >> 2)) % _nflows;
 
     if (_flows[flow].flow_count == _flowsize) {
         change_ports(flow);
@@ -122,13 +124,16 @@ FastUDPFlows::get_packet()
 }
 
 int
-FastUDPFlows::initialize(ErrorHandler *)
+FastUDPFlows::initialize(ErrorHandler * errh)
 {
     _count = 0;
     _flows = new flow_t[_nflows];
 
     for (unsigned i=0; i<_nflows; i++) {
         WritablePacket *q = Packet::make(_len);
+        if (unlikely(!q)) {
+            return errh->error("Could not initialize packet, out of memory?");
+        }
         _flows[i].packet = q;
         memcpy(q->data(), &_ethh, 14);
         click_ip *ip = reinterpret_cast<click_ip *>(q->data()+14);
@@ -164,7 +169,6 @@ FastUDPFlows::initialize(ErrorHandler *)
         }
         _flows[i].flow_count = 0;
     }
-    _last_flow = 0;
 
     return 0;
 }
@@ -173,7 +177,8 @@ void
 FastUDPFlows::cleanup_flows() {
     if (_flows) {
         for (unsigned i=0; i<_nflows; i++) {
-            _flows[i].packet->kill();
+            if (_flows[i].packet)
+                _flows[i].packet->kill();
             _flows[i].packet=0;
         }
         delete[] _flows;
@@ -326,6 +331,28 @@ FastUDPFlows::length_write_handler
     return 0;
 }
 
+int
+FastUDPFlows::eth_write_handler
+(const String &s, Element *e, void * param, ErrorHandler *errh)
+{
+  FastUDPFlows *c = (FastUDPFlows *)e;
+  EtherAddress eth;
+  if (!EtherAddressArg().parse(s, eth))
+    return errh->error("Invalid argument");
+  if (reinterpret_cast<int*>(param) == 0) {
+     memcpy(c->_ethh.ether_shost,eth.sdata(),6);
+  } else {
+     memcpy(c->_ethh.ether_dhost,eth.sdata(),6);
+  }
+  if (c->_flows) {
+      for (unsigned i=0; i<c->_nflows; i++) {
+          if (c->_flows[i].packet)
+              memcpy(static_cast<WritablePacket*>(c->_flows[i].packet)->data(),c->_ethh.ether_dhost,12);
+      }
+  }
+  return 0;
+}
+
 void
 FastUDPFlows::add_handlers()
 {
@@ -335,6 +362,8 @@ FastUDPFlows::add_handlers()
     add_write_handler("reset", FastUDPFlows_reset_write_handler, 0, Handler::BUTTON);
     add_write_handler("active", FastUDPFlows_active_write_handler, 0, Handler::CHECKBOX);
     add_write_handler("limit", FastUDPFlows_limit_write_handler, 0);
+    add_write_handler("srceth", FastUDPFlows::eth_write_handler, 0);
+    add_write_handler("dsteth", FastUDPFlows::eth_write_handler, 1);
     add_data_handlers("length", Handler::OP_READ, &_len);
     add_write_handler("length", length_write_handler, 0);
     add_data_handlers("stop", Handler::OP_READ | Handler::OP_WRITE, &_stop);

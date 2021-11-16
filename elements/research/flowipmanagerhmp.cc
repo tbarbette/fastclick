@@ -1,5 +1,5 @@
 /*
- * FlowIPManagerHMP.{cc,hh} - Flow classification using HashtableMP
+ * flowipmanagerhmp.{cc,hh} - Flow classification using HashtableMP
  *
  * Copyright (c) 2019-2020 Tom Barbette, KTH Royal Institute of Technology
  *
@@ -25,7 +25,7 @@
 
 CLICK_DECLS
 
-FlowIPManagerHMP::FlowIPManagerHMP()
+FlowIPManagerHMP::FlowIPManagerHMP() : Router::InitFuture(this)
 {
     _current = 0;
 }
@@ -39,7 +39,7 @@ int
 FlowIPManagerHMP::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-        .read_or_set_p("CAPACITY", _table_size, 65536)
+            .read_or_set_p("CAPACITY", _table_size, 65536)
             .read_or_set("RESERVE", _reserve, 0)
             .read_or_set("VERBOSE", _verbose, 0)
             .complete() < 0)
@@ -48,6 +48,7 @@ FlowIPManagerHMP::configure(Vector<String> &conf, ErrorHandler *errh)
     find_children(_verbose);
 
     router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
+
     _fcb_builded_init_future.post(this);
 
     return 0;

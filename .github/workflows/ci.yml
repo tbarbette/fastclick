@@ -20,7 +20,7 @@ jobs:
     strategy:
         matrix:
             COMPILER: [gcc, clang]
-            FRAMEWORK: [vanilla, dpdk]
+            FRAMEWORK: [vanilla, dpdk, dpdk-light, vanilla-nopool]
 
     steps:
     - uses: actions/checkout@v2
@@ -33,7 +33,7 @@ jobs:
           python -m pip install --upgrade pip
     - name: framework
       run: |
-          if [ "${{matrix.FRAMEWORK}}" = "dpdk" ] ; then
+          if [ "${{matrix.FRAMEWORK}}" = "dpdk" -o "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then
             echo "Compiling DPDK..." ;
             export STABLE=
             export VERSION=20.11
@@ -52,9 +52,16 @@ jobs:
                 cd .. &&
                 cd .. ;
             fi
+
+            if [ "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then
+                FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --enable-dpdk-packet --disable-clone --disable-task-stats --disable-cpu-load --disable-dpdk-softqueue"
+            fi
             echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
             echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
             echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          elif [ "${{matrix.FRAMEWORK}}" = "vanilla-nopool" ] ; then
+              FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --disable-click-pool"
+              echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
           fi
     - name: configure
       run: |
@@ -62,5 +69,7 @@ jobs:
           ./configure $FLAGS $FRAMEWORK_FLAGS
     - name: make
       run: make
+    - name: simple_launch
+      run: chmod 700 /home/runner ; ./userlevel/click -j 2 -e 'DriverManager(stop);'
     - name: make check
       run: make check

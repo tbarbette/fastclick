@@ -174,15 +174,16 @@ int HTTPServer::ahc_echo(
         hname = path.substring(0,pos);
         param = path.substring(pos + 1);
     }
-    click_chatter("Element '%s', handler '%s', param '%s'",ename.c_str(), hname.c_str(),param.c_str());
+
+    if (server->_verbose) {
+        click_chatter("Element '%s', handler '%s', param '%s'",ename.c_str(), hname.c_str(),param.c_str());
+    }
 
     if (!e) {
         if (hname == "" || ename == "") {
             e = server->router()->root_element();
         } else {
-            body =  "No element named '" + ename + "'";
-            status = 404;
-            goto send;
+		goto e404;
         }
     }
 
@@ -237,7 +238,8 @@ int HTTPServer::ahc_echo(
               return MHD_YES;
           } else {
               String data = *static_cast<String*>(*con_cls);
-              click_chatter("Last call with data %s",data.c_str());
+              if (server->_verbose)
+                click_chatter("Last call to %s with data %s",path.c_str(), data.c_str());
               if (h->writable()) {
                   int ret;
                   if (isNotPost)
@@ -283,9 +285,22 @@ int HTTPServer::ahc_echo(
     assert(false);
 
     bad_handler:
-        body = "Invalid path '" + String(url) + "' or no " + hname + " in " + ename;
-        status = 404;
-        goto send;
+	body = "Invalid path '" + String(url);
+	if (ename)
+		body += "' or no " + hname + " in " + ename;
+	else
+		body += "' or no " + hname + " in root";
+	status = 404;
+    if (server->_verbose)
+	click_chatter(("404 : " + body).c_str());
+	goto send;
+
+	e404:
+    body =  "No element named '" + ename + "'";
+    status = 404;
+    if (server->_verbose)
+	click_chatter(("404 : " + body).c_str());
+    goto send;
 
     send:
     response = MHD_create_response_from_buffer (body.length(),

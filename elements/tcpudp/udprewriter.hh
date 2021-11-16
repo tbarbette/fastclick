@@ -171,9 +171,9 @@ class UDPRewriter : public IPRewriterBase { public:
 
 	UDPFlow(IPRewriterInput *owner, const IPFlowID &flowid,
 		const IPFlowID &rewritten_flowid, int ip_p,
-		bool guaranteed, click_jiffies_t expiry_j)
+		bool guaranteed, click_jiffies_t expiry_j, uint8_t input)
 	    : IPRewriterFlow(owner, flowid, rewritten_flowid,
-			     ip_p, guaranteed, expiry_j) {
+			     ip_p, guaranteed, expiry_j, input) {
 	}
 
 	bool streaming() const {
@@ -232,7 +232,7 @@ class UDPRewriter : public IPRewriterBase { public:
 inline void
 UDPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map[click_current_cpu_id()]);
+    unmap_flow(flow, _state->map);
     flow->~IPRewriterFlow();
     _allocator->deallocate(flow);
 }

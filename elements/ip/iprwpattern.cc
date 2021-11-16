@@ -39,9 +39,10 @@ IPRewriterPattern::IPRewriterPattern(const IPAddress &saddr, int sport,
 		       bool is_napt, bool sequential, bool same_first,
 		       uint32_t variation_top)
     : _saddr(saddr), _sport(sport), _daddr(daddr), _dport(dport),
-      _variation_top(variation_top), _next_variation(0), _is_napt(is_napt),
+      _variation_top(variation_top),_is_napt(is_napt),
       _sequential(sequential), _same_first(same_first), _refcount(0)
 {
+    _next_variation = 0;
 }
 
 namespace {
@@ -235,6 +236,7 @@ IPRewriterPattern::rewrite_flowid(const IPFlowID &flowid,
 	IPFlowID lookup = rewritten_flowid.reverse();
 	uint32_t base = (_is_napt ? ntohs(_sport) : ntohl(_saddr.addr()));
 
+    uint32_t next = _next_variation;
 	uint32_t val;
 	if (_same_first
 	    && (val = ntohs(flowid.sport()) - base) <= _variation_top) {
@@ -243,8 +245,9 @@ IPRewriterPattern::rewrite_flowid(const IPFlowID &flowid,
 		goto found_variation;
 	}
 
+ retry_variation:
 	if (_sequential)
-	    val = (_next_variation > _variation_top ? 0 : _next_variation);
+	    val = (next > _variation_top ? 0 : next);
 	else
 	    val = click_random(0, _variation_top);
 
@@ -254,18 +257,20 @@ IPRewriterPattern::rewrite_flowid(const IPFlowID &flowid,
 		lookup.set_dport(htons(base + val));
 	    else
 		lookup.set_daddr(htonl(base + val));
+        //Verify that the new variation is not already in the map
 	    if (!reply_map.find(lookup))
 		goto found_variation;
 	}
 
 	return IPRewriterBase::rw_drop;
 
-    found_variation:
+found_variation:
+	if ((_next_variation.compare_swap(next, val + 1) != next))
+        goto retry_variation;
 	if (_is_napt)
 	    rewritten_flowid.set_sport(lookup.dport());
 	else
 	    rewritten_flowid.set_saddr(lookup.daddr());
-	_next_variation = val + 1;
     }
 
     return IPRewriterBase::rw_addmap;

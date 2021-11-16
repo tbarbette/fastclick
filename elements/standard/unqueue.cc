@@ -62,6 +62,13 @@ Unqueue::initialize(ErrorHandler *errh)
 }
 
 bool
+Unqueue::get_spawning_threads(Bitvector& b, bool, int port) {
+    unsigned int thisthread = router()->home_thread_id(this);
+    b[thisthread] = 1;
+    return false;
+}
+
+bool
 Unqueue::run_task(Task *)
 {
     if (!_active)

@@ -44,7 +44,7 @@ IP Address of this load-balancer.
 
 FlowIPLoadBalancer, FlowIPNAT */
 
-class IPLoadBalancer : public BatchElement, public TCPHelper, public LoadBalancer {
+class IPLoadBalancer : public BatchElement, public TCPHelper, public LoadBalancer<IPAddress> {
 
 public:
 

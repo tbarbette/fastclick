@@ -27,7 +27,8 @@ my(%flow_code_constants) =
     ('COMPLETE_FLOW' => 'x/x');
 my(@source_file, @header_file, @click_name, @cxx_name, @doc_name,
    @parents, @port_count, @processing, @flow_code, @flags, @batching,
-   @requirements, @element_methods, @element_libs, @provisions, @noexports,
+   @requirements, @features, @element_methods, @element_libs, @provisions,
+   @noexports,
    %click_name_to_id, %cxx_name_to_id, $verbose);
 my(@includes) = ( );
 
@@ -183,12 +184,14 @@ sub process_file ($) {
     $text = <IN>;
     close IN;
 
-    my($req, $prov, $exp, $libs) = ('', '', '', '');
+    my($req, $prov, $feats, $exp, $libs) = ('', '', '', '', '');
     $req .= " " . $1 while $text =~ /^ELEMENT_REQUIRES\s*\((.*)\)/mg;
     $prov .= " " . $1 while $text =~ /^ELEMENT_PROVIDES\s*\((.*)\)/mg;
+	$feats .= " " . $1 while $text =~ /^ELEMENT_FEATURES\s*\((.*)\)/mg;
     $exp .= " " . $1 while $text =~ /^EXPORT_ELEMENT\s*\((.*)\)/mg;
     $libs .= " " . $1 while $text =~ /^ELEMENT_LIBS\s*\((.*)\)/mg;
     $req =~ s/^\s+//;
+	$feats =~ s/^\s+//;
     $prov =~ s/^\s+//;
     $libs =~ s/^\s+//;
 
@@ -246,6 +249,7 @@ sub process_file ($) {
     # apply requirements and provisions
     for ($i = $first; $i < @processing; $i++) {
 	push @requirements, $req;
+	push @features, $feats;
 	push @provisions, $prov;
 	push @element_libs, $libs;
 
@@ -579,6 +583,7 @@ foreach $id (sort sorter 0..$#click_name) {
     print OUT " methods=\"", $element_methods[$id], "\"" if $element_methods[$id];
 
     print OUT " requires=\"", $requirements[$id], "\"" if $requirements[$id];
+	print OUT " features=\"", $features[$id], "\"" if $features[$id];
     print OUT " provides=\"", $provisions[$id], "\"" if $provisions[$id];
     print OUT " libs=\"", xml_quote($element_libs[$id]), "\"" if $element_libs[$id];
     print OUT " noexport=\"noexport\"" if $cxx_name[$id] && $noexports[$id];

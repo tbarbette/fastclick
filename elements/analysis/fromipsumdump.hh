@@ -171,7 +171,7 @@ class FromIPSummaryDump : public BatchElement, public IPSummaryDumpInfo { public
 
     bool run_task(Task *);
 
-    inline Packet *get_packet(bool push=false);
+    Packet *get_packet(bool push=false);
     Packet *pull(int) override;
 #if HAVE_BATCH
     PacketBatch *pull_batch(int,unsigned) override;
@@ -203,6 +203,7 @@ class FromIPSummaryDump : public BatchElement, public IPSummaryDumpInfo { public
     bool _timing : 1;
     bool _have_timing : 1;
     bool _allow_nonexistent : 1;
+    bool _migrate : 1;
     bool _set_timestamp:1;
     int _times;
     int _first_packet_pos;

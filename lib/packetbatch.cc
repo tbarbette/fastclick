@@ -28,18 +28,6 @@ CLICK_DECLS
 #if HAVE_BATCH
 
 # if HAVE_CLICK_PACKET_POOL
-/**
- * Recycle a whole batch of unshared packets of the same type
- *
- * @precond No packet are shared
- */
-void PacketBatch::recycle_batch(bool is_data) {
-    if (is_data) {
-        WritablePacket::recycle_data_batch(this,tail(),count());
-    } else {
-        WritablePacket::recycle_packet_batch(this,tail(),count());
-    }
-}
 
 /**
  * Recycle a whole batch, faster in most cases as it add batches to the pool in
@@ -82,7 +70,7 @@ void PacketBatch::fast_kill_nonatomic() {
  **/
 PacketBatch *
 PacketBatch::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
-        buffer_destructor_type destructor, void* argument )
+        Packet::buffer_destructor_type destructor, void* argument, bool clean)
 {
 #if CLICK_PACKET_USE_DPDK
     click_chatter("UNIMPLEMENTED");
@@ -98,7 +86,7 @@ PacketBatch::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
     WritablePacket *last = p;
     uint16_t i = 0;
     while(p) {
-        p->initialize();
+        p->initialize(clean);
         p->_head = p->_data = data;
         p->_tail = p->_end = data + length[i];
         data += length[i] & 63 ? (length[i] & ~63) + 64 : length[i];
@@ -115,6 +103,10 @@ PacketBatch::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
     if (i != count) {
         click_chatter("Size of list %d, expected %d\n", i, count);
     }
+#if HAVE_FLOW
+    if (fcb_stack)
+        fcb_stack->acquire(count);
+#endif
     return PacketBatch::make_from_simple_list(head, last, i);
 #endif
 }

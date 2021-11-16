@@ -60,7 +60,27 @@ protected:
     TinyExpr _fnt_expr;
 };
 
+/*
+=c
 
+Replay([, I<KEYWORDS>])
+
+=s traces
+
+replay an input of packets at a given speed
+
+=d
+
+
+Keyword arguments are:
+
+=over 8
+
+=item STOP
+
+Integer.  Number of loop to replay.
+
+*/
 class Replay : public ReplayBase { public:
 
 	Replay() CLICK_COLD;
@@ -91,7 +111,7 @@ class Replay : public ReplayBase { public:
     ActiveNotifier _notifier;
 
     struct s_output {
-    	DynamicRing<Packet*> ring;
+	SPSCDynamicRing<Packet*> ring;
     };
 
     struct s_output _output;
@@ -140,7 +160,7 @@ inline bool ReplayBase::load_packets() {
                 if (p_input[i] == 0) {
                     do_pull:
 #if HAVE_BATCH
-                    p_input[i] = input_pull_batch(i,1);
+                    p_input[i] = input_pull_batch(i,1)->first();
 #else
                     p_input[i] = input(i).pull();
 #endif

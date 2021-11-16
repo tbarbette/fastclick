@@ -6,6 +6,7 @@
 #include <click/task.hh>
 #include <click/dpdkdevice.hh>
 #include "queuedevice.hh"
+#include "../../vendor/nicscheduler/ethernetdevice.hh"
 
 CLICK_DECLS
 
@@ -425,6 +426,7 @@ public:
 
     ToDPDKDevice *find_output_element();
 
+    void clear_buffers() CLICK_COLD;
     inline DPDKDevice *get_device() {
         return _dev;
     }
@@ -433,7 +435,11 @@ public:
     static uint64_t read_clock(void* thunk);
 #endif
 
-private:
+    inline EthernetDevice *get_eth_device() {
+        return _dev->get_eth_device();
+    }
+
+protected:
     static int reset_load_handler(
         const String &, Element *, void *, ErrorHandler *
     ) CLICK_COLD;
@@ -450,8 +456,8 @@ private:
     static String statistics_handler(Element *e, void *thunk) CLICK_COLD;
     static int xstats_handler(int operation, String &input, Element *e,
                               const Handler *handler, ErrorHandler *errh);
-    DPDKDevice* _dev;
 
+    DPDKDevice* _dev;
 #if HAVE_DPDK_INTERRUPT
     int _rx_intr;
     class FDState { public:
@@ -464,6 +470,7 @@ private:
     bool _tco;
     bool _uco;
     bool _ipco;
+    bool _clear;
 };
 
 CLICK_ENDDECLS

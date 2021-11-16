@@ -258,4 +258,5 @@ void IPSummaryDump_Payload::static_cleanup()
 
 ELEMENT_REQUIRES(userlevel IPSummaryDump)
 ELEMENT_PROVIDES(IPSummaryDump_Payload)
+ELEMENT_FEATURES(IPSummaryDump)
 CLICK_ENDDECLS

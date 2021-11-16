@@ -50,7 +50,7 @@ void Pipeliner::cleanup(CleanupStage) {
         while ((p = storage.get_value(i).extract()) != 0) {
 #if HAVE_BATCH
             if (receives_batch == 1)
-                static_cast<PacketBatch*>(p)->kill();
+                reinterpret_cast<PacketBatch*>(p)->kill();
             else
 #endif
                 p->kill();
@@ -102,8 +102,10 @@ Pipeliner::configure(Vector<String> & conf, ErrorHandler * errh)
 
 
 int
-Pipeliner::initialize(ErrorHandler *errh)
-{
+Pipeliner::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) {
+    if (stage != THREAD_RECONFIGURE_UP_PRE && stage != THREAD_RECONFIGURE_DOWN_POST && stage != THREAD_INITIALIZE)
+        return 0;
+    //Only handle first-configuration and pre-reconfiguration for up and post-configuration for down
 
     bool fp;
     Bitvector passing = get_passing_threads(false, -1, this, fp);
@@ -139,6 +141,23 @@ Pipeliner::initialize(ErrorHandler *errh)
                       "doubt that.");
     }
 
+    return 0;
+}
+
+int
+Pipeliner::initialize(ErrorHandler *errh)
+{
+    if (_ring_size == -1) {
+    #  if HAVE_BATCH
+        if (receives_batch) {
+            _ring_size = 16;
+        } else
+    #  endif
+        {
+            _ring_size = 1024;
+        }
+    }
+
     ScheduleInfo::initialize_task(this, &_task, _active, errh);
 
     return 0;
@@ -153,7 +172,7 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
     int count = head->count();
     retry:
     //CLWB did not prove helpful here
-    if (storage->insert(head)) {
+    if (storage->insert(head->first())) {
         stats->count += count;
         if (sleepiness >= _sleep_threshold)
             _task.reschedule();
@@ -222,19 +241,19 @@ Pipeliner::run_task(Task* t)
         int n = 0;
         while (!s.is_empty() && n < _burst) {
 #if HAVE_BATCH
-            PacketBatch* b = static_cast<PacketBatch*>(s.extract());
+            PacketBatch* b = reinterpret_cast<PacketBatch*>(s.extract());
 
             if (unlikely(!receives_batch)) {
                 if (out == NULL) {
-                    b->set_tail(b);
+                    b->set_tail(b->first());
                     b->set_count(1);
                     out = b;
                 } else {
-                    out->append_packet(b);
+                    out->append_packet(b->first());
                 }
                 n+=1;
             } else {
-                n+=b->length();
+                n+=b->count();
                 if (out == NULL) {
                     out = b;
                 } else {

@@ -626,4 +626,5 @@ void IPSummaryDump_TCP::static_cleanup()
 
 ELEMENT_REQUIRES(userlevel IPSummaryDump)
 ELEMENT_PROVIDES(IPSummaryDump_TCP)
+ELEMENT_FEATURES(IPSummaryDump)
 CLICK_ENDDECLS

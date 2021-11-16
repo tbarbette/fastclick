@@ -124,9 +124,16 @@ protected :
     friend class Router;
 };
 
+#define BATCH_ELEMENT_DEFINE_SIMPLE_ACTION_BATCH(T) \
+    PacketBatch* simple_action_batch(PacketBatch* batch) override {\
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE(T::simple_action,batch,[](Packet*){});\
+        return batch;\
+    }
+
 #else
+#define BATCH_ELEMENT_DEFINE_SIMPLE_ACTION_BATCH(T)
 class BatchElement : public Element { public:
-    inline void checked_output_push_batch(int port, PacketBatch* batch) {
+    inline void checked_output_push_batch(int, PacketBatch*) {
         click_chatter("Error : checked_output_push_batch called without batching being enabled");
         assert(false);
     }
@@ -149,16 +156,16 @@ class BatchElement : public Element { public:
  * The inherited element cannot be extended further because of CRTP !
  */
 
-template <typename T>
-class ClassifyElement : public BatchElement { public:
+template <typename T, typename Base = BatchElement>
+class ClassifyElement : public Base { public:
 
     void push(int, Packet *p) {
-        checked_output_push(static_cast<T&>(*this).classify(p),p);
+        Base::checked_output_push(static_cast<T&>(*this).classify(p),p);
     }
 
 #if HAVE_BATCH
     void push_batch(int, PacketBatch *batch) {
-          CLASSIFY_EACH_PACKET(noutputs() + 1, static_cast<T&>(*this).classify,batch,checked_output_push_batch);
+          CLASSIFY_EACH_PACKET(Base::noutputs() + 1, static_cast<T&>(*this).classify,batch,Base::checked_output_push_batch);
     }
 #endif
 
@@ -228,13 +235,13 @@ class SimpleBatchElement : public BatchElement { public:
 template <typename T>
 class SimpleElement : public BatchElement { public:
 
-    void push(int port, Packet *p) override final {
+    void push(int port, Packet *p) override {
         p = static_cast<T&>(*this).simple_action(p);
         if (p)
             output(port).push(p);
     }
 
-    Packet* pull(int port) override final {
+    Packet* pull(int port) override {
         Packet *p = input(port).pull();
         if (p)
             p = static_cast<T&>(*this).simple_action(p);
@@ -242,7 +249,7 @@ class SimpleElement : public BatchElement { public:
     }
 
 #if HAVE_BATCH
-    void push_batch(int port, PacketBatch* head) override final {
+    void push_batch(int port, PacketBatch* head) override  {
         head = _sm_action_batch(head);
         if (head)
             output(port).push_batch(head);

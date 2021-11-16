@@ -62,8 +62,9 @@ Signatures::check_port_numbers(int eid, const ProcessingT &pt)
 {
   ElementT *e = const_cast<ElementT *>(_router->element(eid));
   int old_sigid = _sigid[eid];
-  if (old_sigid == SIG_NOT_SPECIAL)
+  if (old_sigid == SIG_NOT_SPECIAL) {
     return;
+  }
 
   // create new ports array
   Vector<int> new_ports;
@@ -114,12 +115,13 @@ Signatures::check_port_numbers(int eid, const ProcessingT &pt)
 
 bool
 Signatures::next_phase(int phase, int eid, Vector<int> &new_sigid,
-		       const ProcessingT &pt)
+		       const ProcessingT &pt, bool do_static)
 {
   ElementT *e = const_cast<ElementT *>(_router->element(eid));
+  click_chatter("Analyzing %s", e->name().c_str());
   int old_sigid = _sigid[eid];
   if (old_sigid == SIG_NOT_SPECIAL
-      || _sigs[old_sigid]._connections.size() == 0) {
+      || (!do_static && _sigs[old_sigid]._connections.size() == 0)) {
     new_sigid[eid] = old_sigid;
     return false;
   }
@@ -153,8 +155,8 @@ Signatures::next_phase(int phase, int eid, Vector<int> &new_sigid,
   // otherwise, search for a match
   int prev = -1, trav = old_sigid;
   while (trav >= 0) {
-    if (memcmp(&_sigs[trav]._connections[0], &new_connections[0],
-	       new_connections.size() * sizeof(int)) == 0) {
+    if (!do_static && memcmp(&_sigs[trav]._connections[0], &new_connections[0],
+           new_connections.size() * sizeof(int)) == 0) {
       new_sigid[eid] = trav;
       return false;
     }
@@ -162,6 +164,8 @@ Signatures::next_phase(int phase, int eid, Vector<int> &new_sigid,
     trav = _sigs[trav]._next;
   }
 
+
+  click_chatter("Append %s", e->name().c_str());
   // if not found, append
   _sigs.push_back(SignatureNode(eid));
   SignatureNode &new_node = _sigs.back();
@@ -182,6 +186,12 @@ Signatures::print_signature() const
   fprintf(stderr, "]\n");
 }
 
+/**
+ * Specify a class (not) to be specialized
+ *
+ * This will set the signature to SIG_NOT_SPECIAL if doit is false, which
+ * will prevent devirtualization of the class.
+ */
 void
 Signatures::specialize_class(const String &eclass_name, bool doit)
 {
@@ -190,7 +200,7 @@ Signatures::specialize_class(const String &eclass_name, bool doit)
 }
 
 void
-Signatures::analyze(ElementMap &em)
+Signatures::analyze(ElementMap &em, bool do_static)
 {
   int ne = _router->nelements();
   ProcessingT pt(const_cast<RouterT *>(_router), &em);
@@ -207,7 +217,7 @@ Signatures::analyze(ElementMap &em)
     phase++;
     alive = false;
     for (int i = 0; i < ne; i++)
-      alive |= next_phase(phase, i, new_sigid, pt);
+      alive |= next_phase(phase, i, new_sigid, pt, do_static);
     _sigid.swap(new_sigid);
   }
 }

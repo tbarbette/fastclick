@@ -52,6 +52,11 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (parse(conf, errh) != 0)
         return -1;
 
+    if (Args(conf, this, errh)
+		.read("BURST", _burst)
+            .complete() < 0)
+        return -1;
+
     if (_internal_tx_queue_size < _burst * 2) {
         return errh->error("IQUEUE (%d) must be at least twice the size of BURST (%d)!",_internal_tx_queue_size, _burst);
     }
@@ -184,7 +189,12 @@ ToNetmapDevice::push_batch(int port, PacketBatch *b_head)
 	State &s = state.get();
 	bool should_be_dropped = false;
 	bool ask_sync = false;
-
+#if HAVE_FLOW
+    FlowControlBlock* sfcb_save = fcb_stack;
+       if (fcb_stack)
+           fcb_stack->release(b_head->count());
+	fcb_stack = 0;
+#endif
 	if (s.q != NULL) {
 		if (s.q_size < _internal_tx_queue_size) {
 			s.q->prev()->set_next(b_head);
@@ -237,6 +247,9 @@ do_send_batch:
             }
         }
     }
+#if HAVE_FLOW
+	fcb_stack = sfcb_save;
+#endif
 }
 #endif
 void
@@ -249,6 +262,10 @@ ToNetmapDevice::push(int, Packet* p) {
 		s.q_size = 1;
 	} else {
 		if (s.q_size < _internal_tx_queue_size) { //Append packet at the end
+			#if HAVE_FLOW
+			if (fcb_stack)
+				fcb_stack->release(1);
+			#endif
 			s.q->prev()->set_next(p);
 			s.q->set_prev(p);
 			s.q_size++;
@@ -259,7 +276,7 @@ ToNetmapDevice::push(int, Packet* p) {
 		}
 	}
 
-	if (s.q_size >= _burst) { //TODO "or if timeout", not implemented yet because batching +- solves this problem
+	if (s.q_size >= _burst) { //TODO "or if timeout", not implemented yet because batching solves this problem, and batching should always be used. ToDPDKDevice does it, if needed, import it from there
 do_send:
 		Packet* last = s.q->prev();
 
@@ -278,7 +295,8 @@ do_send:
 		}
 
 		//Lock is acquired
-		unsigned int sent = send_packets(s.q,false,false);
+		unsigned int sent;
+        SFCB_STACK(sent = send_packets(s.q,false,false));
 
 		if (sent > 0 && s.q)
 			s.q->set_prev(last);
@@ -306,7 +324,7 @@ do_send:
 	}
 }
 
-/*Timer for push mode. It will raise the IODONE flag when running to allow a new
+/*Timer for push (non-batch) mode. It will raise the IODONE flag when running to allow a new
  * full synchronization of the ring to be done.*/
 void
 ToNetmapDevice::run_timer(Timer *) {
@@ -380,7 +398,7 @@ static inline int _send_packet(WritablePacket* p, struct netmap_ring* txring, st
 }
 
 /**
- * Send a linked list of packet, return the number of packet sent and the head
+ * Send a linked list of packet, return the number of packet sent and make the head
  * 	points toward the packets following the last sent packet (could be null)
  * @arg head First packet of the list
  * @arg ask_sync If true, will force to flush packets (call netmap NIOCTXSYNC) after adding them in the ring
@@ -436,7 +454,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync, b
 				slot->flags |= NS_REPORT;
 			}
 
-			BATCH_RECYCLE_PACKET_CONTEXT(p);
+			BATCH_RECYCLE_UNKNOWN_PACKET(p);
 
 			sent++;
 			cur = nm_ring_next(txring,cur);

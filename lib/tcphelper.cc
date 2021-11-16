@@ -15,10 +15,21 @@
  */
 
 #include <click/config.h>
+#include <click/router.hh>
+#include <click/args.hh>
+#include <click/error.hh>
+#include <clicknet/tcp.h>
+#include <clicknet/ip.h>
+#include <clicknet/ether.h>
 #include <click/tcphelper.hh>
+#include <click/ipelement.hh>
 
 CLICK_DECLS
 
+TCPHelper::TCPHelper()
+{
+
+}
 WritablePacket* TCPHelper::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
     uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags,
     uint32_t contentSize) const
@@ -121,3 +132,5 @@ int TCPHelper::iterateOptions(Packet *packet, std::function<bool(uint8_t, void*)
 	}
 	return n;
 }
+
+CLICK_ENDDECLS

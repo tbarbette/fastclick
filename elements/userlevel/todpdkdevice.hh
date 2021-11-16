@@ -1,6 +1,7 @@
 #ifndef CLICK_TODPDKDEVICE_USERLEVEL_HH
 #define CLICK_TODPDKDEVICE_USERLEVEL_HH
 
+#include <click/config.h>
 #include <click/batchelement.hh>
 #include <click/sync.hh>
 #include <click/dpdkdevice.hh>
@@ -140,27 +141,30 @@ public:
         h_opackets,h_obytes,h_oerrors
     };
 
+#if HAVE_IQUEUE
     void run_timer(Timer *);
+#endif
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch *head);
 #endif
     void push(int port, Packet *p);
 
-private:
+protected:
 
+    inline void warn_congestion();
 
     inline void enqueue(rte_mbuf* &q, rte_mbuf* mbuf, const Packet* p);
 
+#if HAVE_IQUEUE
     inline void set_flush_timer(DPDKDevice::TXInternalQueue &iqueue);
     void flush_internal_tx_queue(DPDKDevice::TXInternalQueue &);
-
     per_thread<DPDKDevice::TXInternalQueue> _iqueues;
+#endif
 
     DPDKDevice* _dev;
     int _timeout;
     bool _congestion_warning_printed;
     bool _create;
-    bool _vlan;
     uint32_t _tso;
     bool _tco;
     bool _uco;
@@ -168,6 +172,18 @@ private:
 
     friend class FromDPDKDevice;
 };
+
+
+
+inline void ToDPDKDevice::warn_congestion() {
+            if (!_congestion_warning_printed) {
+                if (!_blocking)
+                    click_chatter("%s: packet dropped", name().c_str());
+                else
+                    click_chatter("%s: congestion warning", name().c_str());
+                _congestion_warning_printed = true;
+            }
+}
 
 CLICK_ENDDECLS
 

@@ -29,6 +29,7 @@
 #include <click/package.hh>
 #include <click/error.hh>
 #include <click/confparse.hh>
+#include <click/allocator.hh>
 
 #if !CLICK_LINUXMODULE && !CLICK_BSDMODULE
 # include <click/userutils.hh>
@@ -57,6 +58,8 @@
 # include <click/nameinfo.hh>
 # include <click/bighashmap_arena.hh>
 #endif
+
+#include <time.h>
 
 #if HAVE_DYNAMIC_LINKING && !CLICK_LINUXMODULE && !CLICK_BSDMODULE
 # define CLICK_PACKAGE_LOADED   1
@@ -374,7 +377,7 @@ RequireLexerExtra::require(String type, String value, ErrorHandler *errh)
 }
 
 
-static Lexer *_click_lexer;
+static Lexer *_click_lexer = 0;
 
 Lexer *
 click_lexer()
@@ -444,6 +447,11 @@ click_static_initialize()
 
     ErrorHandler::static_initialize(new FileErrorHandler(stderr, ""));
 
+# if HAVE_CLICK_PACKET_POOL
+    //We need to initialize a thread pool for the master thread, as initialization phase may start allocating packets
+    WritablePacket::initialize_local_packet_pool();
+# endif
+
     Router::static_initialize();
     NotifierSignal::static_initialize();
     CLICK_DEFAULT_PROVIDES;
@@ -451,12 +459,26 @@ click_static_initialize()
     Router::add_read_handler(0, "classes", read_handler, (void *)GH_CLASSES);
     Router::add_read_handler(0, "packages", read_handler, (void *)GH_PACKAGES);
 
+#ifdef HAVE_RAND_ALIGN
+    char * env = getenv("CLICK_ELEM_RAND_SEED");
+    int seed;
+    if (env) {
+        seed = atoi(env);
+    } else {
+        seed = time(0);
+    }
+
+    click_chatter("Element seed is %d", seed);
+    Element::generator.seed(seed);
+#endif
     click_export_elements();
 }
 
 void
 click_static_cleanup()
 {
+    pool_allocator_mt_base::set_dying(true);
+
     delete _click_lexer;
     _click_lexer = 0;
 
@@ -557,6 +579,10 @@ click_static_initialize()
     cp_va_static_initialize();
     ErrorHandler::static_initialize(new FileErrorHandler(stderr, ""));
     LandmarkT::static_initialize();
+# if HAVE_CLICK_PACKET_POOL
+    //We need to initialize a thread pool for the master thread, as initialization phase may start allocating packets
+    WritablePacket::initialize_local_packet_pool();
+# endif
 }
 
 CLICK_ENDDECLS

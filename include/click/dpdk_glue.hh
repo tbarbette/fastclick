@@ -1,5 +1,6 @@
 #ifndef DPDKGLUE_H
 #define DPDKGLUE_H
+#include <rte_mbuf.h>
 #include <rte_version.h>
 #include <rte_hash_crc.h>
 #include <click/ipflowid.hh>

@@ -104,17 +104,14 @@ CheckIPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("INTERFACES", InterfacesArg(), _bad_src, _good_dst)
         .read("BADSRC", _bad_src)
         .read("GOODDST", _good_dst)
-        .read("OFFSET", _offset)
-        .read("VERBOSE", verbose)
+        .read_or_set("OFFSET", _offset, 0)
+        .read_or_set("VERBOSE", verbose, 0)
         .read("DETAILS", details)
-        .read("CHECKSUM", _checksum)
+        .read_or_set("CHECKSUM", _checksum, 0)
         .consume() < 0)
         return -1;
 
-    if (conf.size() == 0 || (conf.size() == 1 && IntArg().parse(conf[0], _offset))) {
-        /* nada */;
-    }
-    else if (Args(conf, this, errh)
+    if (Args(conf, this, errh)
         .read("BADSRC", OldBadSrcArg(), _bad_src)
         .read("OFFSET", _offset)
         .complete() < 0)

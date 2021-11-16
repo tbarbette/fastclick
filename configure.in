@@ -52,6 +52,20 @@ AC_C_INLINE
 CLICK_PROG_CXX
 AC_PROG_CXXCPP
 
+AX_CHECK_COMPILE_FLAG(-Winconsistent-missing-override,CXXFLAGS="$CXXFLAGS -Wno-inconsistent-missing-override",:,[-Werror])
+
+case "$target" in
+        *x86*)
+                AX_CHECK_X86_FEATURES([CFLAGS="$CFLAGS $X86_FEATURE_CFLAGS";CXXFLAGS="$CXXFLAGS $X86_FEATURE_CFLAGS"])
+        ;;
+        *)
+                # AC_MSG_WARN(["Skipping x86 tests since target is $target"])
+        ;;
+esac
+
+
+
+
 AC_TRY_RUN([#include <new>
 
 int main() {
@@ -70,6 +84,7 @@ AC_CHECK_TOOL(LD, ld)
 AC_CHECK_TOOL(NM, nm)
 AC_CHECK_TOOL(OBJCOPY, objcopy)
 AC_CHECK_TOOL(RANLIB, ranlib, :)
+AC_CHECK_TOOL(READELF, readelf, :)
 AC_CHECK_TOOL(STRIP, strip, :)
 
 conf_auxdir='$(top_srcdir)'
@@ -78,6 +93,11 @@ AC_SUBST(conf_auxdir)
 test -z "$AR_CREATEFLAGS" && AR_CREATEFLAGS=cru
 AC_SUBST(AR_CREATEFLAGS)
 
+EXTRA_DRIVER_OBJS=
+EXTRA_TOOL_OBJS=
+INCLUDES_LLVM=
+LLVM_OBJS=
+LIBS_LLVM=
 
 dnl
 dnl drivers
@@ -193,6 +213,23 @@ else
     LIBS="$save_libs"
 fi
 
+AC_SEARCH_LIBS([bpf_prog_load_xattr], [bpf], [ac_have_libbpf=yes], [ac_have_libbpf=no])
+AC_CHECK_HEADERS([bpf/bpf.h], [ac_have_libbpf_h=yes], [ac_have_libbpf_h=no])
+if test "x$ac_have_libbpf$ac_have_libbpf_h" = "xyesyes"; then
+    AC_DEFINE([HAVE_BPF])
+    have_libbpf=yes
+else
+    have_libbpf=no
+fi
+
+AC_SEARCH_LIBS([curl_global_init], [curl], [ac_have_curl=yes], [ac_have_curl=no])
+AC_CHECK_HEADERS([curl/curl.h], [ac_have_curl_h=yes], [ac_have_curl_h=no])
+if test "$ac_have_curl$ac_have_curl_h" = yesyes; then
+    AC_DEFINE([HAVE_CURL])
+fi
+
+AC_SEARCH_LIBS([elf_version], [elf], [ac_have_elf=yes], [ac_have_elf=no])
+
 AC_SEARCH_LIBS([MHD_start_daemon], [microhttpd], [ac_have_libmicrohttpd=yes], [ac_have_libmicrohttpd=no])
 AC_CHECK_HEADERS([microhttpd.h], [ac_have_microhttpd_h=yes], [ac_have_microhttpd_h=no])
 if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
@@ -222,16 +259,16 @@ else
     have_hyperscan=no
 fi
 
-AC_ARG_ENABLE([json],
-    [AS_HELP_STRING([  --enable-json], [enable JSON support])],
-    [:], [enable_json=no])
-if test "x$enable_json" = "xyes"; then
-    have_json=yes
-    AC_DEFINE([HAVE_JSON])
+AC_SEARCH_LIBS([PAPI_start_counters], [papi], [ac_have_papi=yes], [ac_have_papi=no])
+AC_CHECK_HEADERS([papi.h], [ac_have_papi_h=yes], [ac_have_papi_h=no])
+if test "x$ac_have_papi_h$ac_have_papi" = "xyesyes"; then
+    AC_DEFINE([HAVE_PAPI])
+    have_papi=yes
 else
-    have_json=no
+    have_papi=no
 fi
 
+AC_DEFINE([HAVE_JSON])
 
 AC_CHECK_LIB([pci], [main], [ac_have_pci=yes], [ac_have_pci=no])
 AC_CHECK_HEADERS([pci/pci.h], [ac_have_pci_h=yes], [ac_have_pci_h=no])
@@ -243,6 +280,15 @@ else
     have_pci=no
 fi
 
+AC_ARG_ENABLE([rand-align],
+    [AS_HELP_STRING([  --enable-rand-align], [enable random alignment of element])],
+    [:], [enable_rand_align=no])
+if test "x$enable_rand_align" = "xyes"; then
+    AC_DEFINE([HAVE_RAND_ALIGN])
+    AC_SUBST(DO_RAND_ALIGN,1)
+else
+    AC_SUBST(DO_RAND_ALIGN,0)
+fi
 
 AC_ARG_ENABLE([select],
     [AS_HELP_STRING([  --enable-select=[[select|poll|kqueue]]], [set file descriptor wait mechanism])
@@ -270,143 +316,54 @@ if echo "$enable_select" | grep kqueue >/dev/null 2>&1 && test "$enable_kqueue" 
     AC_DEFINE([HAVE_ALLOW_KQUEUE], [1], [Define if kqueue() may be used to wait for file descriptor events.])
 fi
 
+
+dnl
+dnl check whether tools should be built for host or build
+dnl
+
 AC_ARG_ENABLE([dpdk],
     [AS_HELP_STRING([  --enable-dpdk], [use DPDK])],
     [:], [enable_dpdk=no])
 
 AC_ARG_ENABLE([dpdk-pool],
-    [AS_HELP_STRING([  --enable-dpdk-pool], [use DPDK buffer instead of standard Click buffer])],
+    [AS_HELP_STRING([    --enable-dpdk-pool], [use DPDK buffer instead of standard Click buffer])],
     [:], [enable_dpdk_pool=no])
 
+AC_ARG_ENABLE([dpdk-xchg],
+    [AS_HELP_STRING([    --enable-dpdk-xchg], [use DPDK XCHG API])],
+    [:], [enable_dpdk_xchg=no])
+
 AC_ARG_ENABLE([dpdk-packet],
-    [AS_HELP_STRING([  --enable-dpdk-packet],
+    [AS_HELP_STRING([    --enable-dpdk-packet],
                     [Click packets are DPDK packet])],
     [:], [enable_dpdk_packet=no])
 
-if test "x$enable_dpdk" != "xno"; then
+AC_ARG_ENABLE([dpdk-softqueue],
+    [AS_HELP_STRING([    --disable-dpdk-softqueue],
+                    [Do not use internal software queue in TX to buffer packets before flushing.])],
+    [:], [AC_DEFINE(HAVE_IQUEUE)])
 
-    AC_MSG_CHECKING([for DPDK library])
-
-    if test "x$enable_dpdk" != "xyes"; then
-        RTE_SDK=$enable_dpdk
-    fi
-
-    if test -z "$RTE_SDK_BIN"; then
-        RTE_SDK_BIN=$RTE_SDK/$RTE_TARGET
-    fi
-
-    if test ! -d "$RTE_SDK_BIN"; then
-        RTE_SDK_BIN=$RTE_SDK/build/
-    fi
-
-    if test -z "$RTE_LIBNAME"; then
-        RTE_LIBNAME=dpdk
-    fi
-
-    if test -z "$RTE_SRCDIR"; then
-        RTE_SRCDIR=$RTE_SDK
-    fi
-
-    if test "x$enable_user_multithread" != "xyes"; then
-        AC_MSG_ERROR([
-=========================================
-
---enable-dpdk requires --enable-user-multithread which was not provided.
-
-=========================================])
-    fi
+AC_ARG_ENABLE([flow-api], [AS_HELP_STRING([    --enable-flow-api], [Support for the HW flow classification API. Also needs DPDK>=20.02])], [:], [enable_flow_api=no])
 
 
-    if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
-      AC_SUBST(RTE_USE_PKGCONFIG, 1)
-      RTE_LIB=$(pkg-config --variable=libdir libdpdk)
-      RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
-      rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
-      rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
-      rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
-      rte_ver_major=$rte_ver_year
-      AC_MSG_RESULT([yes])
-    else
-      AC_SUBST(RTE_USE_PKGCONFIG, 0)
-      RTE_INCLUDE=${RTE_SDK_BIN}/include/
-      RTE_LIB="$RTE_SDK_BIN/lib"
-      if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
-        AC_MSG_ERROR([
-=========================================
+AC_ARG_ENABLE([click-pool],
+    [AS_HELP_STRING([    --disable-click-pool], [allow usage of Click Packet pool. It will still only be effectively enabled in specific (but most) cases, see packet.hh])],
+    [:], [enable_click_pool=yes;AC_DEFINE(ALLOW_CLICK_PACKET_POOL)])
 
-Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
-Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
-or install DPDK using meson, or the system package manager.
-Note with the system package manager, you need the devel package
-version (dpdk-dev or dpdk-devel).
 
-=========================================])
-      fi
+AC_ARG_ENABLE([pool-inlining],
+    [AS_HELP_STRING([  --disable-pool-inlining],
+                    [Do not optimize pool_prepare_data_burst function before  data structure reordering done at the IR level.])],
+    [:], [AC_DEFINE(POOL_INLINING)])
 
-      AC_MSG_RESULT([yes, found at $RTE_SDK_BIN])
-
-      if test -e "$RTE_SRCDIR/VERSION"; then
-        rte_ver_year=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($1)}'`
-        rte_ver_month=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($2)}'`
-        rte_ver_minor=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($3)}'`
-        rte_ver_major=$rte_ver_year
-      else
-        if grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_config.h" &> /dev/null; then
-            verfile=rte_config
-        else
-            verfile=rte_version
-        fi
-        rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
-      fi
-    fi
-
-    AC_SUBST(RTE_SDK)
-    AC_SUBST(RTE_TARGET)
-    AC_SUBST(RTE_SDK_BIN)
-    AC_SUBST(RTE_VER_YEAR,  $rte_ver_year)
-    AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
-    AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
-    AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
-    AC_SUBST(DPDK_INCLUDES, -I$RTE_INCLUDE)
-
-    AC_DEFINE([HAVE_DPDK])
-    AC_SUBST(USE_DPDK, yes)
-
-    AC_MSG_CHECKING([whether DPDK has rte_eth_read_clock])
-    if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null; then
-      AC_MSG_RESULT([yes])
-      AC_DEFINE([HAVE_DPDK_READ_CLOCK])
-    else
-      AC_MSG_RESULT([no])
-    fi
+AC_ARG_ENABLE([inlined-allanno],
+    [AS_HELP_STRING([  --enable-inlined-allanno],
+                    [Inline AllAnno struct into Packet class, facilitating the data structure reordering.])],
+    [:], [enable_inlined_allanno=no])
+if test "x$enable_inlined_allanno" = "xyes"; then
+    AC_DEFINE([INLINED_ALLANNO])
 fi
 
-if test "x$enable_dpdk_pool" = "xyes"; then
-    if test "x$enable_dpdk" = "xno"; then
-        AC_MSG_ERROR([
-=========================================
-
---enable-dpdk-pool requires --enable-dpdk which was not provided.
-
-=========================================])
-    fi
-    AC_DEFINE([HAVE_DPDK_PACKET_POOL])
-fi
-
-if test "x$enable_dpdk_packet" = "xyes"; then
-    if test "x$enable_dpdk" = "xno"; then
-        AC_MSG_ERROR([
-=========================================
-
---enable-dpdk-packet requires --enable-dpdk which was not provided.
-
-=========================================])
-    fi
-    AC_DEFINE([CLICK_PACKET_USE_DPDK])
-fi
 
 AC_ARG_ENABLE([zerocopy],
     [AS_HELP_STRING([  --disable-zerocopy], [disable Zero Copy])],
@@ -414,6 +371,14 @@ AC_ARG_ENABLE([zerocopy],
 if test "x$enable_zerocopy" = xyes; then
     AC_DEFINE(HAVE_ZEROCOPY)
 fi
+
+AC_ARG_ENABLE([clone],
+    [AS_HELP_STRING([  --disable-clone], [disable packet cloning])],
+    [AC_DEFINE(CLICK_NOINDIRECT)],[:])
+
+AC_ARG_ENABLE([rsspp],
+    [AS_HELP_STRING([  --disable-rsspp], [disable RSS++ (enabled if --enable-cpu-load by default)])],
+    [:],[enable_rsspp=yes])
 
 dnl linuxmodule driver and features
 
@@ -699,13 +664,13 @@ dnl
 
 AC_ARG_ENABLE([all-elements], [AS_HELP_STRING([--enable-all-elements], [include all provided element groups])])
 
-dnl ELEMENTS_ARG_ENABLE(COLLECTION, HELP-STRING, DEFAULT-VALUE)
+dnl ELEMENTS_ARG_ENABLE(COLLECTION, HELP-STRING, DEFAULT-VALUE, IF_YES, COND)
 element_groups=""
 AC_SUBST(element_groups)
 AC_DEFUN([ELEMENTS_ARG_ENABLE],
 [AC_ARG_ENABLE($1, [  --]builtin(substr, builtin(ifelse, [$3], yes, dis, en)[able-$1              ], 0, 21)[ ]builtin(ifelse, [$3], yes, [do not ], [])[$2], ,
 [enable_]patsubst([$1], -, _)=$3)dnl
-test "x$enable_all_elements" = xyes -a \( ["x$enable_]patsubst([$1], -, _)["] = xNO -o ["x$enable_]patsubst([$1], -, _)["] = x \) && [enable_]patsubst([$1], -, _)[=yes]
+test "x$enable_all_elements" = xyes -a \( ["x$enable_]patsubst([$1], -, _)["] = xNO -o ["x$enable_]patsubst([$1], -, _)["] = x \)$5 && [enable_]patsubst([$1], -, _)[=yes]
 if test ["x$enable_]patsubst([$1], -, _)["] = xyes; then
     :
     $4
@@ -717,12 +682,12 @@ ELEMENTS_ARG_ENABLE(aqm, [include active queue management elements], yes)
 ELEMENTS_ARG_ENABLE(ethernet, [include Ethernet elements], yes)
 ELEMENTS_ARG_ENABLE(etherswitch, [include Ethernet switch elements], NO)
 ELEMENTS_ARG_ENABLE(flow, [include Enable flow system and elements], NO)
+ELEMENTS_ARG_ENABLE(ctx, [include Context-based elements], no, enable_ctx=no , [ -a "x$enable_flow" = xyes ] )
 ELEMENTS_ARG_ENABLE(grid, [include Grid elements (see FAQ)], NO)
 ELEMENTS_ARG_ENABLE(icmp, [include ICMP elements], yes)
 ELEMENTS_ARG_ENABLE(ip, [include IP elements], yes)
 ELEMENTS_ARG_ENABLE(ip6, [include IPv6 elements], NO, AC_DEFINE(HAVE_IP6))
 ELEMENTS_ARG_ENABLE(ipsec, [include IP security elements], NO, AC_DEFINE(HAVE_IPSEC))
-ELEMENTS_ARG_ENABLE(json, [include JSON helpers], NO, AC_DEFINE(HAVE_JSON))
 ELEMENTS_ARG_ENABLE(local, [include local elements], NO)
 ELEMENTS_ARG_ENABLE(radio, [include radio elements], NO)
 ELEMENTS_ARG_ENABLE(research, [include research elements], NO)
@@ -879,7 +844,7 @@ fi
 CLICK_CHECK_POSIX_CLOCKS
 
 AC_ARG_ENABLE([nanotimestamp],
-    [AS_HELP_STRING([--enable-nanotimestamp], [enable nanosecond timestamps])])
+    [AS_HELP_STRING([--enable-nanotimestamp], [enable nanosecond timestamps (default if clock_gettime is available)])])
 # Default to nanosecond-precision timestamps if clock_gettime is available.
 if test "x$enable_nanotimestamp" = x -a "x$have_clock_gettime" = xyes; then
     enable_nanotimestamp=yes
@@ -935,13 +900,61 @@ if test "x$enable_flow" = xyes; then
     else
         AC_DEFINE(HAVE_FLOW)
     fi
+    AC_SUBST(USE_FLOW, yes)
 fi
 
+if test "x$enable_ctx" = xyes; then
+    AC_DEFINE(HAVE_CTX)
+    AC_SUBST(USE_CTX, yes)
+else
+    enable_ctx="no"
+fi
 
+AC_ARG_ENABLE([sloppy],
+    [AS_HELP_STRING([  --disable-sloppy], [disable Sloppy flow timeouts])],
+    [:], [enable_sloppy=yes])
+if test "x$enable_sloppy" = xyes; then
+    AC_DEFINE(HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT)
+fi
 
-dnl
-dnl check whether tools should be built for host or build
-dnl
+AC_ARG_ENABLE([flow-atomic],
+    [AS_HELP_STRING([  --disable-flow-atomic], [use non-atomic flow reference counting])],
+    [:], [enable_flow_atomic=yes])
+if test "x$enable_flow_atomic" = xyes; then
+    AC_DEFINE(FLOW_ATOMIC_USE_COUNT)
+fi
+
+AC_ARG_ENABLE([flow-dynamic],
+    [AS_HELP_STRING([  --disable-flow-dynamic], [allow dynamic flow system])],
+    [:], [enable_flow_dynamic=yes])
+if test "x$enable_flow$enable_flow_dynamic" = xyesyes; then
+    AC_DEFINE(HAVE_FLOW_DYNAMIC)
+fi
+
+AC_ARG_ENABLE([flow-structure],
+              [AS_HELP_STRING([  --disable-flow-structure], [do not free classifier nodes in pool, mark them as released to somehow keep the receive strucutre intact])],
+    [:], [enable_flow_structure=yes])
+if test "x$enable_flow_structure" = xyes; then
+    AC_DEFINE(FLOW_KEEP_STRUCTURE)
+fi
+
+AC_ARG_ENABLE([flow-hash],
+    [AS_HELP_STRING([  --enable-flow-hash=[[reset|keep|epoch]]], [set flow hashtable release mechanism])],
+    [:], [enable_flow_hash=""])
+
+if echo "$enable_flow_hash" | grep epoch >/dev/null 2>&1; then
+    AC_DEFINE([FLOW_HASH_RELEASE], [2], [Flow hash is in epoch mode.])
+elif echo "$enable_flow_hash" | grep keep >/dev/null 2>&1; then
+    AC_DEFINE([FLOW_HASH_RELEASE], [1], [Flow hash is in keep mode.])
+elif echo "$enable_flow_hash" | grep reset >/dev/null 2>&1; then
+    AC_DEFINE([FLOW_HASH_RELEASE], [0], [Flow hash is in reset mode.])
+else
+    if test "x$enable_flow_structure" = xyes; then
+        AC_DEFINE([FLOW_HASH_RELEASE], [1], [Flow hash is in keep mode.])
+    else
+        AC_DEFINE([FLOW_HASH_RELEASE], [2], [Flow hash is in epoch mode.])
+    fi
+fi
 
 AC_ARG_ENABLE(tools,
   [AC_HELP_STRING([--enable-tools=WHERE], [enable tools (host/build/mixed/no) [[mixed]]])],
@@ -974,6 +987,20 @@ dnl
 dnl headers, event detection, dynamic linking
 dnl
 
+AC_ARG_ENABLE(dynamic-linking,
+  [AS_HELP_STRING([--disable-dynamic-linking], [disable dynamic linking])],
+  :, enable_dynamic_linking=yes)
+if test "x$enable_dynamic_linking" = xyes; then
+    CLICK_CHECK_DYNAMIC_LINKING
+    if test "$HOST_TOOLS" != host -a "$enable_tools" != no; then
+        CLICK_CHECK_BUILD_DYNAMIC_LINKING
+    fi
+    CLICK_SHARED=1
+else
+    CLICK_SHARED=0
+fi
+AC_SUBST(CLICK_SHARED)
+
 AC_CHECK_HEADERS_ONCE([termio.h netdb.h sys/event.h pwd.h grp.h execinfo.h])
 CLICK_CHECK_POLL_H
 AC_CHECK_FUNCS([pselect sigaction])
@@ -988,21 +1015,6 @@ if test "x$have_kqueue" = xyes; then
         AC_DEFINE([HAVE_EV_SET_UDATA_POINTER], [1], [Define if the last argument to EV_SET has pointer type.])
     fi
 fi
-
-AC_ARG_ENABLE(dynamic-linking,
-  [AS_HELP_STRING([--disable-dynamic-linking], [disable dynamic linking])],
-  :, enable_dynamic_linking=yes)
-
-if test "x$enable_dynamic_linking" = xyes; then
-    CLICK_CHECK_DYNAMIC_LINKING
-    if test "$HOST_TOOLS" != host -a "$enable_tools" != no; then
-        CLICK_CHECK_BUILD_DYNAMIC_LINKING
-    fi
-    CLICK_SHARED=1
-else
-    CLICK_SHARED=0
-fi
-AC_SUBST(CLICK_SHARED)
 
 dnl
 dnl sockets
@@ -1055,8 +1067,6 @@ dnl
 dnl objects required by element collections
 dnl
 
-EXTRA_DRIVER_OBJS=
-EXTRA_TOOL_OBJS=
 if test "x$enable_ip6" = xyes; then
     EXTRA_DRIVER_OBJS="ip6address.o ip6flowid.o ip6table.o $EXTRA_DRIVER_OBJS"
     EXTRA_TOOL_OBJS="ip6address.o $EXTRA_TOOL_OBJS"
@@ -1370,10 +1380,19 @@ AC_ARG_ENABLE([cpu-load],
     [:], [enable_cpu_load=no])
 if test "x$enable_cpu_load" = xyes; then
     AC_DEFINE(HAVE_CLICK_LOAD)
+else
+    if test "x$enable_rsspp" = xyes; then
+        AC_MSG_NOTICE([--enable-rsspp needs --enable-cpu-load])
+        enable_rsspp=no
+    fi
 fi
 
+if test "x$enable_rsspp" = xyes; then
+    EXTRA_DRIVER_OBJS="nicscheduler.o $EXTRA_DRIVER_OBJS"
+else
+    enable_rsspp=no
+fi
 
-AC_ARG_ENABLE([flow-api], [AS_HELP_STRING([--enable-flow-api], [Support for the HW flow classification API. Also needs DPDK>=20.02])], [:], [enable_flow_api=no])
 AC_CHECK_FILE($srcdir/include/click/flowruleparser.hh, [ac_have_flow_rule_parser_h=yes], [ac_have_flow_rule_parser_h=no])
 AC_CHECK_FILE($srcdir/include/click/flowrulecache.hh, [ac_have_flow_rule_cache_h=yes], [ac_have_flow_rule_cache_h=no])
 AC_CHECK_FILE($srcdir/include/click/flowrulemanager.hh, [ac_have_flow_rule_man_h=yes], [ac_have_flow_rule_man_h=no])
@@ -1461,32 +1480,36 @@ fi
 dnl Support AVX2 instructions
 
 AC_ARG_ENABLE([avx2],
-        AS_HELP_STRING([--enable-avx2],
-                   [check whether AVX2 is enabled, default yes]),
+        AS_HELP_STRING([--disable-avx2],
+                   [Do not check whether AVX2 is enabled]),
           [check_avx2=no],
           [check_avx2=yes])
 
-if test "${check_avx2}" = "yes"; then
-  AX_CHECK_COMPILE_FLAG([-mavx], [CXXFLAGS="-mavx $CXXFLAGS";CFLAGS="-mavx $CFLAGS"])
-  AX_CHECK_COMPILE_FLAG([-mavx2], [CXXFLAGS="-mavx2 $CXXFLAGS";CFLAGS="-mavx2 $CFLAGS"])
-  AC_MSG_CHECKING([whether we can compile AVX2 intrinsics in C])
-  AC_COMPILE_IFELSE([AC_LANG_SOURCE([
-   #include <x86intrin.h>
-   int main(int argc, char **argv){
-   double* q;
-   __m256d a = _mm256_load_pd(q);
-   double d = _mm256_cvtsd_f64(a);
-   return 0;
-   }
-   ])],
-   [HAVE_AVX2=yes],
-   [HAVE_AVX2=no]
-  )
-  AC_MSG_RESULT([${HAVE_AVX2}])
+AC_MSG_CHECKING([if AVX2 should be used])
+if test "x$ax_cv_gcc_x86_cpu_supports_avx2$check_avx2" = "xyesyes"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([HAVE_AVX2],1)
+else
+    AC_MSG_RESULT([no])
 fi
-if test "${HAVE_AVX2}" = "yes"; then
-  AC_DEFINE(HAVE_AVX2)
+
+dnl Support SSE4.2 instructions
+
+AC_ARG_ENABLE([sse42],
+        AS_HELP_STRING([--disable-sse42],
+                   [Do not check whether SSE4.2 is enabled]),
+          [check_sse42=no],
+          [check_sse42=yes])
+
+AC_MSG_CHECKING([if SSE4.2 should be used])
+if test "x$ax_cv_gcc_x86_cpu_supports_sse4_2$check_sse42" = "xyesyes"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([HAVE_SSE42],1)
+else
+    AC_MSG_RESULT([no])
 fi
+
+
 
 AC_ARG_ENABLE([atomic-builtins],
     [AS_HELP_STRING([--enable-atomic-builtins], [Use GCC builtins atomic functions instead of Click own implementation. It should be always used in non-x86 systems. It requires GCC >= 4.7.0])],
@@ -1532,6 +1555,8 @@ dnl Preset $prefix and $exec_prefix.
 test "x$prefix" = xNONE && prefix=$ac_default_prefix
 test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
 
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+clickdir="$DIR"
 clickdatadir="$datadir/click"
 
 for i in bin clickdata data dataroot include lib sbin; do
@@ -1544,7 +1569,7 @@ dnl
 dnl kernel interfaces
 dnl
 
-AC_CHECK_HEADERS_ONCE([ifaddrs.h linux/if_tun.h net/if_dl.h net/if_tap.h net/if_tun.h net/if_types.h net/bpf.h netpacket/packet.h])
+AC_CHECK_HEADERS_ONCE([ifaddrs.h linux/if_tun.h linux/if_packet.h net/if_dl.h net/if_tap.h net/if_tun.h net/if_types.h net/bpf.h netpacket/packet.h])
 
 
 dnl
@@ -1586,6 +1611,161 @@ for i in click-install; do
 done
 AC_SUBST(TOOLDIRS)
 AC_SUBST(TOOL_TARGETS)
+
+
+dnl
+dnl DPDK driver
+dnl
+if test "x$enable_dpdk" != "xno"; then
+
+    AC_MSG_CHECKING([for DPDK library])
+
+    if test "x$enable_dpdk" != "xyes"; then
+        RTE_SDK=$enable_dpdk
+    fi
+
+    if test -z "$RTE_SDK_BIN"; then
+        RTE_SDK_BIN=$RTE_SDK/$RTE_TARGET
+    fi
+
+    if test ! -d "$RTE_SDK_BIN"; then
+        RTE_SDK_BIN=$RTE_SDK/build/
+    fi
+
+    if test -z "$RTE_LIBNAME"; then
+        RTE_LIBNAME=dpdk
+    fi
+
+    if test -z "$RTE_SRCDIR"; then
+        RTE_SRCDIR=$RTE_SDK
+    fi
+
+    if test "x$enable_user_multithread" != "xyes"; then
+        AC_MSG_ERROR([
+=========================================
+
+--enable-dpdk requires --enable-user-multithread which was not provided.
+
+=========================================])
+    fi
+
+
+    if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
+      AC_SUBST(RTE_USE_PKGCONFIG, 1)
+      RTE_LIB=$(pkg-config --variable=libdir libdpdk)
+      RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
+      rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      rte_ver_major=$rte_ver_year
+
+      if test "x$enable_dynamic_linking" = xyes; then
+        DPDK_LIBS=$(pkg-config --libs libdpdk)
+      else
+        DPDK_LIBS=$(pkg-config --libs --static libdpdk)
+      fi
+	  DPDK_CFLAGS=$(pkg-config --cflags libdpdk)
+      AC_MSG_RESULT([yes])
+    else
+      AC_SUBST(RTE_USE_PKGCONFIG, 0)
+      RTE_INCLUDE=${RTE_SDK_BIN}/include/
+      RTE_LIB="$RTE_SDK_BIN/lib"
+      if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
+        AC_MSG_ERROR([
+=========================================
+
+Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
+Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
+or install DPDK using meson, or the system package manager.
+Note with the system package manager, you need the devel package
+version (dpdk-dev or dpdk-devel).
+
+=========================================])
+      fi
+
+      AC_MSG_RESULT([yes, found at $RTE_SDK_BIN])
+
+      if test -e "$RTE_SRCDIR/VERSION"; then
+        rte_ver_year=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($1)}'`
+        rte_ver_month=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($2)}'`
+        rte_ver_minor=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($3)}'`
+        rte_ver_major=$rte_ver_year
+      else
+        if grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_config.h" &> /dev/null; then
+            verfile=rte_config
+        else
+            verfile=rte_version
+        fi
+        rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+      fi
+      dpdk_vars=`cd userlevel/dpdk/ && make -s RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET RTE_VER_YEAR=$rte_ver_year RTE_VER_MONTH=$rte_ver_month RTE_VER_MAJOR=$rte_ver_major RTE_VER_MINOR=$rte_ver_minor`
+      eval $dpdk_vars
+    fi
+
+    AC_SUBST(RTE_SDK)
+    AC_SUBST(RTE_TARGET)
+    AC_SUBST(RTE_SDK_BIN)
+    AC_SUBST(RTE_VER_YEAR,  $rte_ver_year)
+    AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
+    AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
+    AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
+    AC_SUBST(DPDK_INCLUDES, -I${RTE_INCLUDE})
+    AC_SUBST(DPDK_LIBS, ${DPDK_LIBS})
+    AC_SUBST(DPDK_CFLAGS, ${DPDK_CFLAGS})
+
+    AC_DEFINE([HAVE_DPDK])
+    AC_SUBST(USE_DPDK, yes)
+
+    AC_MSG_CHECKING([whether DPDK has rte_eth_read_clock])
+    if ${READELF} -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null; then
+      AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_DPDK_READ_CLOCK])
+    else
+      AC_MSG_RESULT([no])
+    fi
+fi
+
+if test "x$enable_dpdk_pool" = xyes; then
+    if test "x$enable_dpdk" = "xno"; then
+        AC_MSG_ERROR([
+=========================================
+
+--enable-dpdk-pool requires --enable-dpdk which was not provided.
+
+=========================================])
+    fi
+    AC_DEFINE([HAVE_DPDK_PACKET_POOL])
+fi
+
+if test "x$enable_dpdk_xchg" = "xyes"; then
+    if test "x$enable_dpdk" = "xno"; then
+        AC_MSG_ERROR([
+=========================================
+
+--enable-dpdk-xchg requires --enable-dpdk which was not provided.
+
+=========================================])
+    fi
+    AC_DEFINE([HAVE_DPDK_XCHG])
+    AC_SUBST(HAVE_DPDK_XCHG,y)
+    AC_SUBST(DPDK_LIBS,$(echo "$DPDK_LIBS" | sed -e "s/-lrte_xchg_mbuf//"))
+    EXTRA_DRIVER_OBJS="$EXTRA_DRIVER_OBJS fromdpdkdevicexchg.o todpdkdevicexchg.o"
+fi
+
+if test "x$enable_dpdk_packet" = "xyes"; then
+    if test "x$enable_dpdk" = "xno"; then
+        AC_MSG_ERROR([
+=========================================
+
+--enable-dpdk-packet requires --enable-dpdk which was not provided.
+
+=========================================])
+    fi
+    AC_DEFINE([CLICK_PACKET_USE_DPDK])
+fi
 
 
 dnl pcap library
@@ -2288,6 +2468,8 @@ AC_PROG_AWK
 AC_PROG_GREP
 AC_PROG_EGREP
 AC_CHECK_PROGS([MD5SUM], [md5sum md5])
+AC_CHECK_PROGS([LLVMCONFIG], [llvm-config])
+
 
 if test -z "$GMAKE"; then
     AC_MSG_ERROR([
@@ -2300,6 +2482,18 @@ GNU make's pathname.
 ==============================================])
 fi
 
+if test -z "$LLVMCONFIG" -o -n "${CXX##*clang*}" ; then
+    have_llvm=no
+else
+    AC_DEFINE([HAVE_LLVM])
+    have_llvm=yes
+    LLVM_OBJS="llvmutils.o $LLVM_OBJS"
+    LIBS_LLVM="`$LLVMCONFIG --ldflags --system-libs --libs all | tr -d '\n'` $LIBS_LLVM"
+    INCLUDES_LLVM="`$LLVMCONFIG --cxxflags | tr -d '\n'` $INCLUDES_LLVM"
+fi
+AC_SUBST(LLVM_OBJS)
+AC_SUBST(LIBS_LLVM)
+AC_SUBST(INCLUDES_LLVM)
 
 dnl
 dnl install and clean versions of targets
@@ -2390,6 +2584,8 @@ AC_DEFINE_UNQUOTED([CLICK_BINDIR], ["$bindir"], [Install directory for Click exe
 AC_DEFINE_UNQUOTED([CLICK_LIBDIR], ["$libdir"], [Install directory for Click libraries and packages.])
 AC_DEFINE_UNQUOTED([CLICK_DATADIR], ["$clickdatadir"], [Install directory for Click shared data.])
 
+AC_DEFINE_UNQUOTED([CLICK_DIR], ["$clickdir"], [Source directory of Click.])
+
 AC_SUBST(clickdatadir)
 AC_SUBST(clickbuild_bindir)
 AC_SUBST(clickbuild_clickdatadir)
@@ -2397,6 +2593,7 @@ AC_SUBST(clickbuild_datadir)
 AC_SUBST(clickbuild_includedir)
 AC_SUBST(clickbuild_libdir)
 AC_SUBST(clickbuild_sbindir)
+AC_SUBST(clickbuild_clickdir)
 
 
 dnl
@@ -2447,6 +2644,23 @@ if test "x$enable_dpdk" != "xno"; then
     fi
 fi
 
+dnl add 'dpdk-packet' if compiled with --enable-dpdk-packet
+if test "x$enable_dpdk_packet" = xyes; then
+    provisions="$provisions dpdk-packet"
+    packet_mode="DPDK rte_mbuf"
+else
+    if test "x$enable_dpdk_pool" = xyes; then
+        packet_mode="Click's Packet object with DPDK buffers in the pool"
+    else
+        packet_mode="Click's Packet object with any buffers"
+    fi
+fi
+
+dnl add 'dpdk' if compiled with --enable-dpdk
+if test "x$enable_dpdk_xchg" = xyes; then
+    provisions="$provisions dpdk-xchg"
+fi
+
 dnl add 'flow' if compiled with --enable-flow
 if test "x$enable_flow" = xyes; then
     provisions="$provisions flow"
@@ -2454,14 +2668,22 @@ else
     enable_flow="no"
 fi
 
+dnl add 'ctx', HAVE_CTX if compiled with --enable-ctx
+if test "x$enable_ctx" = xyes; then
+    provisions="$provisions ctx"
+else
+    enable_ctx="no"
+fi
+
+
 dnl add 'experimental' if --enable-experimental was supplied
 if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"
 fi
 
-dnl add 'gtp' if gtp elements are available
-if test "x$enable_gtp" = xyes; then
-    provisions="$provisions gtp"
+dnl add 'tunnel' if tunnel elements are available
+if test "x$enable_tunnel" = xyes; then
+    provisions="$provisions tunnel"
 fi
 
 dnl add 'hs' if HyperScan lib is available
@@ -2495,6 +2717,11 @@ if test $ac_have_linux_kernel = y; then
     fi
 fi
 
+dnl add 'load' if CPU load is tracked
+if test "x$enable_cpu_load" = xyes; then
+    provisions="$provisions load"
+fi
+
 dnl add 'mbglib' if mbglib support is available
 if test "$ac_have_libmbdevio$ac_have_mbgdevio_h" = yesyes; then
     provisions="$provisions mbglib"
@@ -2520,6 +2747,11 @@ if test "x$HAVE_NUMA" = xyes; then
     provisions="$provisions numa"
 fi
 
+dnl add 'papi' if libpapi support is available
+if test "x$have_papi" = xyes; then
+    provisions="$provisions papi"
+fi
+
 dnl add 'pcap' if libpcap is available
 if test "x$HAVE_PCAP" = xyes; then
     provisions="$provisions pcap"
@@ -2533,9 +2765,19 @@ if test "x$have_pci" = xyes; then
     provisions="$provisions pci"
 fi
 
+dnl add 'llvm' if llvm-config command is available
+if test "x$have_llvm" = xyes; then
+    provisions="$provisions llvm"
+fi
+
 dnl add 're2' if re2 is available
 if test "x$have_re2" = xyes; then
     provisions="$provisions re2"
+fi
+
+dnl add 'rsspp' if RSS++ is available
+if test "x$enable_rsspp" = xyes; then
+    provisions="$provisions rsspp"
 fi
 
 dnl add 'smpclick' if compiled with --enable-multithread > 1
@@ -2621,13 +2863,17 @@ Configuration Summary:
 
     DPDK   support:              ${dpdk_info}
 
+    RSS++  support:              ${enable_rsspp}
+
     Netmap support:              ${HAVE_NETMAP}
     PCAP   support:              ${have_pcap}
 
+    PAPI   support:              ${have_papi}
     RE2    support:              ${have_re2}
+    BPF    support:              ${have_libbpf}
     HTTPD  support:              ${have_httpd}
-    JSON   support:              ${have_json}
     libpci support:              ${have_pci}
+    LLVM   support:              ${have_llvm}
 "
 
 if test "$feedback" != no; then

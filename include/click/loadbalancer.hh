@@ -15,6 +15,7 @@
 #include <click/timer.hh>
 #include <click/algorithm.hh>
 
+template <typename T>
 class LoadBalancer { public:
 
     LoadBalancer() : _current(0), _dsts(), _weights_helper(), _mode_case(round_robin) {
@@ -87,7 +88,7 @@ protected:
     HashTable<String, LBMode> modetrans;
     HashTable<String, LSTMode> lsttrans;
     per_thread<int> _current;
-    Vector <IPAddress> _dsts;
+    Vector <T> _dsts;
     unprotected_rcu_singlewriter<Vector <unsigned>,2> _weights_helper;
     LBMode _mode_case;
     LSTMode _lst_case;
@@ -99,6 +100,7 @@ protected:
     bool _force_track_load;
     int _awrr_interval;
     float _alpha;
+    bool _autoscale;
 
     uint64_t get_load_metric(int idx) {
         return get_load_metric(idx, _lst_case);
@@ -238,6 +240,7 @@ protected:
         String lst_mode;
         int awrr_timer;
         double alpha;
+        bool autoscale;
         bool has_cst_buckets;
         int cst_buckets;
         int nserver;
@@ -246,6 +249,7 @@ protected:
             .read_or_set("LB_MODE", lb_mode,"rr")
             .read_or_set("LST_MODE",lst_mode,"conn")
             .read_or_set("AWRR_TIME",awrr_timer, 100)
+            .read_or_set("AUTOSCALE", autoscale, false)
             .read_or_set("FORCE_TRACK_LOAD", force_track_load, false)
             .read_or_set("NSERVER", nserver, 0)
             .read("CST_BUCKETS", cst_buckets).read_status(has_cst_buckets)
@@ -255,8 +259,8 @@ protected:
             return -1;
 
         _alpha = alpha;
-        _force_track_load = force_track_load;
-
+        _autoscale = autoscale;
+	_force_track_load = force_track_load;
         if (has_cst_buckets) {
             _cst_hash.resize(cst_buckets, -1);
         }
@@ -264,6 +268,52 @@ protected:
         set_mode(lb_mode, lst_mode, lb, awrr_timer, nserver);
 
         return ret;
+    }
+
+    void add_server() {
+        if (_spares.size() == 0) {
+            click_chatter("No server to add!");
+            return;
+        }
+        int spare = _spares.front();
+        _spares.pop_front();
+
+        int id = click_random() % _selector.size();
+        Vector<unsigned> news;
+        news.reserve(_dsts.size());
+        for (int i = 0; i < _selector.size(); i++) {
+            if (i == id) {
+                news.push_back(spare);
+            }
+            news.push_back(_selector[i]);
+        }
+        _selector.swap(news);
+        if (_mode_case == constant_hash_agg) {
+            build_hash_ring();
+        }
+    }
+
+    void remove_server() {
+        if (_selector.size() == 0) {
+            click_chatter("No server to remove!");
+            return;
+        }
+
+        int id = click_random() % _selector.size();
+        int removed = _selector[id];
+        Vector<unsigned> news;
+        news.reserve(_dsts.size());
+        for (int i = 0; i < _selector.size(); i++) {
+            if (i == id) {
+                continue;
+            }
+            news.push_back(_selector[i]);
+        }
+        _spares.push_back(removed);
+        _selector.swap(news);
+        if (_mode_case == constant_hash_agg) {
+            build_hash_ring();
+        }
     }
 
     enum {
@@ -329,6 +379,9 @@ protected:
 
                     return 0;
                 }
+                if (cs->_autoscale)
+	           cs->checkload();
+                return 0;
             }
         }
         return -1;
@@ -340,11 +393,11 @@ protected:
         LoadBalancer *cs = this;
         switch((uintptr_t) thunk) {
             case h_add_server: {
-                //add_server();
+                add_server();
                 break;
             }
             case h_remove_server: {
-                //remove_server();
+                remove_server();
                 break;
             }
         }
@@ -386,19 +439,34 @@ protected:
         }
     }
 
-    template <class T>
-    void add_lb_handlers(Element* _e) {
-        T* e = (T*)_e;
-        e->set_handler("load", Handler::f_read | Handler::f_read_param | Handler::f_write, e->handler, h_load, h_load);
+    void checkload() {
+        double tot = 0;
+        for (int i = 0; i < _selector.size(); i++) {
+            tot += _loads[_selector[i]].cpu_load;
+        }
+        double avg = tot / _loads.size();
+        if (avg > 80 && _spares.size() > 0) {
+            click_chatter("Load is %f, adding a server", avg);
+            add_server();
+        } else if (avg < 40 && _selector.size() > 1) {
+            remove_server();
+            click_chatter("Load is %f, removing a server", avg);
+        }
 
+    }
+
+    template <class C>
+    void add_lb_handlers(Element* _e) {
+        C* e = (C*)_e;
+        e->set_handler("load", Handler::f_read | Handler::f_read_param | Handler::f_write, e->handler, h_load, h_load);
         e->set_handler("load_raw",  Handler::f_write, e->handler, h_load_raw, h_load_raw);
         e->add_read_handler("nb_active_servers", e->read_handler, h_nb_active_servers);
         e->add_read_handler("nb_total_servers", e->read_handler, h_nb_total_servers);
         e->add_read_handler("load_conn", e->read_handler, h_load_conn);
         e->add_read_handler("load_bytes", e->read_handler, h_load_bytes);
         e->add_read_handler("load_packets", e->read_handler, h_load_packets);
-        //e->add_write_handler("remove_server", e->write_handler, h_remove_server);
-        //e->add_write_handler("add_server", e->write_handler, h_add_server);
+        e->add_write_handler("remove_server", e->write_handler, h_remove_server);
+        e->add_write_handler("add_server", e->write_handler, h_add_server);
     }
 
     void set_mode(String mode, String metric="cpu", Element* owner=0,int awrr_timer_interval = -1, int nserver = 0) {
@@ -424,7 +492,11 @@ protected:
         }
 
         if (nserver == 0) {
-            nserver= _dsts.size();
+            if (_autoscale) {
+                nserver=1;
+            } else {
+                nserver= _dsts.size();
+            }
         }
 
         if (_mode_case == round_robin ||_mode_case == weighted_round_robin || _mode_case == auto_weighted_round_robin) {

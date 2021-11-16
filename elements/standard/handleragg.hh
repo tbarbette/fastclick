@@ -12,9 +12,9 @@ CLICK_DECLS
 
 HandlerAggregate(ELEMENT 1 [, ELEMENT 2 ... ELEMENT N])
 
-=s standard
+=s control
 
-Aggregates handlers
+Aggregates handlers of multiple elements
 
 =d
 

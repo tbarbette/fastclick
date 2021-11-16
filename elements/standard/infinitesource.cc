@@ -132,7 +132,7 @@ InfiniteSource::run_task(Task *)
 	for (int i = 0; i < n; i++) {
 		if (head == NULL) {
 			head = PacketBatch::start_head(_packet->clone());
-			last = head;
+			last = head->first();
 		} else {
 			last->set_next(_packet->clone());
 			last = last->next();

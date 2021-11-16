@@ -34,8 +34,9 @@ IPMirror::~IPMirror()
 int
 IPMirror::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    _dst_anno = true;
-    return Args(conf, this, errh).read_p("DST_ANNO", _dst_anno).complete();
+    return Args(conf, this, errh).
+		read_or_set_p("DST_ANNO", _dst_anno, true)
+			.complete();
 }
 
 Packet *

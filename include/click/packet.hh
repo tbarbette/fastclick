@@ -5,11 +5,14 @@
 #include <click/glue.hh>
 #include <click/timestamp.hh>
 #include <click/packet_anno.hh>
+
+#include "flow/common.hh"
 #if CLICK_LINUXMODULE
 # include <click/skbmgr.hh>
-#elif CLICK_PACKET_USE_DPDK
+#elif CLICK_PACKET_USE_DPDK || HAVE_DPDK
 # include <rte_debug.h>
 # include <rte_mbuf.h>
+# include <rte_malloc.h>
 # include <click/dpdk_glue.hh>
 #else
 # include <click/atomic.hh>
@@ -20,28 +23,36 @@
 #if CLICK_NS
 # include <click/simclick.h>
 #endif
-#if !CLICK_PACKET_USE_DPDK && (CLICK_USERLEVEL || CLICK_NS || CLICK_MINIOS) && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS) && !(NETMAP_PACKET_POOL)
+#if !CLICK_PACKET_USE_DPDK && (CLICK_USERLEVEL || CLICK_NS || CLICK_MINIOS) && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS) && !(NETMAP_PACKET_POOL) && ALLOW_CLICK_PACKET_POOL
 # define HAVE_CLICK_PACKET_POOL 1
 #endif
 #ifndef CLICK_PACKET_DEPRECATED_ENUM
 # define CLICK_PACKET_DEPRECATED_ENUM CLICK_DEPRECATED_ENUM
 #endif
+#include <click/stack.hh>
 struct click_ether;
 struct click_ip;
 struct click_icmp;
 struct click_ip6;
 struct click_tcp;
 struct click_udp;
+
 CLICK_DECLS
+
+//#define HAVE_VECTOR_PACKET_POOL 1
 
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 #define HAVE_BATCH_RECYCLE 1
 #endif
 
-class DPDKDevice;
 class IP6Address;
 class WritablePacket;
 class PacketBatch;
+#if HAVE_DPDK
+class FromDPDKDevice;
+class DPDKDevice;
+#endif
+
 class Packet { public:
 
     /** @name Data */
@@ -51,7 +62,7 @@ class Packet { public:
     enum {
 #ifdef CLICK_MINIOS
 	default_headroom = 48,		///< Increase headroom for improved performance.
-#elif CLICK_PACKET_USE_DPDK || HAVE_DPDK_PACKET_POOL
+#elif CLICK_PACKET_USE_DPDK || HAVE_DPDK_PACKET_POOL || CLICK_PACKET_INSIDE_DPDK
 	default_headroom = RTE_PKTMBUF_HEADROOM,
 #elif HAVE_CLICK_PACKET_POOL
 	default_headroom = 64,
@@ -64,13 +75,14 @@ class Packet { public:
     };
 
     static WritablePacket *make(uint32_t headroom, const void *data,
-				uint32_t length, uint32_t tailroom) CLICK_WARN_UNUSED_RESULT;
+				uint32_t length, uint32_t tailroom, bool clear = true) CLICK_WARN_UNUSED_RESULT;
     static inline WritablePacket *make(const void *data, uint32_t length) CLICK_WARN_UNUSED_RESULT;
     static inline WritablePacket *make(uint32_t length) CLICK_WARN_UNUSED_RESULT;
+    static WritablePacket *make_similar(Packet* original, uint32_t length) CLICK_WARN_UNUSED_RESULT;
 #if CLICK_LINUXMODULE
     static Packet *make(struct sk_buff *skb) CLICK_WARN_UNUSED_RESULT;
 #elif CLICK_PACKET_USE_DPDK
-    static Packet *make(struct rte_mbuf *mb) CLICK_WARN_UNUSED_RESULT;
+    static Packet *make(struct rte_mbuf *mb, bool clear = true) CLICK_WARN_UNUSED_RESULT;
 #endif
 #if CLICK_BSDMODULE
     // Packet::make(mbuf *) wraps a Packet around an existing mbuf.
@@ -89,7 +101,7 @@ class Packet { public:
 
     static WritablePacket* make(unsigned char* data, uint32_t length,
 				buffer_destructor_type buffer_destructor,
-                                void* argument = (void*) 0, int headroom = 0, int tailroom = 0) CLICK_WARN_UNUSED_RESULT;
+                                void* argument = (void*) 0, int headroom = 0, int tailroom = 0, bool clear = true) CLICK_WARN_UNUSED_RESULT;
 #endif //CLICK_USERLEVEL || CLICK_MINIOS
 
 
@@ -104,12 +116,14 @@ class Packet { public:
     inline bool shared_nonatomic() const;
     Packet *clone(bool fast = false) CLICK_WARN_UNUSED_RESULT;
     inline WritablePacket *uniqueify() CLICK_WARN_UNUSED_RESULT;
-#if CLICK_LINUXMODULE
+#ifndef CLICK_NOINDIRECT
+# if CLICK_LINUXMODULE
     inline void get() {skb_get(skb());};
-#elif CLICK_PACKET_USE_DPDK
+# elif CLICK_PACKET_USE_DPDK
     inline void get() {rte_mbuf_refcnt_update(mb(), 1);};
-#else
+# else
     inline void get() {_use_count++;};
+# endif
 #endif
 
     inline const unsigned char *data() const;
@@ -140,6 +154,7 @@ class Packet { public:
         assert(false);
         return NULL;
     }
+
     void set_buffer_destructor(buffer_destructor_type) {
         click_chatter("ILLEGAL CALL TO set_buffer_destructor");
         assert(false);
@@ -157,16 +172,26 @@ class Packet { public:
     void set_buffer_destructor(buffer_destructor_type destructor) {
     	_destructor = destructor;
     }
+
     buffer_destructor_type buffer_destructor() const {
 	return _destructor;
     }
+
     void* destructor_argument() const {
     	return _destructor_argument;
     }
+
     void reset_buffer() {
-	_head = _data = _tail = _end = 0;
-	_destructor = 0;
+	    _head = _data = _tail = _end = 0;
+	    _destructor = 0;
     }
+
+    void set_destructor_argument(void* arg) {
+        _destructor_argument = arg;
+    }
+
+    static inline void release_buffer(unsigned char* head);
+    inline void delete_buffer(unsigned char* head, unsigned char* end);
 #endif
 
 
@@ -377,6 +402,12 @@ class Packet { public:
     inline const click_icmp *icmp_header() const;
     inline const click_tcp *tcp_header() const;
     inline const click_udp *udp_header() const;
+
+    inline uint16_t getContentOffset() const;
+    inline void setContentOffset(uint16_t offset);
+    inline const unsigned char* getPacketContent();
+    inline bool isPacketContentEmpty() const;
+    inline uint16_t getPacketContentSize() const;
     //@}
 
 #if CLICK_LINUXMODULE
@@ -401,10 +432,14 @@ class Packet { public:
         return (const Anno *) (((unsigned char*)this) + ANNO_OFFSET); }
     Anno *xanno()			{
         return (Anno *) (((unsigned char*)this) + ANNO_OFFSET); }
-
 #else
-    inline const Anno *xanno() const		{ return &_aa.cb; }
-    inline Anno *xanno()			{ return &_aa.cb; }
+    #if INLINED_ALLANNO
+    CLICK_OPTNONE const Anno *xanno() const		{ return (const Anno *) &all_anno()->cb; }
+    CLICK_OPTNONE Anno *xanno()			{ return (Anno *) &all_anno()->cb; }
+    #else
+    inline const Anno *xanno() const		{ return (const Anno *) &all_anno()->cb; }
+    inline Anno *xanno()			{ return (Anno *) &all_anno()->cb; }
+    #endif
 #endif
     /** @endcond never */
   public:
@@ -726,14 +761,19 @@ class Packet { public:
 	*reinterpret_cast<click_aliasable_void_pointer_t *>(xanno()->c + i) = const_cast<void *>(x);
     }
 
-#if !CLICK_PACKET_USE_DPDK && !CLICK_LINUXMODULE
+#if !CLICK_PACKET_USE_DPDK && !CLICK_LINUXMODULE && !defined(CLICK_NOINDIRECT)
     inline Packet* data_packet() {
     	return _data_packet;
+    }
+#else
+    inline Packet* data_packet() {
+        return 0;
     }
 #endif
 
     inline void clear_annotations(bool all = true);
     inline void copy_annotations(const Packet *, bool all = true);
+    inline void copy_headers(const Packet *);
     //@}
 
     /** @cond never */
@@ -805,7 +845,9 @@ class Packet { public:
 #if !CLICK_LINUXMODULE
     // All packet annotations are stored in AllAnno so that
     // clear_annotations(true) can memset() the structure to zero.
+#if !INLINED_ALLANNO
     struct AllAnno {
+#endif
 	Anno cb;
 	unsigned char *mac;
 	unsigned char *nh;
@@ -814,12 +856,14 @@ class Packet { public:
 #if !CLICK_PACKET_USE_DPDK
 	char timestamp[sizeof(Timestamp)];
 #endif
+#if INLINED_ALLANNO
+	Packet *nextp;
+	Packet *prevp;
+#else
 	Packet *next;
 	Packet *prev;
-	AllAnno()
-	{
-	}
     };
+#endif
 
 # if CLICK_PACKET_USE_DPDK
     inline struct AllAnno *all_anno() {
@@ -829,6 +873,12 @@ class Packet { public:
         return reinterpret_cast<const AllAnno *>(xanno());
     }
     static struct rte_mempool **_pktmbuf_pools;
+# elif INLINED_ALLANNO
+    CLICK_OPTNONE const class Packet* all_anno() const  { return this;}
+    CLICK_OPTNONE class Packet* all_anno() { return this;}
+# else
+    CLICK_ALWAYS_INLINE const struct AllAnno* all_anno() const { return &_aa;}
+    CLICK_ALWAYS_INLINE struct AllAnno* all_anno() { return &_aa;}
 # endif
 #endif
     /** @endcond never */
@@ -836,8 +886,10 @@ class Packet { public:
 #if !(CLICK_LINUXMODULE || CLICK_PACKET_USE_DPDK)
     // User-space and BSD kernel module implementations.
 protected:
+#ifndef CLICK_NOINDIRECT
     atomic_uint32_t _use_count;
     Packet *_data_packet;
+#endif
 private:
     /* mimic Linux sk_buff */
     unsigned char *_head; /* start of allocated buffer */
@@ -847,7 +899,9 @@ private:
 # if CLICK_BSDMODULE
     struct mbuf *_m;
 # endif
+# if !INLINED_ALLANNO
     AllAnno _aa;
+# endif
 # if CLICK_NS
     SimPacketinfoWrapper _sim_packetinfo;
 # endif
@@ -876,6 +930,7 @@ private:
     void assimilate_mbuf();
 #endif
 
+    WritablePacket *duplicate(int32_t extra_headroom, int32_t extra_tailroom) CLICK_WARN_UNUSED_RESULT;
     inline void shift_header_annotations(const unsigned char *old_head, int32_t extra_headroom);
     WritablePacket *expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom, bool free_on_failure) CLICK_WARN_UNUSED_RESULT;
     WritablePacket *expensive_push(uint32_t nbytes) CLICK_WARN_UNUSED_RESULT;
@@ -883,21 +938,40 @@ private:
 
     friend class WritablePacket;
     friend class PacketBatch;
+#if HAVE_DPDK
     friend class DPDKDevice;
+#endif
 
 };
 
 #if HAVE_CLICK_PACKET_POOL
     struct PacketPool {
+
+        PacketPool() :
+#if HAVE_VECTOR_PACKET_POOL
+            p(), pd()
+#else
+            p(0), pcount(0), pd(0), pdcount(0)
+#endif
+        {
+        }
+#if HAVE_VECTOR_PACKET_POOL
+        Stack<Packet*> p;
+        Stack<Packet*> pd;
+#else
         WritablePacket* p;          // free packets, linked by p->next()
         unsigned pcount;            // # packets in `p` list
         WritablePacket* pd;             // free data buffers, linked by pd->next
         unsigned pdcount;           // # buffers in `pd` list
+#endif
     #  if HAVE_MULTITHREAD
         PacketPool* thread_pool_next; // link to next per-thread pool
     #  endif
     };
 #endif
+
+#include <clicknet/tcp.h>
+#include <clicknet/udp.h>
 
 class WritablePacket : public Packet { public:
 
@@ -914,29 +988,36 @@ class WritablePacket : public Packet { public:
     inline click_icmp *icmp_header() const;
     inline click_tcp *tcp_header() const;
     inline click_udp *udp_header() const;
+    inline unsigned char* getPacketContent();
 
     inline void rewrite_ips(IPPair pair, bool is_tcp = true);
     inline void rewrite_ips_ports(IPPair pair, uint16_t sport, uint16_t dport, bool is_tcp = true);
     inline void rewrite_ipport(IPAddress ip, uint16_t port, const int shift, bool is_tcp = true);
     inline void rewrite_ip(IPAddress ip, const int shift, bool is_tcp = true);
+    inline void rewrite_seq(tcp_seq_t seq, const int shift);
 
 #if !CLICK_LINUXMODULE
-    inline void set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
+    inline void init_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
+    inline void set_buffer(unsigned char *buffer, uint32_t buffer_length);
+    inline void set_data(unsigned char *data);
+    inline void set_data_length(uint32_t length);
 #endif
 
 # if HAVE_CLICK_PACKET_POOL
-    static PacketPool* make_local_packet_pool();
+    static void initialize_local_packet_pool();
 # endif
 
     static void pool_transfer(int from, int to);
+    static WritablePacket * pool_prepare_data_burst(uint16_t count);
+    static void pool_consumed_data_burst(uint16_t n, WritablePacket* tail);
 
 #if !CLICK_LINUXMODULE
-    inline void set_buffer(unsigned char *data, uint32_t length) {
-    	set_buffer(data,length,length);
+    inline void init_buffer(unsigned char *data, uint32_t length) {
+	init_buffer(data,length,length);
     }
 
-    inline void set_buffer(unsigned char *data) {
-       	set_buffer(data,buffer_length());
+    inline void init_buffer(unsigned char *data) {
+	init_buffer(data,buffer_length());
     }
 #endif
 
@@ -959,7 +1040,7 @@ class WritablePacket : public Packet { public:
     }
 
     #if !CLICK_LINUXMODULE || CLICK_PACKET_USE_DPDK
-        inline void initialize();
+        inline void initialize(bool clear);
         inline void initialize_data();
     #endif
         WritablePacket(const Packet &x);
@@ -976,10 +1057,10 @@ class WritablePacket : public Packet { public:
     static WritablePacket *pool_allocate();
     static WritablePacket *pool_data_allocate();
     static WritablePacket *pool_allocate(uint32_t headroom, uint32_t length,
-					 uint32_t tailroom);
+					 uint32_t tailroom, bool clear =true);
 
-    static void check_data_pool_size(PacketPool &packet_pool);
-    static void check_packet_pool_size(PacketPool &packet_pool);
+    static void check_data_pool_size(PacketPool &packet_pool, unsigned n);
+    static void check_packet_pool_size(PacketPool &packet_pool, unsigned n);
     static bool is_from_data_pool(WritablePacket *p);
     static void recycle(WritablePacket *p);
     static WritablePacket *pool_batch_allocate(uint16_t count);
@@ -990,6 +1071,7 @@ class WritablePacket : public Packet { public:
     friend class Packet;
     friend class PacketBatch;
     friend class NetmapDevice;
+    friend class FromDPDKDevice;
 
 };
 
@@ -1008,7 +1090,7 @@ class WritablePacket : public Packet { public:
 inline void
 Packet::clear_annotations(bool all)
 {
-#if CLICK_LINUXMODULE
+#if CLICK_LINUXMODULE || INLINED_ALLANNO
     memset(xanno(), 0, sizeof(Anno));
     if (all) {
 	set_packet_type_anno(HOST);
@@ -1050,21 +1132,24 @@ Packet::copy_annotations(const Packet *p, bool)
 
 #if !CLICK_LINUXMODULE
 inline void
-WritablePacket::initialize()
+WritablePacket::initialize(bool clear)
 {
 #if CLICK_PACKET_USE_DPDK
     click_chatter("UNIMPLEMENTED");
     assert(false); //Should be initialized by DPDK
 #else
+#if !CLICK_NOINDIRECT
     _use_count = 1;
     _data_packet = 0;
+#endif
 # if CLICK_USERLEVEL || CLICK_MINIOS
     _destructor = 0;
 # elif CLICK_BSDMODULE
     _m = 0;
 # endif
 #endif
-    clear_annotations();
+    if (clear)
+        clear_annotations();
 }
 inline void
 WritablePacket::initialize_data()
@@ -1074,8 +1159,10 @@ WritablePacket::initialize_data()
     click_chatter("UNIMPLEMENTED");
     assert(false); //This may not illegal but I need to check what to be done
 #else
+# if !CLICK_NOINDIRECT
     _use_count = 1;
     _data_packet = 0;
+# endif
 #endif
     clear_annotations(false);
 }
@@ -1209,10 +1296,10 @@ Packet::next() const
 {
 #if CLICK_LINUXMODULE
     return (Packet *)(skb()->next);
-#elif CLICK_PACKET_USE_DPDK
-    return all_anno()->next;
+#elif INLINED_ALLANNO
+    return all_anno()->nextp;
 #else
-    return _aa.next;
+    return all_anno()->next;
 #endif
 }
 
@@ -1221,10 +1308,10 @@ Packet::next()
 {
 #if CLICK_LINUXMODULE
     return (Packet *&)(skb()->next);
-#elif CLICK_PACKET_USE_DPDK
-    return all_anno()->next;
+#elif INLINED_ALLANNO
+    return all_anno()->nextp;
 #else
-    return _aa.next;
+    return all_anno()->next;
 #endif
 }
 
@@ -1233,10 +1320,10 @@ Packet::set_next(Packet *p)
 {
 #if CLICK_LINUXMODULE
     skb()->next = p->skb();
-#elif CLICK_PACKET_USE_DPDK
-    all_anno()->next = p;
+#elif INLINED_ALLANNO
+    all_anno()->nextp = p;
 #else
-    _aa.next = p;
+    all_anno()->next = p;
 #endif
 }
 
@@ -1245,10 +1332,10 @@ Packet::prev() const
 {
 #if CLICK_LINUXMODULE
     return (Packet *)(skb()->prev);
-#elif CLICK_PACKET_USE_DPDK
-    return all_anno()->prev;
+#elif INLINED_ALLANNO
+    return all_anno()->prevp;
 #else
-    return _aa.prev;
+    return all_anno()->prev;
 #endif
 }
 
@@ -1257,10 +1344,10 @@ Packet::prev()
 {
 #if CLICK_LINUXMODULE
     return (Packet *&)(skb()->prev);
-#elif CLICK_PACKET_USE_DPDK
-    return all_anno()->prev;
+#elif INLINED_ALLANNO
+    return all_anno()->prevp;
 #else
-    return _aa.prev;
+    return all_anno()->prev;
 #endif
 }
 
@@ -1269,10 +1356,10 @@ Packet::set_prev(Packet *p)
 {
 #if CLICK_LINUXMODULE
     skb()->prev = p->skb();
-#elif CLICK_PACKET_USE_DPDK
-    all_anno()->prev = p;
+#elif INLINED_ALLANNO
+    all_anno()->prevp = p;
 #else
-    _aa.prev = p;
+    all_anno()->prev = p;
 #endif
 }
 
@@ -1287,10 +1374,8 @@ Packet::has_mac_header() const
 # else
     return skb()->mac.raw != 0;
 # endif
-#elif CLICK_PACKET_USE_DPDK
-    return all_anno()->mac != 0;
 #else
-    return _aa.mac != 0;
+    return all_anno()->mac != 0;
 #endif
 }
 
@@ -1307,10 +1392,8 @@ Packet::mac_header() const
 # else
     return skb()->mac.raw;
 # endif
-#elif CLICK_PACKET_USE_DPDK
-    return all_anno()->mac;
 #else
-    return _aa.mac;
+    return all_anno()->mac;
 #endif
 }
 
@@ -1329,10 +1412,8 @@ Packet::has_network_header() const
 # else
     return skb()->nh.raw != 0;
 # endif
-#elif CLICK_PACKET_USE_DPDK
-    return all_anno()->nh != 0;
 #else
-    return _aa.nh != 0;
+    return all_anno()->nh != 0;
 #endif
 }
 
@@ -1349,10 +1430,8 @@ Packet::network_header() const
 # else
     return skb()->nh.raw;
 # endif
-#elif CLICK_PACKET_USE_DPDK
-    return all_anno()->nh;
 #else
-    return _aa.nh;
+    return all_anno()->nh;
 #endif
 }
 
@@ -1371,10 +1450,8 @@ Packet::has_transport_header() const
 # else
     return skb()->h.raw != 0;
 # endif
-#elif CLICK_PACKET_USE_DPDK
-    return all_anno()->h != 0;
 #else
-    return _aa.h != 0;
+    return all_anno()->h != 0;
 #endif
 }
 
@@ -1391,10 +1468,8 @@ Packet::transport_header() const
 # else
     return skb()->h.raw;
 # endif
-#elif CLICK_PACKET_USE_DPDK
-    return all_anno()->h;
 #else
-    return _aa.h;
+    return all_anno()->h;
 #endif
 }
 
@@ -1497,7 +1572,7 @@ Packet::timestamp_anno() const
 #elif CLICK_PACKET_USE_DPDK
     return *(Timestamp*)&(TIMESTAMP_FIELD(mb()));
 #else
-    return *reinterpret_cast<const Timestamp*>(&_aa.timestamp);
+    return *reinterpret_cast<const Timestamp*>(&all_anno()->timestamp);
 #endif
 }
 
@@ -1513,7 +1588,7 @@ Packet::timestamp_anno()
 #elif CLICK_PACKET_USE_DPDK
     return *(Timestamp*)&(TIMESTAMP_FIELD(mb()));
 #else
-    return *reinterpret_cast<Timestamp*>(&_aa.timestamp);
+    return *reinterpret_cast<Timestamp*>(&all_anno()->timestamp);
 #endif
 }
 
@@ -1558,10 +1633,8 @@ Packet::packet_type_anno() const
     return (PacketType)(skb()->pkt_type & PACKET_TYPE_MASK);
 #elif CLICK_LINUXMODULE
     return (PacketType)(skb()->pkt_type);
-#elif CLICK_PACKET_USE_DPDK
-    return all_anno()->pkt_type;
 #else
-    return _aa.pkt_type;
+    return all_anno()->pkt_type;
 #endif
 }
 
@@ -1572,10 +1645,8 @@ Packet::set_packet_type_anno(PacketType p)
     skb()->pkt_type = (skb()->pkt_type & PACKET_CLEAN) | p;
 #elif CLICK_LINUXMODULE
     skb()->pkt_type = p;
-#elif CLICK_PACKET_USE_DPDK
-    all_anno()->pkt_type = p;
 #else
-    _aa.pkt_type = p;
+    all_anno()->pkt_type = p;
 #endif
 }
 
@@ -1671,7 +1742,7 @@ Packet::make(struct sk_buff *skb)
  * The returned packet's annotations and header pointers <em>are not
  * set</em>. */
 inline Packet *
-Packet::make(struct rte_mbuf *mb)
+Packet::make(struct rte_mbuf *mb, bool clear)
 {
   /*  if (unlikely(mb->type != RTE_MBUF_PKT)) {
         click_chatter("cannot convert ctrlmbuf to Packet");
@@ -1686,7 +1757,8 @@ Packet::make(struct rte_mbuf *mb)
         return 0;
     }*/
     Packet *p = reinterpret_cast<Packet *>(mb);
-    p->clear_annotations();
+    if (clear)
+        p->clear_annotations();
     return p;
 }
 #endif
@@ -1706,11 +1778,19 @@ Packet::kill()
 			b->list = 0;
 		# endif
 		skbmgr_recycle_skbs(b);
-	#elif CLICK_PACKET_USE_DPDK
+    #elif CLICK_PACKET_USE_DPDK
+#if HAVE_FLOW_DYNAMIC
+        if (fcb_stack) {
+            fcb_stack->release(1);
+        }
+#endif
 		//Dpdk takes care of indirect and related things
 		rte_pktmbuf_free(mb());
 	#elif HAVE_CLICK_PACKET_POOL && !defined(CLICK_FORCE_EXPENSIVE)
-		if (_use_count.dec_and_test()) {
+#ifndef CLICK_NOINDIRECT
+		if (_use_count.dec_and_test())
+#endif
+        {
 			WritablePacket::recycle(static_cast<WritablePacket *>(this));
 		}
 	#else
@@ -1738,12 +1818,21 @@ Packet::kill_nonatomic()
     # endif
         skbmgr_recycle_skbs(b);
 #elif CLICK_PACKET_USE_DPDK
+#if HAVE_FLOW_DYNAMIC
+        if (fcb_stack) {
+            fcb_stack->release(1);
+        }
+#endif
         rte_pktmbuf_free(mb());
 #elif HAVE_CLICK_PACKET_POOL
-        if (_use_count.nonatomic_dec_and_test()) {
+
+#ifndef CLICK_NOINDIRECT
+        if (_use_count.nonatomic_dec_and_test())
+#endif
+        {
             WritablePacket::recycle(static_cast<WritablePacket *>(this));
 
-    }
+        }
 #else
         if (_use_count.nonatomic_dec_and_test()) {
             delete this;
@@ -1789,9 +1878,10 @@ Packet::make(struct mbuf *m)
     m_freem(m);
     return 0;
   }
+#ifndef CLICK_NOINDIRECT
   p->_use_count = 1;
   p->_data_packet = NULL;
-
+#endif
   if (m->m_pkthdr.len != m->m_len) {
     struct mbuf *m2;
     /* click needs contiguous data */
@@ -1840,12 +1930,16 @@ Packet::make(struct mbuf *m)
 inline bool
 Packet::shared() const
 {
-#if CLICK_LINUXMODULE
-    return skb_cloned(const_cast<struct sk_buff *>(skb()));
-#elif CLICK_PACKET_USE_DPDK
-    return rte_mbuf_refcnt_read(mb()) > 1 || RTE_MBUF_INDIRECT(mb());
+#ifdef CLICK_NOINDIRECT
+    return false;
 #else
+# if CLICK_LINUXMODULE
+    return skb_cloned(const_cast<struct sk_buff *>(skb()));
+# elif CLICK_PACKET_USE_DPDK
+    return rte_mbuf_refcnt_read(mb()) > 1 || RTE_MBUF_INDIRECT(mb());
+# else
     return (_data_packet || _use_count > 1);
+# endif
 #endif
 }
 
@@ -1856,12 +1950,16 @@ Packet::shared() const
 inline bool
 Packet::shared_nonatomic() const
 {
-#if CLICK_LINUXMODULE
-    return skb_cloned(const_cast<struct sk_buff *>(skb()));
-#elif CLICK_PACKET_USE_DPDK
-    return rte_mbuf_refcnt_read(mb()) > 1 || RTE_MBUF_INDIRECT(mb());
+#ifdef CLICK_NOINDIRECT
+    return false;
 #else
+# if CLICK_LINUXMODULE
+    return skb_cloned(const_cast<struct sk_buff *>(skb()));
+# elif CLICK_PACKET_USE_DPDK
+    return rte_mbuf_refcnt_read(mb()) > 1 || RTE_MBUF_INDIRECT(mb());
+# else
     return (_data_packet || _use_count.nonatomic_value() > 1);
+# endif
 #endif
 }
 
@@ -1905,13 +2003,17 @@ private:
 inline WritablePacket *
 Packet::uniqueify()
 {
-#ifdef CLICK_FORCE_EXPENSIVE
+#ifdef CLICK_NOINDIRECT
+    return static_cast<WritablePacket *>(this);
+#else
+#  ifdef CLICK_FORCE_EXPENSIVE
     PacketRef r(this);
-#endif
+#  endif
     if (!shared())
 	return static_cast<WritablePacket *>(this);
     else
-	return expensive_uniqueify(0, 0, true);
+	    return expensive_uniqueify(0, 0, true);
+#endif
 }
 
 inline WritablePacket *
@@ -1967,12 +2069,14 @@ Packet::pull(uint32_t len)
 {
     if (len > length()) {
 	click_chatter("Packet::pull %d > length %d\n", len, length());
-	len = length();
+	    len = length();
     }
 #if CLICK_LINUXMODULE	/* Linux kernel module */
     __skb_pull(skb(), len);
 #elif CLICK_PACKET_USE_DPDK
-    rte_pktmbuf_adj(mb(), len);
+    mb()->data_off += len;
+    mb()->data_len -= len;
+    mb()->pkt_len -= len;
 #else				/* User-space and BSD kernel module */
     _data += len;
 # if CLICK_BSDMODULE
@@ -2083,7 +2187,10 @@ Packet::shrink_data(const unsigned char *data, uint32_t length)
     (void) data;
     (void) length;
 # else
+
+#ifndef CLICK_NOINDIRECT
     assert(_data_packet);
+#endif
     if (data >= _head && data + length >= data && data + length <= _end) {
 	_head = _data = const_cast<unsigned char *>(data);
 	_tail = _end = const_cast<unsigned char *>(data + length);
@@ -2159,10 +2266,8 @@ Packet::set_mac_header(const unsigned char *p)
 # else
     skb()->mac.raw = const_cast<unsigned char *>(p);
 # endif
-#elif CLICK_PACKET_USE_DPDK
+#else				/* User-space and BSD kernel module and CLICK_PACKET_USE_DPDK */
     all_anno()->mac = const_cast<unsigned char *>(p);
-#else				/* User-space and BSD kernel module */
-    _aa.mac = const_cast<unsigned char *>(p);
 #endif
 }
 
@@ -2182,12 +2287,9 @@ Packet::set_mac_header(const unsigned char *p, uint32_t len)
     skb()->mac.raw = const_cast<unsigned char *>(p);
     skb()->nh.raw = const_cast<unsigned char *>(p) + len;
 # endif
-#elif CLICK_PACKET_USE_DPDK
+#else				/* User-space and BSD kernel module and CLICK_PACKET_USE_DPDK */
     all_anno()->mac = const_cast<unsigned char *>(p);
     all_anno()->nh = const_cast<unsigned char *>(p) + len;
-#else				/* User-space and BSD kernel module */
-    _aa.mac = const_cast<unsigned char *>(p);
-    _aa.nh = const_cast<unsigned char *>(p) + len;
 #endif
 }
 
@@ -2216,10 +2318,8 @@ Packet::clear_mac_header()
 # else
     skb()->mac.raw = 0;
 # endif
-#elif CLICK_PACKET_USE_DPDK
+#else				/* User-space and BSD kernel module and CLICK_PACKET_USE_DPDK */
     all_anno()->mac = 0;
-#else				/* User-space and BSD kernel module */
-    _aa.mac = 0;
 #endif
 }
 
@@ -2264,10 +2364,8 @@ Packet::set_network_header(const unsigned char *p)
 # else
     skb()->nh.raw = const_cast<unsigned char *>(p);
 # endif
-#elif CLICK_PACKET_USE_DPDK
+#else				/* User-space and BSD kernel module and CLICK_PACKET_USE_DPDK */
     all_anno()->nh = const_cast<unsigned char *>(p);
-#else				/* User-space and BSD kernel module */
-    _aa.nh = const_cast<unsigned char *>(p);
 #endif
 }
 
@@ -2283,10 +2381,8 @@ Packet::set_transport_header(const unsigned char *p)
 # else
     skb()->h.raw = const_cast<unsigned char *>(p);
 # endif
-#elif CLICK_PACKET_USE_DPDK
+#else				/* User-space and BSD kernel module and CLICK_PACKET_USE_DPDK */
     all_anno()->h = const_cast<unsigned char *>(p);
-#else				/* User-space and BSD kernel module */
-    _aa.h = const_cast<unsigned char *>(p);
 #endif
 }
 
@@ -2306,12 +2402,9 @@ Packet::set_network_header(const unsigned char *p, uint32_t len)
     skb()->nh.raw = const_cast<unsigned char *>(p);
     skb()->h.raw = const_cast<unsigned char *>(p) + len;
 # endif
-#elif CLICK_PACKET_USE_DPDK
+#else				/* User-space and BSD kernel module and CLICK_PACKET_USE_DPDK */
     all_anno()->nh = const_cast<unsigned char *>(p);
     all_anno()->h = const_cast<unsigned char *>(p) + len;
-#else				/* User-space and BSD kernel module */
-    _aa.nh = const_cast<unsigned char *>(p);
-    _aa.h = const_cast<unsigned char *>(p) + len;
 #endif
 }
 
@@ -2331,10 +2424,8 @@ Packet::set_network_header_length(uint32_t len)
 # else
     skb()->h.raw = skb()->nh.raw + len;
 # endif
-#elif CLICK_PACKET_USE_DPDK
+#else				/* User-space and BSD kernel module and CLICK_PACKET_USE_DPDK */
     all_anno()->h = all_anno()->nh + len;
-#else				/* User-space and BSD kernel module */
-    _aa.h = _aa.nh + len;
 #endif
 }
 
@@ -2387,10 +2478,8 @@ Packet::clear_network_header()
 # else
     skb()->nh.raw = 0;
 # endif
-#elif CLICK_PACKET_USE_DPDK
+#else				/* User-space and BSD kernel module and CLICK_PACKET_USE_DPDK */
     all_anno()->nh = 0;
-#else				/* User-space and BSD kernel module */
-    _aa.nh = 0;
 #endif
 }
 
@@ -2505,10 +2594,8 @@ Packet::clear_transport_header()
 # else
     skb()->h.raw = 0;
 # endif
-#elif CLICK_PACKET_USE_DPDK
+#else				/* User-space and BSD kernel module and CLICK_PACKET_USE_DPDK */
     all_anno()->h = 0;
-#else				/* User-space and BSD kernel module */
-    _aa.h = 0;
 #endif
 }
 
@@ -2545,9 +2632,9 @@ Packet::shift_header_annotations(const unsigned char *old_head,
     all_anno()->h += (all_anno()->h ? shift : 0);
 #else
     ptrdiff_t shift = (_head - old_head) + extra_headroom;
-    _aa.mac += (_aa.mac ? shift : 0);
-    _aa.nh += (_aa.nh ? shift : 0);
-    _aa.h += (_aa.h ? shift : 0);
+    all_anno()->mac += (all_anno()->mac ? shift : 0);
+    all_anno()->nh += (all_anno()->nh ? shift : 0);
+    all_anno()->h += (all_anno()->h ? shift : 0);
 #endif
 }
 
@@ -2884,7 +2971,7 @@ WritablePacket::buffer_data() const
 
 #if !CLICK_LINUXMODULE
 inline void
-WritablePacket::set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length) {
+WritablePacket::init_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length) {
 # if CLICK_PACKET_USE_DPDK
     rte_panic("Not allowed with DPDK");
 # else
@@ -2893,10 +2980,32 @@ WritablePacket::set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t
 	_end = data + buffer_length;
 # endif
 }
+inline void
+WritablePacket::set_buffer(unsigned char* buffer, uint32_t buffer_length) {
+# if CLICK_PACKET_USE_DPDK
+    rte_panic("Not allowed with DPDK");
+# else
+	_head = buffer;
+    _end = buffer +buffer_length;
+# endif
+}
+inline void
+WritablePacket::set_data(unsigned char* data) {
+# if CLICK_PACKET_USE_DPDK
+    rte_panic("Not allowed with DPDK");
+# else
+	_data = data;
+# endif
+}
+inline void
+WritablePacket::set_data_length(uint32_t data_length) {
+# if CLICK_PACKET_USE_DPDK
+    rte_panic("Not allowed with DPDK");
+# else
+	_tail = _data + data_length;
+# endif
+}
 #endif
-
-#include <clicknet/tcp.h>
-#include <clicknet/udp.h>
 
 inline void
 WritablePacket::rewrite_ips(IPPair pair, bool is_tcp) {
@@ -3014,7 +3123,119 @@ WritablePacket::rewrite_ip(IPAddress ip, const int shift, bool is_tcp) {
         click_update_in_cksum(&this->udp_header()->uh_sum, t_old_hw, t_new_hw);
 }
 
+//0 for seq, 1 for ack
+inline void
+WritablePacket::rewrite_seq(tcp_seq_t seq, const int shift) {
+    assert(this->network_header());
+    assert(this->transport_header());
+    uint32_t t_old_hw = 0;
+    uint32_t t_new_hw = 0;
+
+    uint16_t *xseq = reinterpret_cast<uint16_t *>(&this->tcp_header()->th_seq);
+    t_old_hw = (uint32_t) xseq[shift * 2];
+    t_old_hw += (t_old_hw >> 16);
+    memcpy(&xseq[shift*2], &seq, 4);
+    t_new_hw = (uint32_t) xseq[shift * 2];
+    t_new_hw += (t_new_hw >> 16);
+
+    click_update_in_cksum(&this->tcp_header()->th_sum, t_old_hw, t_new_hw);
+}
+
+
+#if !CLICK_PACKET_USE_DPDK
+/**
+ * Release a buffer that is directly allocated, ie not one that use destructor
+ */
+inline void
+Packet::release_buffer(unsigned char* head) {
+
+# if HAVE_NETMAP_PACKET_POOL
+                if (NetmapBufQ::is_valid_netmap_buffer(head))
+                    NetmapBufQ::local_pool()->insert_p(head);
+                else
+# endif
+                {
+#  if HAVE_DPDK
+                if (dpdk_enabled)
+                    rte_free(head);
+                else
+#  endif
+                    ::operator delete[](head);
+                }
+}
+
+inline void
+Packet::delete_buffer(unsigned char* head, unsigned char* end
+#if CLICK_BSDMODULE
+        ,unsigned char* m
+#endif
+        ) {
+# ifndef CLICK_NOINDIRECT
+    if (_data_packet) {
+	    _data_packet->kill();
+    }
+# else
+  if (false) {}
+# endif
+# if CLICK_USERLEVEL || CLICK_MINIOS
+    else if (head && _destructor) {
+        if (_destructor != empty_destructor)
+            _destructor(head, end - head, _destructor_argument);
+    } else
+        release_buffer(head);
+# elif CLICK_BSDMODULE
+    if (m)
+	    m_freem(m);
+# endif
+}
+#endif
+
 typedef Packet::PacketType PacketType;
+
+
+inline unsigned char* WritablePacket::getPacketContent()
+{
+    uint16_t offset = getContentOffset();
+
+    return (data() + offset);
+}
+
+
+inline const unsigned char* Packet::getPacketContent()
+{
+    uint16_t offset = getContentOffset();
+
+    return (data() + offset);
+}
+
+inline bool Packet::isPacketContentEmpty() const
+{
+    uint16_t offset = getContentOffset();
+
+    if(offset >= length())
+        return true;
+    else
+        return false;
+}
+
+inline uint16_t Packet::getPacketContentSize() const
+{
+    uint16_t offset = getContentOffset();
+
+    return length() - offset;
+}
+
+inline void Packet::setContentOffset(uint16_t offset)
+{
+    set_anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET, offset);
+}
+
+inline uint16_t Packet::getContentOffset() const
+{
+    return anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET);
+}
+
+
 
 CLICK_ENDDECLS
 #endif

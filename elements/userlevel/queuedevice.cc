@@ -31,13 +31,17 @@ int QueueDevice::use_nodes = 0;
 Vector<int> QueueDevice::inputs_count = Vector<int>();
 Vector<int> QueueDevice::shared_offset = Vector<int>();
 
-QueueDevice::QueueDevice() : _minqueues(0),_maxqueues(128), usable_threads(),
+QueueDevice::QueueDevice() :
+    _minqueues(0),_maxqueues(128), _burst(0),
+    _q_infos(), usable_threads(),
     queue_per_threads(1), queue_share(1), ndesc(0), allow_nonexistent(false),
     _maxthreads(-1), _minthreads(0), firstqueue(-1), lastqueue(-1), n_queues(-1),
-    thread_share(1), _this_node(0), _active(true) {
+    thread_share(1), _thread_state(), _this_node(0), _active(true) {
     _verbose = 1;
 }
-void QueueDevice::static_initialize() {
+
+void
+QueueDevice::static_initialize() {
 #if HAVE_NUMA
     int num_nodes = Numa::get_max_numas();
     if (num_nodes < 1)
@@ -56,9 +60,7 @@ int QueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
     if (Args(this, errh).bind(conf)
             .read_p("QUEUE", firstqueue)
             .read("N_QUEUES",n_queues)
-           .read("MINTHREADS", _minthreads)
            .read("MAXTHREADS", _maxthreads)
-           .read("BURST", _burst)
            .read("VERBOSE", _verbose)
            .read("ACTIVE", _active)
            .read("ALLOW_NONEXISTENT", allow_nonexistent)
@@ -74,9 +76,9 @@ bool QueueDevice::get_spawning_threads(Bitvector& bmk, bool, int port)
 {
     if (noutputs()) { //RX
         //if (_active) { TODO
-            for (int i = firstqueue; i < firstqueue + n_queues; i++) {
+            for (int i = 0; i < n_queues; i++) {
                 for (int j = 0; j < queue_share; j++) {
-                    bmk[thread_for_queue(i) - j] = 1;
+                    bmk[thread_for_queue_offset(i) - j] = 1;
                 }
             }
         // }
@@ -134,8 +136,6 @@ int RXQueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
     _numa_node_override = -1;
 
     if (Args(this, errh).bind(conf)
-        .read("RSS_AGGREGATE", _set_rss_aggregate)
-        .read("PAINT_QUEUE", _set_paint_anno)
         .read("NUMA", _use_numa)
         .read("NUMA_NODE", _numa_node_override)
         .read("SCALE", scale).read_status(has_scale)
@@ -161,6 +161,9 @@ int RXQueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
     _use_numa = false;
 #endif
     return 0;
+}
+
+TXQueueDevice::TXQueueDevice() : _blocking(false), _internal_tx_queue_size(1024) {
 }
 
 int TXQueueDevice::parse(Vector<String> &conf, ErrorHandler* errh) {
@@ -453,7 +456,7 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 
         if (th_share_idx % thread_share != 0) {
             --th_num;
-            _q_infos[qu_num].lock = 0;
+            _q_infos[qu_num - firstqueue].lock = 0;
         }
 
         Task* &task = _thread_state.get_value_for_thread(th_id).task;
@@ -468,7 +471,7 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
         for (int j = 0; j < queue_per_threads; j++) {
             if (_verbose > 2)
                 click_chatter("%s: Queue %d handled by th %d", name().c_str(), qu_num,th_id);
-            _q_infos[qu_num].thread_id = th_id;
+            _q_infos[qu_num - firstqueue].thread_id = th_id;
             // If queues are shared, this mapping is loosy: _q_infos[].thread_id will map to the last thread. That's fine, we only want to retrieve one to find one thread to finish some job
             qu_share_idx++;
             if (qu_share_idx % queue_share == 0)

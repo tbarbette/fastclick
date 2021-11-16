@@ -700,12 +700,14 @@ FromDump::run_task(Task *)
         return false;
 }
 
+#if HAVE_BATCH
 PacketBatch *
 FromDump::pull_batch(int port, unsigned max) {
     PacketBatch* batch = 0;
     MAKE_BATCH(FromDump::pull(port),batch,max);
     return batch;
 }
+#endif
 
 Packet *
 FromDump::pull(int)

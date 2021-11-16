@@ -25,6 +25,7 @@
 #include <click/error.hh>
 #include <click/confparse.hh>
 #include <click/straccum.hh>
+#include <click/archive.hh>
 #include <click/driver.hh>
 #include "lexert.hh"
 #include "routert.hh"
@@ -50,6 +51,7 @@
 #define CHECK_OPT		313
 #define VERBOSE_OPT		314
 #define EXTRAS_OPT		315
+#define EMBED_OPT		316
 
 static const Clp_Option options[] = {
   { "align", 'A', ALIGN_OPT, 0, 0 },
@@ -62,6 +64,7 @@ static const Clp_Option options[] = {
   { "extras", 0, EXTRAS_OPT, 0, Clp_Negate },
   { "file", 'f', ROUTER_OPT, Clp_ValString, 0 },
   { "help", 0, HELP_OPT, 0, 0 },
+  { "ship", 0, EMBED_OPT, 0, 0 },
   { "kernel", 'k', KERNEL_OPT, 0, 0 }, // DEPRECATED
   { "linuxmodule", 'l', KERNEL_OPT, 0, 0 },
   { "package", 'p', PACKAGE_OPT, Clp_ValString, 0 },
@@ -75,6 +78,8 @@ static int driver = -1;
 static String subpackage;
 static HashTable<String, int> initial_requirements(-1);
 static bool verbose = false;
+static bool embed_package = false;
+static String* click_compile_prog = 0;
 
 void
 short_usage()
@@ -109,6 +114,7 @@ Options:\n\
                            for the relevant driver. Default is '.'.\n\
   -E, --elements ELTS      Include element classes ELTS.\n\
       --no-extras          Don't include surplus often-useful elements.\n\
+  -s, --ship               Ship source given in package archives in the binary.\n\
   -V, --verbose            Print progress information.\n\
   -C, --clickpath PATH     Use PATH for CLICKPATH.\n\
       --help               Print this message and exit.\n\
@@ -129,7 +135,9 @@ class Mindriver { public:
     void add_router_requirements(RouterT*, ElementMap&, ErrorHandler*);
     bool add_traits(const Traits&, const ElementMap&, ErrorHandler*);
     bool resolve_requirement(const String& requirement, const ElementMap& emap, ErrorHandler* errh, bool complain = true);
-    void print_elements_conf(FILE*, String package, const ElementMap&, const String &top_srcdir);
+
+    int click_compile_file(String source, String obj, String package, ErrorHandler* errh);
+    void print_elements_conf(FILE*, String package, const ElementMap&, const String &top_srcdir, ErrorHandler* errh);
 
     HashTable<String, int> _provisions;
     HashTable<String, int> _requirements;
@@ -155,10 +163,10 @@ void
 Mindriver::require(const String& req, ErrorHandler* errh)
 {
     if (_provisions.get(req) < 0) {
-	if (verbose && _requirements[req] < 0)
-	    errh->message("requiring %<%s%>", req.c_str());
-	_requirements[req] = 1;
-	_nrequirements++;
+        if (verbose && _requirements[req] < 0)
+            errh->message("requiring %<%s%>", req.c_str());
+        _requirements[req] = 1;
+        _nrequirements++;
     }
 }
 
@@ -189,13 +197,13 @@ Mindriver::add_router_requirements(RouterT* router, ElementMap& emap, ErrorHandl
     HashTable<ElementClassT*, int> primitives(-1);
     router->collect_types(primitives);
     for (HashTable<ElementClassT*, int>::iterator i = primitives.begin(); i.live(); i++) {
-	if (!i.key()->primitive())
-	    continue;
-	String tname = i.key()->name();
-	if (!emap.has_traits(tname))
-	    missing_sa << (nmissing++ ? ", " : "") << tname;
-	else
-	    require(tname, errh);
+        if (!i.key()->primitive())
+            continue;
+        String tname = i.key()->name();
+        if (!emap.has_traits(tname))
+            missing_sa << (nmissing++ ? ", " : "") << tname;
+        else
+            require(tname, errh);
     }
 
     if (nmissing == 1)
@@ -228,27 +236,33 @@ handle_router(Mindriver& md, String filename_in, ElementMap &emap, ErrorHandler 
 }
 
 bool
-Mindriver::add_traits(const Traits& t, const ElementMap&, ErrorHandler* errh)
+Mindriver::add_traits(const Traits& t, const ElementMap& emap, ErrorHandler* errh)
 {
     if (t.source_file)
-	add_source_file(t.source_file, errh);
+	    add_source_file(t.source_file, errh);
 
     if (t.name)
-	provide(t.name, errh);
+	    provide(t.name, errh);
 
     if (t.provisions) {
-	Vector<String> args;
-	cp_spacevec(t.provisions, args);
-	for (String* s = args.begin(); s < args.end(); s++)
-	    if (Driver::driver(*s) < 0)
-		provide(*s, errh);
+        Vector<String> args;
+        cp_spacevec(t.provisions, args);
+        for (String* s = args.begin(); s < args.end(); s++) {
+            if (Driver::driver(*s) < 0)
+            provide(*s, errh);
+            for (int i = 1; i < emap.size(); i++) {
+                if (emap.traits_at(i).features(*s)) {
+                    require(emap.traits_at(i).name, errh);
+                }
+            }
+        }
     }
 
     if (t.requirements) {
-	Vector<String> args;
-	cp_spacevec(t.requirements, args);
-	for (String* s = args.begin(); s < args.end(); s++)
-	    require(*s, errh);
+        Vector<String> args;
+        cp_spacevec(t.requirements, args);
+        for (String* s = args.begin(); s < args.end(); s++)
+            require(*s, errh);
     }
 
     return true;
@@ -260,45 +274,92 @@ Mindriver::resolve_requirement(const String& requirement, const ElementMap& emap
     LandmarkErrorHandler lerrh(errh, "resolving " + requirement);
 
     if (_provisions.get(requirement) > 0)
-	return true;
+	    return true;
 
     int try_name_emapi = emap.traits_index(requirement);
+
     if (try_name_emapi > 0) {
-	add_traits(emap.traits_at(try_name_emapi), emap, &lerrh);
-	return true;
+        add_traits(emap.traits_at(try_name_emapi), emap, &lerrh);
+        return true;
     }
 
-    for (int i = 1; i < emap.size(); i++)
-	if (emap.traits_at(i).provides(requirement)) {
-	    add_traits(emap.traits_at(i), emap, &lerrh);
-	    return true;
-	}
+    if (requirement.starts_with("!")) {
+        String nr = requirement.substring(1);
+        for (int i = 1; i < emap.size(); i++) {
+            if (emap.traits_at(i).provides(nr)) {
+                if (complain)
+                    errh->error("cannot requirement %<%s%> as it is providen", requirement.c_str());
+                return false;
+
+            }
+        }
+        return true;
+    }
+
+    for (int i = 1; i < emap.size(); i++) {
+        if (emap.traits_at(i).provides(requirement)) {
+            add_traits(emap.traits_at(i), emap, &lerrh);
+            return true;
+        }
+    }
+
 
     // check for '|' requirements
     const char *begin = requirement.begin(), *bar;
     while ((bar = find(begin, requirement.end(), '|')) < requirement.end()) {
 	if (resolve_requirement(requirement.substring(begin, bar), emap, errh, false))
-	    return true;
+	        return true;
 	begin = bar + 1;
     }
-
+do_complain:
     if (complain)
 	errh->error("cannot satisfy requirement %<%s%>", requirement.c_str());
+
     return false;
 }
 
+int
+Mindriver::click_compile_file(String source, String obj, String package, ErrorHandler* errh) {
+    // find compile program
+    if (!click_compile_prog)
+        click_compile_prog = new String(clickpath_find_file("click-compile", "bin", CLICK_BINDIR, errh));
+    if (!*click_compile_prog)
+        return -1;
+
+    ContextErrorHandler cerrh
+        (errh, "While compiling dependency %<%s%>:", obj.c_str());
+
+    // prepare click-compile
+    StringAccum compile_command;
+    compile_command << *click_compile_prog << " -t " << Driver::name(driver) << " -p " << package << " --objs -c " << source << " -o " << obj;
+
+    // finish compile_command
+    if (verbose)
+        errh->message("%s", compile_command.c_str());
+    int compile_retval = system(compile_command.c_str());
+    if (compile_retval == 127)
+        return cerrh.error("could not run %<%s%>", compile_command.c_str());
+    else if (compile_retval < 0)
+        return cerrh.error("could not run %<%s%>: %s", compile_command.c_str(), strerror(errno));
+    else if (compile_retval != 0)
+        return cerrh.error("%<%s%> failed", compile_command.c_str());
+    else
+        return 0;
+}
+
 void
-Mindriver::print_elements_conf(FILE *f, String package, const ElementMap &emap, const String &top_srcdir)
+Mindriver::print_elements_conf(FILE *f, String package, const ElementMap &emap, const String &top_srcdir,ErrorHandler* errh)
 {
     Vector<String> sourcevec;
     for (HashTable<String, int>::iterator iter = _source_files.begin();
 	 iter.live();
 	 iter++) {
-	iter.value() = sourcevec.size();
-	sourcevec.push_back(iter.key());
+        iter.value() = sourcevec.size();
+        sourcevec.push_back(iter.key());
     }
 
     Vector<String> headervec(sourcevec.size(), String());
+    Vector<String> compilevec(sourcevec.size(), String());
     Vector<String> classvec(sourcevec.size(), String());
     HashTable<String, int> statichash(0);
 
@@ -306,7 +367,14 @@ Mindriver::print_elements_conf(FILE *f, String package, const ElementMap &emap, 
     for (int i = 1; i < emap.size(); i++) {
 	const Traits &elt = emap.traits_at(i);
 	int sourcei = _source_files.get(elt.source_file);
-	if (sourcei >= 0 && emap.package(elt) == subpackage) {
+	if (sourcei >= 0) {
+        if (emap.package(elt) != subpackage) {
+            if (embed_package) {
+                compilevec[sourcei] = emap.archive(elt);
+            }
+            else
+                continue;
+        }
 	    // track ELEMENT_LIBS
 	    // ah, if only I had regular expressions
 	    if (!headervec[sourcei] && elt.libs) {
@@ -329,8 +397,16 @@ Mindriver::print_elements_conf(FILE *f, String package, const ElementMap &emap, 
 	    // remember header file
 	    headervec[sourcei] = elt.header_file;
 	    // remember name
-	    if (elt.name && !elt.noexport)
-		classvec[sourcei] += " " + elt.cxx + "-" + elt.name;
+	    if (elt.name && !elt.noexport) {
+            // Avoid adding duplicate elements
+            String tmp_elem = " " + elt.cxx + "-" + elt.name;
+            int found = classvec[sourcei].find_left(tmp_elem,0);
+            if(found >= 0) {
+                printf("Found duplicate element! %s at %d\n", tmp_elem.c_str(), found);
+                continue;
+            }
+            classvec[sourcei] += tmp_elem;
+        }
 	    // remember static methods
 	    if (elt.methods && !statichash[elt.cxx]) {
 		statichash[elt.cxx] = 1;
@@ -347,16 +423,32 @@ Mindriver::print_elements_conf(FILE *f, String package, const ElementMap &emap, 
 
     // output data
     time_t now = time(0);
-    const char *date_str = ctime(&now);
+    char date_str[256];
+    strftime(date_str, sizeof(date_str), "%c\n" , localtime(&now));
     fprintf(f, "# Generated by 'click-mkmindriver -p %s' on %s", package.c_str(), date_str);
-    for (int i = 0; i < sourcevec.size(); i++)
-	if (headervec[i]) {
-	    String classstr(classvec[i].begin() + 1, classvec[i].end());
-	    if (headervec[i][0] != '\"' && headervec[i][0] != '<')
-		fprintf(f, "%s%s\t\"%s%s\"\t%s\n", top_srcdir.c_str(), sourcevec[i].c_str(), top_srcdir.c_str(), headervec[i].c_str(), classstr.c_str());
-	    else
-		fprintf(f, "%s%s\t%s\t%s\n", top_srcdir.c_str(), sourcevec[i].c_str(), headervec[i].c_str(), classstr.c_str());
-	}
+    for (int i = 0; i < sourcevec.size(); i++) {
+        if (headervec[i]) {
+            String classstr(classvec[i].begin() + 1, classvec[i].end());
+            if (compilevec[i]) {
+                String source = sourcevec[i];
+                String obj = source.substring(0,source.find_right('.')) + ".o";
+
+                String s = file_string(compilevec[i], errh);
+                Vector<ArchiveElement> ar;
+                ArchiveElement::parse(s, ar);
+                ArchiveElement::extract(ar, source, source, errh);
+                String header = headervec[i];
+                ArchiveElement::extract(ar, header, header, errh);
+                click_compile_file(source,obj,package,errh);
+                fprintf(f, "%s\t\"%s\"\t%s\n", obj.c_str(), header.c_str(), classstr.c_str());
+            } else {
+                if (headervec[i][0] != '\"' && headervec[i][0] != '<')
+                fprintf(f, "%s%s\t\"%s%s\"\t%s\n", top_srcdir.c_str(), sourcevec[i].c_str(), top_srcdir.c_str(), headervec[i].c_str(), classstr.c_str());
+                else
+                fprintf(f, "%s%s\t%s\t%s\n", top_srcdir.c_str(), sourcevec[i].c_str(), headervec[i].c_str(), classstr.c_str());
+            }
+        }
+    }
 }
 
 static String
@@ -478,7 +570,7 @@ particular purpose.\n");
 	    specifier = (clp->negated ? "x" : "a");
 	    break;
 
-	case CHECK_OPT:
+	  case CHECK_OPT:
 	    check = !clp->negated;
 	    break;
 
@@ -492,6 +584,10 @@ particular purpose.\n");
 
 	  case ALIGN_OPT:
 	    break;
+
+      case EMBED_OPT:
+        embed_package = !clp->negated;
+        break;
 
 	  case EXTRAS_OPT:
 	    extras = !clp->negated;
@@ -538,8 +634,9 @@ particular purpose.\n");
     }
 
     ElementMap default_emap;
-    if (!default_emap.parse_default_file(CLICK_DATADIR, errh, verbose))
-	default_emap.report_file_not_found(CLICK_DATADIR, false, errh);
+    if (!default_emap.parse_default_file(CLICK_DATADIR, errh, verbose)) {
+	    default_emap.report_file_not_found(CLICK_DATADIR, false, errh);
+    }
 
     if (subpackage)
         default_emap.parse_package_file(subpackage, 0, CLICK_DATADIR, errh, verbose);
@@ -598,7 +695,7 @@ particular purpose.\n");
 	FILE *f = fopen(fn.c_str(), "w");
 	if (!f)
 	    errh->fatal("%s: %s", fn.c_str(), strerror(errno));
-	md.print_elements_conf(f, package_name, default_emap, top_srcdir);
+	md.print_elements_conf(f, package_name, default_emap, top_srcdir, errh);
 	fclose(f);
     }
 
@@ -609,7 +706,8 @@ particular purpose.\n");
         else if (subpackage && driver == Driver::LINUXMODULE)
             errh->message("Build %<%s.ko%> with %<make MINDRIVER=%s%>.", package_name, package_name);
 	else if (driver == Driver::USERLEVEL)
-	    errh->message("Build %<%sclick%> with %<make MINDRIVER=%s%>.", package_name, package_name);
+	    errh->message("Build %<%sclick%> with %<make %sclick MINDRIVER=%s%>.\nYou should also add STATIC=1 if you use --static pass from click-devirtualize.",
+        package_name, package_name, package_name);
 	else
 	    errh->message("Build %<%sclick.ko%> with %<make MINDRIVER=%s%>.", package_name, package_name);
 	return 0;

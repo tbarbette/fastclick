@@ -23,6 +23,8 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/glue.hh>
+#include <click/standard/scheduleinfo.hh>
+
 CLICK_DECLS
 
 static int
@@ -32,12 +34,14 @@ timestamp_diff(const Timestamp &t1, const Timestamp &t2)
 }
 
 WebGen::WebGen()
-  : _timer(this), _limit(-1), _active(false)
+  : _timer(this), _limit(-1), _active(false), _verbose(false), _task(this)
 {
-
+  _parallel = 16;
   cbfree = NULL;
   rexmit_head = NULL;
   rexmit_tail = NULL;
+
+  _url = "";
 
   memset (cbhash, 0, sizeof (cbhash));
   memset (&perfcnt, 0, sizeof (perfcnt));
@@ -57,12 +61,17 @@ WebGen::configure (Vector<String> &conf, ErrorHandler *errh)
           .read_mp("PREFIX", IPPrefixArg(true), _src_prefix, _mask)
           .read_mp("DST", _dst)
           .read_mp("RATE", cps)
+          .read_p("PARALLEL", _parallel)
           .read("LIMIT", _limit)
           .read("ACTIVE", _active)
+          .read("URL", _url)
           .read("VERBOSE", _verbose)
       .complete();
-
+if (cps == 0) {
+  start_interval = 0;
+} else {
   start_interval = 1000000 / cps;
+}
   return ret;
 }
 
@@ -84,13 +93,22 @@ WebGen::connhash (unsigned src, unsigned short sport)
 }
 
 int
-WebGen::initialize (ErrorHandler *)
+WebGen::initialize (ErrorHandler *errh)
 {
   _timer.initialize (this);
+
+
   if (_active)
     _timer.schedule_now ();
 
-  int ncbs = 2 * (resend_dt / start_interval) * resend_max;
+ int ncbs;
+ if (start_interval) {
+     ncbs = 2 * (resend_dt / start_interval) * resend_max;
+ } else {
+  ScheduleInfo::initialize_task(this, &_task, _active, errh);
+    ncbs = _parallel;
+
+ }
   for (int i = 0; i < ncbs; i++) {
     CB *cb = new CB;
     if (!cb) {
@@ -148,6 +166,8 @@ WebGen::recycle (CB *cb)
   cb->rexmit_unlink ();
   cb->remove_from_list ();
   cb->add_to_list (&cbfree);
+  if (start_interval == 0)
+    _task.reschedule();
 }
 
 void
@@ -174,26 +194,27 @@ WebGen::run_timer (Timer *)
 {
   CB *cb;
   Timestamp now = Timestamp::now();
-
+  if (start_interval) {
   while (timestamp_diff(now, start_tv) > start_interval) {
     start_tv += Timestamp::make_usec(start_interval);
     cb = cbfree;
 
     if (cb) {
       cb->remove_from_list ();
-      cb->reset (pick_src ());
+      cb->reset (pick_src (), _url);
 
       int hv = connhash (cb->_src, cb->_sport);
       cb->add_to_list (&cbhash[hv]);
       tcp_send(cb, 0);
       perfcnt.initiated++;
-        if (perfcnt.initiated >= _limit) {
+        if (_limit > 0 && perfcnt.initiated >= _limit) {
             set_active(false);
             return;
         }
     } else {
       click_chatter ("out of available CBs\n");
     }
+  }
   }
 
   CB *lrxcb = rexmit_tail->rexmit_prev;
@@ -221,6 +242,33 @@ WebGen::run_timer (Timer *)
   _timer.schedule_after_msec(1);
 }
 
+bool
+WebGen::run_task(Task *)
+{
+  CB *cb;
+
+  while(cbfree) {
+      cb = cbfree;
+
+      cb->remove_from_list ();
+      cb->reset (pick_src (), _url);
+
+      int hv = connhash (cb->_src, cb->_sport);
+    if (_verbose > 0)
+     click_chatter("%p{element} CREATE %d %d",this, cb->_sport, cb->_dport);
+
+      cb->add_to_list (&cbhash[hv]);
+      tcp_send(cb, 0);
+      perfcnt.initiated++;
+        if (_limit > 0 && perfcnt.initiated >= _limit) {
+            set_active(false);
+            return false;
+        }
+  }
+  return true;
+}
+
+
 WebGen::CB *
 WebGen::find_cb (unsigned src, unsigned short sport, unsigned short dport)
 {
@@ -243,6 +291,17 @@ WebGen::simple_action (Packet *p)
   tcp_input (p);
   return NULL;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+WebGen::simple_action_batch (PacketBatch *batch)
+{
+    FOR_EACH_PACKET_SAFE(batch,p)
+      tcp_input (p);
+  return NULL;
+}
+#endif
+
 
 void
 WebGen::tcp_input (Packet *p)
@@ -270,12 +329,12 @@ WebGen::tcp_input (Packet *p)
     unsigned plen = sizeof (click_ip) + sizeof (click_tcp);
 
     WritablePacket *wp = fixup_packet (p, plen);
+    click_chatter("Received packet for unknown cb? Sending RST");
     tcp_output (wp,
 		ip->ip_dst, th->th_dport,
 		ip->ip_src, th->th_sport,
 		th->th_ack, th->th_seq, TH_RST,
 		NULL, 0);
-      //click_chatter("Received packet for unknown cb? Sending RST");
     return;
   }
 
@@ -291,8 +350,8 @@ WebGen::tcp_input (Packet *p)
     cb->_rcv_nxt = cb->_irs + 1;
     cb->_connected = 1;
     cb->_do_send = 1;
-      if (_verbose > 0)
-    click_chatter("WebGen connected %d %d",
+    if (_verbose > 0)
+      click_chatter("WebGen connected %d %d",
                   ntohs(cb->_sport),
                   ntohs(cb->_dport));
   } else if (dlen > 0) {
@@ -305,6 +364,9 @@ WebGen::tcp_input (Packet *p)
   }
 
   if (th->th_flags & TH_ACK) {
+    if (_verbose > 0)
+     click_chatter("%p{element} ACK %d %d",this, ntohs (th->th_sport), ntohs (th->th_dport));
+
     if (ack > cb->_snd_una) {
       cb->_snd_una = ack;
     }
@@ -313,13 +375,16 @@ WebGen::tcp_input (Packet *p)
   if ((th->th_flags & TH_FIN) &&
       seq + dlen == cb->_rcv_nxt &&
       cb->_got_fin == 0) {
+    if (_verbose > 0)
+     click_chatter("%p{element} FIN %d %d",this, ntohs (th->th_sport), ntohs (th->th_dport));
+
     cb->_got_fin = 1;
     cb->_rcv_nxt += 1;
     cb->_do_send = 1;
   }
 
   if (th->th_flags & TH_RST) {
-      if (_verbose > 0)
+    if (_verbose > 0)
      click_chatter("%p{element} RST %d %d",this, ntohs (th->th_sport), ntohs (th->th_dport));
     p->kill ();
     recycle (cb);
@@ -522,7 +587,7 @@ WebGen::CB::CB ()
 }
 
 void
-WebGen::CB::reset (IPAddress src)
+WebGen::CB::reset (IPAddress src, String url)
 {
   _src = src;
   _dport = htons (80);
@@ -538,11 +603,15 @@ WebGen::CB::reset (IPAddress src)
   _closed = 0;
   _resends = 0;
 
-  int dir = click_random(0, 9);
-  int file = click_random(0, 8);	// 0 .. 8 exist
-  int c = click_random(0, 2);		// 0 .. 3 exist
-  sprintf (sndbuf, "GET /spec/%d/%d-%d-%d HTTP/1.0\r\n\r\n",
-           dir, dir, c, file);
+  if (url) {
+      sprintf (sndbuf, "GET %s HTTP/1.0\r\n\r\n",url.c_str());
+  } else {
+      int dir = click_random(0, 9);
+      int file = click_random(0, 8);    // 0 .. 8 exist
+      int c = click_random(0, 2);       // 0 .. 3 exist
+      sprintf (sndbuf, "GET /spec/%d/%d-%d-%d HTTP/1.0\r\n\r\n",
+               dir, dir, c, file);
+  }
   sndlen = strlen (sndbuf);
 }
 

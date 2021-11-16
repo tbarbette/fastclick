@@ -170,6 +170,8 @@ void click_lfree(volatile void *p, size_t size);
 
 CLICK_DECLS
 
+#define assume(cond) do { if (!(cond)) __builtin_unreachable(); } while (0)
+
 #if HAVE_DPDK
 extern bool dpdk_enabled;
 #endif
@@ -213,7 +215,7 @@ inline uint32_t click_random() {
 # elif CLICK_LINUXMODULE
     click_random_seed = click_random_seed * 69069L + 5;
     return (click_random_seed ^ jiffies) & CLICK_RAND_MAX; // XXX jiffies??
-#elif CLICK_MINIOS
+# elif CLICK_MINIOS
     return rand();
 # elif HAVE_RANDOM && CLICK_RAND_MAX == RAND_MAX
     // See also click_random() in ns/nsclick.cc
@@ -746,7 +748,7 @@ click_get_cycles()
     uint32_t xlo, xhi;
     __asm__ __volatile__ ("rdtsc" : "=a" (xlo), "=d" (xhi));
     return xlo;
-#elif CLICK_USERLEVEL && HAVE_DPDK && _RTE_CYCLES_H_
+#elif CLICK_USERLEVEL && HAVE_DPDK && defined(_RTE_CYCLES_H_)
     // On other architectures we use DPDK implementation, if available
     return rte_get_tsc_cycles();
 #elif CLICK_USERLEVEL

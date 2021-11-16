@@ -44,7 +44,11 @@ LookupIP6Route::configure(Vector<String> &conf, ErrorHandler *errh)
 
     Vector<String> words;
     cp_spacevec(conf[i], words);
-
+#ifndef __clang__
+//Stupid old GCC raise warning. When is always defined here
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
     if ((words.size()==2 || words.size()==3 )
       && cp_ip6_prefix(words[0], (unsigned char *)&dst, (unsigned char *)&mask, true, this)
 	&& IntArg().parse(words.back(), output_num))
@@ -56,6 +60,9 @@ LookupIP6Route::configure(Vector<String> &conf, ErrorHandler *errh)
 	ok = true;
       }
     }
+#ifndef __clang__
+#pragma GCC diagnostic pop
+#endif
 
   if (ok && output_num>=0) {
     _t.add(dst, mask, gw, output_num);
@@ -88,8 +95,8 @@ LookupIP6Route::initialize(ErrorHandler *)
   return 0;
 }
 
-void
-LookupIP6Route::push(int, Packet *p)
+int
+LookupIP6Route::classify(Packet *p)
 {
   IP6Address a = DST_IP6_ANNO(p);
   IP6Address gw;
@@ -101,8 +108,7 @@ LookupIP6Route::push(int, Packet *p)
 	{
 	    SET_DST_IP6_ANNO(p, _last_gw);
 	}
-      output(_last_output).push(p);
-      return;
+      return _last_output;
     }
  #ifdef IP_RT_CACHE2
     else if (a == _last_addr2) {
@@ -114,10 +120,9 @@ LookupIP6Route::push(int, Packet *p)
       EXCHANGE(_last_output, _last_output2, tmpi);
 #endif
       if (_last_gw2) {
-	  SET_DST_IP6_ANNO(p, _last_gw2);
+	      SET_DST_IP6_ANNO(p, _last_gw2);
       }
-      output(_last_output2).push(p);
-      return;
+      return _last_output2;
     }
 #endif
   }
@@ -136,10 +141,10 @@ LookupIP6Route::push(int, Packet *p)
     if (gw != IP6Address("::0")) {
 	SET_DST_IP6_ANNO(p, IP6Address(gw));
     }
-    output(ifi).push(p);
+    return ifi;
 
   } else {
-    p->kill();
+    return -1;
   }
 }
 
@@ -172,4 +177,6 @@ LookupIP6Route::add_handlers()
 }
 
 CLICK_ENDDECLS
+
 EXPORT_ELEMENT(LookupIP6Route)
+ELEMENT_REQUIRES(IP6RouteTable)

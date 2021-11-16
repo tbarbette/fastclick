@@ -74,6 +74,7 @@ static bool anno_extract(PacketDesc& d, const FieldWriter *f)
 	return true;
     case T_WIRE_LEN:
 	d.v = p->length();
+  return true;
     case T_THREAD:
     d.v = click_current_cpu_id();
 	return true;
@@ -294,4 +295,5 @@ void IPSummaryDump_Anno::static_cleanup()
 
 ELEMENT_REQUIRES(userlevel IPSummaryDump)
 ELEMENT_PROVIDES(IPSummaryDump_Anno)
+ELEMENT_FEATURES(IPSummaryDump)
 CLICK_ENDDECLS

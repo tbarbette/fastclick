@@ -84,9 +84,9 @@ class ICMPPingRewriter : public IPRewriterBase { public:
 
 	ICMPPingFlow(IPRewriterInput *owner, const IPFlowID &flowid,
 		     const IPFlowID &rewritten_flowid,
-		     bool guaranteed, click_jiffies_t expiry_j)
+		     bool guaranteed, click_jiffies_t expiry_j, uint8_t port)
 	    : IPRewriterFlow(owner, flowid, rewritten_flowid,
-			     IP_PROTO_ICMP, guaranteed, expiry_j) {
+			     IP_PROTO_ICMP, guaranteed, expiry_j, port) {
 	    _udp_csum_delta = 0;
 	    click_update_in_cksum(&_udp_csum_delta, flowid.sport(), rewritten_flowid.sport());
 	}
@@ -136,7 +136,7 @@ class ICMPPingRewriter : public IPRewriterBase { public:
 inline void
 ICMPPingRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map[click_current_cpu_id()]);
+    unmap_flow(flow, _state->map);
     static_cast<ICMPPingFlow *>(flow)->~ICMPPingFlow();
     _allocator[click_current_cpu_id()].deallocate(flow);
 }

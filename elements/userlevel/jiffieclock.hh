@@ -36,6 +36,7 @@ private:
   Timestamp last_jiffies_update;
   click_jiffies_t jiffies;
   bool _verbose;
+  int _minprecision;
 };
 
 CLICK_ENDDECLS

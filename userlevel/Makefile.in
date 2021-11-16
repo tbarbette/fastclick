@@ -13,7 +13,7 @@ bindir = @bindir@
 sbindir = @sbindir@
 libdir = @libdir@
 
-VPATH = .:$(top_srcdir)/lib:$(top_srcdir)/vendor/tinyexpr:$(top_srcdir)/$(subdir):$(top_srcdir)/elements/standard
+VPATH = .:$(top_srcdir)/lib:$(top_srcdir)/vendor/tinyexpr:$(top_srcdir)/vendor/nicscheduler:$(top_srcdir)/lib/metron:$(top_srcdir)/$(subdir):$(top_srcdir)/elements/standard
 
 CC = @CC@
 CPP = @CPP@
@@ -63,26 +63,42 @@ endif
 .cc.ii:
 	$(call cxxcompile_nodep,-E $< > $@,CXXCPP)
 
+llvmutils.o: llvmutils.cc
+	$(call cxxcompile,-c $< $(INCLUDES_LLVM) -o $@,CXX)
 
 GENERIC_OBJS = string.o straccum.o nameinfo.o \
-	bitvector.o bighashmap_arena.o hashallocator.o \
+	bitvector.o bighashmap_arena.o hashallocator.o allocator.o \
 	ipaddress.o ipflowid.o etheraddress.o \
 	packet.o packetbatch.o \
 	error.o timestamp.o glue.o task.o timer.o atomic.o fromfile.o gaprate.o \
-	element.o batchelement.o tcphelper.o flowelement.o flow.o \
-	allocator.o \
+	element.o batchelement.o tcphelper.o \
+	allocator.o json.o \
 	confparse.o args.o variableenv.o lexer.o elemfilter.o routervisitor.o \
 	routerthread.o router.o master.o timerset.o selectset.o handlercall.o notifier.o \
 	integers.o md5.o crc32.o in_cksum.o iptable.o \
-	archive.o userutils.o driver.o tinyexpr.o \
-	$(EXTRA_DRIVER_OBJS)
+	archive.o userutils.o driver.o \
+	tinyexpr.o \
+	$(EXTRA_DRIVER_OBJS) $(LLVM_OBJS)
+
+USE_FLOW = @USE_FLOW@
+USE_CTX = @USE_CTX@
+ifeq ($(USE_FLOW),yes)
+GENERIC_OBJS += flow.o flowelement.o flownode.o
+ifeq ($(USE_CTX),yes)
+GENERIC_OBJS += flowbuffer.o bytestreammaintainer.o modificationlist.o \
+	circularbuffer.o rbt.o bufferpool.o bufferpoolnode.o
+endif
+endif
+
 
 EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@
+
+LLVM_OBJS = @LLVM_OBJS@
 
 LIBOBJS = $(GENERIC_OBJS) $(STD_ELEMENT_OBJS) clp.o exportstub.o
 STD_ELEMENT_OBJS = addressinfo.o alignmentinfo.o \
 	errorelement.o portinfo.o scheduleinfo.o
-OBJS = $(ELEMENT_OBJS) $(ELEMENTSCONF).o click.o
+OBJS = $(ELEMENT_OBJS) $(ELEMENTSCONF)$(ELEMENTSSUFFIX).o click.o
 
 CPPFLAGS = @CPPFLAGS@ -DCLICK_USERLEVEL
 CFLAGS = @CFLAGS@
@@ -94,6 +110,9 @@ INCLUDES = -I$(top_builddir)/include -I$(top_builddir)/vendor -I$(top_srcdir)/in
 	@PROPER_INCLUDES@ @PCAP_INCLUDES@ @DPDK_INCLUDES@ @NETMAP_INCLUDES@ @NUMA_INCLUDES@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@ `$(CLICK_BUILDTOOL) --otherlibs` $(ELEMENT_LIBS)
+LIBS_IR = @LIBS@ `$(CLICK_BUILDTOOL) --irlibs` $(ELEMENT_LIBS)
+LIBS_LLVM = @LIBS_LLVM@
+INCLUDES_LLVM= @INCLUDES_LLVM@
 DL_LDFLAGS = @DL_LDFLAGS@
 
 CXXCOMPILE = $(CXX) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CXXFLAGS)
@@ -102,6 +121,29 @@ CXXLINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 COMPILE = $(CC) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS)
 CCLD = $(CC)
 LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
+
+ifndef MINDRIVER
+DRIVER = click
+ELEMENTSCONF = elements
+INSTALLLIBS = libclick.a
+FINDELEMFLAGS = @FINDELEMFLAGS@ --checksum elements.csmk
+-include elements.csmk
+ELEM2EXPORT = elem2export
+else
+DRIVER = $(MINDRIVER)click
+ELEMENTSCONF = elements_$(MINDRIVER)
+ifeq ($(STATIC),1)
+ELEM2EXPORT = elem2exportstatic
+ELEMENTSSUFFIX = .static
+CXXFLAGS := $(CXXFLAGS) -w -fno-access-control
+else
+ELEM2EXPORT = elem2export
+ELEMENTSSUFFIX =
+endif
+endif
+INSTALLPROGS = $(DRIVER) packetmill
+
+all: $(INSTALLPROGS) $(INSTALLLIBS)
 
 USE_DPDK = @USE_DPDK@
 ifeq ($(USE_DPDK),yes)
@@ -112,44 +154,22 @@ ifeq ($(USE_DPDK),yes)
 	RTE_VER_YEAR = @RTE_VER_YEAR@
 	RTE_VER_MONTH = @RTE_VER_MONTH@
 	RTE_USE_PKGCONFIG = @RTE_USE_PKGCONFIG@
-	ifeq (${RTE_USE_PKGCONFIG}$(shell pkg-config --exists libdpdk && echo 1), 11)
-		CFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
-		CXXFLAGS := $(CXXFLAGS) $(shell pkg-config --cflags libdpdk)
-		include rte_parse.mk
-		ifeq ($(CLICK_SHARED),1)
-			LIBS := $(LIBS) $(shell pkg-config --libs libdpdk)
-		else
-			LIBS := $(LIBS) $(shell pkg-config --static --libs libdpdk)
-		endif
-	else
-		include dpdk.mk
-	endif
+	include rte_parse.mk
+	CFLAGS := $(CFLAGS) @DPDK_CFLAGS@
+	CXXFLAGS := $(CXXFLAGS) @DPDK_CFLAGS@
 	EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
 	ifeq ($(shell [ ${HAVE_FLOW_API} -eq 1 ] && echo true),true)
 		EXTRA_DRIVER_OBJS := flowrulemanager.o flowrulecache.o flowruleparser.o $(EXTRA_DRIVER_OBJS)
 	endif
 endif
 
-ifndef MINDRIVER
-DRIVER = click
-ELEMENTSCONF = elements
-INSTALLLIBS = libclick.a
-FINDELEMFLAGS = @FINDELEMFLAGS@ --checksum elements.csmk
--include elements.csmk
-else
-DRIVER = $(MINDRIVER)click
-ELEMENTSCONF = elements_$(MINDRIVER)
-endif
-INSTALLPROGS = $(DRIVER)
+
 
 ifneq ($(ELEMENT_CHECKSUM),)
 ifneq ($(shell $(ELEMENT_CHECKSUMCOMMAND)),$(ELEMENT_CHECKSUM))
 $(shell rm -f $(ELEMENTSCONF).conf $(ELEMENTSCONF).csmk)
 endif
 endif
-
-
-all: $(INSTALLPROGS) $(INSTALLLIBS)
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
@@ -167,6 +187,13 @@ $(DRIVER): Makefile libclick.a $(OBJS)
 	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a $(LIBS),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 endif
+click-opt: Makefile click.ll libclick.a
+	$(call cxxlink,$(DL_LDFLAGS) click.ll libclick.a $(LIBS_IR),LINK)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+
+embedclick-opt: Makefile embedclick.ll libclick.a
+	$(call cxxlink,$(DL_LDFLAGS) embedclick.ll libclick.a $(LIBS_IR),LINK)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 
 libclick.a: Makefile $(LIBOBJS)
 	$(call verbose_cmd,$(AR_CREATE) libclick.a $(LIBOBJS),AR libclick.a)
@@ -175,6 +202,11 @@ libclick.a: Makefile $(LIBOBJS)
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 
+
+packetmill: packetmill.cc $(DRIVER)
+	$(call cxxcompile,-o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS) $(LLVM_OBJS)) libclick.a packetmill.cc $(LIBS) $(LDFLAGS) $(LIBS_LLVM),CXXLINK)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+
 elemlist:
 	@rm -f elements.conf elements.csmk
 	@$(MAKE) elements.conf
@@ -182,8 +214,8 @@ elements.conf: $(top_builddir)/config.status $(CLICK_BUILDTOOL)
 	$(call verbose_cmd,echo "userlevel @element_groups@" | $(CLICK_BUILDTOOL) findelem -r userlevel -p $(top_srcdir) -X $(srcdir)/elements.exclude $(FINDELEMFLAGS) >,FINDELEMENTS,elements.conf)
 $(ELEMENTSCONF).mk: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
 	$(call verbose_cmd,$(CLICK_BUILDTOOL) elem2make -x "$(STD_ELEMENT_OBJS)" < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).mk)
-$(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
-	$(call verbose_cmd,$(CLICK_BUILDTOOL) elem2export < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).cc)
+$(ELEMENTSCONF)$(ELEMENTSSUFFIX).cc: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
+	$(call verbose_cmd,$(CLICK_BUILDTOOL) $(ELEM2EXPORT) < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF)$(ELEMENTSSUFFIX).cc)
 	@rm -f $(ELEMENTSCONF).d
 
 DEPFILES := $(wildcard *.d)
@@ -206,15 +238,19 @@ uninstall:
 	for i in $(INSTALLPROGS); do rm -f $(DESTDIR)$(bindir)/$$i; done
 
 clean:
-	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf elements.csmk libclick.a
+	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc $(ELEMENTSCONF).static.cc elements.conf elements.csmk libclick.a click-opt
 ifeq ($(shell [ ${HAVE_FLOW_API} ] && echo true),true)
 	rm -rf test-pmd/ ../lib/librte_parse_* librte_parse.*
 endif
 	@-for i in $(INSTALLPROGS); do rm -f ../bin/$$i; done
+
+clean-embed:
+	rm -f clickdv* elements_embed* embedclick* package.uo
+
 clean-lib:
 	rm -f $(LIBOBJS) libclick.a
 distclean: clean
 	-rm -f Makefile
 
 .PHONY: all clean clean-lib distclean elemlist \
-	install install-include install-lib install-man uninstall
+	install install-include install-lib install-man install-packetmill uninstall

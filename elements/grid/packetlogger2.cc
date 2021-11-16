@@ -65,6 +65,7 @@ PacketLogger2::clear(const String &foo, Element *e, void *vparam, ErrorHandler *
   while (p->_p.size()) {
     p->_p.pop_front();
   }
+  return 0;
 }
 
 

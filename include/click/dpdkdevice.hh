@@ -42,6 +42,7 @@
 #define rte_ipv4_hdr ipv4_hdr
 #define rte_ether_addr ether_addr
 #endif
+#include <nicscheduler/ethernetdevice.hh>
 
 #if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
 #define rte_ipv4_hdr ipv4_hdr
@@ -74,18 +75,16 @@ typedef uint32_t counter_t;
 
 extern bool dpdk_enabled;
 
-class DPDKDevice {
+class DPDKDevice : public DPDKEthernetDevice {
 public:
 
-    portid_t port_id;
 
-    DPDKDevice() CLICK_COLD;
-    DPDKDevice(portid_t port_id) CLICK_COLD;
+    DPDKDevice(portid_t port_id = -1) CLICK_COLD;
 
     struct DevInfo {
         inline DevInfo() :
             vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
-            init_mac(), init_mtu(0), init_rss(-1), init_fc_mode(FC_UNSET),
+            init_mac(), init_mtu(0), init_rss(-1), init_reta_size(-1), init_fc_mode(FC_UNSET),
             rx_queues(0, false), tx_queues(0, false), n_rx_descs(0), n_tx_descs(0),
             num_pools(0), promisc(false),
 	    mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
@@ -109,6 +108,7 @@ public:
             click_chatter("                MAC Address: %s", init_mac.unparse().c_str());
             click_chatter("      Maximum Transfer Unit: %u", init_mtu);
             click_chatter("Receive Side Scaling queues: %d", init_rss);
+            click_chatter("                  RETA Size: %d", init_reta_size);
             click_chatter("          Flow Control Mode: %d", init_fc_mode);
             click_chatter("             # of Rx Queues: %d", rx_queues.size());
             click_chatter("             # of Tx Queues: %d", tx_queues.size());
@@ -135,6 +135,7 @@ public:
         EtherAddress init_mac;
         uint16_t init_mtu;
         int init_rss;
+        int init_reta_size;
         FlowControlMode init_fc_mode;
         Vector<bool> rx_queues;
         Vector<bool> tx_queues;
@@ -178,9 +179,12 @@ public:
     void set_init_mac(EtherAddress mac);
     void set_init_mtu(uint16_t mtu);
     void set_init_rss_max(int rss_max);
+    void set_init_reta_size(int reta_size);
     void set_init_fc_mode(FlowControlMode fc);
     void set_rx_offload(uint64_t offload);
     void set_tx_offload(uint64_t offload);
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
     void set_init_flow_isolate(const bool &flow_isolate);
 
     inline void set_isolation_mode(const bool &isolated) {
@@ -192,7 +196,7 @@ public:
         }
     };
     inline bool isolated() { return info.flow_isolate; };
-
+#endif
 
 
     unsigned int get_nb_rxdesc();
@@ -202,7 +206,13 @@ public:
     String get_device_vendor_name();
     uint16_t get_device_id();
     const char *get_device_driver();
-    int set_rss_max(int max);
+
+    int dpdk_set_rss_max(int max, unsigned reta_sz = -1);
+    int dpdk_set_rss_reta(unsigned* reta, unsigned reta_sz);
+    int dpdk_get_rss_reta_size() const;
+    Vector<unsigned>  dpdk_get_rss_reta() const;
+
+    EthernetDevice* get_eth_device();
 
     static unsigned int dev_count() {
 #if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
@@ -250,7 +260,11 @@ public:
     }
 
     inline static bool is_dpdk_buffer(Packet* p) {
-        return is_dpdk_packet(p) || (p->data_packet() && is_dpdk_packet(p->data_packet()));
+        return is_dpdk_packet(p)
+#ifndef CLICK_NOINDIRECT
+            || (p->data_packet() && is_dpdk_packet(p->data_packet()))
+#endif
+        ;
     }
 #endif
 
@@ -312,7 +326,7 @@ public:
     */
     class TXInternalQueue {
         public:
-            TXInternalQueue() : pkts(0), index(0), nr_pending(0) { }
+            TXInternalQueue() : pkts(0), index(0), nr_pending(0), timeout() { }
 
             // Array of DPDK Buffers
             struct rte_mbuf **pkts;
@@ -436,19 +450,30 @@ inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node, b
     struct rte_mbuf* mbuf;
     #if CLICK_PACKET_USE_DPDK
     mbuf = p->mb();
+    #elif CLICK_PACKET_INSIDE_DPDK
+    mbuf = ((struct rte_mbuf*)p) - 1;
+    rte_pktmbuf_pkt_len(mbuf) = p->length();
+    rte_pktmbuf_data_len(mbuf) = p->length();
+    mbuf->data_off = p->headroom();
     #else
     if (likely(DPDKDevice::is_dpdk_packet(p) && (mbuf = (struct rte_mbuf *)((unsigned char*) p->buffer() - sizeof(rte_mbuf)) ))
-        || unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument()))) {
+#ifndef CLICK_NOINDIRECT
+        || unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument()))
+#endif
+            ) {
         /* If the packet is an unshared DPDK packet, we can send
          *  the mbuf as it to DPDK*/
         rte_pktmbuf_pkt_len(mbuf) = p->length();
         rte_pktmbuf_data_len(mbuf) = p->length();
         mbuf->data_off = p->headroom();
+#ifndef CLICK_NOINDIRECT
         if (p->shared()) {
             /*Prevent DPDK from freeing the buffer. When all shared packet
              * are freed, DPDKDevice::free_pkt will effectively destroy it.*/
             rte_mbuf_refcnt_update(mbuf, 1);
-        } else {
+        } else
+#endif
+        {
             //Reset buffer, let DPDK free the buffer when it wants
             if (reset)
                 p->reset_buffer();

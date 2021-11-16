@@ -26,6 +26,9 @@
 /* Define for forcing expensive packet operations. */
 #undef CLICK_FORCE_EXPENSIVE
 
+/* Define if indirect packets are not allowed. */
+#undef CLICK_NOINDIRECT
+
 /* Define to generate smaller object files. */
 #undef CLICK_OPTIMIZE_SIZE
 
@@ -40,6 +43,9 @@
 
 /* Define if PollDevice should run fast to get good benchmark numbers */
 #undef CLICK_WARP9
+
+/* Define if you have the __builtin_ctz function. */
+#undef HAVE___BUILTIN_CTZ
 
 /* Define if you have the __builtin_clz function. */
 #undef HAVE___BUILTIN_CLZ
@@ -58,6 +64,9 @@
 
 /* Define if you have the __builtin_ffsll function. */
 #undef HAVE___BUILTIN_FFSLL
+
+/* Define if you have the __builtin_popcount function. */
+#undef HAVE___BUILTIN_POPCOUNT
 
 /* Define if you have the __has_trivial_copy compiler intrinsic. */
 #undef HAVE___HAS_TRIVIAL_COPY
@@ -101,6 +110,9 @@
 /* Define if the C++ compiler understands template alias. */
 #undef HAVE_CXX_TEMPLATE_ALIAS
 
+/* Define if Flow support is enabled. */
+#undef HAVE_FLOW
+
 /* Define if the machine is indifferent to alignment. */
 #undef HAVE_INDIFFERENT_ALIGNMENT
 
@@ -140,6 +152,9 @@
 
 /* Define if the RE2 library is present. */
 #undef HAVE_RE2
+
+/* Define if elements have random alignment. */
+#undef HAVE_RAND_ALIGN
 
 /* Define if you want to use the stride scheduler. */
 #undef HAVE_STRIDE_SCHED
@@ -184,6 +199,9 @@
 
 /* The size of a `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
+
+/* Define if SSE4.2 instruction is available. */
+#undef HAVE_SSE42
 
 /* Define if you want to run multithreaded Click. */
 #undef __MTCLICK__
@@ -268,6 +286,14 @@
 # define CLICK_ALWAYS_INLINE /* nothing */
 #endif
 
+/* Define macro for funtions that should not be optimized. */
+#if __GNUC__
+# define CLICK_OPTNONE __attribute__((optnone))
+#else
+# define CLICK_OPTNONE /* nothing */
+#endif
+
+
 
 #if CLICK_LINUXMODULE
 # define CLICK_CACHE_ALIGN ____cacheline_aligned;
@@ -322,8 +348,12 @@
 #define ELEMENT_REQUIRES(x)
 #define ELEMENT_PROVIDES(x)
 #define ELEMENT_HEADER(x)
+#define ELEMENT_FEATURES(x)
 #define ELEMENT_LIBS(x)
 #define ELEMENT_MT_SAFE(x)
+
+
+#define CLICK_NEVER_REPLACE(x) x
 
 /* Assume CLICK_USERLEVEL unless otherwise defined. */
 #if !defined(CLICK_USERLEVEL) && !defined(CLICK_TOOL) && !defined(CLICK_LINUXMODULE) && !defined(CLICK_BSDMODULE) && !defined(CLICK_MINIOS)

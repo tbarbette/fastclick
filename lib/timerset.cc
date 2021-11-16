@@ -26,7 +26,7 @@
 #include <click/master.hh>
 CLICK_DECLS
 
-TimerSet::TimerSet()
+TimerSet::TimerSet() : _timer_heap()
 {
 #if CLICK_NS
     _max_timer_stride = 1;

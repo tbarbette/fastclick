@@ -790,13 +790,13 @@ Element::initialize_ports(const int *in_v, const int *out_v)
     for (int i = 0; i < ninputs(); i++) {
 	// allowed iff in_v[i] == VPULL
 	int port = (in_v[i] == VPULL ? 0 : -1);
-	_ports[0][i].assign(false, this, 0, port);
+	_ports[0][i].assign_owner(false, this, 0, port);
     }
 
     for (int o = 0; o < noutputs(); o++) {
 	// allowed iff out_v[o] != VPULL
 	int port = (out_v[o] == VPULL ? -1 : 0);
-	_ports[1][o].assign(true, this, 0, port);
+	_ports[1][o].assign_owner(true, this, 0, port);
     }
 }
 
@@ -804,7 +804,7 @@ int
 Element::connect_port(bool isoutput, int port, Element* e, int e_port)
 {
     if (port_active(isoutput, port)) {
-	_ports[isoutput][port].assign(isoutput, this, e, e_port);
+	_ports[isoutput][port].assign_owner(isoutput, this, e, e_port);
 	return 0;
     } else
 	return -1;
@@ -1745,7 +1745,7 @@ bool Element::get_spawning_threads(Bitvector& bmp, bool isoutput, int port) {
     return true;
 }
 
-Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, bool& is_fullpush, int level) {
+Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, bool& is_fullpush, int level, bool touching) {
     Bitvector b(master()->nthreads());
     InputThreadVisitor visitor(b, origin);
     router()->visit(this,forward,port,&visitor);
@@ -1761,8 +1761,10 @@ Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, 
         if (origin != 0 && level > 0)
             click_chatter("loop avoided for %s",name().c_str());
     }
+
     if (!visitor.fullpush)
         is_fullpush = false;
+
     return b;
 }
 
@@ -1771,36 +1773,43 @@ Bitvector Element::get_pushing_threads() {
     bool is_fullpush;
     for (int i = 0; i < ninputs(); i++) {
         if (input_is_push(i))
-            b |= get_passing_threads(false, i, this, is_fullpush, 0);
+            b |= get_passing_threads(false, i, this, is_fullpush, 0, false);
     }
     return b;
 }
 
-Bitvector Element::get_passing_threads(Element*, int level) {
+Bitvector Element::get_passing_threads(Element*, int level, bool touching) {
     bool is_fullpush = true;
     Bitvector b(master()->nthreads());
     for (int i = 0; i < ninputs(); i++) {
         if (input_is_push(i))
-            b |= get_passing_threads(false, i, this, is_fullpush, level);
+            b |= get_passing_threads(false, i, this, is_fullpush, level, touching);
         else
             is_fullpush = false;
     }
     for (int i = 0; i < noutputs(); i++) {
         if (output_is_pull(i))
-            b |= get_passing_threads(true, i, this, is_fullpush, level);
+            b |= get_passing_threads(true, i, this, is_fullpush, level, touching);
     }
     //Add ourself to the bitmap, but the user must know if his element
     // should keep is_fullpush or not
-    get_spawning_threads(b, false, -1);
-    get_spawning_threads(b, true, -1);
+    get_spawning_threads(b, false, touching);
+    get_spawning_threads(b, true, touching);
+
 #if HAVE_FULLPUSH_NONATOMIC
     this->_is_fullpush = is_fullpush;
 #endif
     return b;
 }
 
-Bitvector Element::get_passing_threads() {
-	return get_passing_threads(this, 0);
+/**
+ * Return the list of threads passing by this element
+ * if touching is true (default) it will also return
+ * the threads touching the element, such as remote tables,
+ * multiple directions elements, handlers etc.
+ */
+Bitvector Element::get_passing_threads(bool touching) {
+	return get_passing_threads(this, 0, touching);
 }
 
 bool Element::is_mt_safe() {
@@ -1826,6 +1835,9 @@ void Element::add_remote_element(Element* e) {
 }
 
 int Element::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) {
+    (void)stage;
+    (void)errh;
+    (void)threads;
     return 0;
 }
 
@@ -1842,6 +1854,11 @@ public:
 
     bool visit(Element *e, bool isoutput, int port,
                    Element *from_e, int from_port, int distance) {
+        (void)isoutput;
+        (void)port;
+        (void)from_e;
+        (void)from_port;
+        (void)distance;
         e->thread_configure(_stage, _errh, _threads);
         return true;
     }
@@ -1854,8 +1871,6 @@ public:
  *  In practice, it will call thread_reconfigure with UP_PRE or DOWN_PRE on
  *      downstream elements, execute the ready function, then call UP_POST or
  *      DOWN_POST
- *
- *
  *
  *  @param is_up True if the threads are being activated, false if deactivated.
  */
@@ -3255,6 +3270,13 @@ Element::run_task(Task *)
     return false;
 }
 
+bool
+Element::run_idle_task(IdleTask *)
+{
+    assert(0 /* run_task implementation missing */);
+    return false;
+}
+
 /** @brief Run the element's timer.
  *
  * @param timer the timer object that fired
@@ -3270,5 +3292,11 @@ Element::run_timer(Timer *timer)
     assert(0 /* run_timer implementation missing */);
     (void) timer;
 }
+
+#ifdef HAVE_RAND_ALIGN
+
+int Element::nalloc = 0;
+std::mt19937  Element::generator;
+#endif
 
 CLICK_ENDDECLS

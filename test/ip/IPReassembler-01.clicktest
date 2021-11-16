@@ -2,7 +2,7 @@
 click
 
 %file stdin
-InfiniteSource(LIMIT 1, STOP true)
+InfiniteSource(LIMIT 1, STOP true, BURST 1)
 	-> UDPIPEncap(1.0.0.1, 2, 3.0.0.3, 4)
 	-> EtherEncap(80, 1:1:1:1:1:1, 2:2:2:2:2:2)
 	-> IPPrint(PAYLOAD ascii)

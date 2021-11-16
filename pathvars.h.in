@@ -11,6 +11,9 @@
 /* Install directory for Click shared data. */
 #undef CLICK_DATADIR
 
+/* Source directory of Click. */
+#undef CLICK_DIR
+
 /* FreeBSD kernel include directory. */
 #undef FREEBSD_INCLUDEDIR
 

@@ -23,6 +23,9 @@
 /* Define if select() may be used to wait for file descriptor events. */
 #undef HAVE_ALLOW_SELECT
 
+/* Define if you have the <bpf.h> header file and libbpf. */
+#undef HAVE_BPF
+
 /* Define if <pcap.h> uses bpf_timeval. */
 #undef HAVE_BPF_TIMEVAL
 
@@ -31,6 +34,15 @@
 
 /* Define if you have the CPU load cycles tracking function. */
 #undef HAVE_CLICK_LOAD
+
+/* Define if Click can use a packet pool */
+#undef ALLOW_CLICK_PACKET_POOL
+
+/* Define if context system is enabled. */
+#undef HAVE_CTX
+
+/* Define if curl is present. */
+#undef HAVE_CURL
 
 /* Define if you have the clock_gettime function. */
 #undef HAVE_CLOCK_GETTIME
@@ -103,6 +115,9 @@
 
 /* Define if you have the <linux/if_tun.h> header file. */
 #undef HAVE_LINUX_IF_TUN_H
+
+/* Define if you have the <linux/if_packet.h> header file. */
+#undef HAVE_LINUX_IF_PACKET_H
 
 /* Define if you have the madvise function. */
 #undef HAVE_MADVISE
@@ -238,6 +253,21 @@
 /* Define if Zero-copy is enabled. */
 #undef HAVE_ZEROCOPY
 
+/* Define if Flow sloppy timeout is enabled. */
+#undef HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+
+/* Enable dynamic flow system */
+#undef HAVE_FLOW_DYNAMIC
+
+/* Define if use atomic use count */
+#undef FLOW_ATOMIC_USE_COUNT
+
+/* Define if flow nodes should be released. */
+#undef FLOW_KEEP_STRUCTURE
+
+/* Define if flow hash mode. */
+#define FLOW_HASH_RELEASE 2
+
 /* Define if Netmap support is enabled. */
 #undef HAVE_NETMAP
 
@@ -253,8 +283,26 @@
 /* Define if DPDK has the read_clock function. */
 #undef HAVE_DPDK_READ_CLOCK
 
+/* Define if DPDK have XCHG API. */
+#undef HAVE_DPDK_XCHG
+
+/* Define if LLVM libraries are available. */
+#undef HAVE_LLVM
+
+/* Define if optimizations for pool_prepare_data_burst is not disabled */
+#undef POOL_INLINING
+
+/* Define if AllAnno struct is inlined within Packet Class */
+#undef INLINED_ALLANNO
+
+/* Define if DPDK software queue for TX is enabled. */
+#undef HAVE_IQUEUE
+
 /* Define if a Click user-level driver manages Intel DPDK packet pools. */
 #undef CLICK_PACKET_USE_DPDK
+
+/* Define if a Click packet is inside DPDK packet. */
+#undef CLICK_PACKET_INSIDE_DPDK
 
 /* Define if Click should use Valgrind client requests. */
 #undef HAVE_VALGRIND
@@ -286,7 +334,9 @@
 
 /* Include integer type definitions. */
 #ifdef HAVE_INTTYPES_H
-#define __STDC_FORMAT_MACROS
+# ifndef __STDC_FORMAT_MACROS
+#  define __STDC_FORMAT_MACROS
+# endif
 # include <inttypes.h>
 #endif
 #include <sys/types.h>

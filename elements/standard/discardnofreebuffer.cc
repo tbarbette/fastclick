@@ -63,6 +63,6 @@ DiscardNoFreeBuffer::add_handlers()
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(!dpacket)
+ELEMENT_REQUIRES(!dpdk-packet)
 EXPORT_ELEMENT(DiscardNoFreeBuffer)
 ELEMENT_MT_SAFE(DiscardNoFreeBuffer)

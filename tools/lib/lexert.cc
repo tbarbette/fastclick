@@ -400,11 +400,11 @@ LexerT::lexeme_string(int kind)
 {
     static const char names[] = "identifier\0variable\0'->'\0'=>'\0"
 	"'::'\0'||'\0'...'\0'elementclass'\0'require'\0'provide'\0"
-	"'define'";
+	"'define'\0'<->'";
     static const uint8_t offsets[] = {
-	0, 11, 20, 25, 30, 35, 40, 46, 61, 71, 81, 90
+	0, 11, 20, 25, 30, 35, 40, 46, 61, 71, 81, 90, 96
     };
-    static_assert(sizeof(names) == 90, "names screwup.");
+    static_assert(sizeof(names) == 96, "names screwup.");
 
     char buf[14];
     if (kind >= lexIdent && kind < lexIdent + (int) sizeof(offsets) - 1) {
@@ -994,7 +994,6 @@ LexerT::yconnection()
 	case lex2Colon:
 	    lerror(t, "syntax error before %<%s%>", t.string().c_str());
 	    goto relex;
-
 	case lexArrow:
 	case lex2Arrow:
 	    connector = t.kind();
@@ -1428,6 +1427,7 @@ LexerT::finish(const VariableEnvironment &global_scope)
 {
     RouterT *r = _router;
     _router = 0;
+    r->set_filename(_file._filename.c_str());
     r->redefine(global_scope);
     // resolve anonymous element names
     r->assign_element_names();

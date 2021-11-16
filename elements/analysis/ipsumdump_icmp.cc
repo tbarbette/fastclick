@@ -253,4 +253,5 @@ void IPSummaryDump_ICMP::static_cleanup()
 
 ELEMENT_REQUIRES(userlevel IPSummaryDump)
 ELEMENT_PROVIDES(IPSummaryDump_ICMP)
+ELEMENT_FEATURES(IPSummaryDump)
 CLICK_ENDDECLS

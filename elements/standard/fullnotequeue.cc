@@ -55,13 +55,17 @@ FullNoteQueue::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 void
 FullNoteQueue::push(int, Packet *p)
 {
+tagain:
     // Code taken from SimpleQueue::push().
     Storage::index_type h = head(), t = tail(), nt = next_i(t);
 
     if (nt != h)
 	push_success(h, t, nt, p);
-    else
+    else {
+        if (_blocking)
+            goto tagain;
 	push_failure(p);
+    }
 }
 
 Packet *
