@@ -63,7 +63,7 @@ SetTransportChecksumIP6::simple_action(Packet *p_in)
   click_chatter("Next anno: %u", IP6_NXT_ANNO(p));
 
   switch (IP6_NXT_ANNO(p)) {
-    case 43: {
+    case IP_PROTO_TCP: {
       click_tcp *tcp = (click_tcp *)p->transport_header();
       click_chatter("TCP");
 
