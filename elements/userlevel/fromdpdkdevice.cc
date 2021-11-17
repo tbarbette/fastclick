@@ -460,6 +460,17 @@ void FromDPDKDevice::selected(int fd, int mask) {
 }
 #endif
 
+ToDPDKDevice *
+FromDPDKDevice::find_output_element() {
+    for (auto e : router()->elements()) {
+        ToDPDKDevice *td = dynamic_cast<ToDPDKDevice *>(e);
+        if (td != 0 && (td->_dev->port_id == _dev->port_id)) {
+            return td;
+        }
+    }
+    return 0;
+}
+
 enum {
     h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
     h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,

@@ -186,6 +186,10 @@ uint32_t click_random();
  * Returns @a low if @a low >= @a high. */
 uint32_t click_random(uint32_t low, uint32_t high);
 
+/** @brief Return a number between 0 inclusive @a high, exclusive.
+ */
+uint32_t click_random(uint32_t high);
+
 /** @brief Set the click_random() seed to @a seed. */
 void click_srandom(uint32_t seed);
 

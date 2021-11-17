@@ -424,6 +424,8 @@ public:
     void selected(int fd, int mask) override;
 #endif
 
+    ToDPDKDevice *find_output_element();
+
     void clear_buffers() CLICK_COLD;
     inline DPDKDevice *get_device() {
         return _dev;

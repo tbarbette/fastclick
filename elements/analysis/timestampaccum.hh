@@ -3,6 +3,7 @@
 #define CLICK_TIMESTAMPACCUM_HH
 #include <click/batchelement.hh>
 #include <click/straccum.hh>
+#include <click/args.hh>
 CLICK_DECLS
 
 /*
@@ -47,6 +48,7 @@ class TimestampAccumBase : public BatchElement { public:
     const char *class_name() const	{ return "TimestampAccum"; }
     const char *port_count() const	{ return "1-/="; }
 
+    int configure(Vector<String> &conf, ErrorHandler *errh);
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
@@ -61,6 +63,7 @@ class TimestampAccumBase : public BatchElement { public:
     struct State {
         State() : nsec_accum(0), count(0), nsec_min(UINT64_MAX), nsec_max(0) {
 
+
         };
         uint64_t nsec_accum;
         uint64_t count;
@@ -68,6 +71,7 @@ class TimestampAccumBase : public BatchElement { public:
         uint64_t nsec_max;
     };
     T<State> _state;
+    bool _steady;
 
     static String read_handler(Element *, void *) CLICK_COLD;
     static int reset_handler(const String &, Element *, void *, ErrorHandler *);

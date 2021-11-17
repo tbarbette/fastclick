@@ -56,7 +56,7 @@ class AverageCounterBase : public BatchElement { public:
     inline uint64_t first() const			{ return _stats.first(); }
     inline uint64_t last() const			{ return _stats.last(); }
     inline uint64_t ignore() const			{ return _ignore; }
-    inline void reset()	{ _stats.reset(); }
+    inline void reset(bool with_time=false);
 
 #if HAVE_BATCH
     PacketBatch *simple_action_batch(PacketBatch *batch);
@@ -108,7 +108,15 @@ struct AverageCounterStats {
 
 };
 
-
+template <typename Stats>
+inline void AverageCounterBase<Stats>::reset(bool with_time)	{
+    _stats.reset();
+    if (with_time) {
+        click_jiffies_t jpart = click_jiffies();
+        if (_stats.my_first() == 0)
+            _stats.set_first(jpart);
+    }
+};
 
 
 class AverageCounter : public AverageCounterBase<AverageCounterStats<uint64_t> > { public:

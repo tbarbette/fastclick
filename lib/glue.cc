@@ -514,6 +514,12 @@ click_random(uint32_t low, uint32_t high)
     }
 }
 
+uint32_t
+click_random(uint32_t high)
+{
+    return click_random(0, high - 1);
+}
+
 CLICK_ENDDECLS
 
 

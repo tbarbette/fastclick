@@ -182,10 +182,18 @@ ddeps: Makefile librte_parse.a libclick.a $(OBJS)
 $(DRIVER): ${PARSE_PATH}.sentinel ddeps
 	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a librte_parse.a $(LIBS),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+packetmill: packetmill.cc $(DRIVER)
+	$(call cxxcompile,-o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS) $(LLVM_OBJS)) libclick.a librte_parse.a packetmill.cc $(LIBS) $(LDFLAGS) $(LIBS_LLVM),CXXLINK)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 else
 $(DRIVER): Makefile libclick.a $(OBJS)
 	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a $(LIBS),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+packetmill: packetmill.cc $(DRIVER)
+	$(call cxxcompile,-o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS) $(LLVM_OBJS)) libclick.a packetmill.cc $(LIBS) $(LDFLAGS) $(LIBS_LLVM),CXXLINK)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+
+
 endif
 click-opt: Makefile click.ll libclick.a
 	$(call cxxlink,$(DL_LDFLAGS) click.ll libclick.a $(LIBS_IR),LINK)
@@ -201,11 +209,6 @@ libclick.a: Makefile $(LIBOBJS)
 
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-
-
-packetmill: packetmill.cc $(DRIVER)
-	$(call cxxcompile,-o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS) $(LLVM_OBJS)) libclick.a packetmill.cc $(LIBS) $(LDFLAGS) $(LIBS_LLVM),CXXLINK)
-	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 
 elemlist:
 	@rm -f elements.conf elements.csmk
