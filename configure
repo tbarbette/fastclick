@@ -822,6 +822,7 @@ enable_batch
 enable_verbose_batch
 enable_auto_batch
 enable_netmap_pool
+enable_bpf
 enable_rand_align
 enable_select
 enable_poll
@@ -1564,6 +1565,7 @@ Optional Features:
     --enable-auto-batch=[list|jump|port]
                           make vanilla elements batch-compatible automatically
     --enable-netmap-pool  use netmap buffers instead of standard Click buffers
+    --disable-bpf         Compile without BPF support
     --enable-rand-align   enable random alignment of element
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
@@ -7975,6 +7977,15 @@ else
     LIBS="$save_libs"
 fi
 
+# Check whether --enable-bpf was given.
+if test "${enable_bpf+set}" = set; then :
+  enableval=$enable_bpf; :
+else
+  enable_bpf=yes
+fi
+
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing bpf_prog_load_xattr" >&5
 $as_echo_n "checking for library containing bpf_prog_load_xattr... " >&6; }
 if ${ac_cv_search_bpf_prog_load_xattr+:} false; then :
@@ -8047,7 +8058,7 @@ fi
 
 done
 
-if test "x$ac_have_libbpf$ac_have_libbpf_h" = "xyesyes"; then
+if test "x$ac_have_libbpf$ac_have_libbpf_h$enable_bpf" = "xyesyesyes"; then
     $as_echo "#define HAVE_BPF 1" >>confdefs.h
 
     have_libbpf=yes
