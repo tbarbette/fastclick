@@ -274,7 +274,7 @@ int DPDKDevice::alloc_pktmbufs(ErrorHandler* errh)
      * allocate a unused pool
      */
     int max_socket = -1;
-    for (HashTable<portid_t, DPDKDevice>::const_iterator it = _devs.begin();
+    for (HashTable<portid_t, DPDKDevice*>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it) {
         int numa_node = DPDKDevice::get_port_numa_node(it.key());
         if (numa_node > max_socket)
@@ -1171,7 +1171,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     if (dev_count() == 0 && _devs.size() > 0)
         return errh->error("No DPDK-enabled ethernet port found");
 
-    for (HashTable<portid_t, DPDKDevice>::const_iterator it = _devs.begin();
+    for (HashTable<portid_t, DPDKDevice*>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it)
         if (it.key() >= dev_count())
             return errh->error("Cannot find DPDK port %u", it.key());
@@ -1181,9 +1181,9 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         return err;
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
-        for (HashTable<portid_t, DPDKDevice>::iterator it = _devs.begin();
+        for (HashTable<portid_t, DPDKDevice*>::iterator it = _devs.begin();
             it != _devs.end(); ++it) {
-            int ret = it.value().initialize_device(errh);
+            int ret = it.value()->initialize_device(errh);
             if (ret < 0)
                 return ret;
         }
@@ -1504,7 +1504,7 @@ unsigned DPDKDevice::RING_POOL_CACHE_SIZE = 32;
 unsigned DPDKDevice::RING_PRIV_DATA_SIZE  = 0;
 
 bool DPDKDevice::_is_initialized = false;
-HashTable<portid_t, DPDKDevice> DPDKDevice::_devs;
+HashTable<portid_t, DPDKDevice*> DPDKDevice::_devs;
 struct rte_mempool** DPDKDevice::_pktmbuf_pools = 0;
 unsigned DPDKDevice::_nr_pktmbuf_pools = 0;
 bool DPDKDevice::no_more_buffer_msg_printed = false;
