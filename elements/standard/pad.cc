@@ -32,12 +32,16 @@ int
 Pad::configure(Vector<String>& conf, ErrorHandler* errh)
 {
     _nbytes = 0;
+    _maxlength = 0;
     _zero = true;
     _random = false;
+    _verbose = false;
     return Args(conf, this, errh)
         .read_p("LENGTH", _nbytes)
         .read("ZERO", _zero)
         .read("RANDOM", _random)
+        .read("MAXLENGTH", _maxlength)
+        .read("VERBOSE", _verbose)
         .complete();
 
     if (_zero && _random)
@@ -54,6 +58,13 @@ Pad::simple_action(Packet* p)
         nput = p->length() < _nbytes ? _nbytes - p->length() : 0;
     else
         nput = EXTRA_LENGTH_ANNO(p);
+    if (unlikely(_maxlength) && unlikely(_maxlength < (nput + p->length())))
+    {
+        if (unlikely(_verbose))
+            click_chatter("Tried a too long Pad: %i + %i > %i -> adding only %i bytes",
+                    p->length(), nput, _maxlength, _maxlength - p->length());
+         nput = _maxlength - p->length();
+    }
     if (nput) {
         WritablePacket* q = p->put(nput);
         if (!q)
