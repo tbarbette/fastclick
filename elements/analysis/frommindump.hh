@@ -105,11 +105,10 @@ class FromMinDump : public BatchElement{ public:
     Timer _timer;
     String _filename;
     FILE * _f;
-    
     int _iterations;
     uint8_t * _file_data;
-    uint64_t _file_size;
-    uint64_t _file_pos;
+    size_t _file_size;
+    size_t _file_pos;
 
     int _minor_version;
     unsigned _burst;
