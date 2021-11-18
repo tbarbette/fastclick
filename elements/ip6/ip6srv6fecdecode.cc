@@ -59,7 +59,7 @@ IP6SRv6FECDecode::IP6SRv6FECDecode()
     _rlc_utils.system_coefs = (uint8_t **)CLICK_LALLOC(sizeof(uint8_t *) * RLC_MAX_WINDOWS);
     memset(_rlc_utils.system_coefs, 0, sizeof(uint8_t *) * RLC_MAX_WINDOWS);
     _rlc_utils.constant_terms = (srv6_fec2_term_t **)CLICK_LALLOC(sizeof(srv6_fec2_term_t *) * SRV6_RLC_MAX_SYMBOLS);
-    memset(_rlc_utils.constant_terms, 0, sizeof(srv6_fec2_term_t *) * RLC_MAX_WINDOWS);
+    memset(_rlc_utils.constant_terms, 0, sizeof(srv6_fec2_term_t *) * SRV6_RLC_MAX_SYMBOLS);
     _rlc_utils.undetermined = (bool *)CLICK_LALLOC(sizeof(bool) * SRV6_RLC_MAX_SYMBOLS);
     memset(_rlc_utils.undetermined, 0, sizeof(bool) * SRV6_RLC_MAX_SYMBOLS);
 

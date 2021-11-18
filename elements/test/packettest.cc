@@ -175,6 +175,31 @@ PacketTest::initialize(ErrorHandler *errh)
     CHECK_ALIGNED(p->data());
     p->kill();
 
+    PacketBatch* batch = PacketBatch::make_from_packet(Packet::make(1, lowers, 60, 2));
+    for (int i = 2; i <= 100; i++)
+        batch->append_packet(Packet::make(i, lowers, 60, 2));
+    int i = 0;
+    auto fnt = [](Packet *p_in, std::function<void(Packet*)>add){
+            int r = click_random() % 3;
+            if (r == 0) {
+                add(p_in->clone()->uniqueify());
+                p_in->kill();
+            } else if (r == 1) {
+                Packet* c = p_in->clone();
+                add(p_in->uniqueify());
+                c->kill();
+            } else {
+                add(p_in);
+            }
+    };
+    EXECUTE_FOR_EACH_PACKET_ADD(fnt, batch);
+    CHECK(batch->count() == 100);
+    CHECK(batch->first()->find_count() == 100);
+    i = 1;
+    FOR_EACH_PACKET(batch,p) {
+        CHECK(p->headroom() == i++);
+    }
+
     // Also check some packet header definition properties.
     union {
 	click_ip ip4;
