@@ -10,7 +10,7 @@
 #include <click/dpdkdevice.hh>
 #include <click/handlercall.hh>
 
-#include "fromdpdkdevice.hh"
+#include "../userlevel/fromdpdkdevice.hh"
 
 #include <rte_flow.h>
 

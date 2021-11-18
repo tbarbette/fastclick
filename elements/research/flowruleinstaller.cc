@@ -29,7 +29,7 @@
 #include <signal.h>
 #include <limits>
 
-#include "todpdkdevice.hh"
+#include "../userlevel/todpdkdevice.hh"
 #include "flowruleinstaller.hh"
 
 CLICK_DECLS
@@ -364,7 +364,15 @@ FlowRuleInstaller::flow_generate(portid_t port_id, Vector<rte_flow_item> &patter
     if (res == 0) {*/
     if (flow) {
 
+#if HAVE_RTE_FLOW_UPDATE
         rte_flow_update(port_id, flow, pattern.data(), action, &error);
+#else
+        click_chatter("FastClick was compiled without support "
+                          "to rte_flow_update. "
+                          "Refusing to update rule.");
+        return NULL;
+#endif
+
         return flow;
     } else {
         struct rte_flow_attr attr;
@@ -526,6 +534,7 @@ int FlowRuleInstaller::flow_handler(
 
             struct rte_flow_error error;
             click_chatter("Updating rule %p\n", rule);
+#if HAVE_RTE_FLOW_UPDATE
             int res = rte_flow_update(port_id, rule, pattern.data(), 0, &error);
             if (res != 0) {
                 input = "Failed to update rule " + String(rule);
@@ -534,6 +543,13 @@ int FlowRuleInstaller::flow_handler(
 
             input = "Successfully updated rule " + String(rule);
             return 0;
+#else
+            if (unlikely(fr->_verbose))
+                click_chatter("FastClick was compiled without support to rte_flow_update. "
+                              "Refusing to update rule.");
+            return -1;
+#endif
+
         }
         // 5-tuple
         case h_flow_create_5t: {
@@ -649,6 +665,8 @@ int FlowRuleInstaller::flow_handler(
             Vector<rte_flow_item> pattern = parse_5t(words);
 
             struct rte_flow_error error;
+
+#if HAVE_RTE_FLOW_UPDATE
             int res = rte_flow_update(port_id, rule, pattern.data(), 0, &error);
             if (res == 0) {
                 if (fr->_verbose) {
@@ -659,6 +677,10 @@ int FlowRuleInstaller::flow_handler(
                 input = "Failed to update rule";
                 return -1;
             }
+#else
+            input = "Cannot update rule: rte_flow_update not supported";
+            return -1;
+#endif
         }
         // Pair
         case h_flow_create_pair: {

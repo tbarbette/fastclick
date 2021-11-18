@@ -1731,6 +1731,17 @@ version (dpdk-dev or dpdk-devel).
     else
       AC_MSG_RESULT([no])
     fi
+
+    AC_MSG_CHECKING([whether DPDK has rte_flow_update])
+    if ${READELF} -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_flow_update &> /dev/null; then
+      AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_RTE_FLOW_UPDATE])
+    else
+      AC_MSG_RESULT([no])
+    fi
+
+
+
 fi
 
 if test "x$enable_dpdk_pool" = xyes; then

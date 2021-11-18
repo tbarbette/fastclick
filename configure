@@ -13203,6 +13203,21 @@ $as_echo "yes" >&6; }
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
     fi
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether DPDK has rte_flow_update" >&5
+$as_echo_n "checking whether DPDK has rte_flow_update... " >&6; }
+    if ${READELF} -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_flow_update &> /dev/null; then
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+      $as_echo "#define HAVE_RTE_FLOW_UPDATE 1" >>confdefs.h
+
+    else
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+    fi
+
+
+
 fi
 
 if test "x$enable_dpdk_pool" = xyes; then

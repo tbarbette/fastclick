@@ -283,6 +283,9 @@
 /* Define if DPDK has the read_clock function. */
 #undef HAVE_DPDK_READ_CLOCK
 
+/* Define if DPDK has the rte_flow_update function. */
+#undef HAVE_RTE_FLOW_UPDATE
+
 /* Define if DPDK have XCHG API. */
 #undef HAVE_DPDK_XCHG
 
