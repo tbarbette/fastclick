@@ -2822,6 +2822,8 @@ test -f $srcdir/minios/Makefile.in && AC_CONFIG_FILES([minios/Makefile minios/co
 test -f $srcdir/ns/Makefile.in && AC_CONFIG_FILES([ns/Makefile])
 test -f $srcdir/userlevel/Makefile.in && AC_CONFIG_FILES([userlevel/Makefile])
 
+test -f $srcdir/lib/json.cc && provisions="$provisions Json"
+
 test -d $srcdir/tools/click-align && AC_CONFIG_FILES([tools/click-align/Makefile])
 test -d $srcdir/tools/click-check && AC_CONFIG_FILES([tools/click-check/Makefile])
 test -d $srcdir/tools/click-combine && AC_CONFIG_FILES([tools/click-combine/Makefile])
@@ -2851,7 +2853,8 @@ fi
 if test "x$enable_dpdk" != "xno"; then
     dpdk_info="${enable_dpdk}
     DPDK    Target:              ${RTE_TARGET}
-    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}"
+    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}
+    DPDK  Location:              ${RTE_LIB}"
 else
     dpdk_info=${enable_dpdk}
 fi

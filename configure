@@ -16685,6 +16685,8 @@ test -f $srcdir/ns/Makefile.in && ac_config_files="$ac_config_files ns/Makefile"
 test -f $srcdir/userlevel/Makefile.in && ac_config_files="$ac_config_files userlevel/Makefile"
 
 
+test -f $srcdir/lib/json.cc && provisions="$provisions Json"
+
 test -d $srcdir/tools/click-align && ac_config_files="$ac_config_files tools/click-align/Makefile"
 
 test -d $srcdir/tools/click-check && ac_config_files="$ac_config_files tools/click-check/Makefile"
@@ -18047,7 +18049,8 @@ fi
 if test "x$enable_dpdk" != "xno"; then
     dpdk_info="${enable_dpdk}
     DPDK    Target:              ${RTE_TARGET}
-    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}"
+    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}
+    DPDK  Location:              ${RTE_LIB}"
 else
     dpdk_info=${enable_dpdk}
 fi
