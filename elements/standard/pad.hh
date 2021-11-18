@@ -36,6 +36,11 @@ problem). Default is true.
 Boolean. If true, the added data is randomized. Exclusive with ZERO. Default is
 false.
 
+=item MAXLENGTH
+
+Int. If >0, it specifies the maximum length that a packet can have after padding.
+If the final length would be higher than this, the packet will be truncated to MAXLENGTH
+
 =back
 
 =a Truncate
@@ -56,7 +61,9 @@ class Pad : public SimpleElement<Pad> { public:
   private:
 
     unsigned _nbytes;
+    unsigned _maxlength;
     bool _zero;
+    bool _verbose;
     bool _random;
 };
 

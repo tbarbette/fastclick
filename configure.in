@@ -213,9 +213,14 @@ else
     LIBS="$save_libs"
 fi
 
+AC_ARG_ENABLE([bpf],
+    [AS_HELP_STRING([  --disable-bpf], [Compile without BPF support])],
+    [:], [enable_bpf=yes])
+
+
 AC_SEARCH_LIBS([bpf_prog_load_xattr], [bpf], [ac_have_libbpf=yes], [ac_have_libbpf=no])
 AC_CHECK_HEADERS([bpf/bpf.h], [ac_have_libbpf_h=yes], [ac_have_libbpf_h=no])
-if test "x$ac_have_libbpf$ac_have_libbpf_h" = "xyesyes"; then
+if test "x$ac_have_libbpf$ac_have_libbpf_h$enable_bpf" = "xyesyesyes"; then
     AC_DEFINE([HAVE_BPF])
     have_libbpf=yes
 else
@@ -1726,6 +1731,17 @@ version (dpdk-dev or dpdk-devel).
     else
       AC_MSG_RESULT([no])
     fi
+
+    AC_MSG_CHECKING([whether DPDK has rte_flow_update])
+    if ${READELF} -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_flow_update &> /dev/null; then
+      AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_RTE_FLOW_UPDATE])
+    else
+      AC_MSG_RESULT([no])
+    fi
+
+
+
 fi
 
 if test "x$enable_dpdk_pool" = xyes; then
@@ -2817,6 +2833,8 @@ test -f $srcdir/minios/Makefile.in && AC_CONFIG_FILES([minios/Makefile minios/co
 test -f $srcdir/ns/Makefile.in && AC_CONFIG_FILES([ns/Makefile])
 test -f $srcdir/userlevel/Makefile.in && AC_CONFIG_FILES([userlevel/Makefile])
 
+test -f $srcdir/lib/json.cc && provisions="$provisions Json"
+
 test -d $srcdir/tools/click-align && AC_CONFIG_FILES([tools/click-align/Makefile])
 test -d $srcdir/tools/click-check && AC_CONFIG_FILES([tools/click-check/Makefile])
 test -d $srcdir/tools/click-combine && AC_CONFIG_FILES([tools/click-combine/Makefile])
@@ -2846,7 +2864,8 @@ fi
 if test "x$enable_dpdk" != "xno"; then
     dpdk_info="${enable_dpdk}
     DPDK    Target:              ${RTE_TARGET}
-    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}"
+    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}
+    DPDK  Location:              ${RTE_LIB}"
 else
     dpdk_info=${enable_dpdk}
 fi
