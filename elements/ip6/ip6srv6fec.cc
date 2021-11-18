@@ -439,7 +439,7 @@ void IP6SRv6FECEncode::encapsulate_repair_payload(WritablePacket *p, repair_tlv_
     memcpy(r_tlv, tlv, sizeof(repair_tlv_t));
 
     // Set annotations
-    _repair_packet->set_network_header(p->data(), (unsigned char*)(r_tlv + 1) - p->data());
+    _repair_packet->set_network_header(p->data(), sizeof(click_ip6) + sizeof(click_ip6_sr) + sizeof(repair_tlv_t) + 2 * sizeof(IP6Address)) ;
 }
 
 void
