@@ -209,9 +209,8 @@ ElementDistanceCastTracker::insert(Element *e, int distance)
 bool
 ElementDistanceCastTracker::visit(Element *e, bool, int, Element *, int, int distance)
 {
+
     FlowElement* fe = dynamic_cast<FlowElement*>(e);
-    if (fe && fe->stopClassifier())
-        return false;
     if (e->cast("VirtualFlowSpaceElement")) {
         Router::InitFuture* future = (Router::InitFuture*)e->cast("FCBBuiltFuture");
         if (future) {
@@ -219,10 +218,16 @@ ElementDistanceCastTracker::visit(Element *e, bool, int, Element *, int, int dis
         }
         if (dynamic_cast<VirtualFlowSpaceElement*>(fe)->flow_data_size() > 0)
             insert(e,distance);
-        return _continue;
-    } else
+        return fe && fe->stopClassifier()? false : _continue;
+    } else {
+
+        if (fe && fe->stopClassifier())
+            return false;
+
+
         return true;
     }
+}
 
     struct el {
         int id;

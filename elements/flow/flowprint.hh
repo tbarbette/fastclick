@@ -23,7 +23,8 @@ public:
     int initialize(ErrorHandler *errh) CLICK_COLD;
 
     void push_batch(int port, PacketBatch*);
-
+private:
+    bool _continue;
 };
 CLICK_ENDDECLS
 #endif

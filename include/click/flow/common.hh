@@ -263,9 +263,11 @@ extern __thread FlowControlBlock* fcb_stack;
 extern __thread FlowTableHolder* fcb_table;
 
 
-
+#define SFCB_STACK_PUSH() FlowControlBlock* fcb_save = fcb_stack;fcb_stack=0;
+#define SFCB_STACK_POP() fcb_stack=fcb_save;
 #define SFCB_STACK(fnt) \
-		{FlowControlBlock* fcb_save = fcb_stack;fcb_stack=0;fnt;fcb_stack=fcb_save;}
+		{SFCB_STACK_PUSH();fnt;SFCB_STACK_POP();}
+
 
 #define CLICK_DEBUG_FCBPOOL 0
 
@@ -555,7 +557,8 @@ inline void FlowControlBlock::_do_release() {
            release_fnt(this, thunk);
 #endif
     //click_chatter("Releasing from table");
-    fcb_table->release(this);
+    if (fcb_table)
+        fcb_table->release(this);
     );
 }
 
@@ -595,7 +598,8 @@ inline void FlowControlBlock::release(int packets_nr) {
 #if DEBUG_CLASSIFIER_TIMEOUT  > 2
 	            click_chatter("Not releasing %p because timeout is not passed. Adding to the list",this);
 #endif
-	            fcb_table->release_later(this);
+                if (fcb_table)
+	                fcb_table->release_later(this);
 	            return;
 	        } else {
 #if DEBUG_CLASSIFIER_TIMEOUT  > 2
@@ -603,7 +607,7 @@ inline void FlowControlBlock::release(int packets_nr) {
                 click_chatter("Timeout %p has passed (%d/%d msec)!",this, (Timestamp::recent_steady() - lastseen).msecval(),t);
 #endif
 	        }
-	    } else {
+	    } else { //Does not have timeout
 #if DEBUG_CLASSIFIER_TIMEOUT  > 2
                 click_chatter("No timeout for fcb %p",this);
 #endif
@@ -611,7 +615,7 @@ inline void FlowControlBlock::release(int packets_nr) {
 #endif
 	    this->_do_release();
 
-	}
+	} //use_count > 0
 #if DEBUG_CLASSIFIER_RELEASE
 	else {
 	    click_chatter("NO RELEASE, fcb %p, uc %d",this,this->use_count);

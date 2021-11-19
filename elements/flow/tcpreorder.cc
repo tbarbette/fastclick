@@ -46,6 +46,7 @@ TCPReorder::reorder_initialize(ErrorHandler *errh) {
     if (track.size() > 0) {
         return errh->error("TCPIn now includes support for reordering. Use TCPReorder alone if you only want TCP Reordering");
     }
+    return 0;
 }
 
 void*

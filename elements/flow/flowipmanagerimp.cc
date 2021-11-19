@@ -219,6 +219,8 @@ void FlowIPManagerIMP::push_batch(int, PacketBatch* batch)
 #endif
         output_push_batch(0, batch);
     }
+
+    fcb_stack = 0;
 }
 
 enum {h_count};

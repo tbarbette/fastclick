@@ -250,10 +250,11 @@ public:
     void push_flow(int port, SFFlow* fcb, PacketBatch*);
 
     inline bool new_flow(SFFlow*, Packet*);
-
+    bool stopClassifier() override CLICK_COLD { return true; };
     static const unsigned timeout = 100000;
 
-    static String read_handler(Element *e, void *thunk);
+    static int write_handler(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
+    static String read_handler(Element *e, void *thunk) CLICK_COLD;
     void add_handlers() override CLICK_COLD;
 
     inline Prio prio() const {
