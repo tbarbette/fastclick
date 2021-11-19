@@ -201,7 +201,7 @@ int SFMaker::solve_initialize(ErrorHandler *errh)
         }
 #endif
         s.ready_batch = 0;
-	s.last_tx_time = TSCTimestamp::now_steady();
+    s.last_tx_time = TSCTimestamp::now_steady();
 
 #if SF_LLDS
         s.head_slot = 0;
@@ -654,12 +654,14 @@ start:
         int burst = 0;
         int c = 0;
         int split = 0;
-	PacketBatch* batch = s.ready_batch;
+
+        PacketBatch* batch = s.ready_batch;
         // PacketBatch* batch = 0;
-	int i = 0;
+        int i = 0;
+
         for(FlowQueue::iterator it = q.begin(); it != q.end(); ) {
             Burst &b = *const_cast<Burst*>(&(*it)); //Horrible but safe
-	    if (!batch)
+            if (!batch)
                 batch = b.batch;
             else
                 batch->append_batch(b.batch);
@@ -675,33 +677,32 @@ start:
                 sf_assert(b.batch->count() == count - _max_tx_burst);
                 sf_assert(b.batch->count() == b.batch->find_count());
                     
-		if (_verbose > 3)
+                if (_verbose > 3)
                     click_chatter("[%d] Sending burst of %d packets", i, batch->count());
-		i++;
-		c += batch->count();
-		output(0).push_batch(batch);
-		burst++;
-		    
-		batch = b.batch;
-		s.last_tx_time = send_begin;
+                i++;
+                c += batch->count();
+                output(0).push_batch(batch);
+                burst++;
+
+                batch = b.batch;
+                s.last_tx_time = send_begin;
                 b.batch = 0;
             }
 
-	    it = q.erase(it);
+            it = q.erase(it);
 
         }
             
-	if (batch->count() >= _min_tx_burst || (send_begin - s.last_tx_time).usecval() > _max_tx_delay) {
-	    if (_verbose > 3)
-                click_chatter("[%d] Sending burst of %d packets", i, batch->count());
-            i++;
-	    c += batch->count();
-	    output(0).push_batch(batch);
-	    batch = 0;
-	    s.last_tx_time = send_begin;
-            burst++;
-	}
-        else if (batch->count() > 0){
+        if (batch->count() >= _min_tx_burst || (send_begin - s.last_tx_time).usecval() > _max_tx_delay) {
+            if (_verbose > 3)
+                    click_chatter("[%d] Sending burst of %d packets", i, batch->count());
+                i++;
+            c += batch->count();
+            output(0).push_batch(batch);
+            batch = 0;
+            s.last_tx_time = send_begin;
+                burst++;
+        } else if (batch->count() > 0){
             if (next == TSCTimestamp() || (next - s.last_tx_time).usecval() > _max_tx_delay)
                 next = send_begin + TSCTimestamp::make_usec(_max_tx_delay);
         }
@@ -709,7 +710,7 @@ start:
         s.ready_batch = batch;
 
         s.sf_size+=c;
-        /*output(0).push_batch(superframe);*/
+
         TSCTimestamp send_end = TSCTimestamp::now_steady();
         if (_verbose > 1 &&  c > 100) {
             click_chatter("%d packets sent in %s (total loop %s)",c, (send_end-send_begin).unparse().c_str(), (send_end-now).unparse().c_str());
