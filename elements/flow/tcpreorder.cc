@@ -330,14 +330,14 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
   if (!tcpreorder->packetList && had_awaiting) {
       //We don't have awaiting packets anymore, remove the fct
       //click_chatter("We are now in order, removing release fct");
-#if HAVE_FLOW_DYNAMIC
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
       fcb_remove_release_fnt(tcpreorder,&fcb_release_fnt);
 #endif
   } else if (tcpreorder->packetList && !had_awaiting) {
       //Set release fnt
       if (_verbose)
           click_chatter("Out of order, setting release fct");
-#if HAVE_FLOW_DYNAMIC
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
       fcb_set_release_fnt(static_cast<FlowReleaseChain*>(tcpreorder), &fcb_release_fnt);
 #endif
   }
@@ -607,7 +607,7 @@ void TCPReorder::fcb_release_fnt(FlowControlBlock* fcb, void* thunk) {
 
     //click_chatter("Released %d",i);
     tcpreorder->packetList = 0;
-#if HAVE_FLOW_DYNAMIC
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
     if (tcpreorder->previous_fnt)
         tcpreorder->previous_fnt(fcb, tcpreorder->previous_thunk);
 #endif
