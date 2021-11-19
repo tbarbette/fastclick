@@ -1154,7 +1154,6 @@ SFMaker::add_handlers()
     add_read_handler("dropped", read_handler, AC_KILLED);
     add_read_handler("active", read_handler, AC_ACTIVE);
 
-
     add_write_handler("flush", write_handler, AC_FLUSH);
 }
 

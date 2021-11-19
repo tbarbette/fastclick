@@ -8,6 +8,9 @@
 
 CLICK_DECLS
 
+/**
+ * Displays information about the FCB stack
+ */
 class FlowPrint: public BatchElement {
 public:
 
@@ -25,6 +28,7 @@ public:
     void push_batch(int port, PacketBatch*);
 private:
     bool _continue;
+    bool _show_ptr;
 };
 CLICK_ENDDECLS
 #endif
