@@ -42,7 +42,7 @@ CLICK_DECLS
 	#define FLOW_INDEX(table,index) table.unchecked_at(index)
 #endif
 
-#define HAVE_DYNAMIC_FLOW_RELEASE_FNT 1
+#define HAVE_DYNAMIC_FLOW_RELEASE_FNT HAVE_DYNAMIC_FLOW
 
 class FlowControlBlock;
 class FCBPool;
@@ -96,10 +96,16 @@ union FlowNodeData{
 };
 
 typedef void (*SubFlowRealeaseFnt)(FlowControlBlock* fcb, void* thunk);
+
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
 struct FlowReleaseChain {
     SubFlowRealeaseFnt previous_fnt;
     void* previous_thunk;
 };
+#else
+struct FlowReleaseChain {
+};
+#endif
 
 class FlowControlBlock {
 

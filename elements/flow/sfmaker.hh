@@ -215,6 +215,7 @@ enum Model {
 struct Burst {
     int prio;
     PacketBatch* batch;
+    FlowControlBlock* fcb;
 };
 
 class SFMaker : public FlowStateElement<SFMaker,SFFlow>, public Router::InitFuture, protected TCPHelper
@@ -250,7 +251,7 @@ public:
     void push_flow(int port, SFFlow* fcb, PacketBatch*);
 
     inline bool new_flow(SFFlow*, Packet*);
-    bool stopClassifier() override CLICK_COLD { return true; };
+    bool stopClassifier() override CLICK_COLD { return _remanage; };
     static const unsigned timeout = 100000;
 
     static int write_handler(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
@@ -347,6 +348,7 @@ protected:
     bool _always;
     bool _pass;
     bool _bypass_syn;
+    bool _remanage;
     int _bypass_after_fail;
     uint32_t _max_burst;
     uint32_t _max_tx_burst;

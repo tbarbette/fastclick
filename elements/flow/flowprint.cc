@@ -39,7 +39,7 @@ void FlowPrint::push_batch(int port, PacketBatch* batch) {
 
         return;
 	}
-	click_chatter("%d packets from flow %lu. Count : %d.",batch->count(),fcb_stack->node_data[0], fcb_stack->count());
+	click_chatter("%p{element}: %d packets from flow %lu. Count : %d. Ptr %p", this, batch->count(),fcb_stack->node_data[0], fcb_stack->count(), fcb_stack);
 	output_push_batch(0,batch);
 }
 
