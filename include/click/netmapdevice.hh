@@ -23,12 +23,15 @@
 #define CLICK_NETMAPDEVICE_HH
 
 #if HAVE_NETMAP && CLICK_USERLEVEL
-
 #include <net/if.h>
+#define __UAPI_DEF_IF_NET_DEVICE_FLAGS 0
+#include <linux/if.h>
+
+extern "C" {
 #include <net/netmap.h>
 #define NETMAP_WITH_LIBS 1
 #include <net/netmap_user.h>
-
+}
 #define NS_NOFREE 0x80 //We use this to set that a buffer is shared and should not be freed
 
 

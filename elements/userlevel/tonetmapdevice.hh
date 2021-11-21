@@ -7,12 +7,13 @@
 #include <click/timer.hh>
 #include <click/notifier.hh>
 #include <click/etheraddress.hh>
-#include <click/netmapdevice.hh>
 #include <click/multithread.hh>
 #include <vector>
 #include "queuedevice.hh"
 
 CLICK_DECLS
+
+class NetmapDevice;
 
 /*
  * =title ToNetmapDevice

@@ -327,7 +327,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(Element* owner, Str
                     }
 #endif
 
-                    if (maskv & valuev == 0)
+                    if ((maskv & valuev) == 0)
                         dynamic = true;
                 }
                 FlowNodeDefinition* node = new FlowNodeDefinition(owner);

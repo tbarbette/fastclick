@@ -26,6 +26,7 @@
 #include <click/standard/scheduleinfo.hh>
 #include <click/packet.hh>
 #include <click/packet_anno.hh>
+#include <click/netmapdevice.hh>
 #include <vector>
 
 CLICK_DECLS
@@ -183,60 +184,6 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 
     return 0;
 }
-
-#if !HAVE_NETMAP_PACKET_POOL
-PacketBatch*
-FromNetmapDevice::pull_batch(int port, unsigned max) {
-		click_chatter("PULL BATCH only supports netmap batch!");
-		return 0;
-}
-#else
-PacketBatch*
-FromNetmapDevice::pull_batch(int port, unsigned max) {
-
-	for (int i = queue_for_thisthread_begin(); i <= queue_for_thisthread_end(); i++) {
-		lock();
-		struct nm_desc* nmd = _device->nmds[i];
-#ifdef SYNC_ON_IRQ
-		ioctl(nmd->fd,NIOCRXSYNC,SYNC_ON_IRQ);
-#else
-		ioctl(nmd->fd,NIOCRXSYNC,0);
-#endif
-		struct netmap_ring *rxring = NETMAP_RXRING(nmd->nifp, i);
-
-		u_int cur, n;
-
-		cur = rxring->cur;
-
-		n = nm_ring_space(rxring);
-		if (max && n > max) {
-			n = max;
-		}
-
-		if (n == 0) {
-			unlock();
-			continue;
-		}
-
-		Timestamp ts = Timestamp::make_usec(nmd->hdr.ts.tv_sec, nmd->hdr.ts.tv_usec);
-
-		PacketBatch *batch_head = WritablePacket::make_netmap_batch(n,rxring,cur,_set_rss_aggregate);
-		if (!batch_head) goto error;
-		batch_head->set_timestamp_anno(ts);
-		rxring->head = rxring->cur = cur;
-		unlock();
-		if (batch_head) {
-			add_count(batch_head->count());
-			return batch_head;
-		}
-	}
-	return 0;
-	error: //No more buffer
-	click_chatter("No more buffers !");
-	router()->master()->kill_router(router());
-	return 0;
-}
-#endif
 
 inline bool
 FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
