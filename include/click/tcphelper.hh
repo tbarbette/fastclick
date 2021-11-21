@@ -304,7 +304,12 @@ inline void TCPHelper::resetTCPChecksum(WritablePacket *packet)
         return;
     }
 #if HAVE_DPDK
+
+# if !CLICK_PACKET_USE_DPDK
     rte_mbuf* mbuf = (struct rte_mbuf *) packet->destructor_argument();
+# else
+    rte_mbuf* mbuf = (struct rte_mbuf *) packet;
+# endif
     mbuf->l2_len = packet->mac_header_length();
     mbuf->l3_len = packet->network_header_length();
     mbuf->l4_len = tcph->th_off << 2;
