@@ -1,7 +1,7 @@
 define( $drop_h 0,
         $drop_r 0,
         $drop_k 1,
-        $drop_p 0,
+        $drop_p 0
 		$no_fec 0);
 
 elementclass Input { $port, $MAC_DST, $MAC_DST2 |
@@ -14,7 +14,7 @@ elementclass Input { $port, $MAC_DST, $MAC_DST2 |
 	-> c1 :: Classifier(24/FC000000000000000000000000000009,-)
 	-> c2 :: Classifier(6/2B,-)
 	-> IP6SRProcess()
-	// -> IP6Drop(ADDR fc00::9, ADDR babe:2::5, K $drop_k, R $drop_r, H $drop_h, P $drop_p)
+	-> IP6Drop(ADDR fc00::9, ADDR babe:2::5, K $drop_k, R $drop_r, H $drop_h, P $drop_p)
 	-> sFEC :: Switch($no_fec)	
 	-> fec  :: IP6SRv6FECDecode(DEC fc00::9, ENC fc00::a)
 	-> c3 :: Classifier(24/FC00000000000000000000000000000A,-);

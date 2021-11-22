@@ -1,5 +1,5 @@
-define( $window_size 1,
-        $window_step 1,
+define( $window_size 10,
+        $window_step 2,
 		$no_fec 0);
 
 elementclass Input { $port |

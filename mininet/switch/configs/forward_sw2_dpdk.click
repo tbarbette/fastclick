@@ -12,8 +12,8 @@ define( $intif 0,
 	$nofakefec 0);
 
 //From internal to external
-fd1  :: FromDPDKDevice($intif, PROMISC true, MTU 1610);
-td1  :: ToDPDKDevice($extif);
+fd1  :: FromDevice(sw2-eth1, SNIFFER false);
+td1  :: ToDevice(sw2-eth0);
 fd1 
     -> pr1 :: Print(INT, -1, ACTIVE $doprint)
     -> in1 :: InputEncap($intif, 0:0:0:0:0:13, 0:0:0:0:0:12, babe:2::8, $noencap)
@@ -22,8 +22,8 @@ fd1
     -> td1 ;
 
 //From external to internal
-fd2  :: FromDPDKDevice($extif, PROMISC true, MTU 1610);
-td2  :: ToDPDKDevice($intif);
+fd2  :: FromDevice(sw2-eth0, SNIFFER false);
+td2  :: ToDevice(sw2-eth1);
 fd2 
     -> pr2 :: Print(EXT, -1, ACTIVE $doprint)
     -> in2 :: InputDecap($extif, 0:0:0:0:0:3, 0:0:0:0:0:4, babe:3::2)

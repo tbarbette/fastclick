@@ -158,6 +158,7 @@ class IP6SRv6FECDecode : public BatchElement {
   IP6Address dec; // Decoder SID
   bool _use_dst_anno;
   bool _do_recover;
+  bool _do_fec;
   rlc_info_decoder_t _rlc_info;
   srv6_fec2_feedback_t _rlc_feedback;
   rlc_recover_utils_t _rlc_utils;
@@ -165,16 +166,17 @@ class IP6SRv6FECDecode : public BatchElement {
   static String read_handler(Element *, void *) CLICK_COLD;
 
   void fec_framework(Packet *p_in, std::function<void(Packet*)>push);
-  int fec_scheme_source(WritablePacket *p_in, source_tlv_t *tlv);
-  void fec_scheme_repair(WritablePacket *p_in, repair_tlv_t *tlv, std::function<void(Packet*)>push);
+  void fec_framework(Packet *p_in);
+  int fec_scheme_source(Packet *p_in, source_tlv_t *tlv);
+  void fec_scheme_repair(Packet *p_in, repair_tlv_t *tlv, std::function<void(Packet*)>push);
   WritablePacket *recover_packet_fom_data(srv6_fec2_term_t *rec);
   srv6_fec2_term_t *init_term(Packet *p, uint16_t offset, uint16_t max_packet_length);
   void kill_term(srv6_fec2_term_t *t);
 
   void rlc_fill_muls(uint8_t muls[256 * 256]);
 
-  void store_source_symbol(WritablePacket *p_in, source_tlv_t *tlv);
-  void store_repair_symbol(WritablePacket *p_in, repair_tlv_t *tlv);
+  void store_source_symbol(Packet *p_in, source_tlv_t *tlv);
+  void store_repair_symbol(Packet *p_in, repair_tlv_t *tlv);
   void remove_tlv_source_symbol(WritablePacket *p, uint16_t offset_tlv);
 
   void rlc_recover_symbols(std::function<void(Packet*)>push);

@@ -85,69 +85,69 @@ void
 #endif
 IP6Drop::drop_model(Packet *p_in, std::function<void(Packet*)>push)
 {
-    // Do not drop the repair symbols
-    // TODO: adapt if we change and do not use ping anymore
-    int idxs[] = {2, 3, 7};
-    if (p_in->length() < 200) {
-#if HAVE_BATCH
-        return p_in;
-#else
-        push(p_in);
-#endif
-    }
-    total_seen++;
-    for (int i = 0; i < 1; ++i) {
-        if (total_seen % 1000 == idxs[i]) {
-            //click_chatter("Drop packet");
-#if HAVE_BATCH
-            return 0;
-#else
-            return;
-#endif
-            }
-    }
-#if HAVE_BATCH
-    return p_in;
-#else
-    push(p_in);
-#endif
-
-
-//     const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
-//     uint32_t *dst_32 = (uint32_t *)&ip6->ip6_dst;
-//     bool found = false;
-//     for (int i = 0; i < addrs.size(); ++i) {
-//         IP6Address addr = addrs.at(i);
-//         uint32_t *addr_32 = (uint32_t *)addr.data32();
-//         if (addr_eq(addr_32, dst_32)) {
-//             found = true;
-//             break;
-//         }
-//     }
-//     if (!found) {
+//     // Do not drop the repair symbols
+//     // TODO: adapt if we change and do not use ping anymore
+//     int idxs[] = {2, 3, 7};
+//     if (p_in->length() < 200) {
 // #if HAVE_BATCH
 //         return p_in;
 // #else
 //         push(p_in);
 // #endif
 //     }
-    
 //     total_seen++;
-//     // Do not drop the first packets to ensure a connection between the client and the broker
-//     if (total_seen < 20) {
-//         return p_in;
-//     }
-
-//     if (!gemodel()) {
-//         click_chatter("Drop packet #%u", total_seen);
+//     for (int i = 0; i < 3; ++i) {
+//         if (total_seen % 20 == idxs[i]) {
+//             // click_chatter("Drop packet");
 // #if HAVE_BATCH
-//         return 0;
+//             return 0;
+// #else
+//             return;
+// #endif
+//             }
 //     }
+// #if HAVE_BATCH
 //     return p_in;
 // #else
-//     }
 //     push(p_in);
 // #endif
+
+
+    const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p_in->data());
+    uint32_t *dst_32 = (uint32_t *)&ip6->ip6_dst;
+    bool found = false;
+    for (int i = 0; i < addrs.size(); ++i) {
+        IP6Address addr = addrs.at(i);
+        uint32_t *addr_32 = (uint32_t *)addr.data32();
+        if (addr_eq(addr_32, dst_32)) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+#if HAVE_BATCH
+        return p_in;
+#else
+        push(p_in);
+#endif
+    }
+    
+    total_seen++;
+    // Do not drop the first packets to ensure a connection between the client and the broker
+    if (total_seen < 20) {
+        return p_in;
+    }
+
+    if (!gemodel()) {
+        click_chatter("Drop packet #%u", total_seen);
+#if HAVE_BATCH
+        return 0;
+    }
+    return p_in;
+#else
+    }
+    push(p_in);
+#endif
 }
 
 bool
@@ -198,4 +198,3 @@ IP6Drop::add_handlers()
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IP6Drop)
 ELEMENT_MT_SAFE(IP6Drop)
-

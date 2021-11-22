@@ -161,10 +161,8 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
         return; 
     }
 
-    if (err == 1) { // Repair
-        //t_scheme_s = Timestamp::now();
+    if (err == 1 && _send_repair) { // Repair
         if (!_repair_packet) {
-            // click_chatter("No repair packet TODO");
             return;
         }
 
@@ -177,15 +175,14 @@ IP6SRv6FECEncode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
         encapsulate_repair_payload(_repair_packet, &_repair_tlv, _rlc_info.max_length);
 
         // Send repair packet
-          push(_repair_packet);
-          _repair_packet = 0;
+        push(_repair_packet);
+        _repair_packet = 0;
 
         // Reset parameters of the RLC information
         _rlc_info.max_length = 0;
         memset(&_repair_tlv, 0, sizeof(repair_tlv_t));
         _rlc_info.prng = rlc_reset_coefs();
     }
-
 }
 
 int
@@ -210,6 +207,8 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in, std::function<void(Packet*)>push)
     // Update RLC information
     ++_rlc_info.buffer_size;
     ++_rlc_info.encoding_symbol_id;
+    
+    push(p);
 
     // Same as the srv6_fec_add_source_tlv
     push(p);
@@ -257,9 +256,11 @@ IP6SRv6FECEncode::fec_scheme(Packet *p_in, std::function<void(Packet*)>push)
         _rlc_info.previous_window_step = _rlc_info.window_step;
         // Update coding rate
         // TODO
+
         
         return 1;
     }
+
 
     return 0;
 }
