@@ -1004,6 +1004,7 @@ class WritablePacket : public Packet { public:
 #endif
 
 # if HAVE_CLICK_PACKET_POOL
+    static PacketPool& get_local_packet_pool();
     static void initialize_local_packet_pool();
 # endif
 
@@ -3141,57 +3142,7 @@ WritablePacket::rewrite_seq(tcp_seq_t seq, const int shift) {
     click_update_in_cksum(&this->tcp_header()->th_sum, t_old_hw, t_new_hw);
 }
 
-
-#if !CLICK_PACKET_USE_DPDK
-/**
- * Release a buffer that is directly allocated, ie not one that use destructor
- */
-inline void
-Packet::release_buffer(unsigned char* head) {
-
-# if HAVE_NETMAP_PACKET_POOL
-                if (NetmapBufQ::is_valid_netmap_buffer(head))
-                    NetmapBufQ::local_pool()->insert_p(head);
-                else
-# endif
-                {
-#  if HAVE_DPDK
-                if (dpdk_enabled)
-                    rte_free(head);
-                else
-#  endif
-                    ::operator delete[](head);
-                }
-}
-
-inline void
-Packet::delete_buffer(unsigned char* head, unsigned char* end
-#if CLICK_BSDMODULE
-        ,unsigned char* m
-#endif
-        ) {
-# ifndef CLICK_NOINDIRECT
-    if (_data_packet) {
-	    _data_packet->kill();
-    }
-# else
-  if (false) {}
-# endif
-# if CLICK_USERLEVEL || CLICK_MINIOS
-    else if (head && _destructor) {
-        if (_destructor != empty_destructor)
-            _destructor(head, end - head, _destructor_argument);
-    } else
-        release_buffer(head);
-# elif CLICK_BSDMODULE
-    if (m)
-	    m_freem(m);
-# endif
-}
-#endif
-
 typedef Packet::PacketType PacketType;
-
 
 inline unsigned char* WritablePacket::getPacketContent()
 {

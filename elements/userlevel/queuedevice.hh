@@ -204,6 +204,9 @@ protected:
         return queue_for_thread_end(click_current_cpu_id());
     }
 
+    /**
+     * Return the queue index for a given thread
+     */
     inline int id_for_thread(int tid) {
         if (likely(queue_per_threads == 1))
             return queue_for_thread_begin(tid) - firstqueue;
@@ -211,22 +214,37 @@ protected:
             return (queue_for_thread_begin(tid) - firstqueue) / queue_per_threads;
     }
 
+    /**
+     * Returns the queue id for this thread
+     */
     inline int id_for_thread() {
         return id_for_thread(click_current_cpu_id());
     }
 
+    /**
+     * Return the task responsible for the current thread
+     */
     inline Task* task_for_thread() {
         return _thread_state->task;
     }
 
+    /**
+     * Returns the task for a thread
+     */
     inline Task* task_for_thread(int tid) {
         return _thread_state.get_value_for_thread(tid).task;
     }
 
+    /**
+     * Returns the thread managing a given queue, given by its index (not accountig for first_queue, hence the queue offset)
+     */
     inline int thread_for_queue_offset(int queue) {
         return _q_infos[queue].thread_id;
     }
 
+    /**
+     * Returns the number of threads per queues, in general 1 except when the number of queues is limited
+     */
     int thread_per_queues() {
         return queue_share;
     }

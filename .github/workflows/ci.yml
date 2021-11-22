@@ -20,7 +20,7 @@ jobs:
     strategy:
         matrix:
             COMPILER: [gcc, clang]
-            FRAMEWORK: [vanilla, dpdk, dpdk-light, vanilla-nopool]
+            FRAMEWORK: [vanilla, dpdk, dpdk-light, netmap, vanilla-nopool]
 
     steps:
     - uses: actions/checkout@v2
@@ -55,6 +55,13 @@ jobs:
 
             if [ "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then
                 FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --enable-dpdk-packet --disable-clone --disable-task-stats --disable-cpu-load --disable-dpdk-softqueue"
+            fi
+            if [ "${{matrix.FRAMEWORK}}" = "netmap" ] ; then
+                if [ ! -e "netmap-13.0" ] ; then
+                   wget https://github.com/luigirizzo/netmap/archive/refs/tags/v13.0.tar.gz
+                   tar -zxf v13.0.tar.gz
+                fi
+                FRAMEWORK_FLAGS="--with-netmap=$(pwd)/netmap-13.0/sys/"
             fi
             echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
             echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV

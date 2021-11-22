@@ -230,6 +230,56 @@ Packet::~Packet()
 #endif
 }
 
+#if !CLICK_PACKET_USE_DPDK
+/**
+ * Release a buffer that is directly allocated, ie not one that use destructor
+ */
+inline void
+Packet::release_buffer(unsigned char* head) {
+
+# if HAVE_NETMAP_PACKET_POOL
+                if (NetmapBufQ::is_valid_netmap_buffer(head))
+                    NetmapBufQ::local_pool()->insert_p(head);
+                else
+# endif
+                {
+#  if HAVE_DPDK
+                if (dpdk_enabled)
+                    rte_free(head);
+                else
+#  endif
+                    ::operator delete[](head);
+                }
+}
+
+inline void
+Packet::delete_buffer(unsigned char* head, unsigned char* end
+#if CLICK_BSDMODULE
+        ,unsigned char* m
+#endif
+        ) {
+# ifndef CLICK_NOINDIRECT
+    if (_data_packet) {
+	    _data_packet->kill();
+    }
+# else
+  if (false) {}
+# endif
+# if CLICK_USERLEVEL || CLICK_MINIOS
+    else if (head && _destructor) {
+        if (_destructor != empty_destructor)
+            _destructor(head, end - head, _destructor_argument);
+    } else
+        release_buffer(head);
+# elif CLICK_BSDMODULE
+    if (m)
+	    m_freem(m);
+# endif
+}
+#endif
+
+
+
 #if !CLICK_LINUXMODULE && !CLICK_PACKET_USE_DPDK
 
 # if HAVE_CLICK_PACKET_POOL
@@ -284,13 +334,22 @@ static PacketPool global_packet_pool = {0,0,0,0};
 
 /** @brief Return the local packet pool for this thread.
     @pre initialize_local_packet_pool() has succeeded on this thread. */
-static CLICK_ALWAYS_INLINE inline PacketPool& local_packet_pool() {
+static CLICK_ALWAYS_INLINE inline
+PacketPool& local_packet_pool() {
 #  if HAVE_MULTITHREAD
     return *thread_packet_pool;
 #  else
     // If not multithreaded, there is only one packet pool.
     return global_packet_pool;
 #  endif
+}
+
+/**
+ * Exportable version of the above
+ */
+PacketPool&
+WritablePacket::get_local_packet_pool() {
+    return local_packet_pool();
 }
 
 /** @brief Create and return a local packet pool for this thread. */
