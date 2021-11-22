@@ -81,7 +81,7 @@ IP6SRDecap::simple_action(Packet *p_in)
 
             ip6->ip6_dst = last;
             ip6->ip6_nxt = nxt;
-            ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - srlen);
+            ip6->ip6_plen = htons(ntohs(ip6->ip6_plen));
             p->set_network_header(p->data(), offset);
 
 
