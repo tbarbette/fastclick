@@ -176,11 +176,13 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
     // Find TLV: source or repair symbol
     uint8_t tlv_type = 0;
     // last_entry is 0-indexed => +1
+    //click_chatter("srv6 %u", srv6->ip6_sr_next);
     uint16_t start_tlv_offset = 8 + (srv6->last_entry + 1) * 16;
     // ip6_hdrlen does not include the 8 first bytes => + 1
     uint16_t total_tlv_size = (srv6->ip6_hdrlen + 1) * 8 - start_tlv_offset;
     uint16_t read_bytes = 0;
     uint8_t *tlv_ptr;
+    //click_chatter("SRv6 len=%u, total_tlv_size=%u", srv6->ip6_hdrlen, total_tlv_size);
     while (read_bytes < total_tlv_size) { // Iterate over all TLVs of the SRH
         tlv_ptr = (uint8_t *)srv6 + start_tlv_offset + read_bytes;
         if (tlv_ptr[0] == TLV_TYPE_FEC_SOURCE || tlv_ptr[0] == TLV_TYPE_FEC_REPAIR) {
@@ -203,7 +205,8 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
         memcpy(&source_tlv, tlv_ptr, sizeof(source_tlv_t));
         
         // Remove the TLV from the source packet
-        remove_tlv_source_symbol(p, tlv_ptr - p->data()); // Cleaner way?
+        // We do not remove the TLV to improve performance (we do not make a different copy of the same packet)
+	//remove_tlv_source_symbol(p, tlv_ptr - p->data()); // Cleaner way?
 
         // Call FEC Scheme
         fec_scheme_source(p, &source_tlv);
@@ -219,9 +222,9 @@ IP6SRv6FECDecode::fec_framework(Packet *p_in, std::function<void(Packet*)>push)
 
     // Send the (modified, without TLV) source symbol
     // i.e., do not send the repair symbol out of the tunnel
-    if (tlv_type == TLV_TYPE_FEC_SOURCE) {
+    //if (tlv_type == TLV_TYPE_FEC_SOURCE) {
         push(p);
-    }
+    //}
 
     if (_rlc_info.esid_last_feedback >= 2) {
         //click_chatter("Show last: %u", _rlc_info.esid_last_feedback);
@@ -277,7 +280,7 @@ IP6SRv6FECDecode::store_source_symbol(WritablePacket *p_in, source_tlv_t *tlv) {
         symbol = (srv6_fec2_source_t *)CLICK_LALLOC(sizeof(srv6_fec2_source_t));
     }
     symbol->encoding_symbol_id = tlv->sfpid;
-    symbol->p = p_in->clone();
+    symbol->p = p_in->clone(true);
 
     _rlc_info.source_buffer[encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = symbol;
 
@@ -640,6 +643,7 @@ IP6SRv6FECDecode::rlc_recover_symbols(std::function<void(Packet*)>push)
                 // Store a local copy of the packet for later recovery?
                 recovered->p = p_rec->clone();
                 push(p_rec);
+		click_chatter("Recover a packet");
 
                 _rlc_info.recovd_buffer[recovered->encoding_symbol_id % SRV6_FEC_BUFFER_SIZE] = recovered;
             }
