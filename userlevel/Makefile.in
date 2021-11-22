@@ -171,6 +171,11 @@ $(shell rm -f $(ELEMENTSCONF).conf $(ELEMENTSCONF).csmk)
 endif
 endif
 
+CUCKOOPP_PATH=../vendor/cuckoopp
+CPPFLAGS += -I ${CUCKOOPP_PATH}
+VPATH += :${CUCKOOPP_PATH}
+GENERIC_OBJS += rte_cuckoo_hash_bloom.o rte_cuckoo_hash_lazy_bloom.o
+
 ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
 endif

@@ -87,6 +87,7 @@ private:
 
         IPAddress _vip;
         bool _accept_nonsyn;
+	int _verbose;
 
 	static int handler(int op, String& s, Element* e, const Handler* h, ErrorHandler* errh);
         static String read_handler(Element *handler, void *user_data);

@@ -1646,8 +1646,7 @@ Optional Features:
                           enable port transfer function ptr optimization
     --disable-sloppy      disable Sloppy flow timeouts
     --disable-flow-atomic use non-atomic flow reference counting
-    --disable-flow-dynamic
-                          allow dynamic flow system
+    --enable-flow-dynamic allow dynamic flow system
     --disable-flow-structure
                           do not free classifier nodes in pool, mark them as
                           released to somehow keep the receive strucutre
@@ -11047,7 +11046,7 @@ fi
 if test "${enable_flow_dynamic+set}" = set; then :
   enableval=$enable_flow_dynamic; :
 else
-  enable_flow_dynamic=yes
+  enable_flow_dynamic=no
 fi
 
 if test "x$enable_flow$enable_flow_dynamic" = xyesyes; then
@@ -13111,6 +13110,7 @@ $as_echo_n "checking for DPDK library... " >&6; }
 
 
     if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
+      dpdk_sys="meson"
       RTE_USE_PKGCONFIG=1
 
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
@@ -13129,6 +13129,7 @@ $as_echo_n "checking for DPDK library... " >&6; }
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
     else
+      dpdk_sys="make"
       RTE_USE_PKGCONFIG=0
 
       RTE_INCLUDE=${RTE_SDK_BIN}/include/
@@ -13215,8 +13216,6 @@ $as_echo "yes" >&6; }
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
     fi
-
-
 
 fi
 
@@ -18065,6 +18064,8 @@ if test "x$enable_dpdk" != "xno"; then
     dpdk_info="${enable_dpdk}
     DPDK    Target:              ${RTE_TARGET}
     DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}
+    DPDK      Path:              ${RTE_SDK}
+    DPDK     build:              ${dpdk_sys}
     DPDK  Location:              ${RTE_LIB}"
 else
     dpdk_info=${enable_dpdk}

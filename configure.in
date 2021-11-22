@@ -930,8 +930,8 @@ if test "x$enable_flow_atomic" = xyes; then
 fi
 
 AC_ARG_ENABLE([flow-dynamic],
-    [AS_HELP_STRING([  --disable-flow-dynamic], [allow dynamic flow system])],
-    [:], [enable_flow_dynamic=yes])
+    [AS_HELP_STRING([  --enable-flow-dynamic], [allow dynamic flow system])],
+    [:], [enable_flow_dynamic=no])
 if test "x$enable_flow$enable_flow_dynamic" = xyesyes; then
     AC_DEFINE(HAVE_FLOW_DYNAMIC)
 fi
@@ -1656,6 +1656,7 @@ if test "x$enable_dpdk" != "xno"; then
 
 
     if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
+      dpdk_sys="meson"
       AC_SUBST(RTE_USE_PKGCONFIG, 1)
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
@@ -1672,6 +1673,7 @@ if test "x$enable_dpdk" != "xno"; then
 	  DPDK_CFLAGS=$(pkg-config --cflags libdpdk)
       AC_MSG_RESULT([yes])
     else
+      dpdk_sys="make"
       AC_SUBST(RTE_USE_PKGCONFIG, 0)
       RTE_INCLUDE=${RTE_SDK_BIN}/include/
       RTE_LIB="$RTE_SDK_BIN/lib"
@@ -1730,8 +1732,8 @@ version (dpdk-dev or dpdk-devel).
       AC_DEFINE([HAVE_DPDK_READ_CLOCK])
     else
       AC_MSG_RESULT([no])
-    fi
-
+    fi    
+   
     AC_MSG_CHECKING([whether DPDK has rte_flow_update])
     if ${READELF} -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_flow_update &> /dev/null; then
       AC_MSG_RESULT([yes])
@@ -1739,8 +1741,6 @@ version (dpdk-dev or dpdk-devel).
     else
       AC_MSG_RESULT([no])
     fi
-
-
 
 fi
 
@@ -2865,6 +2865,8 @@ if test "x$enable_dpdk" != "xno"; then
     dpdk_info="${enable_dpdk}
     DPDK    Target:              ${RTE_TARGET}
     DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}
+    DPDK      Path:              ${RTE_SDK}
+    DPDK     build:              ${dpdk_sys}
     DPDK  Location:              ${RTE_LIB}"
 else
     dpdk_info=${enable_dpdk}

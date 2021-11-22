@@ -272,11 +272,13 @@ FlowRuleManager::get_flow_rule_mgr(const portid_t &port_id, ErrorHandler *errh)
 {
     if (!errh) {
         errh = ErrorHandler::default_handler();
+	if(!errh)
+	    errh = new ErrorHandler();
     }
 
     // Invalid port ID
     if (port_id >= DPDKDevice::dev_count()) {
-        errh->error("DPDK Flow Rule Manager (port %u): Denied to create instance for invalid port", port_id);
+	    errh->error("DPDK Flow Rule Manager (port %u): Denied to create instance for invalid port", port_id);
         return NULL;
     }
 

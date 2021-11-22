@@ -12,8 +12,33 @@
 # define click_hashmp_assert(x)
 #endif
 
+#define HASTABLEMP_POW2_SZ 1
+
 CLICK_DECLS
 
+//Strut serving as constant template parameters
+// MT_T is used when multithreading could be enabled
+// NOMT when MT is always disabled
+struct MT_T {
+    bool _mt;
+    MT_T(bool mt = true) {
+        _mt = mt;
+    }
+
+    inline bool mt() const {
+        return _mt;
+    }
+
+    inline void disable_mt() {
+        _mt = false;
+    }
+};
+
+struct NOMT {
+    NOMT(bool) {};
+    inline bool mt() const { return false; };
+    inline void disable_mt() { };
+};
 
 /** @class HashContainerMP
   @brief Intrusive hash table template, MT safe version.
@@ -26,7 +51,7 @@ CLICK_DECLS
 
   For convenience HashTableMP is an alias for HashContainerMP<K,V,shared<V>>
 */
-template <typename K, typename V, typename Item>
+template <typename K, typename V, typename Item, typename MT=MT_T>
 class HashContainerMP { public:
 
     class ListItem { public:
@@ -52,10 +77,27 @@ class HashContainerMP { public:
     };
 
     class Table { public:
-        Table() : _nbuckets(0), buckets(0) {
+        Table() :
+#if HASTABLEMP_POW2_SZ
+         _nbuckets_mask(0),
+#else
+         _nbuckets(0),
+#endif
+         buckets(0) {
             _size = 0;
         }
+        uint32_t nbuckets() {
+#if HASTABLEMP_POW2_SZ
+            return _nbuckets_mask + 1;
+#else
+            return _nbuckets;
+#endif
+        }
+        #if HASTABLEMP_POW2_SZ
+        uint32_t _nbuckets_mask;
+        #else
         uint32_t _nbuckets;
+        #endif
         Bucket* buckets;
         atomic_uint32_t _size;
     private:
@@ -67,35 +109,35 @@ class HashContainerMP { public:
     typedef typename Item::write_ptr write_ptr;
 
     class iterator {
-        mutable HashContainerMP<K,V,Item>* _h;
+        mutable HashContainerMP<K,V,Item,MT>* _h;
         int _b;
         ListItem* _prev;
         ListItem* _item;
     public:
         ~iterator() {
             if (_h) {
-                if (_b < _h->_table->_nbuckets) {
-                    if (likely(_h->_mt))
+                if (_b < _h->_table->nbuckets()) {
+                    if (likely(_h->mt()))
                         _h->_table->buckets[_b].list.read_end();
                 }
-                if (likely(_h->_mt))
+                if (likely(_h->mt()))
                     _h->_table.read_end();
             }
         }
 
         /** @brief Advance this iterator to the next element. */
         void operator++() {
-            if (_b == _h->_table->_nbuckets) return;
+            if (_b == _h->_table->nbuckets()) return;
             if (_item) {
                 _item = _item->_hashnext;
                 _prev = _item;
             }
             while (!_item) {
                 //click_chatter("Bucket %d : %p",_b,_h->_table->buckets[_b]);
-                if (likely(_h->_mt))
+                if (likely(_h->mt()))
                     _h->_table->buckets[_b].list.read_end();
-                if (++_b == _h->_table->_nbuckets) return;
-                if (likely(_h->_mt))
+                if (++_b == _h->_table->nbuckets()) return;
+                if (likely(_h->mt()))
                     _h->_table->buckets[_b].list.read_begin();
                 _item = _h->_table->buckets[_b].list->head;
                 _prev = 0;
@@ -134,31 +176,31 @@ class HashContainerMP { public:
 
         protected:
         //global read lock must be held!
-        iterator(HashContainerMP<K,V,Item>* h) : _h(h), _prev(0) {
+        iterator(HashContainerMP<K,V,Item,MT>* h) : _h(h), _prev(0) {
             _b = 0;
-            if (likely(_h->_mt))
+            if (likely(_h->mt()))
                 _h->_table->buckets[_b].list.read_begin();
             _item =  _h->_table->buckets[_b].list->head;
             if (_item == 0) {
                 (*this)++;
             }
         }
-        friend class HashContainerMP<K,V,Item>;
+        friend class HashContainerMP<K,V,Item,MT>;
     };
 
     class write_iterator {
-        mutable HashContainerMP<K,V,Item>* _h;
+        mutable HashContainerMP<K,V,Item,MT>* _h;
         int _b;
         ListItem* _prev;
         ListItem* _item;
     public:
         ~write_iterator() {
             if (_h) {
-                if (_b < _h->_table->_nbuckets) {
-                    if (likely(_h->_mt))
+                if (_b < _h->_table->nbuckets()) {
+                    if (likely(_h->mt()))
                         _h->_table->buckets[_b].list.write_end();
                 }
-                if (likely(_h->_mt))
+                if (likely(_h->mt()))
                     _h->_table.read_end();
             }
             _h = 0; //Prevent read destruction
@@ -166,16 +208,16 @@ class HashContainerMP { public:
 
         /** @brief Advance this iterator to the next element. */
         void operator++() {
-            if (_b == _h->_table->_nbuckets) return;
+            if (_b == _h->_table->nbuckets()) return;
             if (_item) {
                 _item = _item->_hashnext;
                 _prev = _item;
             }
             while (!_item) {
-                if (likely(_h->_mt))
+                if (likely(_h->mt()))
                     _h->_table->buckets[_b].list.write_end();
-                if (++_b == _h->_table->_nbuckets) return;
-                if (likely(_h->_mt))
+                if (++_b == _h->_table->nbuckets()) return;
+                if (likely(_h->mt()))
                     _h->_table->buckets[_b].list.write_begin();
                 _item = _h->_table->buckets[_b].list->head;
                 _prev = 0;
@@ -218,16 +260,16 @@ class HashContainerMP { public:
 
     protected:
         //global read lock must be held!
-        write_iterator(HashContainerMP<K,V,Item>* h) : _h(h), _prev(0) {
+        write_iterator(HashContainerMP<K,V,Item,MT>* h) : _h(h), _prev(0) {
             _b = 0;
-            if (likely(h->_mt))
+            if (likely(h->mt()))
                 _h->_table->buckets[_b].list.write_begin();
             _item =  _h->_table->buckets[_b].list->head;
             if (_item == 0) {
                 (*this)++;
             }
         }
-        friend class HashContainerMP<K,V,Item>;
+        friend class HashContainerMP<K,V,Item,MT>;
     };
 
     static ListItem *&hashnext(ListItem *e) {
@@ -264,10 +306,10 @@ class HashContainerMP { public:
     /** @brief Return the number of elements stored. */
     inline size_type size() {
         size_type s;
-        if (likely(_mt))
+        if (likely(mt()))
             _table.read_begin();
         s = _table->_size;
-        if (likely(_mt))
+        if (likely(mt()))
             _table.read_end();
         return s;
     }
@@ -275,10 +317,10 @@ class HashContainerMP { public:
     /** @brief Return the number of buckets. */
     inline size_type buckets() {
         size_type s;
-        if (likely(_mt))
+        if (likely(mt()))
             _table.read_begin();
-        s = _table->_nbuckets;
-        if (likely(_mt))
+        s = _table->nbuckets();
+        if (likely(mt()))
             _table.read_end();
         return s;
     }
@@ -292,10 +334,10 @@ class HashContainerMP { public:
     /** @brief Return true if this HashContainer should be rebalanced. */
     inline bool unbalanced() {
         bool r;
-        if (likely(_mt))
+        if (likely(mt()))
             _table.read_begin();
-        r = _table->_size > 2 * _table->_nbuckets && _table->_nbuckets < max_bucket_count;
-        if (likely(_mt))
+        r = _table->_size > 2 * _table->nbuckets() && _table->nbuckets() < max_bucket_count;
+        if (likely(mt()))
             _table.read_end();
         return r;
     }
@@ -360,7 +402,11 @@ class HashContainerMP { public:
     }
 
     inline void disable_mt() {
-        _mt = false;
+        _mt.disable_mt();
+    }
+
+    inline bool mt() {
+        return _mt.mt();
     }
 
     inline void resize_clear(uint32_t n) {
@@ -368,7 +414,7 @@ class HashContainerMP { public:
         initialize(n);
     }
   protected:
-    bool _mt;
+    MT _mt;
 
     __rwlock<Table> _table;
     per_thread<ListItem*> _pending_release;
@@ -376,8 +422,8 @@ class HashContainerMP { public:
     void initialize(size_type n);
     void deinitialize();
 
-    HashContainerMP(const HashContainerMP<K,V,Item> &);
-    HashContainerMP<K,V,Item> &operator=(const HashContainerMP<K,V,Item> &);
+    HashContainerMP(const HashContainerMP<K,V,Item,MT> &);
+    HashContainerMP<K,V,Item,MT> &operator=(const HashContainerMP<K,V,Item,MT> &);
 
     //_table read lock must be held
     size_type bucket(const K &key);
@@ -422,34 +468,38 @@ class HashContainerMP { public:
 
 };
 
-template <typename K, typename V, typename Item>
-void HashContainerMP<K,V,Item>::initialize(size_type n)
+template <typename K, typename V, typename Item, typename MT>
+void HashContainerMP<K,V,Item,MT>::initialize(size_type n)
 {
     _table->_size = 0;
+#if HASTABLEMP_POW2_SZ
+    _table->_nbuckets_mask = next_pow2(n) - 1;
+#else
     _table->_nbuckets = n;
-    _table->buckets = (Bucket *) CLICK_LALLOC(sizeof(Bucket) * _table->_nbuckets);
-    for (size_type b = 0; b < _table->_nbuckets; ++b)
+#endif
+    _table->buckets = (Bucket *) CLICK_LALLOC(sizeof(Bucket) * _table->nbuckets());
+    for (size_type b = 0; b < _table->nbuckets(); ++b)
             new(&_table->buckets[b]) Bucket();
 }
 
-template <typename K, typename V, typename Item>
-void HashContainerMP<K,V,Item>::deinitialize()
+template <typename K, typename V, typename Item, typename MT>
+void HashContainerMP<K,V,Item,MT>::deinitialize()
 {
-    for (size_type b = 0; b < _table->_nbuckets; ++b)
+    for (size_type b = 0; b < _table->nbuckets(); ++b)
         _table->buckets[b].~Bucket();
-    CLICK_LFREE(_table->buckets, sizeof(Bucket) * _table->_nbuckets);
+    CLICK_LFREE(_table->buckets, sizeof(Bucket) * _table->nbuckets());
 }
 
 
-template <typename K, typename V, typename Item>
-HashContainerMP<K,V,Item>::HashContainerMP() :
+template <typename K, typename V, typename Item, typename MT>
+HashContainerMP<K,V,Item,MT>::HashContainerMP() :
   _mt(true), _table(), _pending_release(0)
 {
     initialize(initial_bucket_count);
 }
 
-template <typename K, typename V, typename Item>
-HashContainerMP<K,V,Item>::HashContainerMP(size_type nb) :
+template <typename K, typename V, typename Item, typename MT>
+HashContainerMP<K,V,Item,MT>::HashContainerMP(size_type nb) :
      _mt(true), _table(), _pending_release(0)
 {
     size_type b = 1;
@@ -459,21 +509,21 @@ HashContainerMP<K,V,Item>::HashContainerMP(size_type nb) :
     initialize(b);
 }
 
-template <typename K, typename V, typename Item>
-HashContainerMP<K,V,Item>::~HashContainerMP()
+template <typename K, typename V, typename Item, typename MT>
+HashContainerMP<K,V,Item,MT>::~HashContainerMP()
 {
     clear();
     release_pending(true);
     deinitialize();
 }
 #define MAKE_FIND(ptr_type) \
-        if (likely(_mt))\
+        if (likely(mt()))\
             _table.read_begin();\
         size_type b = bucket(key);\
         Bucket& bucket = _table->buckets[b];\
-        if (likely(_mt))\
+        if (likely(mt()))\
             bucket.list.read_begin();\
-        if (likely(_mt))\
+        if (likely(mt()))\
             _table.read_end();\
         ListItem *pprev;\
         ptr_type p;\
@@ -482,20 +532,20 @@ HashContainerMP<K,V,Item>::~HashContainerMP()
             p.assign(&pprev->item);\
             break;\
         }\
-        if (likely(_mt))\
+        if (likely(mt()))\
             bucket.list.read_end();\
 
-template <typename K, typename V, typename Item>
-inline typename HashContainerMP<K,V,Item>::ptr
-HashContainerMP<K,V,Item>::find(const K &key)
+template <typename K, typename V, typename Item, typename MT>
+inline typename HashContainerMP<K,V,Item,MT>::ptr
+HashContainerMP<K,V,Item,MT>::find(const K &key)
 {
     MAKE_FIND(ptr);
     return p;
 }
 
-template <typename K, typename V, typename Item>
-inline typename HashContainerMP<K,V,Item>::write_ptr
-HashContainerMP<K,V,Item>::find_write(const K &key)
+template <typename K, typename V, typename Item, typename MT>
+inline typename HashContainerMP<K,V,Item,MT>::write_ptr
+HashContainerMP<K,V,Item,MT>::find_write(const K &key)
 {
     MAKE_FIND(write_ptr);
     return p;
@@ -507,17 +557,17 @@ HashContainerMP<K,V,Item>::find_write(const K &key)
  * Calls store to save the found entry to eg a temporary variables. Return true if found, false if not.
  *
  */
-template <typename K, typename V, typename Item> template <bool do_remove>
+template <typename K, typename V, typename Item, typename MT> template <bool do_remove>
 inline bool
-HashContainerMP<K,V,Item>::_find_clean(const K &key, std::function<void(V &c)> store, std::function<bool(V &c)> shoulddelete, std::function<void(ListItem* &head)> on_missing)
+HashContainerMP<K,V,Item,MT>::_find_clean(const K &key, std::function<void(V &c)> store, std::function<bool(V &c)> shoulddelete, std::function<void(ListItem* &head)> on_missing)
 {
-    if (likely(_mt))
+    if (likely(mt()))
         _table.read_begin();
     size_type b = bucket(key);
     Bucket& bucket = _table->buckets[b];
-    if (likely(_mt))
+    if (likely(mt()))
         bucket.list.write_begin();
-    if (likely(_mt))
+    if (likely(mt()))
         _table.read_end();
     ListItem *pprev = bucket.list->head;
     ListItem* *pprev_ptr = &bucket.list->head;
@@ -544,11 +594,11 @@ HashContainerMP<K,V,Item>::_find_clean(const K &key, std::function<void(V &c)> s
         }
     }
     on_missing(bucket.list->head);
-    if (likely(_mt))
+    if (likely(mt()))
         bucket.list.write_end();
     return false;
     found:
-    if (likely(_mt))
+    if (likely(mt()))
         bucket.list.write_end();
     return true;
 }
@@ -558,9 +608,9 @@ HashContainerMP<K,V,Item>::_find_clean(const K &key, std::function<void(V &c)> s
  * XXX Store is not respectful of the item lock
  * Cleaning and removal is done respectfully of the item lock. It is remove right away but not freed until references expire.
  */
-template <typename K, typename V, typename Item>
+template <typename K, typename V, typename Item, typename MT>
 inline bool
-HashContainerMP<K,V,Item>::find_erase_clean(const K &key, std::function<void(V &c)> store, std::function<bool(V &c)> shoulddelete)
+HashContainerMP<K,V,Item,MT>::find_erase_clean(const K &key, std::function<void(V &c)> store, std::function<bool(V &c)> shoulddelete)
 {
 	return _find_clean<true>(key, store, shoulddelete);
 }
@@ -569,9 +619,9 @@ HashContainerMP<K,V,Item>::find_erase_clean(const K &key, std::function<void(V &
  * XXX Store is not respectful of the item lock
  * Cleaning and removal is done respectfully of the item lock. It is remove right away but not freed until references expire.
  */
-template <typename K, typename V, typename Item>
+template <typename K, typename V, typename Item, typename MT>
 inline bool
-HashContainerMP<K,V,Item>::find_clean(const K &key, std::function<void(V &c)> store, std::function<bool(V &c)> shoulddelete)
+HashContainerMP<K,V,Item,MT>::find_clean(const K &key, std::function<void(V &c)> store, std::function<bool(V &c)> shoulddelete)
 {
 	return _find_clean<false>(key, store, shoulddelete);
 }
@@ -580,9 +630,9 @@ HashContainerMP<K,V,Item>::find_clean(const K &key, std::function<void(V &c)> st
  * XXX Replacement if the item already exists is not respectful of the item lock
  * Cleaning is done respectfully of the item lock. It is removed right away but not freed until references expire.
  */
-template <typename K, typename V, typename Item>
+template <typename K, typename V, typename Item, typename MT>
 inline void
-HashContainerMP<K,V,Item>::insert_clean(const K &key, const V& value, std::function<bool(V &c)> shoulddelete)
+HashContainerMP<K,V,Item,MT>::insert_clean(const K &key, const V& value, std::function<bool(V &c)> shoulddelete)
 {
     auto inserter = [key,value,this](ListItem* &head){
 		ListItem* e = allocate(ListItem(key,value));
@@ -601,9 +651,9 @@ HashContainerMP<K,V,Item>::insert_clean(const K &key, const V& value, std::funct
  *
  * Returns true if the entry was found (and therefore storage has been writen)
  */
-template <typename K, typename V, typename Item>
+template <typename K, typename V, typename Item, typename MT>
 inline bool
-HashContainerMP<K,V,Item>::find_erase(const K &key, V &storage) {
+HashContainerMP<K,V,Item,MT>::find_erase(const K &key, V &storage) {
     return find_erase_clean(key, [&storage](V&c){storage = c;}, [](V&){return false;});
 }
 
@@ -612,20 +662,20 @@ HashContainerMP<K,V,Item>::find_erase(const K &key, V &storage) {
  *
  * Do nothing if the entry is not found.
  */
-template <typename K, typename V, typename Item>
+template <typename K, typename V, typename Item, typename MT>
 inline void
-HashContainerMP<K,V,Item>::erase(const K &key) {
+HashContainerMP<K,V,Item,MT>::erase(const K &key) {
     find_erase_clean(key, [](V&){}, [](V&){return false;});
 }
 
 #define MAKE_FIND_INSERT(ptr_type,on_exists,value) \
-    if (likely(_mt))\
+    if (likely(mt()))\
         _table.read_begin();\
     size_type b = bucket(key);\
     Bucket& bucket = _table->buckets[b];\
 \
 retry:\
-    if (likely(_mt))\
+    if (likely(mt()))\
         bucket.list.read_begin();\
     \
     ListItem *pprev;\
@@ -638,10 +688,10 @@ retry:\
     }\
     if (p) {\
         on_exists(pprev->item);\
-        if (likely(_mt))\
+        if (likely(mt()))\
             bucket.list.read_end();\
     } else {\
-        if (likely(_mt) && !bucket.list.read_to_write()) {\
+        if (likely(mt()) && !bucket.list.read_to_write()) {\
             goto retry;\
         }\
         ListItem* e = allocate(ListItem(key,value));\
@@ -653,15 +703,15 @@ retry:\
         p.assign(&e->item);\
 \
         _table->_size++;\
-        if (likely(_mt))\
+        if (likely(mt()))\
             bucket.list.write_end();\
     }\
-    if (likely(_mt))\
+    if (likely(mt()))\
         _table.read_end();\
 
-template <typename K, typename V, typename Item>
-inline typename HashContainerMP<K,V,Item>::ptr
-HashContainerMP<K,V,Item>::find_insert(const K &key,const V &value) {
+template <typename K, typename V, typename Item, typename MT>
+inline typename HashContainerMP<K,V,Item,MT>::ptr
+HashContainerMP<K,V,Item,MT>::find_insert(const K &key,const V &value) {
     MAKE_FIND_INSERT(ptr,(void),value);
     click_hashmp_assert(p.hasref());
     return p;
@@ -670,64 +720,64 @@ HashContainerMP<K,V,Item>::find_insert(const K &key,const V &value) {
 /**
  *  Replace an item if it exists, insert it otherwise. Do not look at use count !
  *  */
-template <typename K, typename V, typename Item>
+template <typename K, typename V, typename Item, typename MT>
 inline void
-HashContainerMP<K,V,Item>::insert(const K &key,const V &value, std::function<void(V&value)> on_replace) {
+HashContainerMP<K,V,Item,MT>::insert(const K &key,const V &value, std::function<void(V&value)> on_replace) {
     MAKE_FIND_INSERT(write_ptr,{on_replace(*pprev->item.unprotected_ptr());pprev->item = value;},value);
 }
 
-template <typename K, typename V, typename Item>
-inline typename HashContainerMP<K,V,Item>::ptr
-HashContainerMP<K,V,Item>::find_create(const K &key,std::function<V(void)> on_create) {
+template <typename K, typename V, typename Item, typename MT>
+inline typename HashContainerMP<K,V,Item,MT>::ptr
+HashContainerMP<K,V,Item,MT>::find_create(const K &key,std::function<V(void)> on_create) {
     MAKE_FIND_INSERT(ptr,(void),on_create());
     return p;
 }
 
-template <typename K, typename V, typename Item>
-inline typename HashContainerMP<K,V,Item>::write_ptr
-HashContainerMP<K,V,Item>::find_insert_write(const K &key,const V &value) {
+template <typename K, typename V, typename Item, typename MT>
+inline typename HashContainerMP<K,V,Item,MT>::write_ptr
+HashContainerMP<K,V,Item,MT>::find_insert_write(const K &key,const V &value) {
     MAKE_FIND_INSERT(write_ptr,(void),value);
     click_hashmp_assert(p.write_held());
     return p;
 }
 
-template <typename K, typename V, typename Item>
-inline typename HashContainerMP<K,V,Item>::iterator
-HashContainerMP<K,V,Item>::begin()
+template <typename K, typename V, typename Item, typename MT>
+inline typename HashContainerMP<K,V,Item,MT>::iterator
+HashContainerMP<K,V,Item,MT>::begin()
 {
-    if (likely(_mt))
+    if (likely(mt()))
         _table.read_begin();
     return iterator(this);
 }
 
-template <typename K, typename V, typename Item>
-inline typename HashContainerMP<K,V,Item>::write_iterator
-HashContainerMP<K,V,Item>::write_begin()
+template <typename K, typename V, typename Item, typename MT>
+inline typename HashContainerMP<K,V,Item,MT>::write_iterator
+HashContainerMP<K,V,Item,MT>::write_begin()
 {
-    if (likely(_mt))
+    if (likely(mt()))
         _table.read_begin();
     return write_iterator(this);
 }
 
-template <typename K, typename V, typename Item>
+template <typename K, typename V, typename Item, typename MT>
 inline bool
-HashContainerMP<K,V,Item>::alone(bool atomic)
+HashContainerMP<K,V,Item,MT>::alone(bool atomic)
 {
     if (_table.refcnt() != 0) return false;
-    if (likely(_mt)) {
+    if (likely(mt())) {
     if (atomic)
         _table.write_begin();
     else
         _table.read_begin();
     }
     bool alone = true;
-    for (int i = 0; i < _table->_nbuckets;i++) {
+    for (int i = 0; i < _table->nbuckets();i++) {
         Bucket& b = _table->buckets[i];
         if (b.list.refcnt() != 0) {
             alone = false;
             break;
         }
-        if (likely(_mt)) {
+        if (likely(mt())) {
             if (atomic)
                 b.list.write_begin();
             else
@@ -741,7 +791,7 @@ HashContainerMP<K,V,Item>::alone(bool atomic)
             }
             item = item->_hashnext;
         }
-        if (likely(_mt)) {
+        if (likely(mt())) {
             if (atomic) {
                 b.list.write_end();
             } else
@@ -750,7 +800,7 @@ HashContainerMP<K,V,Item>::alone(bool atomic)
         if (!alone)
             break;
     }
-    if (likely(_mt)) {
+    if (likely(mt())) {
         if (atomic)
             _table.write_end();
         else
@@ -762,21 +812,25 @@ HashContainerMP<K,V,Item>::alone(bool atomic)
 
 
 //_table.read_lock must be held !
-template <typename K, typename V, typename Item>
-inline typename HashContainerMP<K,V,Item>::size_type
-HashContainerMP<K,V,Item>::bucket(const K &key)
+template <typename K, typename V, typename Item, typename MT>
+inline typename HashContainerMP<K,V,Item,MT>::size_type
+HashContainerMP<K,V,Item,MT>::bucket(const K &key)
 {
-    return ((size_type) hashcode(key)) % _table->_nbuckets;
+#if HASTABLEMP_POW2_SZ
+    return ((size_type) hashcode(key)) & _table->_nbuckets_mask;
+#else
+    return ((size_type) hashcode(key)) % _table->nbuckets();
+#endif
 }
 
-template <typename K, typename V, typename Item>
-inline void HashContainerMP<K,V,Item>::clear()
+template <typename K, typename V, typename Item, typename MT>
+inline void HashContainerMP<K,V,Item,MT>::clear()
 {
-    if (likely(_mt))
+    if (likely(mt()))
         _table.write_begin();
-    for (size_type i = 0; i < _table->_nbuckets; ++i) {
+    for (size_type i = 0; i < _table->nbuckets(); ++i) {
          Bucket& b = _table->buckets[i];
-         if (likely(_mt))
+         if (likely(mt()))
              b.list.write_begin();
         ListItem* item = b.list->head;
         ListItem* next;
@@ -786,33 +840,33 @@ inline void HashContainerMP<K,V,Item>::clear()
             item = next;
         }
         b.list->head = 0;
-        if (likely(_mt))
+        if (likely(mt()))
             b.list.write_end();
     }
-    if (likely(_mt))
+    if (likely(mt()))
         _table.write_end();
     _table->_size = 0;
 }
 
 
-template <typename K, typename V, typename Item>
-inline bool HashContainerMP<K,V,Item>::contains(const K& key)
+template <typename K, typename V, typename Item, typename MT>
+inline bool HashContainerMP<K,V,Item,MT>::contains(const K& key)
 {
-    if (likely(_mt))
+    if (likely(mt()))
         _table.read_begin();
     Bucket &b = _table->buckets[bucket(key)];
-    if (likely(_mt))
+    if (likely(mt()))
         b.list.read_begin();
-    if (likely(_mt))
+    if (likely(mt()))
         _table.read_end();
     for (ListItem* list = b.list->head; list; list = list->_hashnext) {
         if (hashkeyeq(hashkey(list), key)) {
-            if (likely(_mt))
+            if (likely(mt()))
                 b.list.read_end();
             return true;
         }
     }
-    if (likely(_mt))
+    if (likely(mt()))
         _table.read_end();
 
     return false;
@@ -821,9 +875,9 @@ inline bool HashContainerMP<K,V,Item>::contains(const K& key)
 /*
 //These are functions from HashTable still to implement in an MT-way.
 //Normally, all needed structures are there.
-template <typename K, typename V, typename Item>
-inline typename HashContainerMP<K,V,Item>::iterator
-HashContainerMP<K,V,Item>::find_prefer(const K &key)
+template <typename K, typename V, typename Item, typename MT=MT_T>
+inline typename HashContainerMP<K,V,Item,MT>::iterator
+HashContainerMP<K,V,Item,MT>::find_prefer(const K &key)
 {
     size_type b = bucket(key);
     T **pprev;
@@ -838,10 +892,10 @@ HashContainerMP<K,V,Item>::find_prefer(const K &key)
     return iterator(this, b, &_buckets[b], 0);
 }
 
-template <typename K, typename V, typename Item>
-T *HashContainerMP<K,V,Item>::set(iterator &it, T *element, bool balance)
+template <typename K, typename V, typename Item, typename MT=MT_T>
+T *HashContainerMP<K,V,Item,MT>::set(iterator &it, T *element, bool balance)
 {
-    click_hashmp_assert(it._hc == this && it._bucket < _nbuckets);
+    click_hashmp_assert(it._hc == this && it._bucket < nbuckets());
     click_hashmp_assert(bucket(_hashkey(element)) == it._bucket);
     click_hashmp_assert(!it._element || _hashkeyeq(_hashkey(element), _hashkey(it._element)));
     T *old = it.get();
@@ -868,23 +922,23 @@ T *HashContainerMP<K,V,Item>::set(iterator &it, T *element, bool balance)
     return old;
 }
 
-template <typename K, typename V, typename Item>
-inline T *HashContainerMP<K,V,Item>::erase(const K &key)
+template <typename K, typename V, typename Item, typename MT=MT_T>
+inline T *HashContainerMP<K,V,Item,MT>::erase(const K &key)
 {
     iterator it = find(key);
     return set(it, 0);
 }
 
-template <typename K, typename V, typename Item>
-inline void HashContainerMP<K,V,Item>::swap(HashContainerMP<K,V> &o)
+template <typename K, typename V, typename Item, typename MT=MT_T>
+inline void HashContainerMP<K,V,Item,MT>::swap(HashContainerMP<K,V> &o)
 {
     HashContainer_rep<T, A> rep(_rep);
     _rep = o._rep;
     o._rep = rep;
 }
 
-template <typename K, typename V, typename Item>
-void HashContainerMP<K,V,Item>::rehash(size_type n)
+template <typename K, typename V, typename Item, typename MT=MT_T>
+void HashContainerMP<K,V,Item,MT>::rehash(size_type n)
 {
     size_type new_nbuckets = 1;
     while (new_nbuckets < n && new_nbuckets < max_bucket_count)
@@ -894,7 +948,7 @@ void HashContainerMP<K,V,Item>::rehash(size_type n)
     return;
 
     T **new_buckets = (T **) CLICK_LALLOC(sizeof(T *) * new_nbuckets);
-    for (size_type b = 0; b < new_nbuckets; ++b)
+    for (size_type b = 0; b < new/; ++b)
     new_buckets[b] = 0;
 
     size_type old_nbuckets = _nbuckets;
@@ -924,6 +978,15 @@ class HashTableMP : public HashContainerMP<K,V,shared<V> > { public:
     }
 };
 
+template <typename K, typename V>
+class HashTableH : public HashContainerMP<K,V,not_shared<V>,NOMT > { public:
+    HashTableH() : HashContainerMP<K,V,not_shared<V>,NOMT >::HashContainerMP() {
+    }
+
+    HashTableH(int n) : HashContainerMP<K,V,not_shared<V>,NOMT >::HashContainerMP(n) {
+    }
+};
+
 
 template <typename K, typename V>
 class RWHashTableMP : public HashContainerMP<K,V,rwlock<V> > {
@@ -932,7 +995,7 @@ class RWHashTableMP : public HashContainerMP<K,V,rwlock<V> > {
 };
 
 
-template <typename K, typename Vin, typename Time = click_jiffies_t, template <typename> class Protector = shared>
+template <typename K, typename Vin, typename Time = click_jiffies_t, template <typename> class Protector = shared, typename MT=MT_T>
 class AgingTableMP {
 	struct V {
 		Vin value;
@@ -940,9 +1003,9 @@ class AgingTableMP {
 	};
 
   protected:
-	HashContainerMP<K,V,Protector<V> > _table;
+	HashContainerMP<K,V,Protector<V>,MT > _table;
 	Time _timeout;
-	typedef typename HashContainerMP<K,V,Protector<V> >::size_type size_type;
+	typedef typename HashContainerMP<K,V,Protector<V>,MT >::size_type size_type;
 
   public:
 	AgingTableMP(Time timeout = 60) : _table(), _timeout(timeout) {
@@ -987,9 +1050,8 @@ class AgingTableMP {
 };
 
 template <typename K, typename Vin, typename Time = click_jiffies_t>
-class AgingTable : public AgingTableMP<K,Vin,Time,not_shared> { public:
-	AgingTable(Time timeout = 60 * CLICK_HZ ) : AgingTableMP<K,Vin,Time,not_shared>(timeout) {
-        AgingTableMP<K,Vin,Time,not_shared>::_table.disable_mt();
+class AgingTable : public AgingTableMP<K,Vin,Time,not_shared,NOMT> { public:
+	AgingTable(Time timeout = 60 * CLICK_HZ ) : AgingTableMP<K,Vin,Time,not_shared,NOMT>(timeout) {
 	}
 };
 CLICK_ENDDECLS

@@ -90,6 +90,28 @@ operator<<(StringAccum &sa, const IPFlowID &flow_id)
 
 IPFlow5ID::IPFlow5ID(const Packet *p, bool reverse) : IPFlowID(p,reverse) {
 	_proto = p->ip_header()->ip_p;
+    _zero = 0;
+}
+
+
+int
+IPFlow5ID::unparse(char *s) const
+{
+    if (s) {
+	const unsigned char *p = _saddr.data();
+	const unsigned char *q = _daddr.data();
+	return sprintf(s, "(%d: %d.%d.%d.%d, %hu, %d.%d.%d.%d, %hu)", _proto,
+		       p[0], p[1], p[2], p[3], ntohs(_sport),
+		       q[0], q[1], q[2], q[3], ntohs(_dport));
+    } else
+	return 0;
+}
+
+String
+IPFlow5ID::unparse() const
+{
+    char tmp[64];
+    return String(tmp, unparse(tmp));
 }
 
 

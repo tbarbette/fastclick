@@ -161,8 +161,13 @@ Packet *FromMinDump::read_packet(ErrorHandler *errh, uint8_t *data) {
     rte_mbuf *mb = DPDKDevice::get_pkt(_node);
     assert(mb);
     unsigned char *pdata = rte_pktmbuf_mtod(mb, unsigned char *);
+    //p = Packet::make(rte_pktmbuf_headroom(mb), mb, packet_len, rte_pktmbuf_tailroom(mb));
+    
     p = Packet::make(pdata, packet_len, DPDKDevice::free_pkt, mb,
                      rte_pktmbuf_headroom(mb), rte_pktmbuf_tailroom(mb));
+
+
+
   } else {
     p = Packet::make(14, 0, packet_len, 0);
   }
