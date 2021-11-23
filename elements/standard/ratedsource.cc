@@ -50,7 +50,7 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
     String data =
       "Random bullshit in a packet, at least 64 bytes long. Well, now it is.";
     unsigned rate = 10;
-    unsigned bandwidth = 0;
+    ucounter_t bandwidth = 0;
     int limit = -1;
     int datasize = -1;
     bool active = true, stop = false;
@@ -62,11 +62,11 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_p("RATE", rate)
         .read_p("LIMIT", limit)
         .read_p("ACTIVE", active)
-	  .read("HEADROOM", _headroom)
+        .read("HEADROOM", _headroom)
         .read("LENGTH", datasize)
         .read("DATASIZE", datasize) // deprecated
         .read("STOP", stop)
-        .read("BANDWIDTH", BandwidthArg(), bandwidth)
+        .read("BANDWIDTH", bandwidth_arg_t(), bandwidth)
         .read("END_CALL", HandlerCallArg(HandlerCall::writable), end_h)
         .complete() < 0)
         return -1;
