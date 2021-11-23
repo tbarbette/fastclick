@@ -121,6 +121,7 @@ int SFMaker::configure(Vector<String> &conf, ErrorHandler *errh)
             .read_or_set("MIN_TX_BURST", _min_tx_burst, 1)
             .read_or_set("MAX_TX_DELAY", _max_tx_delay, 0)
             .read_or_set("ALWAYSUP", _always, false)
+            .read_or_set("REMANAGE", _remanage, false)
             .read_or_set("MAX_CAP", _max_capacity, -1)
             .complete() < 0)
         return -1;
@@ -201,7 +202,7 @@ int SFMaker::solve_initialize(ErrorHandler *errh)
         }
 #endif
         s.ready_batch = 0;
-	s.last_tx_time = TSCTimestamp::now_steady();
+    s.last_tx_time = TSCTimestamp::now_steady();
 
 #if SF_LLDS
         s.head_slot = 0;
@@ -280,12 +281,14 @@ void SFMaker::handleTCP(PacketBatch* &batch) {
         
         bool ackSent = false;
         tcp_seq_t last_ack = 0;
-        auto fnt = [biggest_ack,&ackSent,&last_ack,biggest_p,hasData,this](Packet* p) -> Packet* {
+        tcp_seq_t last_ack_or = 0;
+        auto fnt = [biggest_ack,&ackSent,&last_ack_or,&last_ack,biggest_p,hasData,this](Packet* p) -> Packet* {
             sf_assert(p->tcp_header());
             tcp_seq_t ack = ntohl(p->tcp_header()->th_ack);
+
             if (!ackSent && !hasData) { //If ack is not sent and all those packets are just acks, force to process
             } else { //Else, remove all simple acks
-                if (isJustAnAck(p) && last_ack != ack) {//Do not remove DUP acks
+                if (isJustAnAck(p) && (last_ack_or != ack || SEQ_LT(ack,biggest_ack))) {//Do not remove DUP acks
                     _state->killed++;
                     p->kill();
                     return 0;
@@ -295,8 +298,14 @@ void SFMaker::handleTCP(PacketBatch* &batch) {
             //And always update ack of kept packets to the last known value
             WritablePacket* q = p->uniqueify();
             //q->rewrite_seq(htonl(biggest_ack), 1);
+            last_ack_or = ntohl(q->tcp_header()->th_ack);
+            if (biggest_ack != last_ack_or) {
+                q->tcp_header()->th_ack = htonl(biggest_ack);
+            //    last_ack_changed = true;
+            } else {
+              //  last_ack_changed = false;
+            }
 
-            q->tcp_header()->th_ack = htonl(biggest_ack);
             q->tcp_header()->th_win = biggest_p->tcp_header()->th_win;
             resetTCPChecksum(q);
             ackSent = true;
@@ -361,9 +370,19 @@ bool SFMaker::schedule_burst_from_flow(SFSlot& f, TSCTimestamp& now, unsigned ma
 
     prepareBurst(f, all);
 #if SF_PRIO
-    Burst b = {.prio = f.prio(now, this), .batch = all};
+    if (_remanage) {
+#if !SF_SLOT_IN_FCB
+        assert(false); //TODO : keep a pointer if slot is not in FCB
+#endif
+        fcb_stack = stack_from_flow(&f);
+    }
+    Burst b = {.prio = f.prio(now, this), .batch = all, .fcb = fcb_stack};
     q.insert(b);
 #else
+    if (_remanage) {
+        fcb_stack = stack_from_flow(&f);
+        fcb_acquire(all->count());
+    }
     output_push_batch(0, all);
 
 #endif
@@ -403,6 +422,10 @@ bool SFMaker::run_task(Task* t)
 {
     TSCTimestamp next = TSCTimestamp();
 
+#if HAVE_FLOW
+    if (!_remanage)
+        assert(fcb_stack == 0);
+#endif
 #if SF_PRIO
     //Priority queue ordering bursts of different flows by emergency
     FlowQueue q = FlowQueue();
@@ -477,7 +500,6 @@ start:
     
         sent = true;
         s.active--;
-        fcb_stack = (FlowControlBlock*)(((uint8_t*)fptr) - _flow_data_offset - sizeof(FlowControlBlock));
         // remove SFSlot from the list.
         removeFromList(f,s);
         f.lock.release();
@@ -516,8 +538,7 @@ start:
             schedule_burst_from_flow(f, now, -1);
             #endif
             sent = true;
-        s.active--;
-            fcb_stack = (FlowControlBlock*)(((uint8_t*)sp_head) - _flow_data_offset - sizeof(FlowControlBlock));
+            s.active--;
             removeFromSPList(f,s);
 
             if (s.sp_head == 0){
@@ -643,62 +664,77 @@ start:
         int burst = 0;
         int c = 0;
         int split = 0;
-	PacketBatch* batch = s.ready_batch;
+
+        PacketBatch* batch = s.ready_batch;
         // PacketBatch* batch = 0;
-	int i = 0;
+        int i = 0;
+
+        if (_remanage) {
+            assert(!batch);
+        }
         for(FlowQueue::iterator it = q.begin(); it != q.end(); ) {
             Burst &b = *const_cast<Burst*>(&(*it)); //Horrible but safe
-	    if (!batch)
-                batch = b.batch;
-            else
-                batch->append_batch(b.batch);
-            b.batch = 0;
 
-            sf_assert(batch);
+            if (_remanage) { //We have to keep bursts together if we re-manage
+                fcb_stack = b.fcb;
+                fcb_acquire(b.batch->count());
+                c += b.batch->count();
+                output(0).push_batch(b.batch);
+                burst++;
 
-            while (batch->count() > _max_tx_burst) {
-                int count = batch->count();
-                batch->split(_max_tx_burst, b.batch);
-                sf_assert(batch->count() == _max_tx_burst);
-                sf_assert(batch->count() == batch->find_count());
-                sf_assert(b.batch->count() == count - _max_tx_burst);
-                sf_assert(b.batch->count() == b.batch->find_count());
-                    
-		if (_verbose > 3)
-                    click_chatter("[%d] Sending burst of %d packets", i, batch->count());
-		i++;
-		c += batch->count();
-		output(0).push_batch(batch);
-		burst++;
-		    
-		batch = b.batch;
-		s.last_tx_time = send_begin;
+                s.last_tx_time = send_begin;
+            } else {
+                if (!batch)
+                    batch = b.batch;
+                else
+                    batch->append_batch(b.batch);
                 b.batch = 0;
-            }
 
-	    it = q.erase(it);
+                sf_assert(batch);
+
+                while (batch->count() > _max_tx_burst) {
+                    int count = batch->count();
+                    batch->split(_max_tx_burst, b.batch);
+                    sf_assert(batch->count() == _max_tx_burst);
+                    sf_assert(batch->count() == batch->find_count());
+                    sf_assert(b.batch->count() == count - _max_tx_burst);
+                    sf_assert(b.batch->count() == b.batch->find_count());
+
+                    if (_verbose > 3)
+                        click_chatter("[%d] Sending burst of %d packets", i, batch->count());
+                    i++;
+                    c += batch->count();
+                    output(0).push_batch(batch);
+                    burst++;
+
+                    batch = b.batch;
+                    s.last_tx_time = send_begin;
+                    b.batch = 0;
+                }
+            }
+            it = q.erase(it);
 
         }
             
-	if (batch->count() >= _min_tx_burst || (send_begin - s.last_tx_time).usecval() > _max_tx_delay) {
-	    if (_verbose > 3)
-                click_chatter("[%d] Sending burst of %d packets", i, batch->count());
-            i++;
-	    c += batch->count();
-	    output(0).push_batch(batch);
-	    batch = 0;
-	    s.last_tx_time = send_begin;
-            burst++;
-	}
-        else if (batch->count() > 0){
-            if (next == TSCTimestamp() || (next - s.last_tx_time).usecval() > _max_tx_delay)
-                next = send_begin + TSCTimestamp::make_usec(_max_tx_delay);
+        if (batch) {
+            if(batch->count() >= _min_tx_burst || (send_begin - s.last_tx_time).usecval() > _max_tx_delay) {
+            if (_verbose > 3)
+                    click_chatter("[%d] Sending burst of %d packets", i, batch->count());
+                i++;
+            c += batch->count();
+            output(0).push_batch(batch);
+            batch = 0;
+            s.last_tx_time = send_begin;
+                burst++;
+            } else if (batch->count() > 0) {
+                if (next == TSCTimestamp() || (next - s.last_tx_time).usecval() > _max_tx_delay)
+                    next = send_begin + TSCTimestamp::make_usec(_max_tx_delay);
+            }
         }
-        
         s.ready_batch = batch;
 
         s.sf_size+=c;
-        /*output(0).push_batch(superframe);*/
+
         TSCTimestamp send_end = TSCTimestamp::now_steady();
         if (_verbose > 1 &&  c > 100) {
             click_chatter("%d packets sent in %s (total loop %s)",c, (send_end-send_begin).unparse().c_str(), (send_end-now).unparse().c_str());
@@ -768,7 +804,7 @@ void SFMaker::push_flow(int, SFFlow* flow, PacketBatch* batch)
 
     int release = batch->count() - existing;
     //assert(fcb_stack->count() > release);
-    //fcb_release(release);
+    fcb_release(release);
     _state->pushed += release;
 
     sf_assert(batch->tail()->next() == 0);
@@ -898,7 +934,7 @@ void SFMaker::push_flow(int, SFFlow* flow, PacketBatch* batch)
     }
 #endif
 
-    } else {
+    } else { //if bypass
 
         auto &s = *_state;
         if (f.inList) {
@@ -910,7 +946,7 @@ void SFMaker::push_flow(int, SFFlow* flow, PacketBatch* batch)
             removeFromSPList(f,s);
         }
 #endif
-        //schedule_burst_from_flow(f,now, -1);
+
         prepareBurst(f, batch);
         output(0).push_batch(batch);
     }
@@ -944,7 +980,7 @@ void SFMaker::push_flow(int, SFFlow* flow, PacketBatch* batch)
 #endif
             if (ready){
                 _state->timer->clear();
-                 run_task(_state->task);
+                 SFCB_STACK(run_task(_state->task));
             }
 #if !SF_NO_SCHED
         }
@@ -991,7 +1027,6 @@ void SFMaker::release_flow(SFFlow* flow) {
 
 inline bool SFMaker::new_flow(SFFlow* flow, Packet*) {
 
-
 #if !SF_SLOT_IN_FCB
     //Get a slot
     flow->index = allocate_index();
@@ -1024,7 +1059,7 @@ inline bool SFMaker::new_flow(SFFlow* flow, Packet*) {
 }
 
 enum handlers_t {
-    AC_PACKETS_AVG, AC_PACKETS, AC_BURSTS_AVG, AC_USELESS_WAIT_AVG, AC_SF, AC_COMPRESS_AVG, AC_SF_FLOWS_AVG, AC_SF_SIZE_AVG, AC_ACTIVE, AC_QUEUED, AC_PUSHED, AC_SENT, AC_KILLED, AC_REORDERED
+    AC_PACKETS_AVG, AC_PACKETS, AC_BURSTS_AVG, AC_USELESS_WAIT_AVG, AC_SF, AC_COMPRESS_AVG, AC_SF_FLOWS_AVG, AC_SF_SIZE_AVG, AC_ACTIVE, AC_QUEUED, AC_PUSHED, AC_SENT, AC_KILLED, AC_REORDERED, AC_FLUSH
 };
 
 String
@@ -1085,6 +1120,20 @@ SFMaker::read_handler(Element *e, void *thunk)
     }
 }
 
+int SFMaker::write_handler(const String &, Element *e, void *thunk, ErrorHandler *)
+{
+    SFMaker *sf = static_cast<SFMaker *>(e);
+    auto &s = *sf->_state;
+    int t = (intptr_t)thunk;
+    switch (t) {
+      case AC_FLUSH:
+          sf->_delay = TSCTimestamp::make_usec(0);
+          sf->_delay_last = TSCTimestamp::make_usec(0);
+          sf->run_task(s.task);
+    }
+    return 0;
+}
+
 void
 SFMaker::add_handlers()
 {
@@ -1104,6 +1153,8 @@ SFMaker::add_handlers()
     add_read_handler("sent", read_handler, AC_SENT);
     add_read_handler("dropped", read_handler, AC_KILLED);
     add_read_handler("active", read_handler, AC_ACTIVE);
+
+    add_write_handler("flush", write_handler, AC_FLUSH);
 }
 
 

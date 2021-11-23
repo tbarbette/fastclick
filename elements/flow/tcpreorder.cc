@@ -46,6 +46,7 @@ TCPReorder::reorder_initialize(ErrorHandler *errh) {
     if (track.size() > 0) {
         return errh->error("TCPIn now includes support for reordering. Use TCPReorder alone if you only want TCP Reordering");
     }
+    return 0;
 }
 
 void*
@@ -329,12 +330,16 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
   if (!tcpreorder->packetList && had_awaiting) {
       //We don't have awaiting packets anymore, remove the fct
       //click_chatter("We are now in order, removing release fct");
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
       fcb_remove_release_fnt(tcpreorder,&fcb_release_fnt);
+#endif
   } else if (tcpreorder->packetList && !had_awaiting) {
       //Set release fnt
       if (_verbose)
           click_chatter("Out of order, setting release fct");
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
       fcb_set_release_fnt(static_cast<FlowReleaseChain*>(tcpreorder), &fcb_release_fnt);
+#endif
   }
     assert(tcpreorder->expectedPacketSeq);
     tcpreorder->packetList = packet;
@@ -602,8 +607,10 @@ void TCPReorder::fcb_release_fnt(FlowControlBlock* fcb, void* thunk) {
 
     //click_chatter("Released %d",i);
     tcpreorder->packetList = 0;
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
     if (tcpreorder->previous_fnt)
         tcpreorder->previous_fnt(fcb, tcpreorder->previous_thunk);
+#endif
 }
 
 CLICK_ENDDECLS

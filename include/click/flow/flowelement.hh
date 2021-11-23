@@ -307,6 +307,9 @@ public :
     }
 
 
+    inline FlowControlBlock* stack_from_flow(void* ptr) {
+        return (FlowControlBlock*)(((uint8_t*)ptr) - _flow_data_offset - sizeof(FlowControlBlock));
+    }
 
     /**
      * Return the T type for a given FCB
