@@ -274,5 +274,7 @@ void ConsistencyCheck::add_handlers()
 }
 
 CLICK_ENDDECLS
+
+ELEMENT_REQUIRES(dpdk)
 EXPORT_ELEMENT(ConsistencyCheck)
 ELEMENT_MT_SAFE(ConsistencyCheck)

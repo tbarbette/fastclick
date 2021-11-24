@@ -197,6 +197,6 @@ void FlowIPManager_CuckooPP::push_batch(int, PacketBatch *batch) {
 
 CLICK_ENDDECLS
 
-ELEMENT_REQUIRES(flow)
+ELEMENT_REQUIRES(flow dpdk)
 EXPORT_ELEMENT(FlowIPManager_CuckooPP)
 ELEMENT_MT_SAFE(FlowIPManager_CuckooPP)
