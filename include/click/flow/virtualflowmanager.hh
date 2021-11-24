@@ -101,11 +101,6 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
     }
 
     
-    static const auto released_fcb_next_setter = [](FlowControlBlock* prev, FlowControlBlock* next)
-    {
-        *(T::get_next_released_fcb(prev)) = next;
-    };
-
     int maintainer() {
         Timestamp recent = Timestamp::recent_steady();
         int dest_core = click_current_cpu_id();
@@ -131,7 +126,10 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
                 int64_t old = (recent - prev->lastseen).msecval();
                 click_chatter("Old %li : %s %s fid %d",old, recent.unparse().c_str(), prev->lastseen.unparse().c_str(),get_fcb_flowid(prev) );
 
-                tw.schedule_after(prev, _timeout * _epochs_per_sec, released_fcb_next_setter);
+                tw.schedule_after(prev, _timeout * _epochs_per_sec,  [](FlowControlBlock* prev, FlowControlBlock* next)
+    {
+        *(T::get_next_released_fcb(prev)) = next;
+    });
                 return next;
             }
 
@@ -158,7 +156,10 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
                 if (likely(prev != *get_next_released_fcb(prev))) {
                     int r = (_timeout * 1000) - old; //Time left in ms
                     r = (r * (_epochs_per_sec)) / 1000;
-                    tw.schedule_after(prev, r, released_fcb_next_setter);
+                    tw.schedule_after(prev, r, [](FlowControlBlock* prev, FlowControlBlock* next)
+    {
+        *(T::get_next_released_fcb(prev)) = next;
+    });
                 }
                 else
                 {
