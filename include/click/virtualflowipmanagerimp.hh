@@ -638,7 +638,6 @@ inline void VFIM_CLASS::process(Packet *p, BatchBuilder &b, Timestamp &recent,
 
     IPFlow5ID fid = IPFlow5ID(p);
     if (_cache && fid == b.last_id) {
-        click_chatter("Cache");
         b.append(p);
         return;
     }
