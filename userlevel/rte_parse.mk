@@ -19,6 +19,7 @@ ${PARSE_PATH}.sentinel:
 	cp -u $(RTE_SDK)/app/test-pmd/config.c $(PARSE_PATH)
 	# Strip the main function off to prevent complilation errors, while linking with Click
 	sed -i '/main(int/Q' $(PARSE_PATH)/testpmd.c
+	sed -i 's/rte_os_shim/rte_os/' $(PARSE_PATH)/testpmd.c
 	head -n -1 $(PARSE_PATH)/testpmd.c > $(PARSE_PATH)/testpmd_t.c;
 	mv $(PARSE_PATH)/testpmd_t.c $(PARSE_PATH)/testpmd.c
 	# Strip off testpmd report messages as our library prints its own report messages
@@ -49,6 +50,10 @@ PARSE_OBJS += test-pmd/noisy_vnf.o test-pmd/util.o
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 20 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 21 ] ) && echo true),true)
 	PARSE_OBJS += test-pmd/5tswap.o
 endif
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 21 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 22 ] ) && echo true),true)
+	PARSE_OBJS += test-pmd/shared_rxq_fwd.o test-pmd/cmd_flex_item.o
+endif
+
 
 CFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
 CXXFLAGS += -I../lib/librte_parse_$(RTE_VERSION)

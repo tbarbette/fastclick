@@ -779,14 +779,22 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
                 i, port_id, numa_node);
 
     if (info.init_mtu != 0) {
+#if RTE_VERSION >= RTE_VERSION_NUM(21,11,0,0)
+        if (dev_conf.rxmode.mtu < info.init_mtu) {
+            dev_conf.rxmode.mtu = info.init_mtu;
+        }
+#else
         if (dev_conf.rxmode.max_rx_pkt_len < info.init_mtu) {
             dev_conf.rxmode.max_rx_pkt_len = info.init_mtu;
         }
+#endif
         if (rte_eth_dev_set_mtu(port_id, info.init_mtu) != 0) {
             return errh->error("Could not set MTU %d",info.init_mtu);
         }
     } else {
-    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+    #if RTE_VERSION >= RTE_VERSION_NUM(21,11,0,0)
+        dev_conf.rxmode.mtu = RTE_ETHER_MTU;
+    #elif RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
         dev_conf.rxmode.max_rx_pkt_len = RTE_ETHER_MAX_LEN;
     #else
         dev_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
@@ -936,13 +944,20 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
     }
 #endif
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(21,11,0,0)
+    if (info.jumbo) {
+        if (dev_conf.rxmode.mtu < dev_info.max_rx_pktlen) {
+            return errh->error("Rx jumbo frame offload is not supported by this device!");
+        }
+    }
+#elif RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
     if (info.jumbo) {
     #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
         unsigned int min_rx_pktlen = (unsigned int) RTE_ETHER_MIN_LEN;
     #else
         unsigned int min_rx_pktlen = (unsigned int) ETHER_MIN_LEN;
     #endif
+
         if (!(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_JUMBO_FRAME)) {
             return errh->error("Rx jumbo frame offload is not supported by this device!");
         } else {
@@ -953,7 +968,6 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
             }
             dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
         }
-        errh->message("Rx jumbo frames offloading enabled on port_id=%u with max_rx_pkt_len %u in [%u, %u]\n", port_id, dev_conf.rxmode.max_rx_pkt_len, min_rx_pktlen, dev_info.max_rx_pktlen);
     } else {
         dev_conf.rxmode.offloads &= ~DEV_RX_OFFLOAD_JUMBO_FRAME;
     }
