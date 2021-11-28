@@ -155,7 +155,8 @@ FlowIPManager_CuckooPP::process(Packet *p, BatchBuilder &b, Timestamp &recent) {
         fcb = get_fcb_from_flowid(ret);
     }
 
-    update_lastseen(fcb, recent);
+    if (have_maintainer)
+        update_lastseen(fcb, recent);
 
     if (b.last == ret) {
         b.append(p);
@@ -180,7 +181,9 @@ FlowIPManager_CuckooPP::process(Packet *p, BatchBuilder &b, Timestamp &recent) {
 
 void FlowIPManager_CuckooPP::push_batch(int, PacketBatch *batch) {
     BatchBuilder b;
-    Timestamp recent = Timestamp::recent_steady();
+    Timestamp recent;
+    if (have_maintainer)
+        recent = Timestamp::recent_steady();
 
     FOR_EACH_PACKET_SAFE(batch, p) {
             process(p, b, recent);

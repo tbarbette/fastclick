@@ -271,8 +271,7 @@ class VirtualFlowIPManagerIMP : public VirtualFlowManager,
 
   protected:
     // The core of the element!
-    virtual void process(Packet *p, BatchBuilder &b, Timestamp &recent,
-                         int core);
+    virtual void process(Packet *p, BatchBuilder &b, Timestamp &recent, int core);
 
     // The functions to be redefined
     // Either redefine the non-packet version or the packet one.
