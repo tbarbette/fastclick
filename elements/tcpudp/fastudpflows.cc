@@ -26,15 +26,18 @@
 #include <click/etheraddress.hh>
 #include <click/error.hh>
 #include <click/glue.hh>
+#include <click/glue.hh>
 #include <click/router.hh>
 #include <click/standard/alignmentinfo.hh>
+#include <click/standard/scheduleinfo.hh>
+
 
 CLICK_DECLS
 
 const unsigned FastUDPFlows::NO_LIMIT;
 
 FastUDPFlows::FastUDPFlows()
-  : _flows(0)
+  : _flows(0), _task(this), _timer(this)
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
@@ -53,8 +56,6 @@ FastUDPFlows::~FastUDPFlows()
 int
 FastUDPFlows::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    _cksum = true;
-    _active = true;
     unsigned rate;
     int limit;
     int len;
@@ -68,10 +69,11 @@ FastUDPFlows::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("DSTIP", _dipaddr)
         .read_mp("FLOWS", _nflows)
         .read_mp("FLOWSIZE", _flowsize)
-        .read_p("CHECKSUM", _cksum)
-        .read_p("SEQUENTIAL", _sequential)
-        .read_p("ACTIVE", _active)
-        .read_p("STOP", _stop)
+        .read_or_set("FLOWBURST", _flowburst, 1)
+        .read_or_set("CHECKSUM", _cksum, true)
+        .read_or_set("SEQUENTIAL", _sequential, false)
+        .read_or_set("ACTIVE", _active, true)
+        .read_or_set("STOP", _stop, false)
         .complete() < 0)
         return -1;
 
@@ -112,9 +114,15 @@ FastUDPFlows::change_ports(int flow)
 Packet *
 FastUDPFlows::get_packet()
 {
-    int flow = (_sequential?(*_last_flow)++ : (click_random() >> 2)) % _nflows;
+    int flow;
+    if (_last_flow->burst_count++ < _flowburst) {
+        flow = _last_flow->index % _nflows;
+    } else {
+        flow = (_sequential?(_last_flow->index)++ : (click_random() >> 2)) % _nflows;
+        _last_flow->burst_count = 1;
+    }
 
-    if (_flows[flow].flow_count == _flowsize) {
+    if (_flows[flow].flow_count >= _flowsize) {
         change_ports(flow);
         _flows[flow].flow_count = 0;
     }
@@ -170,7 +178,47 @@ FastUDPFlows::initialize(ErrorHandler * errh)
         _flows[i].flow_count = 0;
     }
 
+    if (output_is_push(0)) {
+        ScheduleInfo::initialize_task(this, &_task, true, errh);
+        _timer.initialize(this);
+    }
+
     return 0;
+}
+
+void
+FastUDPFlows::run_timer(Timer*) {
+    _task.reschedule();
+}
+
+
+bool
+FastUDPFlows::run_task(Task* t) {
+#if HAVE_BATCH
+    if (in_batch_mode) {
+        const unsigned int max = 32;
+        PacketBatch *batch;
+        MAKE_BATCH(FastUDPFlows::pull(0), batch, max);
+        if (likely(batch)) {
+            output(0).push_batch(batch);
+            t->fast_reschedule();
+            return true;
+        }
+    } else
+#endif
+    {
+        Packet* p = FastUDPFlows::pull(0);
+        if (likely(p)) {
+            output(0).push(p);
+            t->fast_reschedule();
+            return true;
+        }
+    }
+
+    // We had no packet, we must set timer
+    if (_rate_limited)
+        _timer.schedule_at(_rate.expiry());
+    return false;
 }
 
 void
