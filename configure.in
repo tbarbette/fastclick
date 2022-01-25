@@ -225,6 +225,7 @@ if test "x$ac_have_libbpf$ac_have_libbpf_h$enable_bpf" = "xyesyesyes"; then
     have_libbpf=yes
 else
     have_libbpf=no
+    enable_bpf=no
 fi
 
 AC_SEARCH_LIBS([curl_global_init], [curl], [ac_have_curl=yes], [ac_have_curl=no])
@@ -2637,6 +2638,11 @@ fi
 dnl add 'autobatch_port' if autobatch is port
 if test "x$enable_auto_batch" == "xport" ; then
     provisions="$provisions autobatch_port"
+fi
+
+dnl add 'bpf' if BPF is found
+if test "x$enable_bpf" = xyes; then
+    provisions="$provisions bpf"
 fi
 
 dnl add 'batch' if compiled with --enable-batch

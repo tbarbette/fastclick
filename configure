@@ -8064,6 +8064,7 @@ if test "x$ac_have_libbpf$ac_have_libbpf_h$enable_bpf" = "xyesyesyes"; then
     have_libbpf=yes
 else
     have_libbpf=no
+    enable_bpf=no
 fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing curl_global_init" >&5
@@ -16532,6 +16533,10 @@ fi
 
 if test "x$enable_auto_batch" == "xport" ; then
     provisions="$provisions autobatch_port"
+fi
+
+if test "x$enable_bpf" = xyes; then
+    provisions="$provisions bpf"
 fi
 
 if test "x$enable_batch" = xyes; then
