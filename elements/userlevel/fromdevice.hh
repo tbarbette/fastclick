@@ -6,6 +6,12 @@
 
 #if HAVE_BPF
 # define PCAP_DONT_INCLUDE_PCAP_BPF_H 1
+#ifndef bpf_stats_type
+    enum bpf_stats_type {
+            /* enabled run_time_ns and run_cnt */
+            BPF_STATS_RUN_TIME = 0,
+    };
+#endif
 #include <bpf/bpf.h>
 struct bpf_program {
     u_int bf_len;
