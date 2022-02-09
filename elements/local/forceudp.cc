@@ -42,6 +42,7 @@ ForceUDP::configure(Vector<String> &conf, ErrorHandler *errh)
     uint16_t dp;
     if (Args(conf, this, errh)
 	.read_p("DPORT", IPPortArg(IP_PROTO_UDP), dp)
+    .read_or_set("CHECKLENGTH", _check_length, true)
 	.complete() < 0)
 	return -1;
     _dport = dp;
@@ -66,7 +67,7 @@ ForceUDP::simple_action(Packet *p_in)
     goto bad;
 
   ilen = ntohs(ip->ip_len);
-  if(/*ilen > plen || */ilen < hlen + sizeof(click_udp))
+  if(_check_length && (ilen < hlen + sizeof(click_udp)))
     goto bad;
 
   uh = (click_udp *) (((char *)ip) + hlen);
