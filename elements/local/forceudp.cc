@@ -40,12 +40,15 @@ ForceUDP::configure(Vector<String> &conf, ErrorHandler *errh)
     if (conf.size() == 0 || conf[0] == "-1")
 	return 0;
     uint16_t dp;
+    bool has_dp = true;
     if (Args(conf, this, errh)
 	.read_p("DPORT", IPPortArg(IP_PROTO_UDP), dp)
+    .read_status(has_dp)
     .read_or_set("CHECKLENGTH", _check_length, true)
 	.complete() < 0)
 	return -1;
-    _dport = dp;
+    if (has_dp)
+     _dport = dp;
     return 0;
 }
 
@@ -74,9 +77,9 @@ ForceUDP::simple_action(Packet *p_in)
 
   uh->uh_ulen = htons(ilen - hlen);
 
-  if(_dport >= 0){
+  if (_dport >= 0){
     uh->uh_dport = htons(_dport);
-  } else {
+  } else if (_dport > UINT16_MAX) {
     uh->uh_dport = htons(click_random(0, 1023));
   }
   _count++;
