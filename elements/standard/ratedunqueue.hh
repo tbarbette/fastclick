@@ -63,6 +63,8 @@ class RatedUnqueue : public BatchElement { public:
 
   protected:
 
+    static int write_param(const String &conf, Element *e, void *user_data,
+		     ErrorHandler *errh);
     TokenBucket _tb;
     Task _task;
     Timer _timer;
