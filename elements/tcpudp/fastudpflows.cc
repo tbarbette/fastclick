@@ -413,6 +413,7 @@ FastUDPFlows::add_handlers()
     add_write_handler("srceth", FastUDPFlows::eth_write_handler, 0);
     add_write_handler("dsteth", FastUDPFlows::eth_write_handler, 1);
     add_data_handlers("length", Handler::OP_READ, &_len);
+    add_data_handlers("limit", Handler::OP_READ, &_limit);
     add_write_handler("length", length_write_handler, 0);
     add_data_handlers("stop", Handler::OP_READ | Handler::OP_WRITE, &_stop);
 }
