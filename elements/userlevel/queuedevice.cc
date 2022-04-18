@@ -58,8 +58,8 @@ QueueDevice::static_initialize() {
 int QueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
 
     if (Args(this, errh).bind(conf)
-            .read_p("QUEUE", firstqueue)
-            .read("N_QUEUES",n_queues)
+           .read_p("QUEUE", firstqueue)
+           .read("N_QUEUES",n_queues)
            .read("MAXTHREADS", _maxthreads)
            .read("VERBOSE", _verbose)
            .read("ACTIVE", _active)
@@ -439,7 +439,7 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
         return 0;
 }
 
-int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
+int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh, TaskCallback hook) {
     _q_infos.resize(n_queues);
 
     int th_num = 0;
@@ -460,7 +460,10 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
         }
 
         Task* &task = _thread_state.get_value_for_thread(th_id).task;
-        task = (new Task(this));
+        if (hook)
+            task = new Task(hook, this);
+        else
+            task = new Task(this);
         ScheduleInfo::initialize_task(this, task, schedule, errh);
         task->move_thread(th_id);
 

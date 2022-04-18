@@ -180,7 +180,8 @@ protected:
         return n_elements == n_initialized;
     }
 
-    int initialize_tasks(bool schedule, ErrorHandler *errh);
+    int initialize_tasks(bool schedule, ErrorHandler *errh, TaskCallback hook = 0);
+
 
     void cleanup_tasks();
 

@@ -247,15 +247,25 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
         return 0;
 
     ret = initialize_rx(errh);
-    if (ret != 0) return ret;
+    if (ret != 0)
+        return ret;
 
     for (unsigned i = (unsigned)firstqueue; i <= (unsigned)lastqueue; i++) {
         ret = _dev->add_rx_queue(i , _promisc, _vlan_filter, _vlan_strip, _vlan_extend, _lro, _jumbo, ndesc, errh);
         if (ret != 0) return ret;
     }
 
-    ret = initialize_tasks(_active,errh);
-    if (ret != 0) return ret;
+
+    if (queue_per_threads > 1
+#if HAVE_DPDK_INTERRUPT
+     || _rx_intr
+#endif
+     )
+        ret = initialize_tasks(_active, errh, multi_run_task);
+    else
+        ret = initialize_tasks(_active, errh);
+    if (ret != 0)
+        return ret;
 
     if (queue_share > 1)
         return errh->error(
@@ -334,12 +344,11 @@ extern "C" {
 }
 #endif
 
-bool FromDPDKDevice::run_task(Task *t) {
-  struct rte_mbuf *pkts[_burst];
-  int ret = 0;
+inline CLICK_ALWAYS_INLINE bool
+FromDPDKDevice::_run_task(int iqueue)
+{
+    struct rte_mbuf *pkts[_burst];
 
-  int iqueue = queue_for_thisthread_begin();
-  { //This version differs from multi by having support for one queue per thread only, which is extremly usual
 #if HAVE_BATCH
   PacketBatch *head = 0;
   WritablePacket *last;
@@ -406,27 +415,36 @@ for (unsigned i = 0; i < n; ++i) {
 #else
             output(0).push(p);
 #endif
-        }
-#if HAVE_BATCH
-        if (head) {
-            head->make_tail(last,n);
-            output_push_batch(0,head);
-        }
-#endif
-        if (n) {
-            add_count(n);
-            ret = 1;
-        }
     }
 
-#if HAVE_DPDK_INTERRUPT
-     if (ret == 0 && _rx_intr >= 0) {
+#if HAVE_BATCH
+    if (head) {
+        head->make_tail(last,n);
+        output_push_batch(0,head);
+    }
+#endif
+    if (n) {
+        add_count(n);
+    }
+    return n;
+}
+
+bool FromDPDKDevice::multi_run_task(Task *t, void* e) {
+    FromDPDKDevice* fd = static_cast<FromDPDKDevice*>(e);
+    bool ret = false;
+
+    for (int  iqueue = fd->queue_for_thisthread_begin(); iqueue <= fd->queue_for_thisthread_end(); iqueue++) {
+        ret |= fd->_run_task(iqueue);
+    }
+
+    #if HAVE_DPDK_INTERRUPT
+     if (!ret && _rx_intr >= 0) {
            for (int iqueue = queue_for_thisthread_begin();
                 iqueue<=queue_for_thisthread_end(); iqueue++) {
                if (rte_eth_dev_rx_intr_enable(_dev->port_id, iqueue) != 0) {
                    click_chatter("Could not enable interrupts");
                    t->fast_reschedule();
-                   return 0;
+                   return false;
                }
            }
            struct rte_epoll_event event[queue_per_threads];
@@ -442,6 +460,14 @@ for (unsigned i = 0; i < n; ++i) {
            this->selected(0, SELECT_READ);
     }
 #endif
+
+    t->fast_reschedule();
+    return ret;
+}
+
+bool FromDPDKDevice::run_task(Task *t) {
+    int iqueue = queue_for_thisthread_begin();
+    bool ret = _run_task(iqueue);
 
     t->fast_reschedule();
     return ret;

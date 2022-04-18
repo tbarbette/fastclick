@@ -440,6 +440,8 @@ public:
     }
 
 protected:
+    static bool multi_run_task(Task *t, void* e);
+    inline bool _run_task(int iqueue);
     static int reset_load_handler(
         const String &, Element *, void *, ErrorHandler *
     ) CLICK_COLD;
