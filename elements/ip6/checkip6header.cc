@@ -31,9 +31,8 @@
 
 CLICK_DECLS
 
-CheckIP6Header::CheckIP6Header() : _offset(0), _n_bad_src(0), _bad_src(0), _process_eh(false)
+CheckIP6Header::CheckIP6Header() : _offset(0), _n_bad_src(0), _bad_src(0), _process_eh(false), _count(0)
 {
-    _count = 0;
     _drops = 0;
 }
 
@@ -145,23 +144,24 @@ CheckIP6Header::simple_action(Packet *p)
 
     nxt = ip->ip6_nxt;
     if (_process_eh) {
-        ip6_follow_eh(ip, (unsigned char*)p->end_data(), [&nxt,&ip6_totallen,ip](const uint8_t type, unsigned char* hdr){
-            nxt = type;
-            ip6_totallen = hdr - (unsigned char*)ip;
-            return true;
-        });
+        auto fnt = [&nxt,&ip6_totallen,ip] (const uint8_t type, unsigned char* hdr) __attribute__((always_inline)) {
+                nxt = type;
+                ip6_totallen = hdr - (unsigned char*)ip;
+                return true;
+        };
+        ip6_follow_eh<decltype(fnt)>(ip, (unsigned char*)p->end_data(), fnt);
     }
 
     p->set_ip6_header(ip, ip6_totallen);
     SET_IP6_NXT_ANNO(p, nxt);
 
     // shorten packet according to IP6 payload length field
-    if(ntohs(ip->ip6_plen) < (plen-ip6_totallen)) {
+    if(unlikely(ntohs(ip->ip6_plen) < (plen-ip6_totallen))) {
         click_chatter("take!");
         p->take(plen - ip6_totallen - ntohs(ip->ip6_plen));
     }
 
-    _count++;
+    (*_count)++;
 
     return(p);
 
@@ -177,7 +177,8 @@ CheckIP6Header::read_handler(Element *e, void *thunk)
 
     switch (reinterpret_cast<uintptr_t>(thunk)) {
         case h_count: {
-            return String(c->_count);
+            PER_THREAD_SUM(uint64_t, count, c->_count);
+	    return String(count);
         }
         case h_drops: {
             return String(c->_drops);
