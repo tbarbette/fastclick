@@ -41,10 +41,10 @@
 #define ICMP_PARAMPROB_ANNO(p)		    ((p)->anno_u8(ICMP_PARAMPROB_ANNO_OFFSET))
 #define SET_ICMP_PARAMPROB_ANNO(p, v)	((p)->set_anno_u8(ICMP_PARAMPROB_ANNO_OFFSET, (v)))
 
-#define IP6_NXT_OFFSET		    16
-#define IP6_NXT_SIZE			1
-#define IP6_NXT_ANNO(p)			    ((p)->anno_u8(IP6_NXT_OFFSET))
-#define SET_IP6_NXT_ANNO(p, v)		((p)->set_anno_u8(IP6_NXT_OFFSET, (v)))
+#define IP6_NXT_ANNO_OFFSET		    16
+#define IP6_NXT_ANNO_SIZE			1
+#define IP6_NXT_ANNO(p)			    ((p)->anno_u8(IP6_NXT_ANNO_OFFSET))
+#define SET_IP6_NXT_ANNO(p, v)		((p)->set_anno_u8(IP6_NXT_ANNO_OFFSET, (v)))
 
 // byte 17 (lower byte of PAINT2)
 #define PAINT_ANNO_OFFSET		    17

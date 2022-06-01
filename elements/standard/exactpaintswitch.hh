@@ -19,6 +19,8 @@ CLICK_DECLS
  * Contrary to PaintSwitch, the output is choosed using a vector
  * mapping.
  *
+ * For instance, ExactPaintSwitch(IP6_NXT, MAP 6, MAP 17) will push IPv6  TCP packets on port 0, and UDP on port 1.
+ *
  * =a
  * PaintSwitch
  */
@@ -42,6 +44,7 @@ class ExactPaintSwitch : public ClassifyElement<ExactPaintSwitch> {
 
  private:
   Vector<unsigned> map;
+  int _anno;
 };
 
 CLICK_ENDDECLS
