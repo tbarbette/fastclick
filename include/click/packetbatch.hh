@@ -95,9 +95,17 @@ CLICK_DECLS
     EXECUTE_FOR_EACH_PACKET_UNTIL_DO(fnt, batch, [](PacketBatch*& batch, Packet* dropped, Packet* next){ if (!next) return; PacketBatch* remain = PacketBatch::make_from_simple_list(next);batch->set_count(batch->count() - remain->count()); batch->set_tail(dropped); dropped->set_next(0); remain->kill(); })
 
 /**
- * Execute a function on each packet of a batch. The function may return
+ * Execute a function on each packet of a batch.
+ * The batch will be modified in-place according to the output of the function.
+ *
+ * The function may return
  * another packet and which case the packet of the batch will be replaced by
  * that one, or null if the packet is to be dropped.
+ *
+ * If all packets are dropped, batch will become null. If the first packets are dropped, the address of batch will change.
+ *
+ *
+ * Example: EXECUTE_FOR_EACH_PACKET_DROPPABLE([this](Packet* p){return p->push(_nbytes);},batch,[](Packet* p){})
  */
 #define EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop) {\
                 Packet* efepd_next = ((batch != 0)? batch->first()->next() : 0 );\
