@@ -8,7 +8,14 @@
 #include <click/multithread.hh>
 #include <click/hashmap.hh>
 #include <click/ring.hh>
+#include <microhttpd.h>
+
 CLICK_DECLS
+
+#if MHD_VERSION < 0x00097500
+#define MHD_Result int
+#endif
+
 
 /*
 =c
@@ -31,7 +38,7 @@ class HTTPServer : public Element { public:
     void selected(int fd, int mask);
     void update_fd_set();
 
-    static int ahc_echo(
+    static MHD_Result ahc_echo(
         void *cls,
         struct MHD_Connection *connection,
         const char *url,
