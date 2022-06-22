@@ -1,7 +1,6 @@
 #include <click/config.h>
 
 
-#include <microhttpd.h>
 #include "httpserver.hh"
 
 #include <click/args.hh>
@@ -12,8 +11,7 @@
 
 CLICK_DECLS
 
-
-static int ahc_policy(void *cls, const struct sockaddr *addr, socklen_t addrlen) {
+static MHD_Result ahc_policy(void *cls, const struct sockaddr *addr, socklen_t addrlen) {
     (void)cls;
     (void)addr;
     (void)addrlen;
@@ -96,7 +94,7 @@ int HTTPServer::initialize(ErrorHandler *errh) {
 }
 
 
-int HTTPServer::ahc_echo(
+MHD_Result HTTPServer::ahc_echo(
         void *cls,
         struct MHD_Connection *connection,
         const char *url,
@@ -315,7 +313,7 @@ int HTTPServer::ahc_echo(
             response);
     MHD_destroy_response(response);
 
-    return ret;
+    return ret == 0? MHD_NO : MHD_YES;
 }
 
 void HTTPServer::cleanup(CleanupStage) {
