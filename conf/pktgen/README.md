@@ -32,6 +32,9 @@ Layer
 
 Suffix
 ------
-- -dual    : Bidirectionnal test
-- -loop    : Repeat a test in loop changing the given packet size. Usefull to
-              make a graph as in the FastClick paper (packet size vs throughput)
+- -dual     : Bidirectionnal test
+- -mt       : Multi-threaded test
+- -loop     : Repeat a test in loop changing the given packet size. Usefull to
+               make a graph as in the FastClick paper (packet size vs throughput)
+- -playcap  : Instead of UDP, uses a PCAP file
+- -replaycap: Use a PCAP file pre-loaded in memory
