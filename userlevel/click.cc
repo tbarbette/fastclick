@@ -437,11 +437,13 @@ main(int argc, char **argv)
 
         args.dpdk_arg.push_back((char*)(new String("512M"))->c_str());
 
-        args.dpdk_arg.push_back((char*)(new String("--log-level=0"))->c_str());
+        args.dpdk_arg.push_back((char*)(new String("-v"))->c_str());
+
+        args.dpdk_arg.push_back((char*)(new String("--log-level=debug"))->c_str());
 
         args.dpdk_arg.push_back((char*)(new String("--"))->c_str());
 #ifdef HAVE_VERBOSE_BATCH
-        click_chatter("ERROR: Click was compiled with --enable-dpdk-packet, and must therefore be launched with the '--dpdk --' arguments. We'll try to run with --dpdk %s %s %s -m 512M --log-level=0 -- but it's likely to fail... This is only to allow automatic testing.",args.dpdk_arg[1],args.dpdk_arg[2], args.dpdk_arg[3]);
+        click_chatter("ERROR: Click was compiled with --enable-dpdk-packet, and must therefore be launched with the '--dpdk --' arguments. We'll try to run with --dpdk %s %s %s -m 512M -v --log-level=debug -- but it's likely to fail... This is only to allow automatic testing.",args.dpdk_arg[1],args.dpdk_arg[2], args.dpdk_arg[3]);
 #endif
 #endif
     }
