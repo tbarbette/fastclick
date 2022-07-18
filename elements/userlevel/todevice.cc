@@ -58,7 +58,7 @@
 CLICK_DECLS
 
 ToDevice::ToDevice()
-    : _task(this), _timer(&_task), _q(0), _pulls(0)
+    : _task(this), _timer(&_task), _q(0), _pulls(0), _tot_count(0)
 {
 #if TODEVICE_ALLOW_PCAP
     _pcap = 0;
@@ -242,6 +242,7 @@ ToDevice::cleanup(CleanupStage)
         close(_fd);
     _fd = -1;
 #endif
+    _tot_count = 0;
 }
 
 
@@ -327,6 +328,7 @@ ToDevice::run_task(Task *)
             p = batch_error;
             batch_error = 0;
         }
+        _tot_count += count;
     }
 #else
     Packet *p = _q;
@@ -345,6 +347,7 @@ ToDevice::run_task(Task *)
         } else
             break;
     } while (count < _burst);
+    _tot_count += count;
 #endif
 
     if (r == -ENOBUFS || r == -EAGAIN) {
@@ -399,6 +402,8 @@ ToDevice::read_param(Element *e, void *thunk)
         return String(td->_pulls);
     case h_q:
         return String((bool) td->_q);
+    case h_count:
+        return String(td->_tot_count);
     default:
         return String();
     }
@@ -430,6 +435,7 @@ ToDevice::add_handlers()
     add_read_handler("pulls", read_param, h_pulls);
     add_read_handler("signal", read_param, h_signal);
     add_read_handler("q", read_param, h_q);
+    add_read_handler("count", read_param, h_count);
     add_write_handler("debug", write_param, h_debug);
 }
 

@@ -108,6 +108,7 @@ class ToDevice : public BatchElement { public:
     Timer _timer;
 
     String _ifname;
+    uint64_t _tot_count;
 #if TODEVICE_ALLOW_PCAP
     pcap_t *_pcap;
 #endif
@@ -135,7 +136,7 @@ class ToDevice : public BatchElement { public:
     int _backoff;
     int _pulls;
 
-    enum { h_debug, h_signal, h_pulls, h_q };
+    enum { h_debug, h_signal, h_pulls, h_q, h_count };
     FromDevice *find_fromdevice() const;
     int send_packet(Packet *p);
     static int write_param(const String &in_s, Element *e, void *vparam, ErrorHandler *errh) CLICK_COLD;
