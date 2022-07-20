@@ -4,7 +4,7 @@ on:
   push:
     branches: [ '*' ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 env:
     CXXFLAGS: -std=gnu++11
     FLAGS: --enable-all-elements --disable-verbose-batch --enable-simtime
