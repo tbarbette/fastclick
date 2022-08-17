@@ -17,6 +17,7 @@ Folders are organised by demonstrated feature. But some example of course
  * kernel      Kernel-specific feature
  * lib         Library of elementclass. Include them with require(library conf/lib/*.click)
  * nat         NAT and LB
+ * ids         Configuration from a packet-based IDS, inspired from Metron
  * pktgen      Packet generation
  * proxy       Proxy
  * queueing    Advanced queuing, early dropping, ...
