@@ -437,7 +437,7 @@ main(int argc, char **argv)
 
         args.dpdk_arg.push_back((char*)(new String("512M"))->c_str());
 
-        args.dpdk_arg.push_back((char*)(new String("--log-level=debug"))->c_str());
+        args.dpdk_arg.push_back((char*)(new String("--log-level=1"))->c_str());
 
         args.dpdk_arg.push_back((char*)(new String("--"))->c_str());
 #ifdef HAVE_VERBOSE_BATCH
