@@ -37,7 +37,7 @@ jobs:
             echo "Compiling DPDK..." ;
             export STABLE=
             export VERSION=20.11
-            export FRAMEWORK_FLAGS="--enable-dpdk";
+            export FRAMEWORK_FLAGS="--enable-dpdk --enable-user-multithread";
             export PKG_CONFIG_PATH=$(pwd)/dpdk-$STABLE$VERSION/install/lib/x86_64-linux-gnu/pkgconfig/ ;
             export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(pwd)/dpdk-$STABLE$VERSION/install/lib/x86_64-linux-gnu/ ;
             if [ ! -e "dpdk-$STABLE$VERSION" ] || ! pkg-config --exists libdpdk ; then
@@ -76,6 +76,7 @@ jobs:
           ./configure $FLAGS $FRAMEWORK_FLAGS
     - name: make
       run: make
+    #Simple launch avoids going further if something very bad happens
     - name: simple_launch
       run: chmod 700 /home/runner ; ./userlevel/click -j 2 -e 'DriverManager(stop);'
     - name: make check
