@@ -879,6 +879,7 @@ Specializer::do_config_replacement() {
                       int pos = configline.find_left(param);
                       int endofrep = res;
                       bool dynamic = false;
+                      bool fromcode = false;
                       String symbol = args[1].trim();
                       if (pos >= 0) {
                           //Value given by the user
@@ -911,6 +912,7 @@ Specializer::do_config_replacement() {
                           //Value not given by the user
                           if (args.size() > 2 && args[2].trim()) {
                               value=args[2].trim();
+                              fromcode = true;
                               if (_verbose)
                                   click_chatter("User did not overwrite %s, replacing by default value %s", param.c_str(), value.c_str());
                               has_value = true;
@@ -929,7 +931,7 @@ Specializer::do_config_replacement() {
                       if (has_value) {
                           if (_verbose)
                               click_chatter("Value %s given, primitive : %d",value.c_str(),is_primitive_val(value));
-                          configure->replace_expr("!TEMPVAL!", ", "+symbol+", "+ (is_primitive_val(value)?value:"\""+value+"\""), false, true);
+                          configure->replace_expr("!TEMPVAL!", ", "+symbol+", "+ (is_primitive_val(value)||fromcode?value:"\""+value+"\""), false, true);
                       } else if (!dynamic) {
                           click_chatter("No value given");
                           configure->replace_expr("!TEMPVAL!", "", false);
