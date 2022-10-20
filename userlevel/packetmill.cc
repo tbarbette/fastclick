@@ -67,6 +67,12 @@ int main(int argc, char **argv) {
 
   getcwd(pwd, 256);
   chdir(CLICK_DIR "/userlevel/");
+
+  if (!args.router_file) {
+    click_chatter("No configuration was specified !");
+    return -EINVAL;
+  }
+
   if (args.router_file[0] == '/') {
       strncpy(cpath, args.router_file, 256);
   } else {
