@@ -9865,12 +9865,12 @@ if test ${enable_ctx+y}
 then :
   enableval=$enable_ctx;
 else $as_nop
-  enable_ctx=no
+  enable_ctx=NO
 fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_ctx" = xNO -o "x$enable_ctx" = x \) -a "x$enable_flow" = xyes   && enable_ctx=yes
 if test "x$enable_ctx" = xyes; then
     :
-    enable_ctx=no
+    enable_ctx=yes
 fi
 # Check whether --enable-grid was given.
 if test ${enable_grid+y}
@@ -19315,6 +19315,7 @@ Configuration Summary:
 
           Batching:              ${enable_batch}
     Flow Subsystem:              ${enable_flow}
+ Context Subsystem:              ${enable_ctx}
        HW Flow API:              ${have_flow_api}
 
     DPDK   support:              ${dpdk_info}
