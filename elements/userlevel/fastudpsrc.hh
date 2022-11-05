@@ -83,6 +83,7 @@ class FastUDPSource : public Element {
   unsigned _count;
   unsigned _limit;
   bool _active;
+  bool _stop;
 
   FastUDPSource() CLICK_COLD;
   ~FastUDPSource() CLICK_COLD;
