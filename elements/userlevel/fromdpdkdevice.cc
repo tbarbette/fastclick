@@ -383,7 +383,7 @@ for (unsigned i = 0; i < n; ++i) {
         data, rte_pktmbuf_data_len(pkts[i]), DPDKDevice::free_pkt, pkts[i],
         rte_pktmbuf_headroom(pkts[i]), rte_pktmbuf_tailroom(pkts[i]), _clear);
 # endif
-#else
+#else //!HAVE_ZEROCOPY
             WritablePacket *p = Packet::make(data,
                                      (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));
             rte_pktmbuf_free(pkts[i]);
@@ -1014,6 +1014,6 @@ void FromDPDKDevice::add_handlers()
 
 CLICK_ENDDECLS
 
-ELEMENT_REQUIRES(userlevel dpdk QueueDevice)
+ELEMENT_REQUIRES(userlevel dpdk QueueDevice ToDPDKDevice)
 EXPORT_ELEMENT(FromDPDKDevice)
 ELEMENT_MT_SAFE(FromDPDKDevice)
