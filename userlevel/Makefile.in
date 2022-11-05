@@ -85,7 +85,7 @@ USE_CTX = @USE_CTX@
 ifeq ($(USE_FLOW),yes)
 GENERIC_OBJS += flow.o flowelement.o flownode.o
 ifeq ($(USE_CTX),yes)
-GENERIC_OBJS += flowbuffer.o bytestreammaintainer.o modificationlist.o \
+GENERIC_OBJS += flowbuffer.o bytestreammaintainer.o modificationlist.o ctxelement.o \
 	circularbuffer.o rbt.o bufferpool.o bufferpoolnode.o
 endif
 endif

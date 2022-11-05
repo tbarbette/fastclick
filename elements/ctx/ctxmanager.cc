@@ -337,7 +337,9 @@ int CTXManager::_replace_leafs(ErrorHandler *errh) {
 #if HAVE_FLOW_DYNAMIC
         nfcb->reset_count(1);
 #endif
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
         nfcb->release_fnt = 0;
+#endif
         ptr->set_leaf(nfcb);
     }, true, true);
 
