@@ -7,6 +7,7 @@
 #include <click/vector.hh>
 #include <click/notifier.hh>
 #include <click/tinyexpr.hh>
+#include <click/error.hh>
 #include <strings.h>
 CLICK_DECLS
 
@@ -38,6 +39,7 @@ protected:
 
     bool _active;
     bool _loaded;
+    bool _input_in_batch_mode;
 
     unsigned int _burst;
     int _stop;
@@ -146,6 +148,16 @@ private:
 
 inline bool ReplayBase::load_packets() {
         Packet* p_input[ninputs()];
+#if HAVE_BATCH
+        for (int i = 0; i < ninputs(); i++) {
+            if (input(i).element()->in_batch_mode) {
+                if (i > 0 && _input_in_batch_mode) {
+                    return ErrorHandler::default_handler()->error("%p{element} cannot have input in batch mode and not in batch mode", this);
+                }
+                _input_in_batch_mode = true;
+            }
+        }
+#endif
         bzero(p_input,sizeof(Packet*) * ninputs());
         int first_i = -1;
         Timestamp first_t;
@@ -160,9 +172,12 @@ inline bool ReplayBase::load_packets() {
                 if (p_input[i] == 0) {
                     do_pull:
 #if HAVE_BATCH
-                    p_input[i] = input_pull_batch(i,1)->first();
+                    if (likely(_input_in_batch_mode))
+                        p_input[i] = input_pull_batch(i,1)->first();
+                    else
+                        p_input[i] = PacketBatch::make_from_packet(input(i).pull())->first();
 #else
-                    p_input[i] = input(i).pull();
+                        p_input[i] = input(i).pull();
 #endif
                     if (p_input[i] == 0) {
                         if (_use_signal && _input[i].signal.active()) {
