@@ -114,7 +114,15 @@ int main(int argc, char **argv) {
   /* Hint to NPF Packet Generator */
   click_chatter("EVENT COMPILED");
   chdir(pwd);
+  int retryv = 0;
+retry:
   execvp(argv[0], argv);
+  if (errno == 2 && retryv == 0) {
+      retryv++;
+      chdir((char*) CLICK_DIR "/userlevel/");
+      goto retry;
+  }
+  click_chatter("Could not execute embedclick: errno %d (%s)", errno, strerror(errno));
 #pragma GCC diagnostic pop
-  return 0;
+  return -1;
 }
