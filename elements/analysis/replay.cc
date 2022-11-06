@@ -23,7 +23,11 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-ReplayBase::ReplayBase() : _active(true), _loaded(false), _input_in_batch_mode(false), _burst(64), _stop(-1),_stop_time(0),  _quick_clone(false), _task(this), _limit(-1), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true), _timing_packet(), _timing_real(), _startsent(), _fnt_expr() {
+ReplayBase::ReplayBase() : _active(true), _loaded(false),
+#if HAVE_BATCH
+    _input_in_batch_mode(false),
+#endif
+    _burst(64), _stop(-1),_stop_time(0),  _quick_clone(false), _task(this), _limit(-1), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true), _timing_packet(), _timing_real(), _startsent(), _fnt_expr() {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
 #endif

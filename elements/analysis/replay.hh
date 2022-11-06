@@ -39,7 +39,9 @@ protected:
 
     bool _active;
     bool _loaded;
+#if HAVE_BATCH
     bool _input_in_batch_mode;
+#endif
 
     unsigned int _burst;
     int _stop;
