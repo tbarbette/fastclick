@@ -98,9 +98,9 @@ int main(int argc, char **argv) {
       click_chatter("Applying -O3 optimizations");
       exec("opt -S -O3 embedclick.ll -o embedclick.ll");
       exec("make embedclick-opt");
-      argv[0] = "./embedclick-opt";
+      argv[0] = (char*)"./embedclick-opt";
     } else {
-      argv[0] = "./embedclick";
+      argv[0] = (char*)"./embedclick";
     }
   #else
     perfalert("Skipping IR optimizations, as LLVM libraries could not be found!");
