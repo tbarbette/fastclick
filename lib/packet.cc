@@ -1165,8 +1165,11 @@ Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom)
     rte_pktmbuf_data_len(nmb) = length();
     rte_pktmbuf_pkt_len(nmb) = length();
     WritablePacket *npkt = reinterpret_cast<WritablePacket *>(nmb);
-#else
+#elif HAVE_CLICK_PACKET_POOL
     WritablePacket *npkt = WritablePacket::pool_allocate(headroom() + extra_headroom, length(), tailroom() + extra_tailroom, false);
+#else
+    WritablePacket *npkt = new WritablePacket;
+    npkt->alloc_data(headroom() + extra_headroom, length(), tailroom() + extra_tailroom);
 #endif
     memcpy(npkt->all_anno(), all_anno(), sizeof (AllAnno));
 
