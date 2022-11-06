@@ -1086,6 +1086,9 @@ Packet::clone(bool fast)
 	return 0;
 # endif
 
+#ifdef CLICK_NOINDIRECT
+    return duplicate(0, 0);
+#else
     // timing: .31-.39 normal, .43-.55 two allocs, .55-.58 two memcpys
 # if HAVE_CLICK_PACKET_POOL
     Packet *p = WritablePacket::pool_allocate();
@@ -1096,43 +1099,36 @@ Packet::clone(bool fast)
 	    return 0;
     if (unlikely(fast)) {
 
-#ifndef CLICK_NOINDIRECT
         p->_use_count = 1;
-#endif
         p->_head = _head;
         p->_data = _data;
         p->_tail = _tail;
-#ifdef CLICK_FORCE_EXPENSIVE
+# ifdef CLICK_FORCE_EXPENSIVE
         PacketRef r(this);
-#endif
+# endif
         p->_end = _end;
-#if HAVE_DPDK
+# if HAVE_DPDK
         if (DPDKDevice::is_dpdk_packet(this)) {
           p->_destructor = DPDKDevice::free_pkt;
           p->_destructor_argument = destructor_argument();
           rte_mbuf_refcnt_update((rte_mbuf*)p->_destructor_argument, 1);
         }
 
-#ifndef CLICK_NOINDIRECT
         else if (
                 data_packet() && DPDKDevice::is_dpdk_packet(data_packet())) {
            p->_destructor = DPDKDevice::free_pkt;
            p->_destructor_argument = data_packet()->destructor_argument();
            rte_mbuf_refcnt_update((rte_mbuf*)p->_destructor_argument, 1);
         }
-#endif
         else
-#endif
+# endif
         {
             p->_destructor = empty_destructor;
         }
 
-#ifndef CLICK_NOINDIRECT
         p->_data_packet = 0;
-#endif
     } else {
 
-#ifndef CLICK_NOINDIRECT
 
         Packet* origin = this;
         if (origin->_data_packet)
@@ -1140,19 +1136,17 @@ Packet::clone(bool fast)
         memcpy((void*)p, (void*)this, sizeof(Packet));
         p->_use_count = 1;
         p->_data_packet = origin;
-	# if CLICK_USERLEVEL || CLICK_MINIOS
+#  if CLICK_USERLEVEL || CLICK_MINIOS
 		p->_destructor = 0;
-	# else
+#  else
 		p->_m = m;
-	# endif
+#  endif
 		// increment our reference count because of _data_packet reference
 		origin->_use_count++;
-#else
-        assert(false);
-#endif
+
     }
     return p;
-
+# endif /* !CLICK_NOINDIRECT */
 #endif /* CLICK_LINUXMODULE */
 }
 
@@ -1171,6 +1165,9 @@ Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom)
     rte_pktmbuf_data_len(nmb) = length();
     rte_pktmbuf_pkt_len(nmb) = length();
     WritablePacket *npkt = reinterpret_cast<WritablePacket *>(nmb);
+#else
+    WritablePacket *npkt = WritablePacket::pool_allocate(headroom() + extra_headroom, length(), tailroom() + extra_tailroom, false);
+#endif
     memcpy(npkt->all_anno(), all_anno(), sizeof (AllAnno));
 
     unsigned char *start_copy = (unsigned char*)buffer() + (extra_headroom >= 0 ? 0 : -extra_headroom);
@@ -1180,11 +1177,6 @@ Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom)
     npkt->shift_header_annotations(buffer(), extra_headroom);
 
     return npkt;
-#else
-    (void)extra_headroom;
-    (void)extra_tailroom;
-    abort();
-#endif
 }
 
 WritablePacket *
