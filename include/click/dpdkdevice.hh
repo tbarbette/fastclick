@@ -75,6 +75,12 @@ typedef uint32_t counter_t;
 
 extern bool dpdk_enabled;
 
+#ifdef RTE_PCI_ANY_ID
+#define MY_PCI_ANY_ID RTE_PCI_ANY_ID
+#else
+#define MY_PCI_ANY_ID PCI_ANY_ID
+#endif
+
 class DPDKDevice : public DPDKEthernetDevice {
 public:
 
@@ -83,7 +89,7 @@ public:
 
     struct DevInfo {
         inline DevInfo() :
-            vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
+            vendor_id(MY_PCI_ANY_ID), vendor_name(), device_id(MY_PCI_ANY_ID), driver(0),
             init_mac(), init_mtu(0), init_rss(-1), init_reta_size(-1), init_fc_mode(FC_UNSET),
             rx_queues(0, false), tx_queues(0, false), n_rx_descs(0), n_tx_descs(0),
             num_pools(0), promisc(false),
@@ -98,7 +104,7 @@ public:
         }
 
         void print_device_info() {
-            if (device_id == PCI_ANY_ID) {
+            if (device_id == MY_PCI_ANY_ID) {
                 return;
             }
             click_chatter("                Vendor   ID: %d", vendor_id);
