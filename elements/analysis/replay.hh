@@ -39,10 +39,6 @@ protected:
 
     bool _active;
     bool _loaded;
-#if HAVE_BATCH
-    bool _input_in_batch_mode;
-#endif
-
     unsigned int _burst;
     int _stop;
     int _stop_time;
@@ -150,16 +146,6 @@ private:
 
 inline bool ReplayBase::load_packets() {
         Packet* p_input[ninputs()];
-#if HAVE_BATCH
-        for (int i = 0; i < ninputs(); i++) {
-            if (input(i).element()->in_batch_mode) {
-                if (i > 0 && _input_in_batch_mode) {
-                    return ErrorHandler::default_handler()->error("%p{element} cannot have input in batch mode and not in batch mode", this);
-                }
-                _input_in_batch_mode = true;
-            }
-        }
-#endif
         bzero(p_input,sizeof(Packet*) * ninputs());
         int first_i = -1;
         Timestamp first_t;
@@ -174,7 +160,7 @@ inline bool ReplayBase::load_packets() {
                 if (p_input[i] == 0) {
                     do_pull:
 #if HAVE_BATCH
-                    if (likely(_input_in_batch_mode))
+                    if (likely(receives_batch))
                         p_input[i] = input_pull_batch(i,1)->first();
                     else
                         p_input[i] = PacketBatch::make_from_packet(input(i).pull())->first();
