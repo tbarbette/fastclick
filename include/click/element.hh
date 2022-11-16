@@ -337,7 +337,7 @@ class Element { public:
 
         Element* _e;
         int _port;
-        #ifdef HAVE_AUTO_BATCH
+    #ifdef HAVE_AUTO_BATCH
         per_thread<PacketBatch*> current_batch;
 	#endif
 #if HAVE_FLOW_DYNAMIC
@@ -769,9 +769,7 @@ Element::Port::push(Packet* p) const
     FlowControlBlock* tmp_stack = 0;
     if (_unstack) {
         tmp_stack = fcb_stack;
-#if HAVE_FLOW_DYNAMIC
         fcb_stack->release(1);
-#endif
         fcb_stack = 0;
     }
 #endif
@@ -882,9 +880,7 @@ Element::Port::push_batch(PacketBatch* batch) const {
     FlowControlBlock* tmp_stack = 0;
     if (unlikely(_unstack && fcb_stack)) {
         tmp_stack = fcb_stack;
-#if HAVE_FLOW_DYNAMIC
         fcb_stack->release(batch->count());
-#endif
         fcb_stack = 0;
     }
 #endif

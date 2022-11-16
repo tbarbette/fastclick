@@ -110,7 +110,7 @@ FlowNode* CTXManager::resolveContext(FlowType t, Vector<FlowElement*> contextSta
 
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 void CTXManager::run_timer(Timer*) {
-    click_chatter("Release timer!");
+    debug_flow("Release timer!");
 #if DEBUG_CLASSIFIER_RELEASE
     click_chatter("Force run check-release");
 #endif

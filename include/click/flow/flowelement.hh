@@ -34,6 +34,16 @@ public:
     FlowElement();
     ~FlowElement();
 
+    //Those should actually be in some kind of base CTXElement
+# if HAVE_CTX
+    virtual FlowNode* get_table(int iport, Vector<FlowElement*> contextStack);
+
+    virtual FlowNode* resolveContext(FlowType, Vector<FlowElement*> stack);
+# endif
+    virtual FlowType getContext(int port);
+
+    virtual bool stopClassifier() { return false; };
+
 #if HAVE_FLOW_DYNAMIC
     inline void fcb_acquire(int count = 1) {
         fcb_stack->acquire(count);
@@ -58,17 +68,7 @@ public:
     }
 #endif
 
-    //Those should actually be in some kind of base CTXElement
-# if HAVE_CTX
-    virtual FlowNode* get_table(int iport, Vector<FlowElement*> contextStack);
-
-    virtual FlowNode* resolveContext(FlowType, Vector<FlowElement*> stack);
-# endif
-    virtual FlowType getContext(int port);
-
-    virtual bool stopClassifier() { return false; };
 };
-
 
 /**
  * Element that needs FCB space
@@ -188,6 +188,15 @@ protected:
     friend class FlowBufferVisitor;
     friend class VirtualFlowManager;
 };
+
+class UnstackVisitor : public RouterVisitor {
+public:
+    bool visit(Element *e, bool isoutput, int port,
+                   Element *from_e, int from_port, int distance);
+
+};
+
+
 
 /**
  * This future will only trigger once it is called N times.

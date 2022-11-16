@@ -29,7 +29,7 @@ def simpleTest():
     net = Mininet(topo)
     net.start()
 
-    print "Dumping host connections"
+    print("Dumping host connections")
     dumpNodeConnections(net.hosts)
 
     sw1 = net.get(topo.sw1)
