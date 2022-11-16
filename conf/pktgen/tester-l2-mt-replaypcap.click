@@ -1,7 +1,6 @@
 /*
  * Multi-Threaded packet generator with memory preload. Uses DPDK.
  *
- * This version does not compute latency or receive packets back on another interface.
  * It uses 4 threads to replay packets, after they're preloaded in memory.
  *
  * Example usage: bin/click --dpdk -l 0-15 -- conf/pktgen/tester-l2-mt-replaypcap.click trace=/tmp/trace.pcap
@@ -32,22 +31,13 @@ fdIN :: FromDump($trace, STOP false, TIMING false)
 
 tdIN :: ToDPDKDevice($txport, BLOCKING true, BURST $bout, VERBOSE $txverbose, IQUEUE $bout, NDESC 0, TCO 1)
 
-elementclass NoTimestampDiff { $a, $b, $c, $d |
-    input -> output;
-    Idle->[1]output;
-}
-
 elementclass Numberise { $magic |
     input-> Strip(14) -> check :: CheckIPHeader(CHECKSUM false) -> nPacket :: NumberPacket(42) -> StoreData(40, $magic) -> SetIPChecksum -> Unstrip(14) -> output
 }
 
-elementclass NoNumberise { $magic |
-    input-> Strip(14) -> check :: CheckIPHeader(CHECKSUM false) -> Unstrip(14) -> output
-}
-
+//Packets read from the trace are sent to PathSpinLock, that will be queried by multiple thread (and protected).
 fdIN
-    
-    -> rr :: PathSpinlock;
+	-> rr :: PathSpinlock;
 
 elementclass Generator { $magic |
 input
@@ -55,7 +45,6 @@ input
   -> rwIN :: EtherRewrite($INsrcmac,$INdstmac)
   -> Pad()
    -> Numberise($magic)
-//  -> Print(TIMESTAMP true)
   -> replay :: ReplayUnqueue(STOP 0, STOP_TIME 0, QUICK_CLONE $quick, VERBOSE false, ACTIVE true, LIMIT 500000, TIMING 0)
   -> rt :: RecordTimestamp(N $limit, OFFSET 56)
   -> avgSIN :: AverageCounter(IGNORE $ignore)
