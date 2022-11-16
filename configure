@@ -1673,7 +1673,8 @@ Optional Features:
     --disable-sloppy      disable Sloppy flow timeouts
     --disable-flow-atomic use non-atomic flow reference counting
     --disable-flow-dynamic
-                          allow dynamic flow system
+                          use reference counting to automatically acquire and
+                          relealse flow control blocks
     --disable-flow-structure
                           do not free classifier nodes in pool, mark them as
                           released to somehow keep the receive strucutre

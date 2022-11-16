@@ -8,7 +8,6 @@ CLICK_DECLS
 
 #ifdef HAVE_FLOW
 
-
 #define DEBUG_CLASSIFIER_MATCH 0 //0 no, 1 build-time only, 2 whole time, 3 print table after each dup
 #define DEBUG_CLASSIFIER_RELEASE 0
 #define DEBUG_CLASSIFIER_TIMEOUT 0
@@ -41,8 +40,6 @@ CLICK_DECLS
     #define flow_assert(...)
 	#define FLOW_INDEX(table,index) table.unchecked_at(index)
 #endif
-
-#define HAVE_DYNAMIC_FLOW_RELEASE_FNT HAVE_DYNAMIC_FLOW
 
 class FlowControlBlock;
 class FCBPool;
@@ -97,7 +94,7 @@ union FlowNodeData{
 
 typedef void (*SubFlowRealeaseFnt)(FlowControlBlock* fcb, void* thunk);
 
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
 struct FlowReleaseChain {
     SubFlowRealeaseFnt previous_fnt;
     void* previous_thunk;
@@ -161,7 +158,7 @@ private:
 
 
 
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
 		SubFlowRealeaseFnt release_fnt ;
 		void* thunk;
 #endif
@@ -189,7 +186,7 @@ private:
 #if DEBUG_CLASSIFIER
             thread = -1;
 #endif
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
             release_fnt = 0;
             thunk = 0;
 #endif
@@ -341,7 +338,7 @@ private:
 	inline FlowControlBlock* alloc_new() {
 		FlowControlBlock* fcb = (FlowControlBlock*)CLICK_LALLOC(sizeof(FlowControlBlock) + _data_size);
 		flow_assert(fcb);
-/*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+/*#if HAVE_FLOW_DYNAMIC
 		fcb->release_fnt = &pool_release_fnt;
 		fcb->thunk = this;
 #endif*/
@@ -523,11 +520,11 @@ protected:
 };
 
 
-//#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+//#if !HAVE_FLOW_DYNAMIC
 extern __thread FlowTableHolder* fcb_table;
 //#endif
 
-/*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+/*#if HAVE_FLOW_DYNAMIC
         inline FCBPool* FlowControlBlock::get_pool() const { //Only works at initialisation
             return static_cast<FCBPool*>(thunk);
         }
@@ -558,7 +555,7 @@ inline void FlowControlBlock::_do_release() {
     flow_assert(thread == click_current_cpu_id());
     //click_chatter("Release fnt is %p",release_fnt);
     SFCB_STACK(
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
        if (release_fnt)
            release_fnt(this, thunk);
 #endif

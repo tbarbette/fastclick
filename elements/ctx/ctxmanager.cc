@@ -337,7 +337,7 @@ int CTXManager::_replace_leafs(ErrorHandler *errh) {
 #if HAVE_FLOW_DYNAMIC
         nfcb->reset_count(1);
 #endif
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
         nfcb->release_fnt = 0;
 #endif
         ptr->set_leaf(nfcb);
@@ -455,14 +455,14 @@ void CTXManager::cleanup(CleanupStage stage) {
 
 bool CTXManager::run_idle_task(IdleTask*) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-//#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+//#if !HAVE_FLOW_DYNAMIC
     fcb_table = &_table;
 //#endif
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
     click_chatter("%p{element} Idle release",this);
 #endif
     bool work_done = _table.check_release();
-//#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+//#if !HAVE_FLOW_DYNAMIC
     fcb_table = 0;
 //#endif
 #endif
@@ -598,7 +598,7 @@ inline void CTXManager::push_batch_builder(int, PacketBatch* batch) {
 void CTXManager::push_batch(int, PacketBatch* batch) {
     FlowControlBlock* tmp_stack = fcb_stack;
     FlowTableHolder* tmp_table = fcb_table;
-//#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+//#if !HAVE_FLOW_DYNAMIC
     fcb_table = &_table;
 //#endif
     if (_builder)
@@ -608,7 +608,7 @@ void CTXManager::push_batch(int, PacketBatch* batch) {
 
     check_release_flows();
     fcb_stack = tmp_stack;
-//#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+//#if !HAVE_FLOW_DYNAMIC
     fcb_table = tmp_table;
 //#endif
 }
@@ -635,7 +635,7 @@ String CTXManager::read_handler(Element* e, void* thunk) {
             fc->_table.get_root()->print(-1,false,true,false);
             fcb_table = 0;
             return String("");
-#if HAVE_DYNAMIC_FLOW
+#if HAVE_FLOW_DYNAMIC
         case h_timeout_count:
             return String(fc->_table.old_flows->count());
 #endif

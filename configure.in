@@ -931,7 +931,7 @@ if test "x$enable_flow_atomic" = xyes; then
 fi
 
 AC_ARG_ENABLE([flow-dynamic],
-    [AS_HELP_STRING([  --disable-flow-dynamic], [allow dynamic flow system])],
+    [AS_HELP_STRING([  --disable-flow-dynamic], [use reference counting to automatically acquire and relealse flow control blocks])],
     [:], [enable_flow_dynamic=yes])
 if test "x$enable_flow$enable_flow_dynamic" = xyesyes; then
     AC_DEFINE(HAVE_FLOW_DYNAMIC)

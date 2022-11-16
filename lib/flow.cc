@@ -46,7 +46,7 @@ void FlowClassificationTable::set_root(FlowNode* node) {
     assert(node);
     assert(_classifier_release_fnt);
     _root = node;
-/*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+/*#if HAVE_FLOW_DYNAMIC
     auto fnt = [this](FlowControlBlock* fcb){
         fcb->release_fnt = _classifier_release_fnt;
     };

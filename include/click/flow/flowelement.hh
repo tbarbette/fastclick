@@ -125,7 +125,7 @@ public:
     }
 #endif
 
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
     inline void fcb_set_release_fnt(struct FlowReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt) {
         fcb_chain->previous_fnt = fcb_stack->release_fnt;
         fcb_chain->previous_thunk = fcb_stack->thunk;
@@ -341,7 +341,7 @@ public :
                  my_fcb->seen = true;
                  if (Derived::timeout > 0)
                      this->fcb_acquire_timeout(Derived::timeout);
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
                  this->fcb_set_release_fnt(my_fcb, &release_fnt);
 #endif
              } else { //TODO set early drop?
@@ -356,7 +356,7 @@ public :
         if (Derived::timeout > 0) {
             this->fcb_release_timeout();
         }
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
         this->fcb_remove_release_fnt(my_fcb_data(), &release_fnt);
 #endif
         my_fcb_data()->seen = false;
