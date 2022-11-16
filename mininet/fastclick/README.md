@@ -7,7 +7,7 @@ Then, run `vagrant ssh` to jump into the VM.
 Then, simply run the Mininet topology with:
 
 ```
-sudo mn -c ; cd /vagrant && sudo python EXAMPLE/topology.py
+sudo mn -c ; cd /vagrant && sudo python2 EXAMPLE/topology.py
 ```
 
 EXAMPLE is one of the folder in this repository:

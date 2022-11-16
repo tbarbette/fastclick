@@ -5,10 +5,10 @@ click-buildtool provides flow ctx
 Simple session factorization
 
 %script
-click CONF
+click --simtime CONF
 
 %file CONF
-    fcA :: CTXManager(VERBOSE 3, VERBOSE_FCB 0)
+    fcA :: CTXManager(VERBOSE 3, VERBOSE_FCB 0, CLEAN_TIMER 1)
     -> CTXDispatcher(0/08)
     -> CTXDispatcher(0/08)
     -> Print(PASSED) -> Discard;

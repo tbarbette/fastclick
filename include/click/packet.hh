@@ -1772,7 +1772,7 @@ Packet::make(struct rte_mbuf *mb, bool clear)
 inline void
 Packet::kill()
 {
-	#if CLICK_LINUXMODULE
+#if CLICK_LINUXMODULE
 		struct sk_buff *b = skb();
 		b->next = b->prev = 0;
 		# if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 15)
@@ -1780,24 +1780,32 @@ Packet::kill()
 		# endif
 		skbmgr_recycle_skbs(b);
     #elif CLICK_PACKET_USE_DPDK
-#if HAVE_FLOW_DYNAMIC
+        # if HAVE_FLOW_DYNAMIC
         if (fcb_stack) {
             fcb_stack->release(1);
         }
-#endif
+        # endif
 		//Dpdk takes care of indirect and related things
 		rte_pktmbuf_free(mb());
 	#elif HAVE_CLICK_PACKET_POOL && !defined(CLICK_FORCE_EXPENSIVE)
-#ifndef CLICK_NOINDIRECT
+        # ifndef CLICK_NOINDIRECT
 		if (_use_count.dec_and_test())
-#endif
+        # endif
         {
 			WritablePacket::recycle(static_cast<WritablePacket *>(this));
 		}
 	#else
+        # if HAVE_FLOW_DYNAMIC
+        if (fcb_stack) {
+                fcb_stack->release(1);
+        }
+        # endif
+        SFCB_STACK(
         if (_use_count.dec_and_test()) {
+
             delete this;
         }
+        )
     #endif
 }
 
@@ -1819,25 +1827,34 @@ Packet::kill_nonatomic()
     # endif
         skbmgr_recycle_skbs(b);
 #elif CLICK_PACKET_USE_DPDK
-#if HAVE_FLOW_DYNAMIC
+# if HAVE_FLOW_DYNAMIC
         if (fcb_stack) {
             fcb_stack->release(1);
         }
-#endif
+# endif
         rte_pktmbuf_free(mb());
 #elif HAVE_CLICK_PACKET_POOL
 
-#ifndef CLICK_NOINDIRECT
+# ifndef CLICK_NOINDIRECT
         if (_use_count.nonatomic_dec_and_test())
-#endif
+# endif
         {
             WritablePacket::recycle(static_cast<WritablePacket *>(this));
 
         }
 #else
+# if HAVE_FLOW_DYNAMIC
+        if (fcb_stack) {
+
+                click_chatter("Release ksn");
+            fcb_stack->release(1);
+        }
+# endif
+        SFCB_STACK(
         if (_use_count.nonatomic_dec_and_test()) {
             delete this;
         }
+        )
 #endif
 }
 
