@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ main ]
 env:
-    CXXFLAGS: -std=gnu++11
+    CXXFLAGS: -std=gnu++17
     FLAGS: --enable-all-elements --disable-verbose-batch --enable-simtime
 
     #Until we find a solution for the world-writable /home/runner in GitHub Actions...
@@ -20,7 +20,7 @@ jobs:
     strategy:
         matrix:
             COMPILER: [gcc, clang]
-            FRAMEWORK: [vanilla, dpdk, dpdk-light, netmap, vanilla-nopool]
+            FRAMEWORK: [vanilla, dpdk, dpdk-light, netmap, vanilla-nopool, dpdk-flow-dynamic]
 
     steps:
     - uses: actions/checkout@v2
@@ -28,12 +28,14 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: 3.7
+    - name:
+      run: ${{matrix.COMPILER}} -v
     - name: Install pip
       run: |
           python -m pip install --upgrade pip
     - name: framework
       run: |
-          if [ "${{matrix.FRAMEWORK}}" = "dpdk" -o "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then
+          if [ "${{matrix.FRAMEWORK}}" = "dpdk" -o "${{matrix.FRAMEWORK}}" = "dpdk-light" -o "${{matrix.FRAMEWORK}}" = "dpdk-flow-dynamic" ] ; then
             echo "Compiling DPDK..." ;
             export STABLE=
             export VERSION=20.11
@@ -55,6 +57,9 @@ jobs:
 
             if [ "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then
                 FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --enable-dpdk-packet --disable-clone --disable-task-stats --disable-cpu-load --disable-dpdk-softqueue"
+            fi
+            if [ "${{matrix.FRAMEWORK}}" = "dpdk-flow-dynamic" ] ; then
+                FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --enable-flow-dynamic"
             fi
             if [ "${{matrix.FRAMEWORK}}" = "netmap" ] ; then
                 if [ ! -e "netmap-13.0" ] ; then

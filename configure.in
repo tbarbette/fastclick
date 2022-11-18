@@ -223,6 +223,12 @@ AC_CHECK_HEADERS([bpf/bpf.h], [ac_have_libbpf_h=yes], [ac_have_libbpf_h=no])
 if test "x$ac_have_libbpf$ac_have_libbpf_h$enable_bpf" = "xyesyesyes"; then
     AC_DEFINE([HAVE_BPF])
     have_libbpf=yes
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <bpf/bpf.h>
+    enum bpf_stats_type test;
+]], [[]])], ac_cv_bpf_has_bpf_stats_type=yes, ac_cv_bpf_has_bpf_stats_type=no)
+    if test "x$ac_cv_bpf_has_bpf_stats_type" = "xyes"; then
+        AC_DEFINE([HAVE_BPF_STATS_TYPE])
+    fi
 else
     have_libbpf=no
     enable_bpf=no
@@ -832,6 +838,8 @@ CLICK_CHECK_SIGNED_SHIFT
 CLICK_CHECK_ADDRESSABLE_VA_LIST
 CLICK_CHECK_COMPILER_INTRINSICS
 
+AX_CXX_COMPILE_STDCXX(17,[],optional)
+
 
 dnl
 dnl timestamps
@@ -931,8 +939,8 @@ if test "x$enable_flow_atomic" = xyes; then
 fi
 
 AC_ARG_ENABLE([flow-dynamic],
-    [AS_HELP_STRING([  --disable-flow-dynamic], [use reference counting to automatically acquire and relealse flow control blocks])],
-    [:], [enable_flow_dynamic=yes])
+    [AS_HELP_STRING([  --enable-flow-dynamic], [enable dynamic reference counting to automatically acquire and relealse flow control blocksic flow system])],
+    [:], [enable_flow_dynamic=no])
 if test "x$enable_flow$enable_flow_dynamic" = xyesyes; then
     AC_DEFINE(HAVE_FLOW_DYNAMIC)
 fi
@@ -1657,6 +1665,7 @@ if test "x$enable_dpdk" != "xno"; then
 
 
     if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
+      dpdk_sys="meson"
       AC_SUBST(RTE_USE_PKGCONFIG, 1)
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
@@ -1673,6 +1682,7 @@ if test "x$enable_dpdk" != "xno"; then
 	  DPDK_CFLAGS=$(pkg-config --cflags libdpdk)
       AC_MSG_RESULT([yes])
     else
+      dpdk_sys="make"
       AC_SUBST(RTE_USE_PKGCONFIG, 0)
       RTE_INCLUDE=${RTE_SDK_BIN}/include/
       RTE_LIB="$RTE_SDK_BIN/lib"
@@ -1731,8 +1741,8 @@ version (dpdk-dev or dpdk-devel).
       AC_DEFINE([HAVE_DPDK_READ_CLOCK])
     else
       AC_MSG_RESULT([no])
-    fi
-
+    fi    
+   
     AC_MSG_CHECKING([whether DPDK has rte_flow_update])
     if ${READELF} -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_flow_update &> /dev/null; then
       AC_MSG_RESULT([yes])
@@ -1740,8 +1750,6 @@ version (dpdk-dev or dpdk-devel).
     else
       AC_MSG_RESULT([no])
     fi
-
-
 
 fi
 
@@ -2652,6 +2660,11 @@ else
     enable_batch="no"
 fi
 
+dnl add 'cxx17' if compiled a C++17 compiler
+if test "x$ax_cv_cxx_compile_cxx17" = xyes; then
+    provisions="$provisions cxx17"
+fi
+
 dnl add 'dpdk' if compiled with --enable-dpdk
 if test "x$enable_dpdk" != "xno"; then
     provisions="$provisions dpdk"
@@ -2686,6 +2699,9 @@ fi
 dnl add 'flow' if compiled with --enable-flow
 if test "x$enable_flow" = xyes; then
     provisions="$provisions flow"
+    if test "x$enable_flow_dynamic" = xyes; then
+        provisions="$provisions flow-dynamic"
+    fi
 else
     enable_flow="no"
 fi
@@ -2871,6 +2887,8 @@ if test "x$enable_dpdk" != "xno"; then
     dpdk_info="${enable_dpdk}
     DPDK    Target:              ${RTE_TARGET}
     DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}
+    DPDK      Path:              ${RTE_SDK}
+    DPDK     build:              ${dpdk_sys}
     DPDK  Location:              ${RTE_LIB}"
 else
     dpdk_info=${enable_dpdk}

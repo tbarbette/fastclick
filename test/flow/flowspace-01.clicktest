@@ -17,6 +17,7 @@ $VALGRIND click -e "
 "
 
 %expect stderr
+WARNING: This element does not support timeout ! Flows will stay indefinitely in memory...
 Placing  par/t1 :: TestFlowSpace at [2-5]
 Placing  par/t3 :: TestFlowSpace at [2-5]
 Placing  par/t2 :: TestFlowSpace at [6-9]

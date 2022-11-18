@@ -47,6 +47,8 @@ FlowIPManagerHMP::configure(Vector<String> &conf, ErrorHandler *errh)
 
     find_children(_verbose);
 
+    click_chatter("WARNING: This element does not support timeout ! Flows will stay indefinitely in memory...");
+
     router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
 
     _fcb_builded_init_future.post(this);
@@ -103,8 +105,12 @@ void FlowIPManagerHMP::process(Packet* p, BatchBuilder& b)
     } else {
         PacketBatch* batch;
         batch = b.finish();
-        if (batch)
+        if (batch) {
+#if HAVE_FLOW_DYNAMIC
+            fcb_acquire(batch->count());        
+#endif
             output_push_batch(0, batch);
+        }
         fcb_stack = (FlowControlBlock*)((unsigned char*)fcbs + _flow_state_size_full * ret);
         b.init();
         b.append(p);
@@ -125,8 +131,41 @@ void FlowIPManagerHMP::push_batch(int, PacketBatch* batch)
     }
 
     batch = b.finish();
-    if (batch)
+    if (batch) {
+#if HAVE_FLOW_DYNAMIC
+            fcb_acquire(batch->count());        
+#endif
         output_push_batch(0, batch);
+    }
+}
+
+enum {
+    h_count,
+    h_capacity,
+    h_total_capacity
+};
+
+String
+FlowIPManagerHMP::read_handler(Element *e, void *thunk) {
+    FlowIPManagerHMP *f = static_cast<FlowIPManagerHMP *>(e);
+
+    intptr_t cnt = (intptr_t)thunk;
+    switch (cnt) {
+    /*case h_count: the HashTableMP has no counter
+        return String(f->_hash.count());*/
+    case h_capacity:
+        return String(f->_table_size);
+    case h_total_capacity:
+        return String(f->_table_size);
+    default:
+        return "<error>";
+    }
+}
+
+void FlowIPManagerHMP::add_handlers() {
+    add_read_handler("count", read_handler, h_count);
+    add_read_handler("capacity", read_handler, h_capacity);
+    add_read_handler("total_capacity", read_handler, h_total_capacity);
 }
 
 CLICK_ENDDECLS

@@ -16,6 +16,7 @@ struct rte_hash;
 
 
 /**
+ * =c
  * FlowIPManager(CAPACITY [, RESERVE])
  *
  * =s flow

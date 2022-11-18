@@ -116,6 +116,7 @@ class Bitvector {
   but Bit operations actually index into individual bits in some shared word. */
 class Bitvector::Bit { public:
 
+    inline Bit( const Bit & ) = default; 
     inline Bit(Bitvector::word_type &w, int bit_offset);
 
     inline operator bool() const;

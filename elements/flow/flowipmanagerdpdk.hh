@@ -1,5 +1,5 @@
-#ifndef CLICK_FLOWIPMANAGERIMP_HH
-#define CLICK_FLOWIPMANAGERIMP_HH
+#ifndef CLICK_FLOWIPMANAGERDPDK_HH
+#define CLICK_FLOWIPMANAGERDPDK_HH
 #include <click/config.h>
 #include <click/string.hh>
 #include <click/timer.hh>
@@ -7,7 +7,7 @@
 #include <click/multithread.hh>
 #include <click/pair.hh>
 #include <click/flow/common.hh>
-#include <click/flow/flowelement.hh>
+#include <click/flow/virtualflowmanager.hh>
 #include <click/batchbuilder.hh>
 #include <click/timerwheel.hh>
 
@@ -16,8 +16,13 @@ CLICK_DECLS
 class DPDKDevice;
 struct rte_hash;
 
+class FlowIPManager_DPDKState: public FlowManagerIMPStateNoFID { public:
+    void *hash = 0;
+} CLICK_ALIGNED(CLICK_CACHE_LINE_SIZE);
+
 /**
- * FlowIPManagerIMP(CAPACITY [, RESERVE])
+ * =c
+ * FlowIPManager_DPDK(CAPACITY [, RESERVE])
  *
  * =s flow
  *  FCB packet classifier - cuckoo per-thread
@@ -34,28 +39,23 @@ struct rte_hash;
  * =a FlowIPManger
  *
  */
-class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
+class FlowIPManager_DPDK: public VirtualFlowManagerIMP<FlowIPManager_DPDK, FlowIPManager_DPDKState>
+{
     public:
-        FlowIPManagerIMP() CLICK_COLD;
-        ~FlowIPManagerIMP() CLICK_COLD;
+        FlowIPManager_DPDK() CLICK_COLD;
+        ~FlowIPManager_DPDK() CLICK_COLD;
 
-        const char *class_name() const override { return "FlowIPManagerIMP"; }
+        const char *class_name() const override { return "FlowIPManager_DPDK"; }
         const char *port_count() const override { return "1/1"; }
 
         const char *processing() const override { return PUSH; }
         int configure_phase() const override { return CONFIGURE_PHASE_PRIVILEGED + 1; }
 
         int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
-        int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
         void cleanup(CleanupStage stage) override CLICK_COLD;
 
-        void push_batch(int, PacketBatch* batch) override;
-        void run_timer(Timer*) override;
-        bool run_task(Task* t) override;
-
-        void add_handlers() override CLICK_COLD;
-
     protected:
+    /*
         volatile int owner;
         Packet* queue;
 
@@ -78,17 +78,19 @@ class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
         int _timeout;
         Timer _timer; //Timer to launch the wheel
         Task _task;
-        bool _cache;
+        bool _cache;*/
 
-        static String read_handler(Element* e, void* thunk);
-        inline void process(Packet* p, BatchBuilder& b, const Timestamp& recent);
-        TimerWheel<FlowControlBlock> _timer_wheel;
-};
+    //Implemented for VirtualFlowManagerIMP. It is using CRTP so no override.
+    inline int alloc(FlowIPManager_DPDKState& table, int core, ErrorHandler* errh);
+	inline int find(IPFlow5ID &f);
+	inline int insert(IPFlow5ID &f, int);
+    inline int remove(IPFlow5ID &f);
+    inline int count();
 
-const auto fim_setter = [](FlowControlBlock* prev, FlowControlBlock* next)
-{
-    *((FlowControlBlock**)&prev->data_32[2]) = next;
+    friend class VirtualFlowManagerIMP;
 };
 
 CLICK_ENDDECLS
+
 #endif
+

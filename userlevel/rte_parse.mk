@@ -19,6 +19,7 @@ ${PARSE_PATH}.sentinel:
 	cp -u $(RTE_SDK)/app/test-pmd/config.c $(PARSE_PATH)
 	# Strip the main function off to prevent complilation errors, while linking with Click
 	sed -i '/main(int/Q' $(PARSE_PATH)/testpmd.c
+	sed -i 's/const uint32_t *template/const uint32_t */' $(PARSE_PATH)/testpmd.h
 	sed -i 's/rte_os_shim/rte_os/' $(PARSE_PATH)/testpmd.h
 	head -n -1 $(PARSE_PATH)/testpmd.c > $(PARSE_PATH)/testpmd_t.c;
 	mv $(PARSE_PATH)/testpmd_t.c $(PARSE_PATH)/testpmd.c

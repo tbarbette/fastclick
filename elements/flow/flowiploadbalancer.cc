@@ -27,7 +27,7 @@
 
 CLICK_DECLS
 
-FlowIPLoadBalancer::FlowIPLoadBalancer() : _accept_nonsyn(true)
+FlowIPLoadBalancer::FlowIPLoadBalancer() : _accept_nonsyn(true), _verbose(0)
 {
 }
 
@@ -41,6 +41,8 @@ FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(this, errh).bind(conf)
                .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
                .read_mp("VIP", _vip)
+	       .read("VERBOSE", _verbose)
+	       .read("NONSYN", _accept_nonsyn)
                .consume() < 0)
 		return -1;
 
@@ -64,7 +66,8 @@ int FlowIPLoadBalancer::initialize(ErrorHandler *errh)
 bool FlowIPLoadBalancer::new_flow(IPLBEntry* flowdata, Packet* p)
 {
     if (isTCP(p) && !isSyn(p)) {
-        nat_info_chatter("Non syn establishment!");
+	if(unlikely(_verbose))
+	    click_chatter("Non syn establishment!");
         if (!_accept_nonsyn)
             return false;
     }
@@ -72,7 +75,8 @@ bool FlowIPLoadBalancer::new_flow(IPLBEntry* flowdata, Packet* p)
 
     flowdata->chosen_server = server;
 
-    nat_debug_chatter("New flow %d",server);
+    if(unlikely(_verbose))
+	click_chatter("New flow %d",server);
 
     return true;
 }
@@ -85,7 +89,9 @@ void FlowIPLoadBalancer::push_flow(int, IPLBEntry* flowdata, PacketBatch* batch)
         WritablePacket* q =p->uniqueify();
         p = q;
 
-        nat_debug_chatter("Packet for flow %d", b);
+        if(unlikely(_verbose)) {
+            click_chatter("Packet for flow %d", b);
+        }
         IPAddress srv = _dsts[b];
 
         q->ip_header()->ip_dst = srv;

@@ -1297,7 +1297,7 @@ FlowNode* FlowNode::optimize(Bitvector threads) {
 	    newnode->_level = thread;
 	    newnode->_parent = parent();
 	    newnode->default_ptr()->ptr = 0; //BUG if an unexpected thread classify, this is expected
-	    for (int i = 0; i < click_max_cpu_ids(); i++) {
+	    for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
 		 Bitvector tb(threads.size(), false);
 		 tb[i] = true;
 		 FlowNode* newNode = this->duplicate(true,1,true)->optimize(tb);

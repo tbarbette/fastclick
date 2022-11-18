@@ -61,12 +61,14 @@ CLICK_DECLS
         uint32_t tail;
 
 
-        void pool_transfer(unsigned int thread_from, unsigned int thread_to) {
-
+        inline void pool_transfer(unsigned int thread_from, unsigned int thread_to) {
+            (void)thread_from;
+            (void)thread_to;
         }
 
         inline void hint(unsigned int num, unsigned int thread_id) {
-
+            (void)num;
+            (void)thread_id;
         }
 
 
@@ -375,12 +377,14 @@ public:
     }
 
 
-    void pool_transfer(unsigned int thread_from, unsigned int thread_to) {
-
+    inline void pool_transfer(unsigned int thread_from, unsigned int thread_to) {
+        (void)thread_from;
+        (void)thread_to;
     }
 
     inline void hint(unsigned int num, unsigned int thread_id) {
-
+        (void)num;
+        (void)thread_id;
     }
 };
 

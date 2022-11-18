@@ -53,7 +53,7 @@ BatchStats::cast(const char *name)
 
 
 int
-BatchStats::initialize(ErrorHandler *errh)
+BatchStats::initialize(ErrorHandler *)
 {
     return 0;
 }

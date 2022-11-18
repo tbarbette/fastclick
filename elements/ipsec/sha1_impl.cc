@@ -57,6 +57,13 @@
  */
 #include <click/config.h>
 #include "sha1_impl.hh"
+
+#if __cplusplus >= 201103L 
+#define REGISTER_KEYWORD 
+#else
+#define REGISTER_KEYWORD register
+#endif
+
 CLICK_DECLS
 
 
@@ -253,10 +260,10 @@ const char SHA1_version[] = "SHA1 part of SSLeay 0.8.2b 08-Jan-1998";
 
 #ifndef NOPROTO
 #  ifdef SHA1_ASM
-void sha1_block_x86 (SHA1_ctx * c, register unsigned long *p, int num);
+void sha1_block_x86 (SHA1_ctx * c, REGISTER_KEYWORD unsigned long *p, int num);
 #    define sha1_block sha1_block_x86
 #  else
-void sha1_block (SHA1_ctx * c, register unsigned long *p, int num);
+void sha1_block (SHA1_ctx * c, REGISTER_KEYWORD unsigned long *p, int num);
 #  endif
 #else
 #  ifdef SHA1_ASM
@@ -295,9 +302,9 @@ SHA1_init (SHA1_ctx * c)
 }
 
 void
-SHA1_update (SHA1_ctx * c, register unsigned char *data, unsigned long len)
+SHA1_update (SHA1_ctx * c, REGISTER_KEYWORD unsigned char *data, unsigned long len)
 {
-  register ULONG *p;
+  REGISTER_KEYWORD ULONG *p;
   int ew, ec, sw, sc;
   ULONG l;
 
@@ -479,9 +486,9 @@ SHA1_transform (SHA1_ctx *c, unsigned char *b)
 #ifndef SHA1_ASM
 
 void
-sha1_block (SHA1_ctx *c, register unsigned long *W, int num)
+sha1_block (SHA1_ctx *c, REGISTER_KEYWORD unsigned long *W, int num)
 {
-  register ULONG A, B, C, D, E, T;
+  REGISTER_KEYWORD ULONG A, B, C, D, E, T;
   ULONG X[16];
 
   A = c->h0;
@@ -600,9 +607,9 @@ sha1_block (SHA1_ctx *c, register unsigned long *W, int num)
 void
 SHA1_final (unsigned char *md, SHA1_ctx *c)
 {
-  register int i, j;
-  register ULONG l;
-  register ULONG *p;
+  REGISTER_KEYWORD int i, j;
+  REGISTER_KEYWORD ULONG l;
+  REGISTER_KEYWORD ULONG *p;
   static unsigned char end[4] = { 0x80, 0x00, 0x00, 0x00 };
   unsigned char *cp = end;
 

@@ -1,7 +1,7 @@
 #ifndef CLICK_BPF_H
 #define CLICK_BPF_H
 
-#ifndef bpf_stats_type
+#ifndef HAVE_BPF_STATS_TYPE
     enum bpf_stats_type {
             /* enabled run_time_ns and run_cnt */
             BPF_STATS_RUN_TIME = 0,

@@ -58,7 +58,11 @@ CLICK_DECLS
 
 SimpleTCPReorder(FLOWDIRECTION [, MERGESORT])
 
-=s middlebox
+=s ctx
+
+Reorders TCP packets for the ctx subsystem
+
+=d 
 
 reorders TCP packets. This element is deprecated, the functionality has
 been merged in TCPIn. Still, it is interesting to see how to make
@@ -69,8 +73,6 @@ a RST is not propagated to the other side. Meaning that if a connection
 is reused after a RST, the other side will see packets out of order.
 Proper implementation needs a "dual" state, something only accessible after
 TCPIn
-
-=d
 
 This element reorders TCP packets before sending them on its first output. It can be used outside
 of the stack of the middlebox. The second output is optional and is used to push retransmitted

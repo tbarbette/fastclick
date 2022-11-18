@@ -34,7 +34,7 @@ claiming that 18.26.4.99's ethernet address is 00-A0-C9-9C-FD-9C.
 ARPAdvertiser is useful for ARP proxies.
 Normally, you should use ARPResponder rather than ARPAdvertiser.
 
-=back
+=over 8
 
 =h table read-only
 
@@ -55,6 +55,8 @@ Inserts a new entry in the ARP table.
 =h delete write-only
 
 Deletes an entry from the ARP table.
+
+=back
 
 =a
 ARPFaker, ARPQuerier, ARPResponder

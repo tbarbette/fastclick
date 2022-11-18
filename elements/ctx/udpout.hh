@@ -11,7 +11,7 @@ CLICK_DECLS
 
 UDPOut()
 
-=s middlebox
+=s ctx
 
 entry point of an IP path in the stack of the middlebox
 

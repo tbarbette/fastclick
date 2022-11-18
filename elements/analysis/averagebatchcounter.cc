@@ -56,7 +56,7 @@ AverageBatchCounter::initialize(ErrorHandler *errh)
     // Uses an upstream AggregateLength to get frame length
     if (_frame_len_stats) {
         ElementCastTracker filter(router(), "AggregateLength");
-        int found = router()->visit_upstream(this, 0, &filter);
+        router()->visit_upstream(this, 0, &filter);
         if (filter.elements().size() == 0) {
             errh->error("Could not find upstream AggregateLength element: LENGTH_STATS not available");
             _frame_len_stats = false;

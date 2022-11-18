@@ -80,7 +80,7 @@ CounterFile::initialize(ErrorHandler *errh)
 }
 
 void
-CounterFile::cleanup()
+CounterFile::cleanup(CleanupStage)
 {
     void *mmap_data = static_cast<void *>(_mmapped_stats);
 

@@ -1,5 +1,5 @@
 %require
-click-buildtool provides flow ctx TCPReflector
+click-buildtool provides flow flow-dynamic ctx TCPReflector
 
 %script
 click CONFIG --simtime
@@ -113,8 +113,8 @@ Table of CTXManager@3 after optimization :
 |  |  16/FFFFFFFF (HASH-2053, 0 children, dynamic)
 |  |  |-> DEFAULT
 |  |  |  20/FFFFFFFF (HASH-2053, 0 children, dynamic)
-|  |  |  |-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000000000000000000000000000000000000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff00000000000000000000000000000000000000000000)
+|  |  |  |-> DEFAULT 4294967295 UC:{{0|1}} ED:0 (data ffffffff0000000000000000000000000000000000000000000000000000)
+|-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff00000000000000000000000000000000000000000000)
 ---
 IN:   40 | 45000028 00000000 64062a45 121a042c 121a042c 08ae0016 000003e8 00000000 50020000 76ab0000
 RX: 1.000000: 18.26.4.44.2222 > 18.26.4.44.22: S 1000:1001(1,40,40) win 0

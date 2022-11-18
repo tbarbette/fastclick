@@ -34,6 +34,12 @@
 #include <click/packet_anno.hh>
 #include "sadatatuple.hh"
 
+#if __cplusplus >= 201103L 
+#define REGISTER_KEYWORD 
+#else
+#define REGISTER_KEYWORD register
+#endif
+
 CLICK_DECLS
 
 Des::Des()
@@ -453,9 +459,9 @@ void
 Des::des_encrypt(unsigned long *input,unsigned long *output,
 		 des_key_schedule ks,int encrypt)
 {
-  register unsigned long l,r,t,u;
-  register int i;
-  register unsigned long *s;
+  REGISTER_KEYWORD unsigned long l,r,t,u;
+  REGISTER_KEYWORD int i;
+  REGISTER_KEYWORD unsigned long *s;
 
   l=input[0];
   r=input[1];
@@ -527,8 +533,8 @@ int
 Des::des_ecb_encrypt(des_cblock *input,des_cblock *output,
 		     des_key_schedule ks, int encrypt)
 	{
-	register unsigned long l0,l1;
-	register unsigned char *in,*out;
+	REGISTER_KEYWORD unsigned long l0,l1;
+	REGISTER_KEYWORD unsigned char *in,*out;
 	unsigned long ll[2];
 
 	in=(unsigned char *)input;
@@ -550,10 +556,10 @@ Des::des_ecb_encrypt(des_cblock *input,des_cblock *output,
 void
 Des::des_set_key(des_cblock *key,des_key_schedule schedule)
 	{
-	register unsigned long c,d,t,s;
-	register unsigned char *in;
-	register unsigned long *k;
-	register int i;
+	REGISTER_KEYWORD unsigned long c,d,t,s;
+	REGISTER_KEYWORD unsigned char *in;
+	REGISTER_KEYWORD unsigned long *k;
+	REGISTER_KEYWORD int i;
 
 	k=(unsigned long *)schedule;
 	in=(unsigned char *)key;

@@ -1,5 +1,5 @@
 /*
- * FlowIPManagerSpinlock.{cc,hh} - SpinLock-protected version of FlowIPManger
+ * flowipmanager.{cc,hh} - Flow classification for the flow subsystem
  *
  * Copyright (c) 2019-2020 Tom Barbette, KTH Royal Institute of Technology
  *
@@ -20,49 +20,61 @@
 #include <click/ipflowid.hh>
 #include <click/routervisitor.hh>
 #include <click/error.hh>
-#include "flowipmanagerspinlock.hh"
+#include "flowipmanager.hh"
 #include <rte_hash.h>
 #include <click/dpdk_glue.hh>
 #include <rte_ethdev.h>
 
 CLICK_DECLS
 
-Spinlock FlowIPManagerSpinlock::hash_table_lock;
-
-FlowIPManagerSpinlock::FlowIPManagerSpinlock() : _verbose(1), _flags(0), _timer(this), _task(this), Router::InitFuture(this)
+FlowIPManager::FlowIPManager() : _verbose(1), _flags(0), _timer(this), _task(this), _cache(true), Router::InitFuture(this)
 {
 }
 
-FlowIPManagerSpinlock::~FlowIPManagerSpinlock()
+FlowIPManager::~FlowIPManager()
 {
 }
 
 int
-FlowIPManagerSpinlock::configure(Vector<String> &conf, ErrorHandler *errh)
+FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    bool lf = false;
+
     if (Args(conf, this, errh)
         .read_or_set_p("CAPACITY", _table_size, 65536)
         .read_or_set("RESERVE", _reserve, 0)
         .read_or_set("TIMEOUT", _timeout, 60)
+#if RTE_VERSION > RTE_VERSION_NUM(18,8,0,0)
+        .read_or_set("LF", lf, false)
+#endif
+        .read_or_set("CACHE", _cache, true)
+        .read_or_set("VERBOSE", _verbose, 1)
         .complete() < 0)
         return -1;
+
+    find_children(_verbose);
+
+    router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
+    _fcb_builded_init_future.post(this);
 
     if (!is_pow2(_table_size)) {
         _table_size = next_pow2(_table_size);
         click_chatter("Real capacity will be %d",_table_size);
     }
 
-    find_children(_verbose);
+#if RTE_VERSION > RTE_VERSION_NUM(18,8,0,0)
+    if (lf) {
+        _flags &= ~RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY;
+        _flags |= RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY_LF | RTE_HASH_EXTRA_FLAGS_MULTI_WRITER_ADD;
+    }
+#endif
 
-    router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
-
-    _fcb_builded_init_future.post(this);
+    _reserve += sizeof(IPFlow5ID)  + sizeof(FlowControlBlock);
 
     return 0;
 }
 
-
-int FlowIPManagerSpinlock::solve_initialize(ErrorHandler *errh)
+int FlowIPManager::solve_initialize(ErrorHandler *errh)
 {
     struct rte_hash_parameters hash_params = {0};
     char buf[32];
@@ -72,10 +84,12 @@ int FlowIPManagerSpinlock::solve_initialize(ErrorHandler *errh)
     hash_params.hash_func = ipv4_hash_crc;
     hash_params.hash_func_init_val = 0;
     hash_params.extra_flag = _flags;
-    FlowIPManagerSpinlock::hash_table_lock = Spinlock();
 
-    _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
+    assert(_reserve >=  sizeof(IPFlow5ID) + sizeof(FlowControlBlock));
+    _flow_state_size_full = _reserve;
 
+    if (_verbose)
+     errh->message("Per-flow size is %d", _reserve);
     sprintf(buf, "%s", name().c_str());
     hash = rte_hash_create(&hash_params);
     if (!hash)
@@ -88,78 +102,90 @@ int FlowIPManagerSpinlock::solve_initialize(ErrorHandler *errh)
         return errh->error("Could not init data table !");
 
     if (_timeout > 0) {
-        _timer_wheel.initialize(_timeout);
+        if (_flags) {
+            errh->warning("This element uses a timer wheel that will use a global lock. Consider using FlowIPManager_CuckooPP instead which uses per-thread timer wheels.");
+        }
+        _timer_wheel.initialize(_timeout + 1);
+
+        _timer.initialize(this);
+        _timer.schedule_after(Timestamp::make_sec(1));
+        _task.initialize(this, false);
+
     }
 
-    _timer.initialize(this);
-    _timer.schedule_after(Timestamp::make_sec(1));
-    _task.initialize(this, false);
     return Router::InitFuture::solve_initialize(errh);
 }
 
-const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next)
+
+static inline FlowControlBlock** fcb_next_ptr(FlowControlBlock* fcb) {
+    return (FlowControlBlock**)(((unsigned char*)&fcb->data_32) + sizeof(IPFlow5ID));
+}
+
+static const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next)
 {
-    *((FlowControlBlock**)&prev->data_32[2]) = next;
+    *fcb_next_ptr(prev) = next;
 };
 
-bool FlowIPManagerSpinlock::run_task(Task* t)
+bool FlowIPManager::run_task(Task* t)
 {
     Timestamp recent = Timestamp::recent_steady();
     _timer_wheel.run_timers([this,recent](FlowControlBlock* prev) -> FlowControlBlock*{
-        FlowControlBlock* next = *((FlowControlBlock**)&prev->data_32[2]);
+        FlowControlBlock* next = *fcb_next_ptr(prev);
         int old = (recent - prev->lastseen).sec();
-        if (old > _timeout) {
-            // click_chatter("Release %p as it is expired since %d", prev, old);
-            // expire
-            FlowIPManagerSpinlock::hash_table_lock.acquire();
-            rte_hash_free_key_with_position(hash, prev->data_32[0]);
-            FlowIPManagerSpinlock::hash_table_lock.release();
+        if (old >= _timeout) {
+            if (unlikely(_verbose > 1))
+                click_chatter("Release %p as it is expired since %d", prev, old);
+            //expire
+            rte_hash_del_key(hash, (IPFlow5ID*)&prev->data_32[0]);
         } else {
-            // click_chatter("Cascade %p", prev);
-            // No need for lock as we'll be the only one to enqueue there
-            _timer_wheel.schedule_after(prev, _timeout - (recent - prev->lastseen).sec(),setter);
+            //No need for lock as we'll be the only one to enqueue there
+            int delta = (recent - prev->lastseen).sec();
+            _timer_wheel.schedule_after(prev, _timeout - delta,setter);
         }
         return next;
     });
     return true;
 }
 
-void FlowIPManagerSpinlock::run_timer(Timer* t)
+void FlowIPManager::run_timer(Timer* t)
 {
     _task.reschedule();
     t->reschedule_after(Timestamp::make_sec(1));
 }
 
-void FlowIPManagerSpinlock::cleanup(CleanupStage stage)
+void FlowIPManager::cleanup(CleanupStage stage)
 {
     if (hash)
-    {
-        FlowIPManagerSpinlock::hash_table_lock.acquire();
         rte_hash_free(hash);
-        FlowIPManagerSpinlock::hash_table_lock.release();
-    }
 }
 
-void FlowIPManagerSpinlock::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
+void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
 {
     IPFlow5ID fid = IPFlow5ID(p);
+
+    if (_cache && fid == b.last_id) {
+        b.append(p);
+        return;
+    }
+
     rte_hash*& table = hash;
     FlowControlBlock* fcb;
-
-    FlowIPManagerSpinlock::hash_table_lock.acquire();
     int ret = rte_hash_lookup(table, &fid);
 
     if (ret < 0) { // new flow
         ret = rte_hash_add_key(table, &fid);
-        if (ret < 0) {
+        if (unlikely(ret < 0)) {
             if (unlikely(_verbose > 0)) {
                 click_chatter("Cannot add key (have %d items. Error %d)!", rte_hash_count(table), ret);
             }
             p->kill();
             return;
         }
+        if (unlikely(_verbose > 1))
+            click_chatter("New flow %d", ret);
         fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
-        fcb->data_32[0] = ret;
+        //Remember ID for deletion
+        *((IPFlow5ID*)&fcb->data_32[0]) = fid;
         if (_timeout) {
             if (_flags) {
                 _timer_wheel.schedule_after_mp(fcb, _timeout, setter);
@@ -167,11 +193,12 @@ void FlowIPManagerSpinlock::process(Packet* p, BatchBuilder& b, const Timestamp&
                 _timer_wheel.schedule_after(fcb, _timeout, setter);
             }
         }
-    } else {
+    } else { //existing flow
+        if (unlikely(_verbose > 1))
+            click_chatter("Existing flow %d", ret);
         fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
     }
 
-    FlowIPManagerSpinlock::hash_table_lock.release();
     if (b.last == ret) {
         b.append(p);
     } else {
@@ -179,16 +206,24 @@ void FlowIPManagerSpinlock::process(Packet* p, BatchBuilder& b, const Timestamp&
         batch = b.finish();
         if (batch) {
             fcb_stack->lastseen = recent;
+#if HAVE_FLOW_DYNAMIC
+            fcb_acquire(batch->count());
+#endif
             output_push_batch(0, batch);
         }
         fcb_stack = fcb;
         b.init();
         b.append(p);
+        b.last = ret;
+        if (_cache)
+            b.last_id = fid;
+
     }
 }
 
-void FlowIPManagerSpinlock::push_batch(int, PacketBatch* batch)
+void FlowIPManager::push_batch(int, PacketBatch* batch)
 {
+    SFCB_STACK(
     BatchBuilder b;
     Timestamp recent = Timestamp::recent_steady();
     FOR_EACH_PACKET_SAFE(batch, p) {
@@ -197,33 +232,36 @@ void FlowIPManagerSpinlock::push_batch(int, PacketBatch* batch)
 
     batch = b.finish();
     if (batch) {
-    fcb_stack->lastseen = recent;
+        fcb_stack->lastseen = recent;
+#if HAVE_FLOW_DYNAMIC
+        fcb_acquire(batch->count());
+#endif
         output_push_batch(0, batch);
     }
+    );
 }
 
 enum {h_count};
-String FlowIPManagerSpinlock::read_handler(Element* e, void* thunk)
+String FlowIPManager::read_handler(Element* e, void* thunk)
 {
-    FlowIPManagerSpinlock* fc = static_cast<FlowIPManagerSpinlock*>(e);
+    FlowIPManager* fc = static_cast<FlowIPManager*>(e);
 
     rte_hash* table = fc->hash;
     switch ((intptr_t)thunk) {
     case h_count:
-        FlowIPManagerSpinlock::hash_table_lock.acquire();
         return String(rte_hash_count(table));
-        FlowIPManagerSpinlock::hash_table_lock.release();
     default:
         return "<error>";
     }
 };
 
-void FlowIPManagerSpinlock::add_handlers()
+void FlowIPManager::add_handlers()
 {
+    add_read_handler("count", read_handler, h_count);
 }
 
 CLICK_ENDDECLS
 
-ELEMENT_REQUIRES(FlowIPManager)
-EXPORT_ELEMENT(FlowIPManagerSpinlock)
-ELEMENT_MT_SAFE(FlowIPManagerSpinlock)
+ELEMENT_REQUIRES(dpdk dpdk19)
+EXPORT_ELEMENT(FlowIPManager)
+ELEMENT_MT_SAFE(FlowIPManager)

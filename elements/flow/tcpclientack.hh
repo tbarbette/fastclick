@@ -27,7 +27,11 @@ CLICK_DECLS
 
 TCPClientAck()
 
-=s middlebox
+=s ctx
+
+ACKs TCP packet, for the CTX subsystem.
+
+=d
 
 ACKs packets as they are received. It has two outputs, the first one
 let the packet pass through and the second one is used to generate the acks.

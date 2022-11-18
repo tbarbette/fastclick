@@ -9,9 +9,11 @@ CLICK_DECLS
 /*
 =c
 
-NumberPacket()
+NumberPacket() Set an increasing number inside packet
 
-=s
+=s analysis
+
+=d
 
 Set an increasing number inside the payload of each packet
 
