@@ -4,6 +4,7 @@
 
 #include <click/ipflowid.hh>
 #include <algorithm>
+#include <iterator>
 #if HAVE_DPDK
 #include <click/dpdk_glue.hh>
 #endif

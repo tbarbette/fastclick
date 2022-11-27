@@ -3,7 +3,7 @@
 This test checks whether KernelHandlerProxy works.
 
 %require
-[ `whoami` = root ]
+[ `whoami` = root ] && click-buildtool provides linuxmodule
 
 %script
 click-install KERNELCONFIG

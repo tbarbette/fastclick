@@ -40,7 +40,6 @@ $fastclick = <<SCRIPT
   git clone https://github.com/tbarbette/fastclick.git fastclick
   pushd fastclick
   source ~/.profile
-  git checkout fastclick
   ./configure --enable-dpdk --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --enable-cpu-load  --enable-user-timestamp --enable-all-elements
   make -j 4
   sudo make install

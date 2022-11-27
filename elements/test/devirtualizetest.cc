@@ -53,6 +53,8 @@ DevirtualizeTest::initialize(ErrorHandler *errh)
     CHECK(fn.replace_expr("1","_bob", true, true));
     CHECK(!fn.replace_expr("bob","1", true, true));
     CHECK(fn.replace_expr("_bob","bab", true, true));
+    if (fn.body().trim() != "int a = bab + 30;")
+        click_chatter("%s", fn.body().trim().c_str());
     CHECK(fn.body().trim() == "int a = bab + 30;");
 
     
