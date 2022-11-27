@@ -75,6 +75,8 @@ jobs:
               FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --disable-click-pool"
               echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
           fi
+    - name: version
+      run: ${{matrix.COMPILER}} -v
     - name: configure
       run: |
           if [ "${{matrix.COMPILER}}" = "clang" ] ; then export CC=clang; export CXX=clang++; fi
@@ -83,6 +85,6 @@ jobs:
       run: make
     #Simple launch avoids going further if something very bad happens
     - name: simple_launch
-      run: chmod 700 /home/runner ; ./userlevel/click -j 2 -e 'DriverManager(stop);'
+      run: ( chmod 700 /home/runner || exit 0 ) ; ./userlevel/click -j 2 -e 'DriverManager(stop);'
     - name: make check
       run: make check

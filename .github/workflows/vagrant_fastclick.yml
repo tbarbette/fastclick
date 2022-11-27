@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   vagrant-up:
-    runs-on: macos-10.15
+    runs-on: macos-12
 
     steps:
       - uses: actions/checkout@v2
@@ -22,6 +22,24 @@ jobs:
 
       - name: Run vagrant up
         run: cd mininet/fastclick/ && vagrant up
+      - name: Test SSH to machine
+        run: cd mininet/fastclick/ && vagrant ssh -c "echo hello"
+      - name: List fastclick state
+        run: |
+            cd mininet/fastclick/
+            vagrant ssh -c "ls /home/vagrant/fastclick"
+            vagrant ssh -c "ls /home/vagrant/fastclick/bin"
+            vagrant ssh -c "ls -al /home/vagrant/fastclick/bin"
+            vagrant ssh -c "file /home/vagrant/fastclick/userlevel/click"
+      - name: Click hello world
+        run: cd mininet/fastclick/ && vagrant ssh -c "cd /home/vagrant/fastclick ; ./userlevel/click -e 'DriverManager(print $now);' ; exit 0" || exit 0
 
-      - name: ssh into box after boot
-        run: cd mininet/fastclick/ && vagrant ssh -c "echo 'hello world!'"
+      - name: ssh to box and launch mininet
+        run: |
+            cd mininet/fastclick/
+            vagrant ssh -c "sudo mn -c ; cd /vagrant && echo exit | sudo python2 switch/topology.py" 2>&1 | tee test.log
+            ls
+            vagrant ssh -c "ls"
+            vagrant ssh -c "ls /home/vagrant/fastclick/"
+            vagrant ssh -c "cat /home/vagrant/fastclick/click.log"
+            grep "1 packets transmitted, 1 received" test.log

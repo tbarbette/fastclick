@@ -28,3 +28,4 @@ elementclass Input { $label |
 FromDevice($dev1, SNIFFER false) -> Input(FROMH1) -> [0]s[0] -> w0;
 FromDevice($dev2, SNIFFER false) -> Input(FROMH2) -> [1]s[1] -> w1;
 
+DriverManager(wait 15s);

@@ -40,11 +40,16 @@ def simpleTest():
 
 
     print("Waiting for FastClick to set up...")
-    time.sleep(3)
+    time.sleep(5)
 
     client = net.get("h1")
     print("Waiting for everything to set up...")
-    time.sleep(2)
+    time.sleep(5)
+
+    print("Verifying connectivity")
+    client.sendCmd("ping -c 1 10.220.0.10")
+    result = client.waitOutput()
+    print(result)
 
     CLI(net)
     net.stop()
