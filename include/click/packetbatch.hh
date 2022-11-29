@@ -551,6 +551,12 @@ public :
         set_count(first_batch_count);
     }
 
+    inline PacketBatch* split(int first_batch_count) {
+                PacketBatch* second;
+                split(first_batch_count,second, false);
+                return second;
+    }
+
     /**
      * Remove the first packet
      * @return the new batch without front. Do not use "this" afterwards!

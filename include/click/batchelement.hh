@@ -224,12 +224,13 @@ class SimpleBatchElement : public BatchElement { public:
 /**
  * Batch helper element.
  *
- * Allows to make an element that implements only simple_action, and
- * which does not call pull or push batch compatible by making it
- * extend SimpleElement<T> where T is the element itself.
- * It also avoids the virtual call, so actually a vanilla element using
+ * Build an element that implements only simple_action, and
+ * which does not call pull or push. Just extend SimpleElement<T> where T
+ * is the new element itself.
+ * It also avoids the virtual call, so a vanilla element using
  * this version even without batching will run faster.
  *
+ * Downside :
  * The inherited element cannot be extended further because of CRTP !
  */
 template <typename T>
