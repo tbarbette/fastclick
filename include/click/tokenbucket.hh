@@ -483,6 +483,14 @@ class TokenCounterX { public:
 	_time_point = time;
     }
 
+    /** @brief Return the internal time point.
+     * @return time point
+     *
+     * @sa refill */
+    time_point_type time_point() {
+	    return _time_point;
+    }
+
     /** @brief Remove @a t tokens from the counter.
      * @param rate associated token rate
      * @param t number of tokens
@@ -910,6 +918,10 @@ class TokenBucketX { public:
      * @sa refill */
     void set_time_point(time_point_type time) {
 	_bucket.set_time_point(time);
+    }
+
+    time_point_type time_point() {
+	return _bucket.time_point();
     }
 
     /** @brief Remove @a t tokens from the bucket.

@@ -272,10 +272,25 @@ public :
     }
 
     void push_batch(int port, PacketBatch* head) final {
-        push_flow(port, fcb_data(), head);
+            push_flow(port, fcb_data(), head);
     };
 
     virtual void push_flow(int port, T* flowdata, PacketBatch* head) = 0;
+};
+
+class DefaultChecker { public:
+    struct str  {
+        bool seen;
+    };
+    static inline bool seen(void*, str* s) {
+        return s->seen;;
+    }
+    static inline void mark_seen(void*, str* s) {
+        s->seen = true;
+    }
+    static inline void release(void*, str* s) {
+        s->seen = false;
+    }
 };
 
 /**
@@ -289,14 +304,14 @@ public :
  *
  * close_flow() can be called to release the flow now, remove timer etc It will not call your release_flow(); automatically, do it before. A packet coming for the same flow after close_flow() is called will be considered from a new flow (seen flag is reset).
  */
-template<class Derived, typename T> class FlowStateElement : public VirtualFlowSpaceElement {
+template<class Derived, typename T, typename Checker = DefaultChecker> class FlowStateElement : public VirtualFlowSpaceElement {
     struct AT : public FlowReleaseChain {
         T v;
-        bool seen;
+        typename Checker::str str;
     };
 public :
 
-    typedef FlowStateElement<Derived, T> derived;
+    typedef FlowStateElement<Derived, T, Checker> derived;
 
     FlowStateElement() CLICK_COLD;
 
@@ -339,9 +354,9 @@ public :
 
     void push_batch(int port, PacketBatch* head) {
          auto my_fcb = my_fcb_data();
-         if (!my_fcb->seen) {
+         if (!Checker::seen(&my_fcb->v, &my_fcb->str)) {
              if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
-                 my_fcb->seen = true;
+                 Checker::mark_seen(&my_fcb->v, &my_fcb->str);
                  if (Derived::timeout > 0)
                      this->fcb_acquire_timeout(Derived::timeout);
 #if HAVE_FLOW_DYNAMIC
@@ -362,7 +377,7 @@ public :
 #if HAVE_FLOW_DYNAMIC
         this->fcb_remove_release_fnt(my_fcb_data(), &release_fnt);
 #endif
-        my_fcb_data()->seen = false;
+        Checker::release(&my_fcb_data()->v, &my_fcb_data()->str);
     }
 
 private:
@@ -462,8 +477,8 @@ void FlowSpaceElement<T>::fcb_set_init_data(FlowControlBlock* fcb, const T data)
  * FlowSpaceElement
  */
 
-template<class Derived, typename T>
-FlowStateElement<Derived, T>::FlowStateElement() : VirtualFlowSpaceElement() {
+template<class Derived, typename T, typename Checker>
+FlowStateElement<Derived, T, Checker>::FlowStateElement() : VirtualFlowSpaceElement() {
 }
 
 /**
