@@ -55,6 +55,15 @@ FunctionTest::initialize(ErrorHandler *errh)
     CHECK(ffs_lsb(0x80000000U) == 32);
     CHECK(ffs_lsb(0x00010000U) == 17);
 
+    CHECK(next_pow2(31U) == 32);
+    CHECK(next_pow2(32U) == 32);
+
+    CHECK(next_msb(0U) == 1);
+    CHECK(next_msb(1U) == 1);
+    CHECK(next_msb(32U) == 5);
+    CHECK(next_msb(255U) == 8);
+    CHECK(next_msb(256U) == 8);
+
     CHECK(int_sqrt(0U) == 0);
     CHECK(int_sqrt(1U) == 1);
     CHECK(int_sqrt(3U) == 1);

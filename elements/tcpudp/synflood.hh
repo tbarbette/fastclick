@@ -53,10 +53,11 @@ CLICK_DECLS
  * =item LEN
  * The lenght of the generated packets. Default is 60
  * 
+ * =e
  *
- * SYNFlood(10.1.1.1, 172.16.1.1, 1, 80, LEN 1400)
- * -> EtherRewrite(11:11:11:11:11:11, 22:22:22:22:22:22)
- * -> ToDPDKDevice(0)
+ *  SYNFlood(10.1.1.1, 172.16.1.1, 1, 80, LEN 1400)
+ *  -> EtherRewrite(11:11:11:11:11:11, 22:22:22:22:22:22)
+ *  -> ToDPDKDevice(0)
  * 
  *
  **/

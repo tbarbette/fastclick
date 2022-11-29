@@ -29,7 +29,7 @@ struct mstat
 
 MidStat([CLOSECONNECTION])
 
-=s middlebox
+=s ctx
 
 Count the number of bytes and packets in sessions.
 

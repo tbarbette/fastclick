@@ -575,9 +575,9 @@ click_qsort(void *base, size_t n, size_t size,
 {
     int swaptype;
     if ((((char *) base - (char *) 0) | size) % CQ_WORD_SIZE)
-	swaptype = 2;
+	    swaptype = 2;
     else
-	swaptype = (size > CQ_WORD_SIZE ? 1 : 0);
+	    swaptype = (size > CQ_WORD_SIZE ? 1 : 0);
     cq_word_t swaptmp;
 
     size_t stackbuf[CQ_STACKSIZ];
@@ -586,9 +586,9 @@ click_qsort(void *base, size_t n, size_t size,
     *stack++ = n;
 
     while (stack != stackbuf) {
-	stack -= 2;
-	char *a = (char *) base + stack[0] * size;
-	n = stack[1] - stack[0];
+    stack -= 2;
+    char *a = (char *) base + stack[0] * size;
+    n = stack[1] - stack[0];
 
 	// insertion sort for tiny arrays
 	if (n < 7) {

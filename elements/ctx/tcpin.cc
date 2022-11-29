@@ -831,7 +831,7 @@ void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
 
     tin->release_tcp_internal(fcb);
 
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
     if (fcb_in->previous_fnt) {
         flow_assert(fcb_in->previous_fnt != &release_tcp);
         fcb_in->previous_fnt(fcb, fcb_in->previous_thunk);
@@ -846,7 +846,7 @@ void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
 void TCPIn::releaseFCBState() {
     //click_chatter("TCP is closing, killing state");
     fcb_release_timeout();
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
     fcb_remove_release_fnt(fcb_data(), &release_tcp);
 #endif
     SFCB_STACK(
@@ -1173,7 +1173,7 @@ inline void TCPIn::initializeFcbSide(fcb_tcpin* fcb_in, Packet* packet, bool kee
 
     if (!keep_fct) {
         fcb_acquire_timeout(TCP_TIMEOUT);
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
         fcb_set_release_fnt(fcb_in, release_tcp);
 #endif
     }
@@ -1189,7 +1189,7 @@ inline void TCPIn::initializeFcbSide(fcb_tcpin* fcb_in, Packet* packet, bool kee
 inline void TCPIn::releaseFcbSide(FlowControlBlock* fcb, fcb_tcpin* fcb_in) {
     fcb_in->fin_seen = false;
 
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
     if (fcb_in->conn_release_fnt) {
         fcb_in->conn_release_fnt(fcb,fcb_in->conn_release_thunk);
         fcb_in->conn_release_fnt = 0;
@@ -1230,7 +1230,7 @@ inline void TCPIn::initializeFcbSyn(fcb_tcpin* fcb_in, const click_ip *iph , con
 bool TCPIn::registerConnectionClose(StackReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt, void* thunk)
 {
     auto fcb_in = fcb_data();
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
     fcb_chain->previous_fnt = fcb_in->conn_release_fnt;
     fcb_chain->previous_thunk = fcb_in->conn_release_thunk;
     fcb_in->conn_release_fnt = fnt;

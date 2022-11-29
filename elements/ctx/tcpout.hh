@@ -15,7 +15,7 @@ CLICK_DECLS
 
 TCPOut()
 
-=s middlebox
+=s ctx
 
 exit point of a TCP path in the stack of the middlebox
 

@@ -9,9 +9,11 @@ CLICK_DECLS
 /*
 =c
 
-CheckNumberPacket()
+CheckNumberPacket() Check increasing number inside packet
 
-=s
+=s analysis
+
+=d
 
 Check there is an increasing number inside the payload of each packets
 

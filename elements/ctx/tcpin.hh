@@ -114,7 +114,7 @@ CLICK_DECLS
 
 TCPIn(FLOWDIRECTION, OUTNAME, RETURNNAME)
 
-=s middlebox
+=s ctx
 
 entry point of a TCP path in the stack of the middlebox
 

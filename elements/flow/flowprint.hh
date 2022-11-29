@@ -9,7 +9,13 @@
 CLICK_DECLS
 
 /**
+ * =c
+ * FlowPrint
+ * 
+ * =s flow
+ * 
  * Displays information about the FCB stack
+ * 
  */
 class FlowPrint: public BatchElement {
 public:

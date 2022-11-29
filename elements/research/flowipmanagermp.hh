@@ -16,16 +16,18 @@ class DPDKDevice;
 struct rte_hash;
 
 /**
+ * =c
  * FlowIPManagerMP(...)
  *
  * =s flow
- *  FCB packet classifier, cuckoo thread-safe implementation
+ *
+ *  FCB packet classifier, cuckoo thread-safe implementation of DPDK.
  *
  * =d
  *  Multi-thread equivalent of FlowIPManager. This version uses DPDK's
  *  thread-safe implementation of cuckoo hash table to ensure thread safeness.
  *
- *  See FlowIPManager documentation for usage.
+ *  See @FlowIPManager documentation for usage.
  *
  * =a FlowIPManger
  */

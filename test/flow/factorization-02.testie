@@ -28,31 +28,31 @@ CTXDispatcher@2 :: CTXDispatcher has no default rule. Non-matching traffic will 
 Table of fcA before optimization :
 ---
 0/FF (DEFINITION, 1 children)
-|-> 8 UC:1 ED:0 (data 080000000000000000000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff00000000)
+|-> 8 UC:{{0|1}} ED:0 (data 080000000000000000000000)
+|-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff00000000)
 ---
 Table of fcA after optimization :
 ---
 0/FF (TWOCASE, 1 children)
-|-> 8 UC:1 ED:0 (data 080000000000000000000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff00000000)
+|-> 8 UC:{{0|1}} ED:0 (data 080000000000000000000000)
+|-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff00000000)
 ---
 Table of fcA after replacing nodes :
 ---
 0/FF (TWOCASE, 1 children)
-|-> 8 UC:1 ED:0 (data 080000000000000000000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff00000000)
+|-> 8 UC:{{0|1}} ED:0 (data 080000000000000000000000)
+|-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff00000000)
 ---
 Table of fcA after getting new packet (length 2) :
 ---
 0/FF (TWOCASE, 1 children)
-|-> 8 UC:1 ED:0 (data 080000000000000000000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff00000000)
+|-> 8 UC:{{0|1}} ED:0 (data 080000000000000000000000)
+|-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff00000000)
 ---
 PASSED:    2 | 0823
 Table of fcA after getting new packet (length 2) :
 ---
 0/FF (TWOCASE, 1 children)
-|-> 8 UC:1 ED:0 (data 080000000000000000000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff00000000)
+|-> 8 UC:{{0|1|2}} ED:0 (data 080000000000000000000000)
+|-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff00000000)
 ---

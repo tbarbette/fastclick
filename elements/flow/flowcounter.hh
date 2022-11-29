@@ -13,8 +13,10 @@ CLICK_DECLS
 
 FlowCounter([CLOSECONNECTION])
 
-=s middlebox
+=s flow
 
+Counts all flows passing by, the number of active flows, and the number of 
+packets per flow.
 
  */
 

@@ -87,7 +87,7 @@ void FullNoteQueue::push_batch(int port, PacketBatch* batch) {
 }
 
 PacketBatch* FullNoteQueue::pull_batch(int port, unsigned max) {
-    PacketBatch* batch;
+    PacketBatch* batch = 0;
     MAKE_BATCH(FullNoteQueue::pull(port),batch,max);
     return batch;
 }

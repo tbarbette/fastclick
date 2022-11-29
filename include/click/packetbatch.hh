@@ -345,8 +345,8 @@ CLICK_DECLS
  */
 #define MAKE_BATCH(fnt,head,max) {\
         head = PacketBatch::start_head(fnt);\
-        Packet* last = head->first();\
         if (head != 0) {\
+            Packet* last = head->first();\
             unsigned int count = 1;\
             while (count < (unsigned)(max>0?max:BATCH_MAX_PULL)) {\
                 Packet* current = fnt;\
@@ -357,7 +357,7 @@ CLICK_DECLS
                 count++;\
             }\
             head->make_tail(last,count);\
-        } else head = 0;\
+        }\
 }
 
 /**
@@ -447,6 +447,7 @@ public :
      *
      * Creates a new batch, with @a p as the first packet. Batch is *NOT* valid
      *  until you call make_tail().
+     * If the Packet is null, returns no batch.
      */
     inline static PacketBatch* start_head(Packet* p) {
         return reinterpret_cast<PacketBatch*>(p);

@@ -393,8 +393,6 @@ This list is a subset of the list returned by rules_list handler.
 
 Returns the number of flow rules being installed.
 
-=h
-
 =a DPDKInfo, ToDPDKDevice */
 
 class ToDPDKDevice;

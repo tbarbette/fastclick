@@ -34,6 +34,31 @@ public:
     FlowElement();
     ~FlowElement();
 
+#if HAVE_FLOW_DYNAMIC
+    inline void fcb_acquire(int count = 1) {
+        fcb_stack->acquire(count);
+    }
+    inline void fcb_update(int count) {
+        if (count > 0)
+            fcb_stack->acquire(count);
+        else if (count < 0)
+            fcb_stack->release(-count);
+    }
+
+    inline void fcb_release(int count = 1) {
+        fcb_stack->release(count);
+    }
+#else
+    inline void fcb_acquire(int count = 1) {
+        (void)count;
+    }
+    inline void fcb_update(int) {}
+    inline void fcb_release(int count = 1) {
+        (void)count;
+    }
+#endif
+
+    //Those should actually be in some kind of base CTXElement
 # if HAVE_CTX
     virtual FlowNode* get_table(int iport, Vector<FlowElement*> contextStack);
 
@@ -63,29 +88,6 @@ public:
     int configure_phase() const        { return CONFIGURE_PHASE_DEFAULT + 5; }
 
     void *cast(const char *name) override;
-#if HAVE_FLOW_DYNAMIC
-    inline void fcb_acquire(int count = 1) {
-        fcb_stack->acquire(count);
-    }
-    inline void fcb_update(int count) {
-        if (count > 0)
-            fcb_stack->acquire(count);
-        else if (count < 0)
-            fcb_stack->release(-count);
-    }
-
-    inline void fcb_release(int count = 1) {
-        fcb_stack->release(count);
-    }
-#else
-    inline void fcb_acquire(int count = 1) {
-        (void)count;
-    }
-    inline void fcb_update(int) {}
-    inline void fcb_release(int count = 1) {
-        (void)count;
-    }
-#endif
 
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     inline void fcb_acquire_timeout(int nmsec) {
@@ -125,7 +127,7 @@ public:
     }
 #endif
 
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
     inline void fcb_set_release_fnt(struct FlowReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt) {
         fcb_chain->previous_fnt = fcb_stack->release_fnt;
         fcb_chain->previous_thunk = fcb_stack->thunk;
@@ -164,7 +166,7 @@ public:
         }
     }
 #else
-    inline void fcb_set_release_fnt(struct FlowReleaseChain* fcb, SubFlowRealeaseFnt fnt) {
+    inline void fcb_set_release_fnt(struct FlowReleaseChain*, SubFlowRealeaseFnt) {
         click_chatter("ERROR: YOU MUST HAVE DYNAMIC FLOW RELEASE FNT fct setted !");
         assert(false);
     }
@@ -242,6 +244,7 @@ protected:
     friend class CTXElement;
 };
 
+
 template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {
 
 public :
@@ -269,7 +272,7 @@ public :
     }
 
     void push_batch(int port, PacketBatch* head) final {
-            push_flow(port, fcb_data(), head);
+        push_flow(port, fcb_data(), head);
     };
 
     virtual void push_flow(int port, T* flowdata, PacketBatch* head) = 0;
@@ -341,7 +344,7 @@ public :
                  my_fcb->seen = true;
                  if (Derived::timeout > 0)
                      this->fcb_acquire_timeout(Derived::timeout);
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
                  this->fcb_set_release_fnt(my_fcb, &release_fnt);
 #endif
              } else { //TODO set early drop?
@@ -356,7 +359,7 @@ public :
         if (Derived::timeout > 0) {
             this->fcb_release_timeout();
         }
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
         this->fcb_remove_release_fnt(my_fcb_data(), &release_fnt);
 #endif
         my_fcb_data()->seen = false;
@@ -404,6 +407,9 @@ public:
 
 	bool visit(Element *e, bool isoutput, int port,
 			       Element *from_e, int from_port, int distance) {
+        (void)from_e;
+        (void)from_port;
+        (void)distance;
 		FlowElement* dispatcher = dynamic_cast<FlowElement*>(e);
 		if (dispatcher != NULL) {
 		    if (dispatcher == origin)

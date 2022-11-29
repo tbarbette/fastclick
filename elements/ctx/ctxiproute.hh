@@ -8,11 +8,14 @@ CLICK_DECLS
 /*
  * =c
  * CTXIPRoute(DST1/MASK1 [GW1] OUT1, DST2/MASK2 [GW2] OUT2, ...)
- * =s threads
+ *
+ * =s ctx
+ *
  * IP routing table using the flow system
  * V<classification>
+ *
  * =d
- * Interfaces are exactly the same as LookupIPRoute. But it is using the flow
+ * Interfaces are exactly the same as LookupIPRoute. But it is using the ctx
  * system to do the lookup in advance.
  *
  * =a LookupIPRoute

@@ -57,8 +57,11 @@ CLICK_DECLS
 
 TCPReorder(FLOWDIRECTION [, MERGESORT])
 
-=s middlebox
+=s flow
 
+Reorders TCP packets. Compatible with the flow subsystem.
+
+=d
 reorders TCP packets. This element is deprecated, the functionality has
 been merged in TCPIn. Still, it is interesting to see how to make
 a standalone TCP reorderer that will not do much more than that.

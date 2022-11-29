@@ -16,11 +16,14 @@ CLICK_DECLS
 
 
 /*
-=title XDPLoader
-
 =c
 
-XDPLoader()
+XDPLoader
+
+=s 
+
+Load a BPF program at PATH into the XDP device DEV
+
 */
 
 class XDPLoader : public Element {

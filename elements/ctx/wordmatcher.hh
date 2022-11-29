@@ -29,15 +29,17 @@ enum DPIMode {ALERT, CLOSE, MASK, REPLACE, REMOVE, FULL};
 
 WordMatcher([CLOSECONNECTION])
 
-=s middlebox
+=s ctx
 
-removes insults in payload. This element is not intended for performance
-as it loops through a list of insults. Use CTXIDSMatcher for an efficient
-version.
+Remove/mask word in payload.
 
 =d
 
-This element removes or replace insults in web pages
+Removes words in payload. This element is not intended for performance
+as it loops through a list of wordss. Use CTXIDSMatcher for an efficient
+version.
+
+=over 8
 
 =item CLOSECONNECTION
 
@@ -48,6 +50,8 @@ Default value: false.
 
 =item REPLACE
 Boolean if true, replace the insult instead of removing the bytes. Default to true.
+
+=back
 
 =a HTTPIn, HTTPOut */
 

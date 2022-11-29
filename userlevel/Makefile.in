@@ -157,7 +157,7 @@ ifeq ($(USE_DPDK),yes)
 	include rte_parse.mk
 	CFLAGS := $(CFLAGS) @DPDK_CFLAGS@
 	CXXFLAGS := $(CXXFLAGS) @DPDK_CFLAGS@
-	EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
+	EXTRA_DRIVER_OBJS := dpdkdevice.o rte_cuckoo_hash_bloom.o rte_cuckoo_hash_lazy_bloom.o $(EXTRA_DRIVER_OBJS)
 	ifeq ($(shell [ ${HAVE_FLOW_API} -eq 1 ] && echo true),true)
 		EXTRA_DRIVER_OBJS := flowrulemanager.o flowrulecache.o flowruleparser.o $(EXTRA_DRIVER_OBJS)
 	endif
@@ -186,6 +186,10 @@ ifneq ($(shell $(ELEMENT_CHECKSUMCOMMAND)),$(ELEMENT_CHECKSUM))
 $(shell rm -f $(ELEMENTSCONF).conf $(ELEMENTSCONF).csmk)
 endif
 endif
+
+CUCKOOPP_PATH=../vendor/cuckoopp
+CPPFLAGS += -I ${CUCKOOPP_PATH}
+VPATH += :${CUCKOOPP_PATH}
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk

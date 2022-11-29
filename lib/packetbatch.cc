@@ -97,7 +97,7 @@ PacketBatch::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
 #if HAVE_CLICK_PACKET_POOL
         p = static_cast<WritablePacket *>(p->next());
 #else
-        WritablePacket *p = new WritablePacket;
+        p = new WritablePacket;
 #endif
     }
     if (i != count) {

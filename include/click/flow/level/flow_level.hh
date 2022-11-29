@@ -360,7 +360,7 @@ private:
     T _mask;
 public:
 
-    FlowLevelGeneric(T mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
+    FlowLevelGeneric(T mask, int offset) : FlowLevelOffset(offset),  _mask(mask) {
         _get_data = &get_data_ptr;
     }
     FLOW_LEVEL_DEFINE(FlowLevelGeneric<T>,get_data);

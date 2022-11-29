@@ -1,5 +1,5 @@
 %require
-click-buildtool provides flow ctx
+click-buildtool provides flow flow-dynamic ctx
 
 %script
 click C1
@@ -52,10 +52,10 @@ fd1 :: CTXDispatcher has no default rule. Non-matching traffic will be dropped. 
 Table of fc1 after optimization :
 ---
 0/FF (TWOCASE, 1 children)
-|-> 5 UC:1 ED:0 (data 050000000100000000000000)
+|-> 5 UC:{{0|1}} ED:0 (data 050000000100000000000000)
 |-> DEFAULT
 |  0/FF (ARRAY, 0 children, dynamic)
-|  |-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000)
+|  |-> DEFAULT 4294967295 UC:{{0|1}} ED:0 (data ffffffff0000000000000000)
 ---
 M0:    1 | 03
 0:    1 | 03
@@ -70,14 +70,14 @@ Table of fc2 after optimization :
 0/FF (TWOCASE, 1 children)
 |-> 2
 |  1/FF (TWOCASE, 1 children)
-|  |-> 5 UC:1 ED:0 (data 050000000100000000000000)
+|  |-> 5 UC:{{0|1}} ED:0 (data 050000000100000000000000)
 |  |-> DEFAULT
 |  |  1/FF (ARRAY, 0 children, dynamic)
-|  |  |-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000)
+|  |  |-> DEFAULT 4294967295 UC:{{0|1}} ED:0 (data ffffffff0000000000000000)
 |-> DEFAULT
 |  1/FF (TWOCASE, 1 children)
-|  |-> 5 UC:1 ED:0 (data 050000000100000000000000)
-|  |-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff00000000)
+|  |-> 5 UC:{{0|1}} ED:0 (data 050000000100000000000000)
+|  |-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff00000000)
 ---
 M0:    2 | 0203
 0:    2 | 0203
@@ -94,14 +94,14 @@ Table of fc3 after optimization :
 0/FF (TWOCASE, 1 children)
 |-> 2
 |  2/FF (TWOCASE, 1 children)
-|  |-> 5 UC:1 ED:0 (data 050000000100000000000000)
+|  |-> 5 UC:{{0|1}} ED:0 (data 050000000100000000000000)
 |  |-> DEFAULT
 |  |  1/FF (ARRAY, 0 children, dynamic)
-|  |  |-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000)
+|  |  |-> DEFAULT 4294967295 UC:{{0|1}} ED:0 (data ffffffff0000000000000000)
 |-> DEFAULT
 |  2/FF (TWOCASE, 1 children)
-|  |-> 5 UC:1 ED:0 (data 050000000100000000000000)
-|  |-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff00000000)
+|  |-> 5 UC:{{0|1}} ED:0 (data 050000000100000000000000)
+|  |-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff00000000)
 ---
 1:    3 | 010005
 1:    3 | 020305

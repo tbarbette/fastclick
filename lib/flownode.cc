@@ -296,7 +296,7 @@ void  FlowNode::traverse_all_leaves_and_empty_default(std::function<void(FlowNod
  * Call fnt on all nodes having an empty default or a leaf default.
  * Semantically, this is traversing all "else", undefined cases
  */
-bool  FlowNode::traverse_all_default_leaf(std::function<bool(FlowNode*)> fnt) {
+bool FlowNode::traverse_all_default_leaf(std::function<bool(FlowNode*)> fnt) {
     NodeIterator it = this->iterator();
     FlowNodePtr* cur;
     while ((cur = it.next()) != 0) {

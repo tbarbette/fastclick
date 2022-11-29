@@ -8,9 +8,9 @@ CLICK_DECLS
 
 FlowAcquire()
 
-=s FlowAcquire
+=s flow
 
-sets packet FlowAcquire annotations
+Acquire one flow reference count the first time a flow passes by
 
 =d
 
@@ -30,10 +30,6 @@ class FlowAcquire : public FlowSpaceElement<bool> { public:
     void add_handlers() CLICK_COLD;
 
     void push_flow(int port, bool* flowdata, PacketBatch* head);
-
-  private:
-
-    int _color;
 
 };
 

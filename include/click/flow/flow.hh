@@ -227,7 +227,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
                             child_ptr->leaf->initialize();
                             child_ptr->leaf->parent = parent;
 
-    /*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+    /*#if HAVE_FLOW_DYNAMIC
                             child_ptr->leaf->release_fnt = _classifier_release_fnt;
     #endif*/
                             child_ptr->set_data(data);

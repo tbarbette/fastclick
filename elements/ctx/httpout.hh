@@ -23,9 +23,9 @@ struct fcb_httpout
 /*
 =c
 
-HTPPOut()
+HTTPOut()
 
-=s middlebox
+=s ctx
 
 exit point of an HTTP path in the stack of the middlebox
 
