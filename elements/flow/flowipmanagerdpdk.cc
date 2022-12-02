@@ -45,12 +45,13 @@ int
 FlowIPManager_DPDK::alloc(FlowIPManager_DPDKState & table, int core, ErrorHandler* errh)
 {
     struct rte_hash_parameters hash_params = {0};
+
     char buf[64];
     sprintf(buf, "%i-%s", core, name().c_str());
 
     hash_params.name = buf;
-
     hash_params.entries = _capacity;
+
     hash_params.key_len = sizeof(IPFlow5ID);
     hash_params.hash_func = ipv4_hash_crc;
     hash_params.hash_func_init_val = 0;

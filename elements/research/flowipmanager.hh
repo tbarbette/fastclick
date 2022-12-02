@@ -58,6 +58,8 @@ class FlowIPManager: public VirtualFlowManager, public Router::InitFuture {
         void add_handlers() override CLICK_COLD;
 
     protected:
+        #define FCB_DATA(fcb, offset) (((uint8_t *)(fcb->data_32)) + (offset))
+
         volatile int owner;
         Packet* queue;
         rte_hash* hash;
@@ -68,7 +70,11 @@ class FlowIPManager: public VirtualFlowManager, public Router::InitFuture {
         int _verbose;
         int _flags;
 
-        int _timeout;
+        uint32_t _recycle_interval_ms;
+        uint32_t _timeout_ms;
+        FlowControlBlock* _qbsr;
+        uint32_t _timeout_epochs;
+        uint32_t _epochs_per_sec;      // Granularity for the epoch
         Timer _timer; //Timer to launch the wheel
         Task _task;
 

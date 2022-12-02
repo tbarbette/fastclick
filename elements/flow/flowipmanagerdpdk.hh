@@ -49,36 +49,11 @@ class FlowIPManager_DPDK: public VirtualFlowManagerIMP<FlowIPManager_DPDK, FlowI
         const char *port_count() const override { return "1/1"; }
 
         const char *processing() const override { return PUSH; }
-        int configure_phase() const override { return CONFIGURE_PHASE_PRIVILEGED + 1; }
 
         int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
         void cleanup(CleanupStage stage) override CLICK_COLD;
 
     protected:
-    /*
-        volatile int owner;
-        Packet* queue;
-
-
-        struct gtable {
-            gtable() : hash(0), fcbs(0) {
-            }
-            rte_hash* hash;
-            FlowControlBlock *fcbs;
-        } CLICK_ALIGNED(CLICK_CACHE_LINE_SIZE);
-
-        gtable* _tables;
-
-        int _tables_count;
-        int _table_size;
-        int _flow_state_size_full;
-        int _verbose;
-        int _flags;
-
-        int _timeout;
-        Timer _timer; //Timer to launch the wheel
-        Task _task;
-        bool _cache;*/
 
     //Implemented for VirtualFlowManagerIMP. It is using CRTP so no override.
     inline int alloc(FlowIPManager_DPDKState& table, int core, ErrorHandler* errh);

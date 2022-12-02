@@ -57,20 +57,21 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
 
     int parse(Args *args) {
         double recycle_interval = 0;
+        int timeout = 0;
         int ret =
             (*args)
                 .read_or_set_p("CAPACITY", _capacity, 65536) // HT capacity
                 .read_or_set("RESERVE", _reserve, 0)
                 .read_or_set("VERBOSE", _verbose, 0)
                 .read_or_set("CACHE", _cache, 1)
-                .read_or_set("TIMEOUT", _timeout, 0) // Timeout for the entries
+                .read_or_set("TIMEOUT", timeout, 0) // Timeout for the entries
                 .read_or_set("RECYCLE_INTERVAL", recycle_interval, 1)
-//                .read_or_set("FLOW_BATCH", _flows_batchsize, 16)
                 .consume();
 
         _recycle_interval_ms = (int)(recycle_interval * 1000);
         _epochs_per_sec = max(1, 1000 / _recycle_interval_ms);
-        _timeout_ms = _timeout * 1000;
+        _timeout_ms = timeout * 1000;
+        _timeout_epochs = timeout * _epochs_per_sec;
 
         return ret;
     }
@@ -94,8 +95,8 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
                 return -1;
             }
 
-            if (_timeout > 0) {
-                t._timer_wheel.initialize(_timeout * _epochs_per_sec);
+            if (_timeout_epochs > 0) {
+                t._timer_wheel.initialize(_timeout_epochs);
             }
 
             t.fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _capacity);
@@ -111,13 +112,12 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
                     t.imp_flows_push(i);
             }
 
-             if (_timeout > 0 && have_maintainer) {
+             if (_timeout_ms > 0 && have_maintainer) {
                 //click_chatter("Initializing maintain timer %d", core);
                 t.maintain_timer = new Timer(this);
                 t.maintain_timer->initialize(this, true);
                 t.maintain_timer->assign(run_maintain_timer, this);
                 t.maintain_timer->move_thread(core);
-                //t.current = 0;
                 t.maintain_timer->schedule_after_msec(_recycle_interval_ms);
             } else {
                 click_chatter("%p{element} does not have timeout enabled. Another mean must be used to remove old flows.", this);
@@ -173,13 +173,13 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
                 int64_t old = (recent - prev->lastseen).msecval();
                 click_chatter("Old %li : %s %s fid %d",old, recent.unparse().c_str(), prev->lastseen.unparse().c_str(),get_fcb_flowid(prev) );
 
-                tw.schedule_after(prev, _timeout * _epochs_per_sec,  setter);
+                tw.schedule_after(prev, _timeout_epochs,  setter);
                 return next;
             }
 
             int old = (recent - prev->lastseen).msecval();
 
-            if (old + _recycle_interval_ms >= _timeout * 1000) {
+            if (old + _recycle_interval_ms >= _timeout_ms) {
 
                 //expire
                 //click_chatter("Release %p", prev);
@@ -203,7 +203,7 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
             } else {
                 //No need for lock as we'll be the only one to enqueue there
                 if (likely(prev != *get_next_released_fcb(prev))) {
-                    int r = (_timeout * 1000) - old; //Time left in ms
+                    int r = (_timeout_ms) - old; //Time left in ms
                     r = (r * (_epochs_per_sec)) / 1000;
                     tw.schedule_after(prev, r, setter);
                 }
@@ -232,8 +232,8 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
 
         batch = b.finish();
         if (batch) {
-            if (have_maintainer)
-             update_lastseen(fcb_stack, recent);
+            if (have_maintainer && _timeout_epochs)
+                update_lastseen(fcb_stack, recent);
             #if HAVE_FLOW_DYNAMIC
                 fcb_acquire(batch->count());
             #endif
@@ -268,6 +268,7 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
             // INSERT IN TABLE
         
             ret = ((T*)this)->insert(fid, flowid);
+
         } else {
             
             ret = ((T*)this)->insert(fid, 0);
@@ -275,7 +276,7 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
             flowid = ret;
         }
 
-        if (unlikely(ret <= 0)) {
+        if (unlikely(ret < 0)) {
             p->kill();
             return;
         }
@@ -286,16 +287,14 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
             *(get_fcb_flowid(fcb)) = flowid;
         }
 
-        if (_timeout) {
-
+        if (_timeout_epochs) {
             memcpy(get_fcb_key(fcb), &fid, sizeof(IPFlow5ID));
-            state._timer_wheel.schedule_after(fcb, _timeout * _epochs_per_sec, setter);            
-        
+            state._timer_wheel.schedule_after(fcb, _timeout_epochs, setter);
         }
 
-    } // if ret ==0
-    else {
-        // Old flow
+    } // (end)It's a new flow
+    else
+    { // Old flow
         fcb = get_fcb_from_flowid(ret);
     }
 
@@ -307,8 +306,8 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
 
 
         if (batch) {
-                    if (have_maintainer)
-            update_lastseen(fcb_stack, recent);
+            if (have_maintainer && _timeout_epochs)
+                update_lastseen(fcb_stack, recent);
             #if HAVE_FLOW_DYNAMIC
                 fcb_acquire(batch->count());
             #endif
@@ -336,6 +335,9 @@ protected:
         return (uint32_t *)FCB_DATA(fcb, 0);
     };
 
+    /**
+     * Returns the location of the IPFlow5ID in the FCB
+     */
     static inline IPFlow5ID *get_fcb_key(FlowControlBlock *fcb) {
         return (IPFlow5ID *)FCB_DATA(fcb, (State::need_fid()? sizeof(uint32_t) : 0 ));
     };
@@ -405,9 +407,9 @@ protected:
     per_thread_oread<State> _tables;
     uint32_t _capacity;
     int _verbose;
-    uint32_t _timeout;
     uint32_t _flow_state_size_full;
     bool _cache;
+    uint32_t _timeout_epochs;
     uint32_t _timeout_ms;          // Timeout for deletion
     uint32_t _epochs_per_sec;      // Granularity for the epoch
     uint16_t _recycle_interval_ms; // When to run the maintainer
