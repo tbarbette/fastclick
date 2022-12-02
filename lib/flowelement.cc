@@ -355,7 +355,7 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
         int my_place;
         int min_place = 0;
 
-        //We need to verify the reserved space for all possible CTXManager
+        //We need to verify the reserved space for all possible VirtualFlowManager
         for (int i = 0; i < _entries.size(); i++) {
             VirtualFlowManager* fc = dynamic_cast<VirtualFlowManager*>(_entries[i]);
             //If this flow manager can reach the element, then we need to have enough reserved space
@@ -412,6 +412,7 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
             int tot = vfe->flow_data_offset() + vfe->flow_data_size();
             if (tot > fc->_reserve)
                 fc->_reserve = tot;
+            vfe->flow_announce_manager(_entries[i], ErrorHandler::default_handler());
         }
         fc->fcb_built();
     }

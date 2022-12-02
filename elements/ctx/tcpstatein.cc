@@ -1,6 +1,5 @@
 /*
-/*
- * TCPStateIN.{cc,hh}
+ * tcpstatein.{cc,hh}
  */
 
 #include <click/config.h>

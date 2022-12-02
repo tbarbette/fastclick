@@ -1,6 +1,7 @@
 %require
 click-buildtool provides dpdk
 click-buildtool provides flow
+click-buildtool provides SFMaker
 
 %script
 click --dpdk -m 2048M --no-huge --vdev net_ring0 -- CONFIG
@@ -11,7 +12,7 @@ FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
 -> EnsureDPDKBuffer
 -> Unqueue
 -> Print(F, -1)
--> fh1 :: FlowIPManagerIMP(CAPACITY 2000000, VERBOSE 99)
+-> fh1 :: FlowIPManagerIMP(CAPACITY 2000000, VERBOSE 99, TIMEOUT 0)
 -> fc :: FlowCounter 
 -> sfb :: FlowPrint
 -> Print(A, -1)

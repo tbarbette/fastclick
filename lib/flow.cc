@@ -59,7 +59,7 @@ FlowNode* FlowClassificationTable::get_root() {
 }
 
 FlowTableHolder::FlowTableHolder() :
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
 old_flows(fcb_list()),
 #endif
 _pool(), _classifier_release_fnt(0), _classifier_thunk(0)
@@ -67,7 +67,7 @@ _pool(), _classifier_release_fnt(0), _classifier_thunk(0)
 
     }
 
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
 void
 FlowTableHolder::delete_all_flows() {
     for (int i = 0; i < old_flows.weight(); i++) {
@@ -96,7 +96,7 @@ FlowTableHolder::delete_all_flows() {
 FlowTableHolder::~FlowTableHolder() {
     auto previous = fcb_table;
     fcb_table = this;
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
     //TODO : same, do from the right thread
     //delete_all_flows();
 #endif
@@ -423,7 +423,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(Element* owner, Str
     return FlowClassificationTable::Rule{.root = root, .output = output, .is_default = is_default};
 }
 
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
 
 
 /**

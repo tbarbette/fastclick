@@ -5,17 +5,19 @@ click-buildtool provides flow ctx
 Simple session factorization
 
 %script
-click --simtime CONF
-
-%file CONF
-    fcA :: CTXManager(VERBOSE 3, VERBOSE_FCB 0, CLEAN_TIMER 1)
+TIMER=
+if click-buildtool provides ctx-global-timer ; then
+    TIMER=", CLEAN_TIMER 1"
+fi
+click --simtime -e "
+    fcA :: CTXManager(VERBOSE 3, VERBOSE_FCB 0 $TIMER )
     -> CTXDispatcher(0/08)
     -> CTXDispatcher(0/08)
     -> Print(PASSED) -> Discard;
 InfiniteSource(DATA \<0823>, LIMIT 1, STOP true) -> fcA;
 InfiniteSource(DATA \<0923>, LIMIT 1, STOP true) -> fcA;
 
-DriverManager(wait,wait);
+DriverManager(wait,wait);"
 
 %expect stderr
 Reachable VirtualFlowSpaceElement element list :

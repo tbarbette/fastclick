@@ -79,7 +79,7 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 #endif
 
-    _reserve += sizeof(IPFlow5ID)  + sizeof(FlowControlBlock);
+    _reserve += sizeof(uint32_t) + (_timeout_epochs > 0?sizeof(FlowControlBlock*):0);
 
     return 0;
 }
@@ -95,11 +95,11 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     hash_params.hash_func_init_val = 0;
     hash_params.extra_flag = _flags;
 
-    assert(_reserve >=  sizeof(IPFlow5ID) + sizeof(FlowControlBlock));
-    _flow_state_size_full = _reserve;
+    assert(_reserve >=  sizeof(uint32_t) + (_timeout_epochs > 0?sizeof(FlowControlBlock*):0));
+    _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
     if (_verbose)
-     errh->message("Per-flow size is %d", _reserve);
+        errh->message("Per-flow size is %d", _reserve);
     sprintf(buf, "%s", name().c_str());
     hash = rte_hash_create(&hash_params);
     if (!hash)
@@ -131,22 +131,25 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
 /**
  * Returns the location of the IPFlow5ID in the FCB (first data)
  */
-static inline IPFlow5ID *get_fcb_key(FlowControlBlock *fcb) {
+/*static inline IPFlow5ID *get_fcb_key(FlowControlBlock *fcb) {
     return (IPFlow5ID *)FCB_DATA(fcb, 0);
+};*/
+static inline uint32_t *get_fcb_flowid(FlowControlBlock *fcb) {
+    return (uint32_t *)FCB_DATA(fcb, 0);
 };
 
 /**
  * Returns the location of the IPFlow5ID in the FCB (second data, after the key  when released)
  */
 static inline FlowControlBlock** fcb_next_ptr(FlowControlBlock* fcb) {
-    return (FlowControlBlock**)(get_fcb_key(fcb) + 1);
+     return (FlowControlBlock **)(fcb->data + sizeof(uint32_t));
 }
 
 /**
  * Returns the location of the IPFlow5ID in the FCB (secothird  data, after the next released ptr  when released)
  */
 static inline uint32_t* get_released_fcb_flowid(FlowControlBlock* fcb) {
-    return (uint32_t*)(fcb_next_ptr(fcb) + 1);
+    return (uint32_t*)(get_fcb_flowid(fcb));
 }
 
 
@@ -170,11 +173,19 @@ bool FlowIPManager::run_task(Task* t)
             if (unlikely(_verbose > 1))
                 click_chatter("Release %p as it is expired since %d", prev, old);
             //expire
-            int fid = rte_hash_del_key(hash, get_fcb_key(prev));
-            if (this->_flags & RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY_LF) {
-                *get_released_fcb_flowid(prev) = fid;
-                *fcb_next_ptr(prev) = _qbsr;
-                _qbsr = prev;
+            void* keyptr;
+            if (unlikely(rte_hash_get_key_with_position(hash, *get_fcb_flowid(prev),&keyptr) != 0)) {
+                click_chatter("Could not get flow key");
+            } else {
+                int fid = rte_hash_del_key(hash, keyptr); //get_fcb_key(prev));
+                //From now on the key is detroyed, the FCB can't be found
+                //However in LF, a thread might be using the FCB still. It won't use the key
+                //So the key space can be used to remember the next id
+                if (this->_flags & RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY_LF) {
+                    *get_released_fcb_flowid(prev) = fid;
+                    *fcb_next_ptr(prev) = _qbsr;
+                    _qbsr = prev;
+                }
             }
         } else {
             //No need for lock as we'll be the only one to enqueue there
@@ -225,7 +236,8 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
         fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
 
         if (_timeout_epochs) {
-            memcpy(get_fcb_key(fcb), &fid, sizeof(IPFlow5ID));
+            //memcpy(get_fcb_key(fcb), &fid, sizeof(IPFlow5ID));
+            *get_fcb_flowid(fcb) = ret;
 
             if (_flags) {
                 _timer_wheel.schedule_after_mp(fcb, _timeout_epochs, setter);

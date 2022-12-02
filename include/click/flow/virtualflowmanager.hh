@@ -73,6 +73,8 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
         _timeout_ms = timeout * 1000;
         _timeout_epochs = timeout * _epochs_per_sec;
 
+        //_reserve += reserve_size() is called by the parrent
+
         return ret;
     }
 
@@ -84,6 +86,7 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
         _tables.compress(passing);
 
         click_chatter("Real capacity for each table will be %d", _capacity);
+        assert(_reserve >= reserve_size());
         _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
         for (int ui = 0; ui < _tables.weight(); ui++) {

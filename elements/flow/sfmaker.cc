@@ -1010,7 +1010,6 @@ void SFMaker::release_flow(SFFlow* flow) {
     f.lock.acquire();
     if (!f.empty()) {
         f.dequeue()->kill();
-
         click_chatter("BUG : a flow timed out with some packets in its ring. Expire in %dusec", (TSCTimestamp::now_steady() - f.expiry(this)).usecval());
     }
 
@@ -1159,5 +1158,6 @@ SFMaker::add_handlers()
 
 
 CLICK_ENDDECLS
+ELEMENT_REQUIRES(!ctx-global-timeout)
 EXPORT_ELEMENT(SFMaker)
 ELEMENT_MT_SAFE(SFMaker)

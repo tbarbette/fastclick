@@ -102,7 +102,7 @@ public:
         return 0;
     }
 
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
     void run_timer(Timer*) override;
 #endif
     bool run_idle_task(IdleTask*) override;
@@ -173,7 +173,7 @@ inline bool CTXManager::get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint32_t
 
 inline void CTXManager::check_release_flows() {
     if (_do_release) {
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
         auto &head = _table.old_flows.get();
         if (head.count() > head._count_thresh) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
@@ -351,7 +351,7 @@ inline void CTXManager::flush_builder(Packet* &last, Builder &builder, const Tim
  * Checks that the FCB has not timed out
  */
 static inline void check_fcb_still_valid(FlowControlBlock* fcb, Timestamp now) {
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
             if (unlikely(fcb->count() == 0 && fcb->hasTimeout())) {
 # if DEBUG_CLASSIFIER_TIMEOUT > 0
                 assert(fcb->flags & FLOW_TIMEOUT_INLIST);
