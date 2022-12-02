@@ -81,7 +81,9 @@ public:
     virtual const int flow_data_index() const {
         return -1;
     }
-
+    virtual const int flow_announce_manager(VirtualFlowManager* manager, ErrorHandler* errh)  const {
+        return 0;
+    }
     inline void set_flow_data_offset(int offset) {_flow_data_offset = offset; }
     inline int flow_data_offset() {return _flow_data_offset; }
 
@@ -89,8 +91,9 @@ public:
 
     void *cast(const char *name) override;
 
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-    inline void fcb_acquire_timeout(int nmsec) {
+
+#if HAVE_CTX_GLOBAL_TIMEOUT
+    inline void ctx_acquire_timeout(int nmsec) {
         //Do not set a smaller timeout
         if ((fcb_stack->flags & FLOW_TIMEOUT) && (nmsec <= (int)(fcb_stack->flags >> FLOW_TIMEOUT_SHIFT))) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
@@ -104,7 +107,7 @@ public:
         fcb_stack->flags = (nmsec << FLOW_TIMEOUT_SHIFT) | FLOW_TIMEOUT | ((fcb_stack->flags & FLOW_TIMEOUT_INLIST) ? FLOW_TIMEOUT_INLIST : 0);
     }
 
-    inline void fcb_release_timeout() {
+    inline void ctx_release_timeout() {
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
         click_chatter("Releasing timeout of %p",this);
 #endif
@@ -117,12 +120,12 @@ public:
             fcb_stack->flags = 0;
     }
 #else
-    inline void fcb_acquire_timeout(int nmsec) {
+    inline void ctx_acquire_timeout(int nmsec) {
         //TODO : use a local timer
         fcb_acquire();
     }
 
-    inline void fcb_release_timeout() {
+    inline void ctx_release_timeout() {
         fcb_release();
     }
 #endif
@@ -179,8 +182,8 @@ public:
     }
 
     int initialize(ErrorHandler *errh) override CLICK_COLD {
-	//The element itself is automatically posted by build_fcb via  fcb_builded_init_future
-	return 0;
+        //The element itself is automatically posted by build_fcb via  fcb_builded_init_future
+        return 0;
     }
 protected:
 
@@ -325,6 +328,14 @@ public :
     FlowStateElement() CLICK_COLD;
 
     virtual const size_t flow_data_size()  const { return sizeof(AT); }
+    virtual const int flow_announce_manager(Element* manager, ErrorHandler* errh)  const {
+        if (Derived::timeout > 0) {
+            if (manager->cast("CTXManager") == 0) {
+                errh->warning("The timeout of %dms of %p{element} is ignored, only the flow manager %p{element} timeout is prevalent.", Derived::timeout, this, manager);
+            }
+        }
+        return 0;
+     }
 
     /**
      * CRTP virtual
@@ -332,7 +343,6 @@ public :
     inline bool new_flow(T*, Packet*) {
         return true;
     }
-
 
     inline FlowControlBlock* stack_from_flow(void* ptr) {
         return (FlowControlBlock*)(((uint8_t*)ptr) - _flow_data_offset - sizeof(FlowControlBlock));
@@ -367,7 +377,7 @@ public :
              if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
                  Checker::mark_seen(&my_fcb->v, &my_fcb->str);
                  if (Derived::timeout > 0)
-                     this->fcb_acquire_timeout(Derived::timeout);
+                     this->ctx_acquire_timeout(Derived::timeout);
 #if HAVE_FLOW_DYNAMIC
                  this->fcb_set_release_fnt(my_fcb, &release_fnt);
 #endif
@@ -381,7 +391,7 @@ public :
 
     void close_flow() {
         if (Derived::timeout > 0) {
-            this->fcb_release_timeout();
+            this->ctx_release_timeout();
         }
 #if HAVE_FLOW_DYNAMIC
         this->fcb_remove_release_fnt(my_fcb_data(), &release_fnt);

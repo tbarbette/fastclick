@@ -845,7 +845,7 @@ void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
  */
 void TCPIn::releaseFCBState() {
     //click_chatter("TCP is closing, killing state");
-    fcb_release_timeout();
+    ctx_release_timeout();
 #if HAVE_FLOW_DYNAMIC
     fcb_remove_release_fnt(fcb_data(), &release_tcp);
 #endif
@@ -1172,7 +1172,7 @@ inline void TCPIn::initializeFcbSide(fcb_tcpin* fcb_in, Packet* packet, bool kee
     fcb_in->expectedPacketSeq = getSequenceNumber(packet); //Not next because this one will be checked just after
 
     if (!keep_fct) {
-        fcb_acquire_timeout(TCP_TIMEOUT);
+        ctx_acquire_timeout(TCP_TIMEOUT);
 #if HAVE_FLOW_DYNAMIC
         fcb_set_release_fnt(fcb_in, release_tcp);
 #endif

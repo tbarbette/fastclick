@@ -93,14 +93,14 @@ fm.count_fids:
 
 FlowIPManagerMP
 
-Placing  ftest :: TestFlowSpace at [74-77]
-Per-flow size is 78
+Placing  ftest :: TestFlowSpace at [14-17]
+Per-flow size is 18
 warning: This element uses a timer wheel that will use a global lock. Consider using FlowIPManager_CuckooPP instead which uses per-thread timer wheels.
 fm.count:
 0
 BEFORE:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
 AFTER:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
-fprint :: FlowPrint: 1 packets from flow 738466322. Count : 1
+fprint :: FlowPrint: 1 packets from flow 63. Count : 1
 fm.count:
 1
 While executing 'DriverManager@8 :: DriverManager':
@@ -109,13 +109,13 @@ BEFORE:   30 | 4500001e 00000000 64112a43 121a042c 121a042d 00000000
 BEFORE:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
 AFTER:   30 | 4500001e 00000000 64112a43 121a042c 121a042d 00000000
 AFTER:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
-fprint :: FlowPrint: 2 packets from flow 738466322. Count : 2
+fprint :: FlowPrint: 2 packets from flow 62. Count : 2
 BEFORE:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
 AFTER:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
-fprint :: FlowPrint: 1 packets from flow 738466322. Count : 1
+fprint :: FlowPrint: 1 packets from flow 62. Count : 1
 BEFORE:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
 AFTER:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
-fprint :: FlowPrint: 1 packets from flow 738466322. Count : 1
+fprint :: FlowPrint: 1 packets from flow 61. Count : 1
 fm.count:
 0
 While executing 'DriverManager@8 :: DriverManager':
@@ -124,13 +124,13 @@ While executing 'DriverManager@8 :: DriverManager':
 
 FlowIPManager
 
-Placing  ftest :: TestFlowSpace at [74-77]
-Per-flow size is 78
+Placing  ftest :: TestFlowSpace at [14-17]
+Per-flow size is 18
 fm.count:
 0
 BEFORE:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
 AFTER:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
-fprint :: FlowPrint: 1 packets from flow 738466322. Count : 1
+fprint :: FlowPrint: 1 packets from flow 0. Count : 1
 fm.count:
 1
 While executing 'DriverManager@8 :: DriverManager':
@@ -139,13 +139,13 @@ BEFORE:   30 | 4500001e 00000000 64112a43 121a042c 121a042d 00000000
 BEFORE:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
 AFTER:   30 | 4500001e 00000000 64112a43 121a042c 121a042d 00000000
 AFTER:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
-fprint :: FlowPrint: 2 packets from flow 738466322. Count : 2
+fprint :: FlowPrint: 2 packets from flow 1. Count : 2
 BEFORE:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
 AFTER:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
-fprint :: FlowPrint: 1 packets from flow 738466322. Count : 1
+fprint :: FlowPrint: 1 packets from flow 1. Count : 1
 BEFORE:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
 AFTER:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
-fprint :: FlowPrint: 1 packets from flow 738466322. Count : 1
+fprint :: FlowPrint: 1 packets from flow 2. Count : 1
 fm.count:
 0
 While executing 'DriverManager@8 :: DriverManager':

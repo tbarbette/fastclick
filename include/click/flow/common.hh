@@ -121,11 +121,13 @@ private:
 #endif
         Timestamp lastseen; //Last seen is also used without sloppy timeout for cache purposes
 
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-		//#define FLOW_RELEASE			  0x01 //Release me when you got free time, my packets will never arrive again
-		//#define FLOW_PERMANENT 			  0x02 //Never release
+#if HAVE_CTX_GLOBAL_TIMEOUT
+        /**
+         * If FLOW_TIMEOUT is set, an element has asked this flow to be put in the timer "list" (flows without active reference but not freed)
+         * only CTXManager will look for this.
+         */
         //0x20 is reserved, see below
-        #define FLOW_TIMEOUT_INLIST       0x40 //Timeout is already in list
+        #define FLOW_TIMEOUT_INLIST       0x40 //Timeout is already in release list
 		#define FLOW_TIMEOUT              0x80 //Timeout set
         #define FLOW_TIMEOUT_SHIFT           8
 		#define FLOW_TIMEOUT_MASK   0x000000ff //Delta + lastseen timestamp in msec
@@ -190,7 +192,7 @@ private:
             release_fnt = 0;
             thunk = 0;
 #endif
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
 			next = 0; //TODO : only once?
 #endif
 		}
@@ -452,7 +454,7 @@ public:
     }
 
 
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
     void delete_all_flows();
 #endif
     void set_release_fnt(SubFlowRealeaseFnt pool_release_fnt, void* thunk);
@@ -464,7 +466,7 @@ public:
         _pool.release(fcb); //Release the FCB itself inside the pool
     }
 
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
     void release_later(FlowControlBlock* fcb);
     bool check_release();
     struct fcb_list {
@@ -549,7 +551,7 @@ extern __thread FlowTableHolder* fcb_table;
 }
 
 inline void FlowControlBlock::_do_release() {
-#if DEBUG_CLASSIFIER && HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if DEBUG_CLASSIFIER && HAVE_CTX_GLOBAL_TIMEOUT
     flow_assert(!(flags & FLOW_TIMEOUT_INLIST));
 #endif
     flow_assert(thread == click_current_cpu_id());
@@ -582,7 +584,7 @@ inline void FlowControlBlock::release(int packets_nr) {
 	if (use_count == 0) {
 	    debug_flow_2("[%d] Release fcb %p, uc 0, hc %d",click_current_cpu_id(), this,hasTimeout());
 		//assert(this->hasTimeout());
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
 	    if (this->hasTimeout()) {
 	        if (this->flags & FLOW_TIMEOUT_INLIST) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 2

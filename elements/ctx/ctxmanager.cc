@@ -50,7 +50,7 @@ CTXManager::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("VERBOSE",_verbose)
             .read("VERBOSE_FCB", _size_verbose)
             .read("CONTEXT",context)
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
             .read("CLEAN_TIMER",_clean_timer)
 #endif
             .read("EARLYDROP", _early_drop)
@@ -108,7 +108,7 @@ FlowNode* CTXManager::resolveContext(FlowType t, Vector<FlowElement*> contextSta
 
 }
 
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
 void CTXManager::run_timer(Timer*) {
     debug_flow("Release timer!");
 #if DEBUG_CLASSIFIER_RELEASE
@@ -388,7 +388,7 @@ int CTXManager::_replace_leafs(ErrorHandler *errh) {
  */
 int CTXManager::_initialize_timers(ErrorHandler *errh) {
     if (_do_release) {
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
         auto pushing = get_pushing_threads();
         for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
             if (pushing[i]) {
@@ -425,7 +425,7 @@ void CTXManager::cleanup(CleanupStage stage) {
 //            _table.get_root()->print();
 //            click_chatter("Deleting!");
 //
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
             //We are not on the right thread, so we'll delete the cache by ourselves
             //TODO : elements and cache assume release is done on the same thread, we must implement thread_cleanup
             //_table.delete_all_flows();
@@ -454,14 +454,15 @@ void CTXManager::cleanup(CleanupStage stage) {
 
 
 bool CTXManager::run_idle_task(IdleTask*) {
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+    bool work_done = false;
+#if HAVE_CTX_GLOBAL_TIMEOUT
 //#if !HAVE_FLOW_DYNAMIC
     fcb_table = &_table;
 //#endif
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
     click_chatter("%p{element} Idle release",this);
 #endif
-    bool work_done = _table.check_release();
+    work_done = _table.check_release();
 //#if !HAVE_FLOW_DYNAMIC
     fcb_table = 0;
 //#endif
@@ -635,7 +636,7 @@ String CTXManager::read_handler(Element* e, void* thunk) {
             fc->_table.get_root()->print(-1,false,true,false);
             fcb_table = 0;
             return String("");
-#if HAVE_FLOW_DYNAMIC
+#if HAVE_CTX_GLOBAL_TIMEOUT
         case h_timeout_count:
             return String(fc->_table.old_flows->count());
 #endif

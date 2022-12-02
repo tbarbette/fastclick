@@ -26,7 +26,11 @@ TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
     .complete() < 0)
         return -1;
 
-    VirtualFlowManager::fcb_builded_init_future()->post([this](ErrorHandler* errh){return reorder_initialize(errh);},this);
+    VirtualFlowManager::fcb_builded_init_future()->post(
+        [this](ErrorHandler* errh){
+            return reorder_initialize(errh);
+        },this
+    );
 
     return 0;
 }
@@ -323,7 +327,7 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
         click_tcp *th = (click_tcp *) (((char *)ip) + hlen);
         //click_chatter("Last packet, releasing timeout");
         if (th->th_flags & (TH_FIN | TH_RST))
-                fcb_release_timeout();
+                ctx_release_timeout();
     }
 
   send_batch:
@@ -432,7 +436,7 @@ bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, PacketBatch
 
         //If there is no better TCP manager, we must ensure the flow stays alive
         if (!_notimeout) {
-            fcb_acquire_timeout(2000);
+            ctx_acquire_timeout(2000);
         }
 
         // Ensure that the list of waiting packets is free
