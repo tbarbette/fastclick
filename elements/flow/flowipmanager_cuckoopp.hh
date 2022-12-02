@@ -26,6 +26,7 @@ public:
     const char *processing() const override { return PUSH; }
 
     int configure(Vector<String> &conf, ErrorHandler *errh) override CLICK_COLD;
+    void cleanup(CleanupStage stage) override CLICK_COLD;
 
  
 protected:

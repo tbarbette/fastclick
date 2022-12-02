@@ -35,7 +35,6 @@ int FlowIPManager_CuckooPP::configure(Vector<String> &conf, ErrorHandler *errh) 
 int
 FlowIPManager_CuckooPP::alloc(FlowIPManager_CuckooPPState & table, int core, ErrorHandler* errh)
 {
-
     struct rte_hash_hvariant_parameters hash_params = {0};
 
     char buf[64];
@@ -95,7 +94,7 @@ FlowIPManager_CuckooPP::insert(IPFlow5ID &f, int flowid)
     data.a = flowid;
     int ret = rte_hash_bloom_add_key_data(table, key, data, 0, 0);
 
-    return ret >= 0? flowid : 0;
+    return ret >= 0? flowid : -1;
 }
 
 int
@@ -111,6 +110,9 @@ FlowIPManager_CuckooPP::remove(IPFlow5ID &f)
     return ret >= 0? 0 : ret;
 }
 
+void FlowIPManager_CuckooPP::cleanup(CleanupStage stage)
+{
+}
 
 CLICK_ENDDECLS
 

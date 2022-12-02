@@ -17,6 +17,7 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/args.hh>
+#include <click/algorithm.hh>
 #include <click/ipflowid.hh>
 #include <click/routervisitor.hh>
 #include <click/error.hh>
@@ -27,7 +28,7 @@
 
 CLICK_DECLS
 
-FlowIPManager::FlowIPManager() : _verbose(1), _flags(0), _timer(this), _task(this), _cache(true), Router::InitFuture(this)
+FlowIPManager::FlowIPManager() : _verbose(1), _flags(0), _timer(this), _task(this), _cache(true), _qbsr(0), Router::InitFuture(this)
 {
 }
 
@@ -39,16 +40,19 @@ int
 FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     bool lf = false;
+    int recycle_interval = 1;
+    int timeout = 60;
 
     if (Args(conf, this, errh)
         .read_or_set_p("CAPACITY", _table_size, 65536)
         .read_or_set("RESERVE", _reserve, 0)
-        .read_or_set("TIMEOUT", _timeout, 60)
+        .read_or_set("TIMEOUT", timeout, 60)
 #if RTE_VERSION > RTE_VERSION_NUM(18,8,0,0)
         .read_or_set("LF", lf, false)
 #endif
         .read_or_set("CACHE", _cache, true)
         .read_or_set("VERBOSE", _verbose, 1)
+        .read_or_set("RECYCLE_INTERVAL", recycle_interval, 1)
         .complete() < 0)
         return -1;
 
@@ -61,6 +65,12 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
         _table_size = next_pow2(_table_size);
         click_chatter("Real capacity will be %d",_table_size);
     }
+
+    _recycle_interval_ms = (int)(recycle_interval * 1000);
+    _epochs_per_sec = max(1, (int)(1000 / _recycle_interval_ms));
+    _timeout_ms = timeout * 1000;
+    _timeout_epochs = timeout * _epochs_per_sec;
+
 
 #if RTE_VERSION > RTE_VERSION_NUM(18,8,0,0)
     if (lf) {
@@ -101,14 +111,16 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     if (!fcbs)
         return errh->error("Could not init data table !");
 
-    if (_timeout > 0) {
+    if (_timeout_epochs > 0) {
         if (_flags) {
             errh->warning("This element uses a timer wheel that will use a global lock. Consider using FlowIPManager_CuckooPP instead which uses per-thread timer wheels.");
         }
-        _timer_wheel.initialize(_timeout + 1);
+
+
+        _timer_wheel.initialize(_timeout_epochs);
 
         _timer.initialize(this);
-        _timer.schedule_after(Timestamp::make_sec(1));
+        _timer.schedule_after(Timestamp::make_msec(_recycle_interval_ms));
         _task.initialize(this, false);
 
     }
@@ -116,10 +128,27 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     return Router::InitFuture::solve_initialize(errh);
 }
 
+/**
+ * Returns the location of the IPFlow5ID in the FCB (first data)
+ */
+static inline IPFlow5ID *get_fcb_key(FlowControlBlock *fcb) {
+    return (IPFlow5ID *)FCB_DATA(fcb, 0);
+};
 
+/**
+ * Returns the location of the IPFlow5ID in the FCB (second data, after the key  when released)
+ */
 static inline FlowControlBlock** fcb_next_ptr(FlowControlBlock* fcb) {
-    return (FlowControlBlock**)(((unsigned char*)&fcb->data_32) + sizeof(IPFlow5ID));
+    return (FlowControlBlock**)(get_fcb_key(fcb) + 1);
 }
+
+/**
+ * Returns the location of the IPFlow5ID in the FCB (secothird  data, after the next released ptr  when released)
+ */
+static inline uint32_t* get_released_fcb_flowid(FlowControlBlock* fcb) {
+    return (uint32_t*)(fcb_next_ptr(fcb) + 1);
+}
+
 
 static const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next)
 {
@@ -129,18 +158,28 @@ static const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next)
 bool FlowIPManager::run_task(Task* t)
 {
     Timestamp recent = Timestamp::recent_steady();
+    while (_qbsr) {
+        FlowControlBlock* next = *fcb_next_ptr(_qbsr);
+        rte_hash_free_key_with_position(hash, *get_released_fcb_flowid(_qbsr));
+        _qbsr = next;
+    }
     _timer_wheel.run_timers([this,recent](FlowControlBlock* prev) -> FlowControlBlock*{
         FlowControlBlock* next = *fcb_next_ptr(prev);
-        int old = (recent - prev->lastseen).sec();
-        if (old >= _timeout) {
+        int old = (recent - prev->lastseen).msecval();
+        if (old >= _timeout_ms) {
             if (unlikely(_verbose > 1))
                 click_chatter("Release %p as it is expired since %d", prev, old);
             //expire
-            rte_hash_del_key(hash, (IPFlow5ID*)&prev->data_32[0]);
+            int fid = rte_hash_del_key(hash, get_fcb_key(prev));
+            if (this->_flags & RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY_LF) {
+                *get_released_fcb_flowid(prev) = fid;
+                *fcb_next_ptr(prev) = _qbsr;
+                _qbsr = prev;
+            }
         } else {
             //No need for lock as we'll be the only one to enqueue there
-            int delta = (recent - prev->lastseen).sec();
-            _timer_wheel.schedule_after(prev, _timeout - delta,setter);
+            //int delta = (recent - prev->lastseen).sec();
+            _timer_wheel.schedule_after(prev, _timeout_epochs, setter);
         }
         return next;
     });
@@ -150,7 +189,7 @@ bool FlowIPManager::run_task(Task* t)
 void FlowIPManager::run_timer(Timer* t)
 {
     _task.reschedule();
-    t->reschedule_after(Timestamp::make_sec(1));
+    t->reschedule_after(Timestamp::make_msec(_recycle_interval_ms));
 }
 
 void FlowIPManager::cleanup(CleanupStage stage)
@@ -184,13 +223,14 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
         if (unlikely(_verbose > 1))
             click_chatter("New flow %d", ret);
         fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
-        //Remember ID for deletion
-        *((IPFlow5ID*)&fcb->data_32[0]) = fid;
-        if (_timeout) {
+
+        if (_timeout_epochs) {
+            memcpy(get_fcb_key(fcb), &fid, sizeof(IPFlow5ID));
+
             if (_flags) {
-                _timer_wheel.schedule_after_mp(fcb, _timeout, setter);
+                _timer_wheel.schedule_after_mp(fcb, _timeout_epochs, setter);
             } else {
-                _timer_wheel.schedule_after(fcb, _timeout, setter);
+                _timer_wheel.schedule_after(fcb, _timeout_epochs, setter);
             }
         }
     } else { //existing flow

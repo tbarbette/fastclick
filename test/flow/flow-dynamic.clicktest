@@ -68,6 +68,8 @@ Real capacity for each table will be 65536
 fm.count:
 0
 BEFORE:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
+AFTER:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
+fprint :: FlowPrint: 1 packets from flow 738466322. Count : 1
 fm.count:
 1
 fm.count_fids:
@@ -84,7 +86,7 @@ BEFORE:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
 AFTER:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
 fprint :: FlowPrint: 1 packets from flow 738466322. Count : 1
 fm.count:
-1
+0
 fm.count_fids:
 
 
@@ -115,7 +117,7 @@ BEFORE:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
 AFTER:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
 fprint :: FlowPrint: 1 packets from flow 738466322. Count : 1
 fm.count:
-3
+0
 While executing 'DriverManager@8 :: DriverManager':
   no 'fm.count_fids' read handler
 
