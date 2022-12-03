@@ -8,7 +8,9 @@ on:
 env:
     CXXFLAGS: -std=gnu++17
     FLAGS: --enable-all-elements --disable-verbose-batch --enable-simtime
-
+    #For DPDK
+    STABLE:
+    VERSION: 20.11
     #Until we find a solution for the world-writable /home/runner in GitHub Actions...
     NODPDKTEST: 1
 
@@ -23,59 +25,66 @@ jobs:
             FRAMEWORK: [vanilla, dpdk, dpdk-light, netmap, vanilla-nopool, dpdk-flow-dynamic]
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
       with:
-        python-version: 3.7
-    - name:
-      run: ${{matrix.COMPILER}} -v
-    - name: Install pip
+        python-version: '3.7'
+    - name: Cache Python Packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/pip/
+        key: ${{ runner.os }}-pip
+    - name: Cache DPDK
+      if: ${{matrix.FRAMEWORK}} == "dpdk" || ${{matrix.FRAMEWORK}} == "dpdk-light" || "${{matrix.FRAMEWORK}}" == "dpdk-flow-dynamic"
+      id: cache-dpdk
+      uses: actions/cache@v3
+      with:
+        path: dpdk-$STABLE$VERSION
+        key: ${{ runner.os }}-dpdk
+    - name: Build DPDK
+      if: steps.cache-dpdk.outputs.cache-hit != 'true' and (${{matrix.FRAMEWORK}} == "dpdk" || ${{matrix.FRAMEWORK}} == "dpdk-light" || "${{matrix.FRAMEWORK}}" == "dpdk-flow-dynamic")
       run: |
-          python -m pip install --upgrade pip
+            wget http://fast.dpdk.org/rel/dpdk-$VERSION.tar.gz &&
+            tar -zxf dpdk-$VERSION.tar.gz &&
+            cd dpdk-$STABLE$VERSION &&
+            pip3 install meson ninja &&
+            meson -Dprefix=$(pwd)/install/ build &&
+            cd build &&
+            ninja &&
+            ninja install &&
+            cd .. &&
+            cd .. ;
     - name: framework
       run: |
           if [ "${{matrix.FRAMEWORK}}" = "dpdk" -o "${{matrix.FRAMEWORK}}" = "dpdk-light" -o "${{matrix.FRAMEWORK}}" = "dpdk-flow-dynamic" ] ; then
-            echo "Compiling DPDK..." ;
-            export STABLE=
-            export VERSION=20.11
+            echo "Setting DPDK variables..." ;
             export FRAMEWORK_FLAGS="--enable-dpdk --enable-user-multithread";
             export PKG_CONFIG_PATH=$(pwd)/dpdk-$STABLE$VERSION/install/lib/x86_64-linux-gnu/pkgconfig/ ;
             export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(pwd)/dpdk-$STABLE$VERSION/install/lib/x86_64-linux-gnu/ ;
-            if [ ! -e "dpdk-$STABLE$VERSION" ] || ! pkg-config --exists libdpdk ; then
-                wget http://fast.dpdk.org/rel/dpdk-$VERSION.tar.gz &&
-                tar -zxf dpdk-$VERSION.tar.gz &&
-                cd dpdk-$STABLE$VERSION &&
-                pip3 install meson ninja &&
-                meson -Dprefix=$(pwd)/install/ build &&
-                cd build &&
-                ninja &&
-                ninja install &&
-                cd .. &&
-                cd .. ;
-            fi
-
-            if [ "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then
-                FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --enable-dpdk-packet --disable-clone --disable-task-stats --disable-cpu-load --disable-dpdk-softqueue"
-            fi
-            if [ "${{matrix.FRAMEWORK}}" = "dpdk-flow-dynamic" ] ; then
-                FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --enable-flow-dynamic"
-            fi
-            if [ "${{matrix.FRAMEWORK}}" = "netmap" ] ; then
-                if [ ! -e "netmap-13.0" ] ; then
-                   wget https://github.com/luigirizzo/netmap/archive/refs/tags/v13.0.tar.gz
-                   tar -zxf v13.0.tar.gz
-                fi
-                FRAMEWORK_FLAGS="--with-netmap=$(pwd)/netmap-13.0/sys/"
-            fi
-            echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
-            echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
-            echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
-          elif [ "${{matrix.FRAMEWORK}}" = "vanilla-nopool" ] ; then
-              FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --disable-click-pool"
-              echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
           fi
-    - name: version
+
+          if [ "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then
+              FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --enable-dpdk-packet --disable-clone --disable-task-stats --disable-cpu-load --disable-dpdk-softqueue"
+          fi
+          if [ "${{matrix.FRAMEWORK}}" = "dpdk-flow-dynamic" ] ; then
+              FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --enable-flow-dynamic"
+          fi
+          if [ "${{matrix.FRAMEWORK}}" = "netmap" ] ; then
+              if [ ! -e "netmap-13.0" ] ; then
+                 wget https://github.com/luigirizzo/netmap/archive/refs/tags/v13.0.tar.gz
+                 tar -zxf v13.0.tar.gz
+              fi
+              FRAMEWORK_FLAGS="--with-netmap=$(pwd)/netmap-13.0/sys/"
+          fi
+          if [ "${{matrix.FRAMEWORK}}" = "vanilla-nopool" ] ; then
+              FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --disable-click-pool"
+          fi
+          echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
+    - name: Compiler version
       run: ${{matrix.COMPILER}} -v
     - name: configure
       run: |
