@@ -23,9 +23,7 @@ jobs:
         matrix:
             COMPILER: [gcc, clang]
             FRAMEWORK: [vanilla, dpdk, dpdk-light, netmap, vanilla-nopool, dpdk-flow-dynamic]
-
     steps:
-
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4
       with:
@@ -36,21 +34,27 @@ jobs:
         path: |
           ~/.cache/pip/
         key: ${{ runner.os }}-pip
+    - name: Set up Clang
+      if: ${{ matrix.COMPILER == 'clang' }}
+      uses: egor-tensin/setup-clang@v1
+      with:
+        version: latest
+        platform: x64
     - name: Cache DPDK
-      if: ${{matrix.FRAMEWORK}} == "dpdk" || ${{matrix.FRAMEWORK}} == "dpdk-light" || "${{matrix.FRAMEWORK}}" == "dpdk-flow-dynamic"
+      if: matrix.FRAMEWORK == 'dpdk' || matrix.FRAMEWORK == 'dpdk-light' || matrix.FRAMEWORK == 'dpdk-flow-dynamic'
       id: cache-dpdk
       uses: actions/cache@v3
       with:
-        path: dpdk-$STABLE$VERSION
-        key: ${{ runner.os }}-dpdk
+        path: dpdk-20.11
+        key: ${{ runner.os }}-dpdk-default
     - name: Build DPDK
-      if: steps.cache-dpdk.outputs.cache-hit != 'true' and (${{matrix.FRAMEWORK}} == "dpdk" || ${{matrix.FRAMEWORK}} == "dpdk-light" || "${{matrix.FRAMEWORK}}" == "dpdk-flow-dynamic")
+      if: ${{ steps.cache-dpdk.outputs.cache-hit != 'true' && (matrix.FRAMEWORK == 'dpdk' || matrix.FRAMEWORK == 'dpdk-light' || matrix.FRAMEWORK == 'dpdk-flow-dynamic') }}
       run: |
             wget http://fast.dpdk.org/rel/dpdk-$VERSION.tar.gz &&
             tar -zxf dpdk-$VERSION.tar.gz &&
             cd dpdk-$STABLE$VERSION &&
             pip3 install meson ninja &&
-            meson -Dprefix=$(pwd)/install/ build &&
+            meson -Dprefix=$(pwd)/install/ -Dmachine=default build &&
             cd build &&
             ninja &&
             ninja install &&

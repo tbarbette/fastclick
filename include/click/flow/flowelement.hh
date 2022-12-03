@@ -192,12 +192,14 @@ protected:
     friend class VirtualFlowManager;
 };
 
+# if HAVE_FLOW_DYNAMIC
 class UnstackVisitor : public RouterVisitor {
 public:
     bool visit(Element *e, bool isoutput, int port,
                    Element *from_e, int from_port, int distance);
 
 };
+# endif
 
 
 
