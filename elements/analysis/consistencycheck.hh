@@ -77,7 +77,9 @@ class ConsistencyCheck : public BatchElement { public:
 
     int initialize(ErrorHandler *errh) override CLICK_COLD;
 
+#ifdef HAVE_BATCH
     void push_batch(int, PacketBatch * batch) override;
+#endif
 
     static String read_handler(Element* e, void* thunk);
  private:
