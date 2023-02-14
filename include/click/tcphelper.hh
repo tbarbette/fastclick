@@ -20,8 +20,16 @@
 #include <click/dpdkdevice.hh>
 #endif
 #include "iphelper.hh"
+
 #if HAVE_DPDK
 #include <rte_ip.h>
+
+#if RTE_VERSION >= RTE_VERSION_NUM(22,07,0,0)
+#define PKT_TX_TCP_CKSUM RTE_MBUF_F_TX_TCP_CKSUM
+#define PKT_TX_IP_CKSUM RTE_MBUF_F_TX_IP_CKSUM
+#define PKT_TX_IPV4 RTE_MBUF_F_TX_IPV4
+#endif
+
 #endif
 
 CLICK_DECLS

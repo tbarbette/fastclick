@@ -5,6 +5,10 @@
 #include <rte_hash_crc.h>
 #include <click/ipflowid.hh>
 
+#if RTE_VERSION >= RTE_VERSION_NUM(22,07,0,0)
+#define PKT_RX_TIMESTAMP RTE_MBUF_F_RX_TIMESTAMP
+#endif
+
 inline uint32_t
 ipv4_hash_crc(const void *data,  uint32_t data_len,
                 uint32_t init_val)

@@ -23,6 +23,14 @@
 #include <clicknet/tcp.h>
 #include <clicknet/udp.h>
 #include <rte_ip.h>
+
+#if RTE_VERSION >= RTE_VERSION_NUM(22,07,0,0)
+#define PKT_TX_IP_CKSUM RTE_MBUF_F_TX_IP_CKSUM
+#define PKT_TX_TCP_CKSUM RTE_MBUF_F_TX_TCP_CKSUM
+#define PKT_TX_IPV4 RTE_MBUF_F_TX_IPV4
+#define PKT_TX_UDP_CKSUM RTE_MBUF_F_TX_UDP_CKSUM
+#endif
+
 CLICK_DECLS
 
 ResetIPChecksum::ResetIPChecksum()
