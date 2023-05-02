@@ -1,3 +1,5 @@
+# IMPORTANT : This file is only for old versions of DPDK. Look at the Makefile for the cleaner method actually in use
+
 ifeq ($(RTE_SDK),)
 $(error "Please define RTE_SDK environment variable")
 endif
