@@ -17,10 +17,13 @@ ${PARSE_PATH}.sentinel:
 	cp -u $(RTE_SDK)/app/test-pmd/testpmd.c $(PARSE_PATH)
 	cp -u $(RTE_SDK)/app/test-pmd/testpmd.h $(PARSE_PATH)
 	cp -u $(RTE_SDK)/app/test-pmd/config.c $(PARSE_PATH)
+	cp -u $(RTE_SDK)/app/test-pmd/cmdline.c $(PARSE_PATH)
 	# Strip the main function off to prevent complilation errors, while linking with Click
 	sed -i '/main(int/Q' $(PARSE_PATH)/testpmd.c
-	sed -i 's/const uint32_t *template/const uint32_t */' $(PARSE_PATH)/testpmd.h
+	sed -i 's/\([*(>]\)template\([= .,[;)]\)/\1ptemplate\2/g' $(PARSE_PATH)/config.c $(PARSE_PATH)/testpmd.h
 	sed -i 's/rte_os_shim/rte_os/' $(PARSE_PATH)/testpmd.h
+	sed -i 's/} template;/} ptemplate;/' $(PARSE_PATH)/testpmd.h
+	sed -i 's/static cmdline_parse_ctx_t/cmdline_parse_ctx_t/' $(PARSE_PATH)/cmdline.c
 	head -n -1 $(PARSE_PATH)/testpmd.c > $(PARSE_PATH)/testpmd_t.c;
 	mv $(PARSE_PATH)/testpmd_t.c $(PARSE_PATH)/testpmd.c
 	# Strip off testpmd report messages as our library prints its own report messages
@@ -54,7 +57,9 @@ endif
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 21 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 22 ] ) && echo true),true)
 	PARSE_OBJS += test-pmd/shared_rxq_fwd.o test-pmd/cmd_flex_item.o
 endif
-
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 22 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 23 ] ) && echo true),true)
+	PARSE_OBJS += test-pmd/cmdline_cman.o
+endif
 
 CFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
 CXXFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
