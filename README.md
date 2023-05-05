@@ -18,16 +18,13 @@ Be sure to watch the repository and check out the [GitHub Discussions](https://g
 Quick start for DPDK
 --------------------
 
- * Install DPDK's dependencies (`sudo apt install libelf-dev build-essential pkg-config zlib1g-dev libnuma-dev`)
- * Install DPDK (http://core.dpdk.org/doc/quick-start/). Since 20.11 you have to use meson : `meson build && cd build && ninja && sudo ninja install`
+ * Install DPDK's dependencies (`sudo apt install libelf-dev build-essential pkg-config zlib1g-dev libnuma-dev python3-pyelftools`) and install DPDK (http://core.dpdk.org/doc/quick-start/). To build DPDK, since 20.11 you have to use meson : `meson build && cd build && ninja && sudo ninja install`
  * Build FastClick, with support for DPDK using the following command:
 
 ```
 ./configure --enable-dpdk --enable-intel-cpu --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --disable-cpu-load
 make
 ```
-  * Since DPDK is using Meson and pkg-config, to compile against various, or non-globally installed DPDK versions, one can prepend `PKG_CONFIG_PATH=path/to/libpdpdk.pc/../` to both configure and make.
-
 *You will find more information in the [High-Speed I/O wiki page](https://github.com/tbarbette/fastclick/wiki/High-speed-I-O).*
 
 FastClick "Light"
