@@ -314,6 +314,6 @@ void FlowIPManager::add_handlers()
 
 CLICK_ENDDECLS
 
-ELEMENT_REQUIRES(dpdk dpdk19)
+ELEMENT_REQUIRES(dpdk dpdk19 flow)
 EXPORT_ELEMENT(FlowIPManager)
 ELEMENT_MT_SAFE(FlowIPManager)

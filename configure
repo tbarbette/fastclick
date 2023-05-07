@@ -1671,6 +1671,7 @@ Optional Features:
   --enable-user-timestamp enable support for user-provided clock system
   --enable-bound-port-transfer
                           enable port transfer function ptr optimization
+  Optional features about flow and context:
     --disable-ctx-global-timeout
                           disable sloppy CTX timeouts. Enabled if CTX is
                           enabled by default.
@@ -4022,7 +4023,6 @@ test -n "$target_alias" &&
   test "$program_prefix$program_suffix$program_transform_name" = \
     NONENONEs,x,x, &&
   program_prefix=${target_alias}-
-
 
 if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
@@ -9883,10 +9883,10 @@ then :
 else $as_nop
   enable_flow=NO
 fi
-test "x$enable_all_elements" = xyes -a \( "x$enable_flow" = xNO -o "x$enable_flow" = x \) && enable_flow=yes
+test "x$enable_all_elements" = xyes -a \( "x$enable_flow" = xNO -o "x$enable_flow" = x \) -a "x$enable_batch" = xyes   && enable_flow=yes
 if test "x$enable_flow" = xyes; then
     :
-
+    enable_flow=yes
 fi
 # Check whether --enable-ctx was given.
 if test ${enable_ctx+y}
@@ -10102,7 +10102,7 @@ fi
 all_element_groups=
 for i in `(cd $srcdir/elements; ls | sed '/^CVS$/d;/^\.git/d;/^bsdmodule$/d;/^linuxmodule$/d;/^ns$/d;/^userlevel$/d;/^minios$/d')`; do
     enableval=`eval 'echo $'"enable_$i"`
-    test "x$enable_all_elements" = xyes -a "x$enableval" '!=' xno && enableval=yes
+    test "x$enable_all_elements" = xyes -a "x$enableval" '=' xyes && enableval=yes
     test -d "$srcdir/elements/$i" -a "$enableval" = "yes" && element_groups="$element_groups $i"
     test -d "$srcdir/elements/$i" && all_element_groups="$all_element_groups$i "
 done
@@ -14589,6 +14589,7 @@ if test "x$have_aligned_new" = xyes; then
     CXXFLAGS="$CXXFLAGS -faligned-new"
 fi
 
+
 if test "x$enable_flow" = xyes; then
     if test "x$enable_batch" != xyes; then
         as_fn_error $? "--enable-flow needs --enable-batch! Flow subsystem will be disabled." "$LINENO" 5
@@ -14608,6 +14609,8 @@ if test "x$enable_ctx" = xyes; then
 else
     enable_ctx="no"
 fi
+
+
 
 # Check whether --enable-ctx-global-timeout was given.
 if test ${enable_ctx_global_timeout+y}
