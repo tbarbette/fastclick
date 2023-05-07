@@ -15,8 +15,8 @@ Announcements
 -------------
 Be sure to watch the repository and check out the [GitHub Discussions](https://github.com/tbarbette/fastclick/discussions) to stay up to date!
 
-Quick start for DPDK
---------------------
+Quick start (using DPDK for I/O)
+--------------------------------
 
  * Install DPDK's dependencies (`sudo apt install libelf-dev build-essential pkg-config zlib1g-dev libnuma-dev python3-pyelftools`) and install DPDK (http://core.dpdk.org/doc/quick-start/). To build DPDK, since 20.11 you have to use meson : `meson build && cd build && ninja && sudo ninja install`
  * Build FastClick, with support for DPDK using the following command:
