@@ -49,6 +49,9 @@ cache:
         - dpdk-$DPDK_VERSION
         - netmap-$NETMAP_VERSION
 before_script:
+    - if ! ( gcc -v &> /dev/null ) ; then
+        apt-get install -yqq build-essential
+      fi
     - gcc -v
     - export RTE_SDK=`pwd`/dpdk-$DPDK_VERSION;
       export RTE_TARGET=x86_64-native-linuxapp-gcc;
