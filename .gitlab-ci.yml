@@ -1,8 +1,11 @@
 #This file is quite deprecated, but we keep it there in case someone has an internal GitLab CI pipeline and wants to reuse this
+
+default:
+  image: ubuntu:22.04
+
 variables:
-    DPDK_VERSION: "17.08"
     NETMAP_VERSION: "11.1"
-    CONFIG: "--enable-gtp --enable-json"
+    CONFIG: "--enable-all-elements --disable-verbose-batch --enable-simtime"
 
 batch:
     script:
@@ -10,20 +13,43 @@ batch:
 autobatch:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-batch $CONFIG --disable-verbose-batch --enable-auto-batch=port && make && make check
-
 ip6:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-ip6 --enable-json $CONFIG --disable-batch && make && make check
 mt:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG --disable-batch && make && make check
-dpdk-batch:
-    script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk $CONFIG --enable-batch --disable-verbose-batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
 
-dpdk-nobatch:
+noclone:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk $CONFIG --disable--batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG --disable-clone && make && make check
+
+dpdk:
+  parallel:
+    matrix:
+      - DPDK_VERSION: ["20.11", "23.03"]
+        DPDK_CONFIG: ["--enable-dpdk-packet --enable-batch", "--enable-batch", "--disable-batch", "--enable-dpdk-pool"]
+  before_script:
+    - echo "Running global pre-install..."
+    - !reference [before_script]
+    - echo "Running local pre-install..."
+    - export RTE_SDK=`pwd`/dpdk-$DPDK_VERSION;
+      export RTE_TARGET=x86_64-native-linuxapp-gcc;
+      export PKG_CONFIG_PATH=${RTE_SDK}/install/lib/x86_64-linux-gnu/pkgconfig/;
+      export LD_LIBRARY_PATH=${RTE_SDK}/install/lib/x86_64-linux-gnu/:${RTE_SDK}/install/lib/:$LD_LIBRARY_PATH;
+      if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" ]; then
+            wget http://dpdk.org/browse/dpdk/snapshot/dpdk-$DPDK_VERSION.tar.gz &&
+            tar -zxf dpdk-$DPDK_VERSION.tar.gz &&
+            cd dpdk-$DPDK_VERSION ;
+            pip3 install meson ninja &&
+            meson -Dprefix=$(pwd)/install/ -Dmachine=default build &&
+            cd build && ( ninja && ninja install ) ;  cd .. ; cd .. ;
+      fi;
+      ldconfig
+  script:
+        - ls $PKG_CONFIG_PATH
+        - echo $LD_LIBRARY_PATH
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk ${DPDK_CONFIG} $CONFIG RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make && make check
 
 netmap_single:
     script:
@@ -46,24 +72,16 @@ fnetmap:
 
 cache:
     paths:
-        - dpdk-$DPDK_VERSION
+        - dpdk-*
         - netmap-$NETMAP_VERSION
 before_script:
-    - if ! ( gcc -v &> /dev/null ) ; then
-        apt-get install -yqq build-essential
-      fi
-    - gcc -v
-    - export RTE_SDK=`pwd`/dpdk-$DPDK_VERSION;
-      export RTE_TARGET=x86_64-native-linuxapp-gcc;
-      if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" ]; then
-        wget http://dpdk.org/browse/dpdk/snapshot/dpdk-$DPDK_VERSION.tar.gz &&
-            tar -zxf dpdk-$DPDK_VERSION.tar.gz &&
-            cd dpdk-$DPDK_VERSION ;
-            make config T=$RTE_TARGET &&
-            make install T=$RTE_TARGET ;
-            cd ..;
+    - if ( command -v apt-get &> /dev/null ) ; then
+        echo "Installing dependencies..." ;
+        apt-get update -yqq && apt-get install -yqq build-essential sudo wget libelf-dev pkg-config zlib1g-dev libnuma-dev python3-pyelftools ninja-build meson linux-headers-$(uname -r) python3-pip ;
+
       fi;
-    - if [ ! -e "netmap-$NETMAP_VERSION/sys/net/netmap.h" ] ; then wget https://github.com/luigirizzo/netmap/archive/v$NETMAP_VERSION.tar.gz && tar -xvf v$NETMAP_VERSION.tar.gz && cd netmap-$NETMAP_VERSION && cd LINUX && ./configure --no-drivers && cd .. && cd .. ; fi
+    - gcc -v
+    - if [ ! -e "netmap-$NETMAP_VERSION/sys/net/netmap.h" ] ; then wget https://github.com/luigirizzo/netmap/archive/v$NETMAP_VERSION.tar.gz && tar -xvf v$NETMAP_VERSION.tar.gz && ( cd netmap-$NETMAP_VERSION && cd LINUX && ./configure --no-drivers ; cd .. && cd .. ) ; fi
     - ls -al
     - if [ `sudo -n whoami` = "root" ] ; then sudo insmod netmap-$NETMAP_VERSION/LINUX/netmap.ko && sudo chmod 666 /dev/netmap ; fi
     - export CONFIG_NETMAP="--with-netmap=`pwd`/netmap-$NETMAP_VERSION/sys/"

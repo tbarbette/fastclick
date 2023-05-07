@@ -11,8 +11,8 @@ dnl The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
 dnl notice is a summary of the Click LICENSE file; the license in that file is
 dnl legally binding.
 
-AC_INIT([click], [2.1])
-AC_PREREQ(2.60)
+AC_INIT([click],[2.1])
+AC_PREREQ([2.71])
 AC_CONFIG_HEADERS([include/click/config.h:config.h.in], [echo > stamp-h])
 AC_CONFIG_HEADERS([include/click/pathvars.h:pathvars.h.in])
 AC_CONFIG_HEADERS([include/click/config-bsdmodule.h:config-bsdmodule.h.in include/click/config-linuxmodule.h:config-linuxmodule.h.in include/click/config-ns.h:config-ns.h.in include/click/config-userlevel.h:config-userlevel.h.in include/click/config-minios.h:config-minios.h.in])
@@ -39,7 +39,7 @@ AC_DEFINE_UNQUOTED([CLICK_VERSION_CODE], [CLICK_MAKE_VERSION_CODE($click_version
 CLICK_INIT('$(top_srcdir)')
 
 dnl support for cross compiling
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 
 dnl This is wrong!!
 AC_CHECK_TOOL(CC, gcc)
@@ -66,14 +66,14 @@ esac
 
 
 
-AC_TRY_RUN([#include <new>
+AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <new>
 
 int main() {
     std::size_t sz = 8;
     std::align_val_t al{64};
     void* a = operator new(sz,al);
     return (a == nullptr?1:0);
-}],AC_DEFINE([HAVE_ALIGNED_NEW]))
+}]])],[AC_DEFINE(HAVE_ALIGNED_NEW)],[],[])
 
 CLICK_PROG_KERNEL_CC
 CLICK_PROG_KERNEL_CXX
@@ -693,7 +693,7 @@ ELEMENTS_ARG_ENABLE(app, [include application-level elements], yes)
 ELEMENTS_ARG_ENABLE(aqm, [include active queue management elements], yes)
 ELEMENTS_ARG_ENABLE(ethernet, [include Ethernet elements], yes)
 ELEMENTS_ARG_ENABLE(etherswitch, [include Ethernet switch elements], NO)
-ELEMENTS_ARG_ENABLE(flow, [include Enable flow system and elements], NO)
+ELEMENTS_ARG_ENABLE(flow, [include Enable flow system and elements], NO, enable_flow=yes, [ -a "x$enable_batch" = xyes ] )
 ELEMENTS_ARG_ENABLE(ctx, [include Context-based elements], NO, enable_ctx=yes , [ -a "x$enable_flow" = xyes ] )
 ELEMENTS_ARG_ENABLE(grid, [include Grid elements (see FAQ)], NO)
 ELEMENTS_ARG_ENABLE(icmp, [include ICMP elements], yes)
@@ -717,7 +717,7 @@ AC_ARG_ENABLE(skip-elements, [AS_HELP_STRING([--enable-skip-elements=ELTS], [dis
 all_element_groups=
 for i in `(cd $srcdir/elements; ls | sed '/^CVS$/d;/^\.git/d;/^bsdmodule$/d;/^linuxmodule$/d;/^ns$/d;/^userlevel$/d;/^minios$/d')`; do
     enableval=`eval 'echo $'"enable_$i"`
-    test "x$enable_all_elements" = xyes -a "x$enableval" '!=' xno && enableval=yes
+    test "x$enable_all_elements" = xyes -a "x$enableval" '=' xyes && enableval=yes
     test -d "$srcdir/elements/$i" -a "$enableval" = "yes" && element_groups="$element_groups $i"
     test -d "$srcdir/elements/$i" && all_element_groups="$all_element_groups$i "
 done
@@ -801,10 +801,10 @@ dnl
 dnl functions
 dnl
 
-AC_LANG_C
+AC_LANG([C])
 AC_REPLACE_FUNCS(strerror)
 AC_CHECK_FUNCS(random snprintf strnlen strtof strtold strtoul tcgetpgrp vsnprintf aligned_alloc)
-AC_LANG_CPLUSPLUS
+AC_LANG([C++])
 
 
 dnl
@@ -908,6 +908,7 @@ if test "x$have_aligned_new" = xyes; then
     CXXFLAGS="$CXXFLAGS -faligned-new"
 fi
 
+
 if test "x$enable_flow" = xyes; then
     if test "x$enable_batch" != xyes; then
         AC_MSG_ERROR([--enable-flow needs --enable-batch! Flow subsystem will be disabled.])
@@ -923,6 +924,8 @@ if test "x$enable_ctx" = xyes; then
 else
     enable_ctx="no"
 fi
+
+m4_divert_once([HELP_ENABLE], [[  Optional features about flow and context:]])
 
 AC_ARG_ENABLE([ctx-global-timeout],
     [AS_HELP_STRING([  --disable-ctx-global-timeout], [disable sloppy CTX timeouts. Enabled if CTX is enabled by default.])],
@@ -971,7 +974,7 @@ else
 fi
 
 AC_ARG_ENABLE(tools,
-  [AC_HELP_STRING([--enable-tools=WHERE], [enable tools (host/build/mixed/no) [[mixed]]])],
+  [AS_HELP_STRING([--enable-tools=WHERE],[enable tools (host/build/mixed/no) [[mixed]]])],
   :, enable_tools=mixed)
 
 if test "$enable_tools" != mixed -a "$enable_tools" != host -a "$enable_tools" != build -a "$enable_tools" != no; then
@@ -1034,7 +1037,7 @@ dnl
 dnl sockets
 dnl
 
-AC_LANG_C
+AC_LANG([C])
 SOCKET_LIBS=
 if test "$enable_userlevel" = yes; then
     savelibs="$LIBS"; LIBS=
@@ -1052,7 +1055,7 @@ if test "$enable_userlevel" = yes; then
     fi
 fi
 AC_SUBST(SOCKET_LIBS)
-AC_LANG_CPLUSPLUS
+AC_LANG([C++])
 
 
 dnl
@@ -1066,10 +1069,10 @@ dnl
 dnl mmap
 dnl
 
-AC_LANG_C
+AC_LANG([C])
 AC_CHECK_HEADERS_ONCE([sys/mman.h])
 AC_FUNC_MMAP
-AC_LANG_CPLUSPLUS
+AC_LANG([C++])
 AC_CHECK_FUNCS(madvise)
 AC_CHECK_DECLS(madvise, [], [], [#if HAVE_SYS_MMAN_H
 #include <sys/types.h>
@@ -1870,11 +1873,11 @@ if test "$properprefix" != no; then
     AC_CHECK_HEADER(prop.h, have_prop_h=yes, have_prop_h=no)
     CPPFLAGS="$saveflags"
 
-    AC_LANG_C
+    AC_LANG([C])
     saveflags="$LDFLAGS"; test -n "$properprefix" && LDFLAGS="$LDFLAGS -L$properprefix/lib"
     AC_CHECK_LIB(proper, prop_open, have_libproper=yes, have_libproper=no)
     LDFLAGS="$saveflags"
-    AC_LANG_CPLUSPLUS
+    AC_LANG([C++])
 
     if test $have_prop_h = yes -a $have_libproper = yes; then
         AC_DEFINE(HAVE_PROPER)
@@ -1909,7 +1912,7 @@ if test "$expatprefix" != no; then
     AC_CHECK_HEADER(expat.h, have_expat_h=yes, have_expat_h=no)
     CPPFLAGS="$saveflags"
 
-    AC_LANG_C
+    AC_LANG([C])
     saveflags="$LDFLAGS"; test -n "$expatprefix" && LDFLAGS="$LDFLAGS -L$expatprefix/lib"
     AC_CHECK_LIB(expat, XML_ParserCreateNS, have_libexpat=yes, have_libexpat=no)
     LDFLAGS="$saveflags"
@@ -2055,7 +2058,7 @@ $linux_autoconf_include
 
 
     AC_CACHE_CHECK([for C++-includable kernel header files], [ac_cv_cxx_aware_system],
-        [AC_LANG_CPLUSPLUS
+        [AC_LANG([C++])
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <linux/signal.h>
 #include <linux/skbuff.h>
@@ -2160,7 +2163,7 @@ void f1(int64_t) { // will fail if long long and int64_t are the same type
     fi
 
     AC_CACHE_CHECK([for <asm/alternative.h>], [ac_cv_linux_asm_alternative_h],
-        [AC_LANG_C
+        [AC_LANG([C])
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <asm/alternative.h>]],
 [[]])],
@@ -2170,7 +2173,7 @@ void f1(int64_t) { // will fail if long long and int64_t are the same type
     fi
 
     AC_CACHE_CHECK([for <asm/scatterlist.h>], [ac_cv_linux_asm_scatterlist_h],
-        [AC_LANG_C
+        [AC_LANG([C])
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <asm/scatterlist.h>]],
 [[]])],
@@ -2180,7 +2183,7 @@ void f1(int64_t) { // will fail if long long and int64_t are the same type
     fi
 
     AC_CACHE_CHECK([for <asm/system.h>], [ac_cv_linux_asm_system_h],
-        [AC_LANG_C
+        [AC_LANG([C])
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <asm/system.h>]],
 [[]])],
@@ -2198,7 +2201,7 @@ void f1(int64_t) { // will fail if long long and int64_t are the same type
 
     dnl Linux kernel network configuration
 
-    AC_LANG_CPLUSPLUS
+    AC_LANG([C++])
     AC_CACHE_CHECK([whether struct sk_buff has a security member], [ac_cv_linuxmodule_skbuff_security],
         [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <linux/skbuff.h>]],
@@ -2408,7 +2411,7 @@ CFLAGS="$save_cflags"
     dnl Linux kernel file system configuration
 
     AC_CACHE_CHECK([whether struct super_block has an s_d_op member], [ac_cv_linuxmodule_super_block_s_d_op],
-        [AC_LANG_C
+        [AC_LANG([C])
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <linux/fs.h>]],
 [[extern struct super_block *sb; sb->s_d_op = 0;]])],
@@ -2425,7 +2428,7 @@ CFLAGS="$save_cflags"
     fi
 
     AC_CACHE_CHECK([whether struct dentry has a d_child member], [ac_cv_linuxmodule_dentry_d_child],
-        [AC_LANG_C
+        [AC_LANG([C])
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <linux/fs.h>
 #include <linux/dcache.h>]],

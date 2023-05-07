@@ -577,12 +577,20 @@ FromFile::get_packet(size_t size, uint32_t sec, uint32_t subsec, ErrorHandler *e
 #else
     if (_pos + size <= _len) {
 
+#ifndef CLICK_NOINDIRECT
         if (Packet *p = _data_packet->clone()) {
             p->shrink_data(_buffer + _pos, size);
             p->timestamp_anno().assign(sec, subsec);
             _pos += size;
             return p;
         }
+#else
+        if (Packet *p = Packet::make(_buffer + _pos, size)) {
+            p->timestamp_anno().assign(sec, subsec);
+            _pos += size;
+            return p;
+        }
+#endif
     } else
 #endif
     {
