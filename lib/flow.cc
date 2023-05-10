@@ -21,6 +21,7 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <stdlib.h>
+#include <byteswap.h>
 #include <regex>
 #include <click/flow/flow.hh>
 #include <click/flow/flowelement.hh>

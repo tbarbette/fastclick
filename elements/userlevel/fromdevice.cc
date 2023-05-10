@@ -43,6 +43,8 @@
 #include <click/packet_anno.hh>
 #include <click/standard/scheduleinfo.hh>
 #include <click/userutils.hh>
+#include <netinet/if_ether.h>
+#define _LINUX_IF_ETHER_H 1
 #include <linux/ethtool.h>
 #include <linux/netlink.h>
 #include <unistd.h>
