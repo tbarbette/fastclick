@@ -75,11 +75,7 @@ cache:
         - dpdk-*
         - netmap-$NETMAP_VERSION
 before_script:
-    - if ( command -v apt-get &> /dev/null ) ; then
-        echo "Installing dependencies..." ;
-        apt-get update -yqq && apt-get install -yqq build-essential sudo wget libelf-dev pkg-config zlib1g-dev libnuma-dev python3-pyelftools ninja-build meson linux-headers-$(uname -r) python3-pip ;
-
-      fi;
+    - sh deps.sh
     - gcc -v
     - if [ ! -e "netmap-$NETMAP_VERSION/sys/net/netmap.h" ] ; then wget https://github.com/luigirizzo/netmap/archive/v$NETMAP_VERSION.tar.gz && tar -xvf v$NETMAP_VERSION.tar.gz && ( cd netmap-$NETMAP_VERSION && cd LINUX && ./configure --no-drivers ; cd .. && cd .. ) ; fi
     - ls -al
