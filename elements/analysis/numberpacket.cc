@@ -44,7 +44,7 @@ int NumberPacket::configure(Vector<String> &conf, ErrorHandler *errh) {
     return 0;
 }
 
-inline Packet* NumberPacket::smaction(Packet *p) {
+inline Packet* NumberPacket::simple_action(Packet *p) {
     WritablePacket *wp = nullptr;
     if (p->length() >= (unsigned)_offset + _size_of_number) {
         wp = p->uniqueify();
@@ -66,22 +66,6 @@ inline Packet* NumberPacket::smaction(Packet *p) {
 
     return wp;
 }
-
-Packet*
-NumberPacket::simple_action(Packet *p) {
-    return smaction(p);
-}
-
-#if HAVE_BATCH
-PacketBatch*
-NumberPacket::simple_action_batch(PacketBatch *batch) {
-    FOR_EACH_PACKET_SAFE(batch,p) {
-        p = smaction(p);
-    }
-    return batch;
-}
-#endif
-
 
 String
 NumberPacket::read_handler(Element *e, void *thunk)

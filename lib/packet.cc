@@ -1063,10 +1063,14 @@ Packet::clone(bool fast)
         return duplicate(0,0);
     }
 # endif
-    Packet* p = reinterpret_cast<Packet *>(
-    rte_pktmbuf_clone(mb(), DPDKDevice::get_mpool(rte_socket_id())));
-    if (likely(!p))
+    auto pool = DPDKDevice::get_mpool(rte_socket_id());
+    rte_mbuf* m = rte_pktmbuf_alloc(pool);
+    if (unlikely(!m))
         return 0;
+    rte_pktmbuf_attach(m,mb());
+    m->nb_segs = 1;
+    m->pkt_len = mb()->pkt_len;
+    Packet* p = reinterpret_cast<Packet*>(m);
     p->copy_annotations(this,true);
     p->copy_headers(this);
     return p;
