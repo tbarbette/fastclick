@@ -69,7 +69,7 @@ extern "C" {
 #define DEV_TX_OFFLOAD_TCP_TSO RTE_ETH_TX_OFFLOAD_TCP_TSO
 #define DEV_TX_OFFLOAD_MULTI_SEGS RTE_ETH_TX_OFFLOAD_MULTI_SEGS
 #ifndef RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE
-# define RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE
+# define RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE DEV_TX_OFFLOAD_MBUF_FAST_FREE
 #endif
 
 //#define DEF_DEV_RXDESC DEF_RTE_ETH_RXDESC
@@ -703,7 +703,8 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     sprintf(vendor_and_dev, "%x:%x", info.vendor_id, info.device_id);
 
     // Retrieve more information about the vendor of this NIC
-    String dev_pci = shell_command_output_string("lspci -d " + String(vendor_and_dev), "", errh);
+
+    String dev_pci = shell_command_output_string("lspci -d " + String(vendor_and_dev) + " 2>/dev/null", "", errh);
     String long_vendor_name = parse_pci_info(dev_pci, "Ethernet controller");
     if (!long_vendor_name.empty()) {
         info.vendor_name = keep_token_left(long_vendor_name, ' ');
