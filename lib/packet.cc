@@ -1065,6 +1065,8 @@ Packet::clone(bool fast)
 # endif
     Packet* p = reinterpret_cast<Packet *>(
     rte_pktmbuf_clone(mb(), DPDKDevice::get_mpool(rte_socket_id())));
+    if (likely(!p))
+        return 0;
     p->copy_annotations(this,true);
     p->copy_headers(this);
     return p;
@@ -1406,7 +1408,6 @@ Packet::expensive_push(uint32_t nbytes)
     __skb_push(q->skb(), nbytes);
 #elif CLICK_PACKET_USE_DPDK
     rte_pktmbuf_prepend(q->mb(), nbytes);
-    click_chatter("New head : %d",q->headroom());
 #else				/* User-space and BSD kernel module */
     q->_data -= nbytes;
 # ifdef CLICK_BSDMODULE
@@ -1423,9 +1424,6 @@ Packet::expensive_push(uint32_t nbytes)
 WritablePacket *
 Packet::expensive_put(uint32_t nbytes)
 {
-#if CLICK_PACKET_USE_DPDK
-    assert(false);
-#endif
   static int chatter = 0;
   if (tailroom() < nbytes && chatter < 5) {
     click_chatter("expensive Packet::put; have %d wanted %d",

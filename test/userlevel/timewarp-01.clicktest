@@ -2,6 +2,9 @@
 
 Test timewarp functionality.
 
+%require
+click-provides !dpdk-packet #Dpdk-packet will force DPDK eal initialization, which slows down the initialization and breaks the test
+
 %script
 
 now () {

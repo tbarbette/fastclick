@@ -430,7 +430,9 @@ main(int argc, char **argv)
         args.dpdk_arg.push_back((char*)(new String("--no-huge"))->c_str());
         args.dpdk_arg.push_back((char*)(new String("-l"))->c_str());
         char* s = (char*)malloc(14);
-        snprintf(s,14,"0-%d",click_nthreads - 1);
+        if (args.click_affinity_offset < 0)
+            args.click_affinity_offset = 0;
+        snprintf(s,14,"%d-%d", args.click_affinity_offset, args.click_affinity_offset + click_nthreads - 1);
         args.dpdk_arg.push_back(s);
 
         args.dpdk_arg.push_back((char*)(new String("-m"))->c_str());
