@@ -53,7 +53,7 @@ dpdk:
         - ls $PKG_CONFIG_PATH
         - echo $LD_LIBRARY_PATH
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk ${DPDK_CONFIG} $CONFIG RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
-        - if [[ "$DPDK_CONFIG" = *"--enable-dpdk-pool"* ]] ; then make check ; fi
+        - if [[ "$DPDK_CONFIG" != *"--enable-dpdk-pool"* ]] ; then make check ; fi
 
 netmap_single:
     script:
