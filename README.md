@@ -43,6 +43,18 @@ make
  
 Ultimately, FastClick will still be impacted by its high flexibility and the many options it supports in each elements. This is adressed by [PacketMill](#packetmill) by embedding constant parameters, and other stuffs to produce one efficient binary.
 
+Docker
+------
+We provide a Dockerfile to build FastClick with DPDK. Public images are available too in [docker hub](https://hub.docker.com/r/tbarbette/fastclick-dpdk).
+
+The docker container must run in priviledged mode, and most often in network host mode.
+
+```
+sudo docker run -v /mnt/huge:/dev/hugepages -it --privileged --network host tbarbette/fastclick-dpdk:generic --dpdk -- -e "FromDPDKDevice(0) -> Discard;"
+```
+
+Note: the default image is build for the "default" arch, it will be suboptimal in term of performances. Check the [Docker wiki page for more information.](https://github.com/tbarbette/fastclick/wiki/Docker)
+
 Contribution
 ------------
 FastClick also aims at keeping a more up-to-date fork and welcomes

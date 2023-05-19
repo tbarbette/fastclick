@@ -16,7 +16,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-
+#include <sys/types.h>
 #include <rte_tchh_structs.h>
 
 #ifdef __cplusplus

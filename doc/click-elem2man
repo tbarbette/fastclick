@@ -1332,8 +1332,11 @@ sub process_comment ($$$) {
     # close output file & make links if appropriate
     if ($filename_func) {
         close OUT;
-        use File::Which;
-        $zcat = which("gzcat") ? "gzcat" : "zcat";
+        sub check_exists_command {
+           my $check = `sh -c 'command -v $_[0]'`;
+            return $check;
+        }
+        $zcat = check_exists_command("gzcat") ? "gzcat" : "zcat";
         if ($gzip ? open(INX, "-|", $zcat, $main_outname) : open(INX, "<", $main_outname)) {
             $gzip ? open(OUTX, "-|", $zcat, $main_outname . "~") : open(OUTX, "<", $main_outname . "~");
             local($/) = undef;
