@@ -1,6 +1,12 @@
 /**
  * RSS base
  */
+#if RTE_VERSION >= RTE_VERSION_NUM(21,8,0,0)
+#define ETH_RSS_IPV4 RTE_ETH_RSS_IPV4
+#define ETH_RSS_NONFRAG_IPV4_TCP RTE_ETH_RSS_NONFRAG_IPV4_TCP
+#define ETH_RSS_NONFRAG_IPV4_UDP RTE_ETH_RSS_NONFRAG_IPV4_UDP
+#endif
+
 MethodRSS::MethodRSS(NICScheduler* b, EthernetDevice* fd) :
     BalanceMethodDevice(b,fd),
     //_verifier(0),
@@ -35,7 +41,7 @@ int MethodRSS::initialize(ErrorHandler *errh, int startwith) {
         if (rte_eth_dev_rss_hash_conf_get(port_id, &_rss_conf) != 0) {
             errh->warning("Could not get RSS configuration. Will use a default one.");
             _rss_conf.rss_key_len = 40;
-            _rss_conf.rss_hf = ETH_RSS_IPV4 | ETH_RSS_NONFRAG_IPV4_TCP |ETH_RSS_NONFRAG_IPV4_UDP;
+            _rss_conf.rss_hf = ETH_RSS_IPV4 | ETH_RSS_NONFRAG_IPV4_TCP | ETH_RSS_NONFRAG_IPV4_UDP;
             for (int i = 0; i < 40; i++)
                 _rss_conf.rss_key[i] = click_random();
 
