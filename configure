@@ -14486,7 +14486,7 @@ else
   check_avx2=yes
 fi
 
-echo "x$cpu_supports_avx2$check_avx2"
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking if AVX2 should be used" >&5
 $as_echo_n "checking if AVX2 should be used... " >&6; }
 if test "x$cpu_supports_avx2$check_avx2" = "xyesyes"; then
@@ -19660,6 +19660,8 @@ echo "
 Configuration Summary:
     C     Compiler:              ${CC}
     C++   Compiler:              ${CXX}
+    CFLAGS:                      ${CFLAGS}
+    CXXFLAGS:                    ${CXXFLAGS}
 
           Batching:              ${enable_batch}
     Flow Subsystem:              ${enable_flow}
