@@ -8,3 +8,6 @@ for arch in ${archs} ; do
         docker push tbarbette/fastclick-dpdk:$arch
     fi
 done
+
+docker tag tbarbette/fastclick-dpdk:corei7 tbarbette/fastclick-dpdk:generic
+docker push tbarbette/fastclick-dpdk:generic
