@@ -3555,9 +3555,7 @@ test -n "$target_alias" &&
   program_prefix=${target_alias}-
 
 
-using_clang=`$CXX --version | grep ^clang | cut -f1 -d' '`
-if test -z "$using_clang"; then
-    if test -n "$ac_tool_prefix"; then
+if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -3649,7 +3647,7 @@ else
   CC="$ac_cv_prog_CC"
 fi
 
-    if test -n "$ac_tool_prefix"; then
+if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}g++", so it can be a program name with args.
 set dummy ${ac_tool_prefix}g++; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -3741,7 +3739,6 @@ else
   CXX="$ac_cv_prog_CXX"
 fi
 
-fi
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
