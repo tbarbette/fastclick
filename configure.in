@@ -57,18 +57,6 @@ AC_PROG_CXXCPP
 
 AX_CHECK_COMPILE_FLAG(-Winconsistent-missing-override,CXXFLAGS="$CXXFLAGS -Wno-inconsistent-missing-override",:,[-Werror])
 
-case "$target" in
-        *x86*)
-                AX_CHECK_X86_FEATURES([CFLAGS="$CFLAGS $X86_FEATURE_CFLAGS";CXXFLAGS="$CXXFLAGS $X86_FEATURE_CFLAGS"])
-        ;;
-        *)
-                # AC_MSG_WARN(["Skipping x86 tests since target is $target"])
-        ;;
-esac
-
-
-
-
 AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <new>
 
 int main() {
@@ -1504,22 +1492,31 @@ fi
 
 dnl Support AVX2 instructions
 
+AC_COMPILE_IFELSE([
+#ifndef __AVX2__
+#error
+#endif
+         ], [cpu_supports_avx2="yes"], [cpu_supports_avx2="no"])
+
 AC_ARG_ENABLE([avx2],
         AS_HELP_STRING([--disable-avx2],
                    [Do not check whether AVX2 is enabled]),
           [check_avx2=no],
           [check_avx2=yes])
-
+echo "x$cpu_supports_avx2$check_avx2"
 AC_MSG_CHECKING([if AVX2 should be used])
-if test "x$ax_cv_gcc_x86_cpu_supports_avx2$check_avx2" = "xyesyes"; then
+if test "x$cpu_supports_avx2$check_avx2" = "xyesyes"; then
     AC_MSG_RESULT([yes])
     AC_DEFINE([HAVE_AVX2],1)
 else
     AC_MSG_RESULT([no])
 fi
 
-dnl Support SSE4.2 instructions
-
+AC_COMPILE_IFELSE([
+#ifndef __SSE4_2__
+#error
+#endif
+         ], [cpu_supports_sse42="yes"], [cpu_supports_sse42="no"])
 AC_ARG_ENABLE([sse42],
         AS_HELP_STRING([--disable-sse42],
                    [Do not check whether SSE4.2 is enabled]),
@@ -1527,7 +1524,7 @@ AC_ARG_ENABLE([sse42],
           [check_sse42=yes])
 
 AC_MSG_CHECKING([if SSE4.2 should be used])
-if test "x$ax_cv_gcc_x86_cpu_supports_sse4_2$check_sse42" = "xyesyes"; then
+if test "x$cpu_supports_sse42$check_sse42" = "xyesyes"; then
     AC_MSG_RESULT([yes])
     AC_DEFINE([HAVE_SSE42],1)
 else
