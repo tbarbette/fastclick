@@ -1,6 +1,6 @@
 FROM alpine:3.17
 
-ARG machine=default
+ARG machine=corei7
 ARG source=0
 
 MAINTAINER tom.barbette@uclouvain.be
@@ -42,7 +42,7 @@ WORKDIR /fastclick
 
 COPY ./ /fastclick/
 
-RUN echo "DPDK in $RTE_SDK" && ./configure --enable-dpdk --enable-intel-cpu --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-flow-atomic --disable-flow-dynamic --disable-ctx-global-timeout --disable-ctx --disable-task-stats --disable-cpu-load --disable-dpdk-softqueue --enable-flow-api --prefix=/fastclick-install/ && \
+RUN echo "DPDK in $RTE_SDK" && ./configure --enable-dpdk --enable-intel-cpu --verbose --enable-select=poll CFLAGS="-O3 -march=$machine" CXXFLAGS="-std=c++11 -O3 -march=$machine"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-flow-atomic --disable-flow-dynamic --disable-ctx-global-timeout --disable-ctx --disable-task-stats --disable-cpu-load --disable-dpdk-softqueue --enable-flow-api --enable-portable-binary --prefix=/fastclick-install/ && \
     make clean && make && make install && \
     if [ $source != "1" ] ; then rm -rf /fastclick ; fi
 
