@@ -1156,7 +1156,7 @@ Packet::clone(bool fast)
 #endif /* CLICK_LINUXMODULE */
 }
 
-inline WritablePacket *
+WritablePacket *
 Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom)
 {
 #if CLICK_PACKET_USE_DPDK
