@@ -89,6 +89,7 @@ class Packet { public:
     // Packet now owns the mbuf.
     static inline Packet *make(struct mbuf *mbuf) CLICK_WARN_UNUSED_RESULT;
 #endif
+
 #if CLICK_USERLEVEL || CLICK_MINIOS
     typedef void (*buffer_destructor_type)(unsigned char* buf, size_t sz, void* argument);
 
@@ -115,6 +116,7 @@ class Packet { public:
     inline bool shared() const;
     inline bool shared_nonatomic() const;
     Packet *clone(bool fast = false) CLICK_WARN_UNUSED_RESULT;
+    WritablePacket *duplicate(int32_t extra_headroom = 0, int32_t extra_tailroom = 0) CLICK_WARN_UNUSED_RESULT;
     inline WritablePacket *uniqueify() CLICK_WARN_UNUSED_RESULT;
 #ifndef CLICK_NOINDIRECT
 # if CLICK_LINUXMODULE
@@ -930,7 +932,6 @@ private:
     void assimilate_mbuf();
 #endif
 
-    WritablePacket *duplicate(int32_t extra_headroom, int32_t extra_tailroom) CLICK_WARN_UNUSED_RESULT;
     inline void shift_header_annotations(const unsigned char *old_head, int32_t extra_headroom);
     WritablePacket *expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom, bool free_on_failure) CLICK_WARN_UNUSED_RESULT;
     WritablePacket *expensive_push(uint32_t nbytes) CLICK_WARN_UNUSED_RESULT;

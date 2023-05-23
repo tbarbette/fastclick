@@ -107,6 +107,7 @@ class FastUDPFlows : public BatchElement {
         unsigned int _flowburst;
         bool _cksum;
         bool _sequential;
+        bool _duplicate;
         click_jiffies_t _first;
         click_jiffies_t _last;
         struct state_t {
@@ -126,7 +127,8 @@ class FastUDPFlows : public BatchElement {
         Timer _timer;
 
         void change_ports(int);
-        Packet *get_packet();
+        Packet *gen_packet();
+        Packet *get_p();
 
         static int eth_write_handler(const String &, Element *, void *, ErrorHandler *);
 
