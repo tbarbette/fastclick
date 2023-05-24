@@ -3,7 +3,7 @@ archs="i386 i486 i586 pentium lakemont pentium-mmx winchip-c6 winchip2 c3 samuel
 for arch in ${archs} ; do
     if ( gcc -march=$arch -dM -E - < /dev/null | egrep "SSE4_2" ) &> /dev/null ; then
         echo "Building for $arch..."
-        docker build -t tbarbette/fastclick-dpdk:$arch --build-arg machine=$arch etc/Dockerfile.dpdk
+        docker build -t tbarbette/fastclick-dpdk:$arch --build-arg machine=$arch -f etc/Dockerfile.dpdk .
         #docker tag fastclick-dpdk-$arch tbarbette/fastclick-dpdk:$arch
         docker push tbarbette/fastclick-dpdk:$arch
     fi
