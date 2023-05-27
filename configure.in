@@ -1505,6 +1505,10 @@ AC_MSG_CHECKING([if AVX2 should be used])
 if test "x$cpu_supports_avx2$check_avx2" = "xyesyes"; then
     AC_MSG_RESULT([yes])
     AC_DEFINE([HAVE_AVX2],1)
+    save_cflags="$CFLAGS"
+    CFLAGS="$save_cflags -mavx2"
+    save_cxxflags="$CXXFLAGS"
+    CXXFLAGS="$save_cxxflags -mavx2"
 else
     AC_MSG_RESULT([no])
 fi
@@ -1524,6 +1528,10 @@ AC_MSG_CHECKING([if SSE4.2 should be used])
 if test "x$cpu_supports_sse42$check_sse42" = "xyesyes"; then
     AC_MSG_RESULT([yes])
     AC_DEFINE([HAVE_SSE42],1)
+    save_cflags="$CFLAGS"
+    CFLAGS="$save_cflags -msse4.2"
+    save_cxxflags="$CXXFLAGS"
+    CXXFLAGS="$save_cxxflags -msse4.2"
 else
     AC_MSG_RESULT([no])
 fi
