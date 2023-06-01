@@ -446,7 +446,12 @@ inline void ip6_follow_eh(const click_ip6* ip6, const unsigned char* end, F fn) 
 
 inline void* ip6_find_header(const click_ip6* ip6, const uint8_t type, const unsigned char* end) {
 	unsigned char* pos = 0;
-	auto fnt = [&pos,type] (const uint8_t next, unsigned char* hdr) __attribute__((always_inline)) -> bool {
+	auto fnt = [&pos,type] (const uint8_t next, unsigned char* hdr)
+
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+        __attribute__((always_inline))
+#endif
+        -> bool {
 		if (next == type) {
 			pos = hdr;
 			return 0;
