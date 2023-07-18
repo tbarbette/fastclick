@@ -89,7 +89,7 @@ private:
     bool _verbose;
     int _tc_offset;
     unsigned char _tc_mask;
-
+    bool _nano;
     inline int smaction(Packet *p);
 
     RecordTimestamp *get_recordtimestamp_instance();

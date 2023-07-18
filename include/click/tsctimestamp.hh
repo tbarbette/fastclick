@@ -76,6 +76,13 @@ class TSCTimestamp {
         return val / (cycles_hz_warp() / 1000000);
     }
 
+    /**
+     * @brief returns the total number of nsecs represented by this timestamp
+     */
+    inline double nsecval() {
+        return (double)val / ((double)cycles_hz_warp() / 1000000000.0d);
+    }
+
     inline int64_t tsc_val() {
         return val;
     }

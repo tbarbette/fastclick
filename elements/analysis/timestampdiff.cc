@@ -56,6 +56,7 @@ int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("OFFSET",_offset)
             .read("N", _limit)
             .read("MAXDELAY", _max_delay_ms)
+            .read("NANO", _nano)
             .read_or_set("SAMPLE", _sample, 1)
             .read_or_set("VERBOSE", _verbose, false)
             .read_or_set("TC_OFFSET", _tc_offset, -1)
@@ -256,12 +257,12 @@ inline int TimestampDiff::smaction(Packet *p)
     }
 
     TimestampT diff = now - old;
-    uint32_t usec = diff.usecval();
-    if ((usec > _max_delay_ms * 1000)) {
+    uint32_t usec = _nano? diff.nsecval() : diff.usecval();
+    if ((usec > _max_delay_ms * (_nano?1000000:1000))) {
         if (_verbose) {
             click_chatter(
                 "Packet %" PRIu64 " experienced delay %u ms > %u ms",
-                i, (usec)/1000, _max_delay_ms
+                i, (usec)/ (_nano?1000000:1000), _max_delay_ms
             );
         }
     }
