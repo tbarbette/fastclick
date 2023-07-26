@@ -38,7 +38,7 @@ you can pin to different thread using StaticThreadSched.
 
 Arguments:
 
-=over 20
+=over 8
 
 =item PORT
 
