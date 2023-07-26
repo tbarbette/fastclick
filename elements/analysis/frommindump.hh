@@ -43,7 +43,10 @@ Loop over the file TIMES time. Default is 1: read one the whole file. -1 to loop
 A handler to call on each loop, e.g. a Script to print a message. Default is disabled.
 
 =item DPDK
-Force the generation of DPDK packets
+Force the generation of DPDK packets. Defaults to false.
+
+=item ACTIVE.
+Boolean. The element is not reading packets if false. To be used with the active handler. Default true.
 
 =a ToMinDump, FromIPSummaryDump
 
