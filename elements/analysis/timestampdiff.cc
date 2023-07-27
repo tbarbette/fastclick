@@ -244,17 +244,18 @@ inline int TimestampDiff::smaction(Packet *p)
 {
     TimestampT now = TimestampT::now_steady();
     uint64_t i = NumberPacket::read_number_of_packet(p, _offset, _net_order);
+if (_sample != 1) {
+        if ((uint32_t)i % _sample != 0) {
+            return 0;
+        }
+    }
     TimestampT old = get_recordtimestamp_instance()->get(i);
 
     if (old == TimestampT::uninitialized_t()) {
         return 1;
     }
 
-    if (_sample != 1) {
-        if ((uint32_t)i % _sample != 0) {
-            return 0;
-        }
-    }
+
 
     TimestampT diff = now - old;
     uint32_t usec = _nano? diff.nsecval() : diff.usecval();

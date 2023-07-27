@@ -97,6 +97,7 @@ private:
     int _offset;
     bool _dynamic;
     bool _net_order;
+    uint32_t _sample;
     Vector<TimestampT> _timestamps;
     NumberPacket *_np;
 };
@@ -105,6 +106,8 @@ private:
 const TimestampT read_timestamp = TimestampUnread;
 
 inline TimestampT RecordTimestamp::get(uint64_t i) {
+    if (_sample > 1)
+        i = i / _sample;
     if (i >= (unsigned)_timestamps.size()) {
         click_chatter("%p{element}: Index %lu is out of range !", this, i);
         return TimestampT::uninitialized_t();

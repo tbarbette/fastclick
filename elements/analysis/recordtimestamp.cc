@@ -39,8 +39,9 @@ int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
             .read("COUNTER", e)
             .read("N", n)
             .read("OFFSET", _offset)
-            .read("DYNAMIC", _dynamic)
-            .read("NET_ORDER", _net_order)
+            .read_or_set("DYNAMIC", _dynamic, false)
+            .read_or_set("NET_ORDER", _net_order, false)
+            .read_or_set("SAMPLE", _sample, false)
             .complete() < 0)
         return -1;
 
@@ -64,6 +65,12 @@ RecordTimestamp::rmaction(Packet *p) {
     uint64_t i;
     if (_offset >= 0) {
         i = get_numberpacket(p, _offset, _net_order);
+        if (_sample > 1) {
+            if (i % _sample == 0)
+                i = i / _sample;
+            else
+                return;
+        }
         assert(i < ULLONG_MAX);
         while (i >= (unsigned)_timestamps.size()) {
             if (!_dynamic && i >= (unsigned)_timestamps.capacity()) {
