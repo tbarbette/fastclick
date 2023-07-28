@@ -127,7 +127,7 @@ if TIMING is not true. Defaults to 100, the original time.
 String. A function that can be used to change the ACCELERATION according to 
 the current time. The parsing uses TinyFNT and therefore follows the format.
 The variable containing the time is x. E.g. "10 + min(90,10*x)" will have an
-acceleration from 10 to 100% in 9 seconds. See @ReplayUnqueue for more details.
+acceleration from 10 to 100% in 9 seconds. See ReplayUnqueue for more details.
 Ineffective if TIMING is not true. Defaults to an empty string (inactive).
 
 =item BURST

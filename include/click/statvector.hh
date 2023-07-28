@@ -14,7 +14,7 @@ class StatVector {
 
 
 
-    enum{H_MEDIAN,H_AVERAGE,H_DUMP,H_MAX_OBS,H_N_OBS,H_NZ,H_MAX,H_MAX_OBS_VAL};
+    enum{H_MEDIAN=736,H_AVERAGE,H_DUMP,H_MAX_OBS,H_N_OBS,H_NZ,H_MAX,H_MAX_OBS_VAL};
 
     static String read_handler(Element *e, void *thunk)
     {

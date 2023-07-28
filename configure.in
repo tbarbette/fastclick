@@ -1828,6 +1828,10 @@ pcap.h and/or -lpcap not found; user-level driver can't steal packets.
     HAVE_USERLEVEL_DRIVER=1
 fi
 
+if test "x$enable_dpdk_packet" = "xyes" -a "x$HAVE_NETMAP" = "xyes"; then
+        AC_MSG_ERROR([--with-netmap is not compatible with --enable-dpdk-packet ])
+fi
+
 if test "x$enable_netmap_pool" = "xyes"; then
     if test "x$HAVE_NETMAP" != "xyes"; then
         AC_MSG_ERROR([

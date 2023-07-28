@@ -11,7 +11,7 @@ CLICK_DECLS
 
 CheckNumberPacket() Check increasing number inside packet
 
-=s analysis
+=s timestamps
 
 =d
 

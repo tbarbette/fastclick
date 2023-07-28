@@ -3,6 +3,7 @@
 #include <click/element.hh>
 #include <click/vector.hh>
 #include <click/multithread.hh>
+#include <click/statvector.hh>
 #include <click/flow/flowelement.hh>
 
 CLICK_DECLS
@@ -15,13 +16,42 @@ FlowCounter([CLOSECONNECTION])
 
 =s flow
 
-Counts all flows passing by, the number of active flows, and the number of 
-packets per flow.
+Counts the number of flows and packets per flow
+
+=d
+
+This element uses the flow subsystem to count the number of flows passing by,
+the one considered still active (using the upstream FlowManager's definition of
+active flow) and the number of packets per flow.
+
+
+=h count
+
+Returns the number of flows seen
+
+=h open
+
+Returns the number of flows currently active
+
+=h average
+
+Returns the average length of a flow
+
+=h median
+
+Returns the median length of flows
+
+=h dump
+
+Print the histogram of flow sizes
+
+
+=a MidStat
 
  */
 
 
-class FlowCounter : public FlowStateElement<FlowCounter,int>
+class FlowCounter : public FlowStateElement<FlowCounter,int>, StatVector<int>
 {
 public:
     /** @brief Construct an FlowCounter element
@@ -36,10 +66,10 @@ public:
 
     void release_flow(int* fcb) {
         _state->open--;
-        if (_state->lengths.size() < *fcb) {
-            _state->lengths.resize(*fcb, 0);
-        }
-        _state->lengths[*fcb - 1]++;
+        unsigned n = *fcb - 1;
+        if (n > 32767)
+            n = 32767;
+        (*stats)[n]++;
     }
 
     const static int timeout = 15000;
@@ -55,11 +85,9 @@ public:
     void add_handlers() override CLICK_COLD;
 protected:
 
-
     struct fcstate {
         long count;
         long open;
-        Vector<int> lengths;
     };
     per_thread<fcstate> _state;
 

@@ -16,9 +16,12 @@ CLICK_DECLS
 
 
 /*
+
+=title XDPLoader
+
 =c
 
-XDPLoader
+XDPLoader(PATH, DEV, [CLEAN])
 
 =s 
 

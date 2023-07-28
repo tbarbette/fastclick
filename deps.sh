@@ -1,6 +1,11 @@
 #!/bin/sh
 # This installs dependencies for both DPDK and FastClick, support for apt-get(Debian, Ubuntu, ...) and apk (Alpine) for now. PRs are welcome.
 
+opt=0
+if [ $1 = "--optional" ] ; then
+    opt=1
+fi
+
 echo "Installing dependencies..." ;
 if ( command -v apt-get &> /dev/null ) ; then
     echo "Using apt-get"
@@ -9,6 +14,10 @@ if ( command -v apt-get &> /dev/null ) ; then
     header=linux-headers-$(uname -r)
     if apt-cache search --names-only $header &> /dev/null ;  then
        apt-get install -yqq $header
+    fi
+    if [ $opt -eq 1 ] ; then
+        echo "Installing optional dependencies"
+        apt-get install -yqq libmicrohttpd-dev libhyperscan-dev libpci-dev libbpf-dev libpapi-dev libre2-dev llvm-dev
     fi
 elif ( command -v apk &> /dev/null ) ; then
     echo "Using apk"

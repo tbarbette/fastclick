@@ -167,7 +167,7 @@ replay an input of packets at a given speed, pull to push
 
 Technically equivalent to Replay->Unqueue-> it is more efficient.
 
-Keyword arguments are the same than @Replay, with the addition of:
+Keyword arguments are the same than Replay, with the addition of:
 
 =over 8
 
