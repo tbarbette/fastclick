@@ -37,6 +37,7 @@
 #include <click/args.hh>
 #include <click/etheraddress.hh>
 #include <click/timer.hh>
+#include <click/router.hh>
 
 #if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
 #define rte_ipv4_hdr ipv4_hdr
@@ -231,6 +232,8 @@ public:
     static struct rte_mempool *get_mpool(unsigned int);
 
     static int get_port_numa_node(portid_t port_id);
+
+    static Router::ChildrenFuture all_initialized;
 
 #if HAVE_FLOW_API
     int set_mode(

@@ -149,6 +149,10 @@ public:
 #endif
     void push(int port, Packet *p);
 
+
+    uint16_t port_id() {
+        return _dev->port_id;
+    }
 protected:
 
     inline void warn_congestion();
