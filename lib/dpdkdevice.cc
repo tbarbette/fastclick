@@ -1283,7 +1283,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         }
     }
 #endif
-
+    all_initialized.solve_initialize(errh);
     return 0;
 }
 
@@ -1579,6 +1579,7 @@ HashTable<portid_t, DPDKDevice*> DPDKDevice::_devs;
 struct rte_mempool** DPDKDevice::_pktmbuf_pools = 0;
 unsigned DPDKDevice::_nr_pktmbuf_pools = 0;
 bool DPDKDevice::no_more_buffer_msg_printed = false;
+Router::ChildrenFuture DPDKDevice::all_initialized;
 
 CLICK_ENDDECLS
 

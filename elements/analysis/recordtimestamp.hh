@@ -5,10 +5,15 @@
 #include <click/batchelement.hh>
 #include <click/timestamp.hh>
 #include <click/tsctimestamp.hh>
+#include <click/hashtable.hh>
 #include "numberpacket.hh"
 
 CLICK_DECLS
 
+#if HAVE_DPDK
+struct rte_mbuf;
+class ToDPDKDevice;
+#endif
 class NumberPacket;
 #define TimestampT TSCTimestamp
 #define TimestampUnread TSCTimestamp(1)
@@ -70,7 +75,7 @@ public:
     ~RecordTimestamp() CLICK_COLD;
 
     const char *class_name() const override { return "RecordTimestamp"; }
-    const char *port_count() const override { return PORTS_1_1; }
+    const char *port_count() const override { return "0-1/="; }
     const char *processing() const override { return PUSH; }
     const char *flow_code() const override { return "x/x"; }
 
@@ -93,11 +98,16 @@ public:
                      NumberPacket::read_number_of_packet(p, offset, net_order);
     }
 
+#if HAVE_DPDK
+    inline static uint16_t calc_latency(uint16_t port, uint16_t qidx,
+                struct rte_mbuf **pkts, uint16_t nb_pkts, void *ptr);
+#endif
 private:
     int _offset;
     bool _dynamic;
     bool _net_order;
     uint32_t _sample;
+    ToDPDKDevice* _tx_dev;
     Vector<TimestampT> _timestamps;
     NumberPacket *_np;
 };
