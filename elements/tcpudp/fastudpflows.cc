@@ -69,6 +69,7 @@ FastUDPFlows::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("DSTIP", _dipaddr)
         .read_mp("FLOWS", _nflows)
         .read_mp("FLOWSIZE", _flowsize)
+        .read_or_set("BURST", _burst, 32)
         .read_or_set("FLOWBURST", _flowburst, 1)
         .read_or_set("CHECKSUM", _cksum, true)
         .read_or_set("SEQUENTIAL", _sequential, false)
@@ -203,7 +204,7 @@ FastUDPFlows::run_task(Task* t) {
     }
 #if HAVE_BATCH
     if (in_batch_mode) {
-        const unsigned int max = 32;
+        const unsigned int max = _burst;
         PacketBatch *batch;
         MAKE_BATCH(get_p(), batch, max);
         if (likely(batch)) {

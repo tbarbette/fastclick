@@ -105,6 +105,7 @@ class FastUDPFlows : public BatchElement {
         unsigned int _nflows;
         unsigned int _flowsize;
         unsigned int _flowburst;
+        unsigned int _burst;
         bool _cksum;
         bool _sequential;
         bool _duplicate;
