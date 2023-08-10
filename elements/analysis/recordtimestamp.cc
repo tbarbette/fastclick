@@ -65,7 +65,7 @@ int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
     uint32_t n = 0;
     Element *e = NULL;
 #if HAVE_DPDK
-    ToDPDKDevice* _tx_dev;
+    ToDPDKDevice* _tx_dev = 0;
     int _tx_dev_id = 0;
 #endif
     if (Args(conf, this, errh)
