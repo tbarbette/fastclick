@@ -107,7 +107,9 @@ private:
     bool _dynamic;
     bool _net_order;
     uint32_t _sample;
+#if HAVE_DPDK
     ToDPDKDevice* _tx_dev;
+#endif
     Vector<TimestampT> _timestamps;
     NumberPacket *_np;
 };

@@ -1,10 +1,12 @@
 /**
  * RSS base
  */
-#if RTE_VERSION >= RTE_VERSION_NUM(21,8,0,0)
+#if HAVE_DPDK
+# if RTE_VERSION >= RTE_VERSION_NUM(21,8,0,0)
 #define ETH_RSS_IPV4 RTE_ETH_RSS_IPV4
 #define ETH_RSS_NONFRAG_IPV4_TCP RTE_ETH_RSS_NONFRAG_IPV4_TCP
 #define ETH_RSS_NONFRAG_IPV4_UDP RTE_ETH_RSS_NONFRAG_IPV4_UDP
+# endif
 #endif
 
 MethodRSS::MethodRSS(NICScheduler* b, EthernetDevice* fd) :
