@@ -37,7 +37,7 @@ RecordTimestamp::RecordTimestamp() :
 RecordTimestamp::~RecordTimestamp() {
 }
 
-
+#if HAVE_DPDK
 inline uint16_t
 RecordTimestamp::calc_latency(uint16_t port __rte_unused, uint16_t qidx,
                 struct rte_mbuf **pkts, uint16_t nb_pkts, void *ptr)
@@ -58,8 +58,8 @@ RecordTimestamp::calc_latency(uint16_t port __rte_unused, uint16_t qidx,
         rt->_timestamps[n] = TimestampT::now_steady();
     }
     return nb_pkts;
-
 }
+#endif
 
 int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
     uint32_t n = 0;
@@ -71,8 +71,10 @@ int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
     if (Args(conf, this, errh)
             .read("COUNTER", e)
             .read("N", n)
+#if HAVE_DPDK
             .read("TXDEV", ElementCastArg("ToDPDKDevice"), _tx_dev)
             .read("TXDEV_QID", _tx_dev_id)
+#endif
             .read_or_set("OFFSET", _offset, -1)
             .read_or_set("DYNAMIC", _dynamic, false)
             .read_or_set("NET_ORDER", _net_order, false)
