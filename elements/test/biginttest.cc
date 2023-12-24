@@ -36,8 +36,8 @@ BigintTest::BigintTest()
 #define CHECK(x, a, b) if (!(x)) return errh->error("%s:%d: test `%s' failed [%llu, %u]", __FILE__, __LINE__, #x, a, b);
 #define CHECK0(x) if (!(x)) return errh->error("%s:%d: test `%s' failed", __FILE__, __LINE__, #x);
 
-static bool test_multiply(uint32_t a, uint32_t b, ErrorHandler *errh) {
-    uint32_t x[2];
+static bool test_multiply(uint64_t a, uint64_t b, ErrorHandler *errh) {
+    uint64_t x[2];
     bigint::multiply(x[1], x[0], a, b);
     uint64_t c = (((uint64_t) x[1]) << 32) | x[0];
     if (c != (uint64_t) a * b) {
@@ -47,11 +47,11 @@ static bool test_multiply(uint32_t a, uint32_t b, ErrorHandler *errh) {
     return true;
 }
 
-static bool test_mul(uint64_t a, uint32_t b, ErrorHandler *errh) {
-    uint32_t ax[2];
+static bool test_mul(uint64_t a, uint64_t b, ErrorHandler *errh) {
+    uint64_t ax[2];
     ax[0] = a;
     ax[1] = a >> 32;
-    uint32_t cx[2];
+    uint64_t cx[2];
     cx[0] = cx[1] = 0;
     bigint::multiply_add(cx, ax, 2, b);
     uint64_t c = (((uint64_t) cx[1]) << 32) | cx[0];
@@ -62,11 +62,11 @@ static bool test_mul(uint64_t a, uint32_t b, ErrorHandler *errh) {
     return true;
 }
 
-static bool test_div(uint64_t a, uint32_t b, ErrorHandler *errh) {
-    uint32_t ax[4];
+static bool test_div(uint64_t a, uint64_t b, ErrorHandler *errh) {
+    uint64_t ax[4];
     ax[0] = a;
     ax[1] = a >> 32;
-    uint32_t r = bigint::divide(ax+2, ax, 2, b);
+    uint64_t r = bigint::divide(ax+2, ax, 2, b);
     uint64_t c = ((uint64_t) ax[3] << 32) | ax[2];
     if (c != a / b) {
         errh->error("%llu / %u == %llu, not %llu", a, b, a * b, c);
@@ -79,22 +79,22 @@ static bool test_div(uint64_t a, uint32_t b, ErrorHandler *errh) {
     return true;
 }
 
-static bool test_inverse(uint32_t a, ErrorHandler *errh) {
-    assert(a & (1 << 31));
-    uint32_t a_inverse = bigint::inverse(a);
+static bool test_inverse(uint64_t a, ErrorHandler *errh) {
+    assert(a & (1 << 63));
+    uint64_t a_inverse = bigint::inverse(a);
     // "Inverse is floor((b * (b - a) - 1) / a), where b = 2^32."
     uint64_t b = (uint64_t) 1 << 32;
     uint64_t want_inverse = (b * (b - a) - 1) / a;
     assert(want_inverse < b);
     if (a_inverse != want_inverse) {
-        errh->error("inverse(%u) == %u, not %u", a, (uint32_t) want_inverse, a_inverse);
+        errh->error("inverse(%u) == %u, not %u", a, (uint64_t) want_inverse, a_inverse);
         return false;
     }
     return true;
 }
 
 static bool test_add(uint64_t a, uint64_t b, ErrorHandler *errh) {
-    uint32_t ax[6];
+    uint64_t ax[6];
     ax[2] = a;
     ax[3] = a >> 32;
     ax[4] = b;
@@ -112,35 +112,35 @@ int
 BigintTest::initialize(ErrorHandler *errh)
 {
     for (int i = 0; i < 3000; i++) {
-        uint32_t a = click_random() | (click_random() << 31);
-        uint32_t b = click_random() | (click_random() << 31);
+        uint64_t a = click_random() | (click_random() << 63);
+        uint64_t b = click_random() | (click_random() << 63);
         CHECK(test_multiply(a, b, errh), a, b);
         CHECK(test_mul(a, b, errh), a, b);
     }
     for (int i = 0; i < 8000; i++) {
-        uint32_t a = click_random();
+        uint64_t a = click_random();
         CHECK0(test_inverse(a | 0x80000000, errh));
     }
     CHECK0(test_inverse(0x80000000, errh));
     for (int i = 0; i < 8000; i++) {
-        uint64_t a = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
-        uint64_t b = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
+        uint64_t a = click_random() | ((uint64_t) click_random() << 63);
+        uint64_t b = click_random() | ((uint64_t) click_random() << 63);
         CHECK0(test_add(a, b, errh));
     }
     CHECK0(test_div(12884758640815563913ULL, 2506284098U, errh));
     for (int i = 0; i < 3000; i++) {
-        uint64_t a = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
-        uint32_t b = click_random();
+        uint64_t a = click_random() | ((uint64_t) click_random() << 63);
+        uint64_t b = click_random();
         CHECK(test_div(a, b | 0x80000000, errh), a, b | 0x80000000);
     }
     for (int i = 0; i < 3000; i++) {
-        uint64_t a = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
-        uint32_t b = click_random();
+        uint64_t a = click_random() | ((uint64_t) click_random() << 63);
+        uint64_t b = click_random();
         CHECK(test_div(a, b & ~0x80000000, errh), a, b & ~0x80000000);
         CHECK(test_div(a, b | 0x80000000, errh), a, b | 0x80000000);
     }
 
-    uint32_t x[3] = { 3481, 592182, 3024921038U };
+    uint64_t x[3] = { 3481, 592182, 3024921038U };
     CHECK0(bigint::unparse_clear(x, 3) == "55799944231168388787108580761");
 
     x[0] = 10;
