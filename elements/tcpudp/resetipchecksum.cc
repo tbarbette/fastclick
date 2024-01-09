@@ -18,10 +18,14 @@
 #include <click/config.h>
 #include "resetipchecksum.hh"
 #include <click/glue.hh>
-#include <click/dpdkdevice.hh>
+#include <click/args.hh>
+
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
 #include <clicknet/udp.h>
+
+#if HAVE_DPDK
+#include <click/dpdkdevice.hh>
 #include <rte_ip.h>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(22,07,0,0)
@@ -29,6 +33,8 @@
 #define PKT_TX_TCP_CKSUM RTE_MBUF_F_TX_TCP_CKSUM
 #define PKT_TX_IPV4 RTE_MBUF_F_TX_IPV4
 #define PKT_TX_UDP_CKSUM RTE_MBUF_F_TX_UDP_CKSUM
+#endif
+
 #endif
 
 CLICK_DECLS
@@ -60,9 +66,73 @@ ResetIPChecksum::simple_action(Packet *p_in)
         click_ip *iph = p->ip_header();
 
         iph->ip_sum = 0;
+#if HAVE_DPDK
         if (!DPDKDevice::is_dpdk_buffer(p))
         {
+#endif
             click_chatter("Not a DPDK buffer. For max performance, arrange TCP element to always work on DPDK buffers");
+            unsigned char *nh_data = (p->has_network_header() ? p->network_header() : p->data());
+            unsigned plen = p->end_data() - nh_data, hlen;
+
+            if (likely(plen >= sizeof(click_ip))
+                && likely((hlen = iph->ip_hl << 2) >= sizeof(click_ip))
+                && likely(hlen <= plen)) {
+                iph->ip_sum = 0;
+                iph->ip_sum = click_in_cksum((unsigned char *) iph, hlen);
+            } else {
+                if (++_drops == 1)
+                    click_chatter("ResetIPChecksum: bad input IP packet");
+                p->kill();
+                return 0;
+            }
+            if (_l4) {
+                if (iph->ip_p == IP_PROTO_TCP) { 
+                    click_tcp *tcph = p->tcp_header();
+                    unsigned plen = ntohs(iph->ip_len) - (iph->ip_hl << 2);
+                    unsigned csum;
+
+                    if (!p->has_transport_header() || plen < sizeof(click_tcp)
+                        || plen > (unsigned)p->transport_length()) {
+                        if (++_drops == 1)
+                            click_chatter("ResetIPChecksum: bad input TCP packet");
+                        p->kill();
+                        return 0;
+                    }
+
+                    /*if (_fixoff) {
+                        unsigned off = tcph->th_off << 2;
+                        if (off < sizeof(click_tcp))
+                        tcph->th_off = sizeof(click_tcp) >> 2;
+                        else if (off > plen && !IP_ISFRAG(iph))
+                        tcph->th_off = plen >> 2;
+                    }*/
+
+                    tcph->th_sum = 0;
+                    csum = click_in_cksum((unsigned char *)tcph, plen);
+                    tcph->th_sum = click_in_cksum_pseudohdr(csum, iph, plen);
+                } else if (iph->ip_p == IP_PROTO_UDP) {
+                    click_udp *udph = p->udp_header();
+                    int len;
+                    if (IP_ISFRAG(iph)
+                    || p->transport_length() < (int) sizeof(click_udp)
+                    || (len = ntohs(udph->uh_ulen),
+                        p->transport_length() < len)) {
+                    
+                        click_chatter("%p{element}: fragment or short packet. Setting UDP checksum to 0", this);
+                        udph->uh_sum = 0;
+                        return p;
+                    }
+
+                    udph->uh_sum = 0;
+                    unsigned csum = click_in_cksum((unsigned char *)udph, len);
+                    udph->uh_sum = click_in_cksum_pseudohdr(csum, iph, len);
+                } else {
+                    click_chatter("%p{element}: Unknown protocol %d?", this, iph->ip_p);
+                }
+                
+            }
+            return p;
+#if HAVE_DPDK
         } else {
 #if CLICK_PACKET_USE_DPDK
             rte_mbuf* mbuf = (struct rte_mbuf *) p;
@@ -74,39 +144,41 @@ ResetIPChecksum::simple_action(Packet *p_in)
 
             if (_l4) {
                 uint16_t sum;
-			if (iph->ip_p == IP_PROTO_TCP) {
-                    click_tcp *tcph = p->tcp_header();
-                    mbuf->l4_len = tcph->th_off << 2;
-                #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
-                    sum = rte_ipv4_phdr_cksum((const struct rte_ipv4_hdr *)iph, mbuf->ol_flags);
-                #else
-                    sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
-                #endif
-					tcph->th_sum = sum;
-					mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_TCP_CKSUM | PKT_TX_IPV4;
-				} else if (iph->ip_p == IP_PROTO_UDP) {
-			        click_udp *udph = p->udp_header();
-			        mbuf->l4_len = sizeof(click_udp);
-                #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
-                    sum = rte_ipv4_phdr_cksum((const struct rte_ipv4_hdr *)iph, mbuf->ol_flags);
-                #else
-                    sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
-                #endif
-			        udph->uh_sum = sum;
-				mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM | PKT_TX_IPV4;
-			} else {
-			mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
-			}
+                if (iph->ip_p == IP_PROTO_TCP) {
+                        click_tcp *tcph = p->tcp_header();
+                        mbuf->l4_len = tcph->th_off << 2;
+                    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+                        sum = rte_ipv4_phdr_cksum((const struct rte_ipv4_hdr *)iph, mbuf->ol_flags);
+                    #else
+                        sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
+                    #endif
+                        tcph->th_sum = sum;
+                        mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_TCP_CKSUM | PKT_TX_IPV4;
+                    } else if (iph->ip_p == IP_PROTO_UDP) {
+                        click_udp *udph = p->udp_header();
+                        mbuf->l4_len = sizeof(click_udp);
+                    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+                        sum = rte_ipv4_phdr_cksum((const struct rte_ipv4_hdr *)iph, mbuf->ol_flags);
+                    #else
+                        sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
+                    #endif
+                        udph->uh_sum = sum;
+                    mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM | PKT_TX_IPV4;
+                } else {
+                mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
+                }
             } else {
-		mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
+		        mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
             }
         }
         return p;
+#endif
     } else {
         if (++_drops == 1)
             click_chatter("ResetIPChecksum: bad input packet");
         p->kill();
     }
+
     return 0;
 }
 
@@ -126,6 +198,5 @@ ResetIPChecksum::add_handlers()
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(dpdk)
 EXPORT_ELEMENT(ResetIPChecksum)
 ELEMENT_MT_SAFE(ResetIPChecksum)
