@@ -29,6 +29,10 @@
 #include <click/error.hh>
 #include <click/glue.hh>
 #include <click/packet_anno.hh>
+#include <nicscheduler/ethernetdevice.hh>
+#include <net/ethernet.h>
+
+
 CLICK_DECLS
 
 ARPQuerier::ARPQuerier()
@@ -58,6 +62,7 @@ ARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
     Timestamp timeout, poll_timeout(60);
     bool have_capacity, have_entry_capacity, have_entry_packet_capacity, have_capacity_slim_factor, have_timeout, have_broadcast,
 	broadcast_poll = false, have_cache = false;
+    EthernetDevice* macdev;
     _arpt = 0;
     if (Args(this, errh).bind(conf)
 	.read("CAPACITY", capacity).read_status(have_capacity)
@@ -70,6 +75,7 @@ ARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("POLL_TIMEOUT", poll_timeout)
 	.read("BROADCAST_POLL", broadcast_poll)
 	.read("CACHE", have_cache)
+    .read("MACDEV", ElementCastArg("EthernetDevice"), macdev)
 	.consume() < 0)
 	return -1;
 
@@ -93,13 +99,26 @@ ARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
     _arpt->add_remote_element(this);
 
     IPAddress my_mask;
-    if (conf.size() == 1)
-	conf.push_back(conf[0]);
-    if (Args(conf, this, errh)
-	.read_mp("IP", IPPrefixArg(true), _my_ip, my_mask)
-	.read_mp("ETH", _my_en)
-	.complete() < 0)
-	return -1;
+
+    if (macdev) {
+        if (Args(conf, this, errh)
+            .read_mp("IP", IPPrefixArg(true), _my_ip, my_mask)
+            .complete() < 0)
+            return -1;
+        if (macdev->get_mac == 0)
+            return errh->error("MACDEV does not support getting the MAC address");
+        struct ether_addr addr = macdev->get_mac(macdev);
+        _my_en = EtherAddress((unsigned char*) &addr);
+    } else {
+        if (conf.size() == 1)
+	    conf.push_back(conf[0]);
+
+        if (Args(conf, this, errh)
+        .read_mp("IP", IPPrefixArg(true), _my_ip, my_mask)
+        .read_mp("ETH", _my_en)
+        .complete() < 0)
+        return -1;
+    }
 
     if (!have_broadcast) {
 	_my_bcast_ip = _my_ip | ~my_mask;

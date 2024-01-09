@@ -30,6 +30,9 @@
 #include <click/glue.hh>
 #include <click/straccum.hh>
 #include <click/packet_anno.hh>
+#include <nicscheduler/ethernetdevice.hh>
+#include <net/ethernet.h>
+
 CLICK_DECLS
 
 ARPResponder::ARPResponder()
@@ -50,6 +53,8 @@ ARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) const
     Vector<Entry> entries;
     EtherAddress ena;
     bool have_ena = false;
+    EthernetDevice* macdev;
+
 
     for (int i = 0; i < words.size(); ++i) {
 	IPAddress addr, mask;
@@ -63,6 +68,18 @@ ARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) const
 		return errh->error("more than one ETH");
 	    }
 	    have_ena = true;
+    } else if (ElementCastArg("EthernetDevice").parse(words[i], macdev, this)) {
+	    if (have_ena) {
+            v.resize(old_vsize);
+            return errh->error("more than one ETH");
+	    }
+        if (macdev->get_mac == 0) {
+            v.resize(old_vsize);
+            return errh->error("MACDEV does not support getting the MAC address");
+        }
+        struct ether_addr addr = macdev->get_mac(macdev);
+        ena = EtherAddress((unsigned char*) &addr);
+	    have_ena = true;
 	} else {
 	    v.resize(old_vsize);
 	    return errh->error("expected IP/MASK ETH");
@@ -70,9 +87,10 @@ ARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) const
     }
 
     // check for an argument that is both IP address and Ethernet address
-    for (int i = 0; !have_ena && i < words.size(); ++i)
-	if (EtherAddressArg().parse(words[i], ena, this))
-	    have_ena = true;
+    for (int i = 0; !have_ena && i < words.size(); ++i) {
+        if (EtherAddressArg().parse(words[i], ena, this))
+            have_ena = true;
+    }
 
     if (v.size() == old_vsize)
 	return errh->error("missing IP/MASK");

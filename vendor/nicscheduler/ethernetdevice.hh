@@ -28,15 +28,17 @@ struct EthernetDevice;
 typedef std::vector<unsigned> (*eth_get_rss_reta)(struct EthernetDevice* eth);
 typedef int (*eth_get_rss_reta_size)(struct EthernetDevice* eth);
 typedef int (*eth_set_rss_reta)(struct EthernetDevice* eth, unsigned* table, unsigned table_sz);
+typedef struct ether_addr (*eth_get_mac)(struct EthernetDevice* eth);
 
 struct EthernetDevice {
-	EthernetDevice() : get_rss_reta_size(0), set_rss_reta(0), get_rss_reta(0)  {
+	EthernetDevice() : get_rss_reta_size(0), set_rss_reta(0), get_rss_reta(0), get_mac(0)  {
 
 	}
 
 	eth_get_rss_reta_size get_rss_reta_size;
 	eth_set_rss_reta set_rss_reta;
 	eth_get_rss_reta get_rss_reta;
+    eth_get_mac get_mac;
 };
 
 #if HAVE_DPDK
