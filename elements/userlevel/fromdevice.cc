@@ -102,6 +102,11 @@ static int dev_eth_get_rss_reta_size(EthernetDevice* eth) {
 }
 #endif
 
+static struct ether_addr dev_eth_get_mac(EthernetDevice* eth) {
+    FromDevice* fd = (FromDevice*)((unsigned char*)eth - offset_of_base(FromDevice,EthernetDevice,get_rss_reta_size));
+	return fd->dev_get_mac();
+}
+
 FromDevice::FromDevice()
     :
 #if FROMDEVICE_ALLOW_PCAP
@@ -122,6 +127,7 @@ FromDevice::FromDevice()
 	set_rss_reta = &dev_eth_set_rss_reta;
 	get_rss_reta_size = &dev_eth_get_rss_reta_size;
 #endif
+    get_mac = &dev_eth_get_mac;
 }
 
 FromDevice::~FromDevice()
@@ -216,7 +222,7 @@ FromDevice::cast(const char *n)
     if (strcmp(n, "EthernetDevice") == 0)
         return static_cast<EthernetDevice*>(this);
     else
-	return Element::cast(n);
+	    return Element::cast(n);
 }
 
 #if FROMDEVICE_ALLOW_LINUX
@@ -863,6 +869,32 @@ free:
 }
 
 #endif
+struct ether_addr
+FromDevice::dev_get_mac() {
+    int fd;
+    struct ifreq ifr;
+    const char *iface = _ifname.c_str();
+    unsigned char *mac = NULL;
+    struct ether_addr mymac = {0};
+
+    memset(&ifr, 0, sizeof(ifr));
+
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    ifr.ifr_addr.sa_family = AF_INET;
+    strncpy(ifr.ifr_name , iface , IFNAMSIZ-1);
+
+    if (0 == ioctl(fd, SIOCGIFHWADDR, &ifr)) {
+        mac = (unsigned char *)ifr.ifr_hwaddr.sa_data;
+
+        //display mac address
+        printf("Mac : %.2X:%.2X:%.2X:%.2X:%.2X:%.2X\n" , mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+        memcpy(&mymac, mac, sizeof(struct ether_addr));
+    }
+    return mymac;
+}
+
 
 void
 FromDevice::add_handlers()

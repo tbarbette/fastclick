@@ -102,8 +102,8 @@ the known Ethernet address.  Defaults to false.
 
    c :: Classifier(12/0806 20/0002, 12/0800, ...);
    a :: ARPQuerier(18.26.4.24, 00:00:C0:AE:67:EF);
-   c[0] -> a[1];
-   c[1] -> ... -> a[0];
+   c[0] -> [1]a;
+   c[1] -> ... -> [0]a;
    a[0] -> ... -> ToDevice(eth0);
 
 =n
