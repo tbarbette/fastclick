@@ -40,7 +40,7 @@
 CLICK_DECLS
 
 ResetIPChecksum::ResetIPChecksum()
-    : _drops(0)
+    : _drops(0), _warned(0)
 {
 }
 
@@ -70,7 +70,8 @@ ResetIPChecksum::simple_action(Packet *p_in)
         if (!DPDKDevice::is_dpdk_buffer(p))
         {
 #endif
-            click_chatter("Not a DPDK buffer. For max performance, arrange TCP element to always work on DPDK buffers");
+            if (_warned++ < 10) 
+		    click_chatter("Not a DPDK buffer. For max performance, arrange TCP element to always work on DPDK buffers");
             unsigned char *nh_data = (p->has_network_header() ? p->network_header() : p->data());
             unsigned plen = p->end_data() - nh_data, hlen;
 

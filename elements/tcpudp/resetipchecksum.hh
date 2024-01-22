@@ -35,7 +35,7 @@ class ResetIPChecksum : public BatchElement { public:
   private:
     bool _l4;
     unsigned _drops;
-
+    unsigned _warned;
 };
 
 CLICK_ENDDECLS
