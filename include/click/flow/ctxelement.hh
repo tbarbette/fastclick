@@ -719,6 +719,28 @@ inline size_t aarch64_strstr_anysize(const char* s, size_t n, const char* needle
 
     return std::string::npos;
 }
+#else
+inline size_t strstr_naive(const char * hay, size_t size, const char *needle, size_t needlesize) {
+
+  if (size == needlesize) {
+    return memcmp(hay, needle, size) == 0 ? 0 : std::string::npos;
+  }
+
+  const char first = needle[0];
+  const ssize_t maxpos = ssize_t(size) - ssize_t(needlesize) + 1;
+  for(ssize_t i = 0; i < maxpos; i++) {
+    if(hay[i] != first) {
+       i++;
+       while( i < maxpos && hay[i] != first ) i++;
+       if ( i == maxpos ) break;
+    }
+    size_t j = 1;
+    for( ; j < needlesize; ++j)
+      if(hay[ i + j ] != needle[ j ] ) break;
+    if( j == needlesize) return i;
+  }
+  return std::string::npos;
+}
 #endif
 
 //Inline functions
@@ -731,6 +753,8 @@ inline char* CTXElement::searchInContent(char *content, const StringRef &pattern
     size_t pos = sse2_strstr_anysize(content, length, pattern.data(), pattern.length());
 #elif __aarch64__
     size_t pos = aarch64_strstr_anysize(content, length, pattern.data(), pattern.length());
+#else
+    size_t pos = strstr_naive(content, length, pattern.data(), pattern.length());
 #endif
     if (pos == std::string::npos)
         return 0;
