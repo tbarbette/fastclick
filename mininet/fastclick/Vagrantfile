@@ -71,8 +71,17 @@ Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/focal64"
 
   config.vm.provider "virtualbox" do |v|
-	v.cpus = 3
-	v.memory = 3072
+	v.cpus = 4
+	v.memory = 4096
+    v.customize [ "modifyvm", :id, "--uartmode1", "disconnected" ]
+  end
+
+  config.vm.provider "hyperv" do |h|
+      h.enable_virtualization_extensions = true
+      h.linked_clone = true
+      h.cpus = 4
+	  h.memory = 4096
+      h.maxmemory = 4096
   end
 
   config.vm.synced_folder "../../conf", "/conf"
