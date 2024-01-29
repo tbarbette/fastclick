@@ -29,6 +29,8 @@
 #include <click/dpdk_glue.hh>
 #include <click/packet.hh>
 
+#include <net/ethernet.h>
+
 #if HAVE_FLOW_API
     #include <click/flowrulemanager.hh>
 extern "C" {
@@ -109,10 +111,19 @@ static std::vector<unsigned> dpdk_eth_get_rss_reta(EthernetDevice* eth) {
 	return ret;
 }
 
+static struct ether_addr dpdk_eth_get_mac(EthernetDevice* eth) {
+    struct ether_addr addr;
+    rte_eth_macaddr_get(((DPDKDevice*)eth)->port_id, (struct rte_ether_addr*)&addr);
+    return addr;
+}
+
+
+
 DPDKDevice::DPDKDevice(portid_t id) : info(), DPDKEthernetDevice() {
 	set_rss_reta = &dpdk_eth_set_rss_reta;
 	get_rss_reta = &dpdk_eth_get_rss_reta;
 	get_rss_reta_size = &dpdk_eth_get_rss_reta_size;
+	get_mac = &dpdk_eth_get_mac;
     assert(get_rss_reta_size);
     this->port_id = id;
     #if HAVE_FLOW_API
@@ -1109,7 +1120,7 @@ void DPDKDevice::set_init_flow_isolate(const bool &flow_isolate) {
 }
 #endif
 
-EtherAddress DPDKDevice::get_mac() {
+EtherAddress DPDKDevice::dpdk_get_mac() {
     assert(_is_initialized);
     struct rte_ether_addr addr;
     rte_eth_macaddr_get(port_id, &addr);

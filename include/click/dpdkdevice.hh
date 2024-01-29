@@ -45,6 +45,8 @@
 #include <click/timer.hh>
 #include <click/router.hh>
 
+struct ether_address;
+
 #if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
 #define rte_ipv4_hdr ipv4_hdr
 #define rte_ether_addr ether_addr
@@ -195,7 +197,7 @@ public:
         ErrorHandler *errh
     ) CLICK_COLD;
 
-    EtherAddress get_mac();
+    EtherAddress dpdk_get_mac();
     void set_init_mac(EtherAddress mac);
     void set_init_mtu(uint16_t mtu);
     void set_init_rss_max(int rss_max);
