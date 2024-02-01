@@ -176,10 +176,10 @@ AverageCounterBase<Stats>::averagecounter_read_rate_handler(Element *e, void *th
 template <typename Stats>
 static int
 averagecounter_reset_write_handler
-(const String &, Element *e, void *, ErrorHandler *)
+(const String &, Element *e, void *param, ErrorHandler *)
 {
   AverageCounterBase<Stats> *c = (AverageCounterBase<Stats> *)e;
-  c->reset();
+  c->reset((uintptr_t)param);
   return 0;
 }
 
