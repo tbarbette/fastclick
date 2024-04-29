@@ -6,15 +6,22 @@
 #include <random>
 
 CLICK_DECLS
-
+        .read_or_set("S", _s, 0) //Array size in MB
+        .read_or_set("N", _n, 0) //Number of array access (4bytes)
+        .read_or_set("R", _r, 0) //Percentage of access that are packet read (vs Array access) between 0 and 100
+        .read_or_set("PAYLOAD", _payload, false) //Access payload or only header
+        .read_or_set("W",_w, 0) //Amount of call to random, purely CPU intensive fct
 /*
 =c
 
-WorkPackage(W, N)
+WorkPackage([S, N, R, PAYLOAD, W])
 
 =s test
 
-Compute a random number for a certain amount of W time, and makes N accesses to
+Compute W random numbers, then makes N accesses to an array of S bytes if R = 0 for every packets
+passing by.
+If R is bigger than 0, R% of the accesses will be made to the payload of the packet
+instead of the array of bytes.
 
 */
 class WorkPackage : public BatchElement {
