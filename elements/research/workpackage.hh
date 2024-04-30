@@ -6,11 +6,7 @@
 #include <random>
 
 CLICK_DECLS
-        .read_or_set("S", _s, 0) //Array size in MB
-        .read_or_set("N", _n, 0) //Number of array access (4bytes)
-        .read_or_set("R", _r, 0) //Percentage of access that are packet read (vs Array access) between 0 and 100
-        .read_or_set("PAYLOAD", _payload, false) //Access payload or only header
-        .read_or_set("W",_w, 0) //Amount of call to random, purely CPU intensive fct
+
 /*
 =c
 
