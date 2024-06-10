@@ -16194,7 +16194,7 @@ fi
 
 printf "%s\n" "#define HAVE_NUMA 1" >>confdefs.h
 
-            LDFLAGS="$LDFLAGS -Lnuma"
+            LDFLAGS="$LDFLAGS -lnuma"
         fi
 
         if test "$HAVE_NUMA" = yes; then
@@ -19108,7 +19108,7 @@ else
 
     have_llvm=yes
     LLVM_OBJS="llvmutils.o $LLVM_OBJS"
-    LIBS_LLVM="`$LLVMCONFIG --ldflags --system-libs --libs all | tr '\n' ' ' ` $LIBS_LLVM"
+    LIBS_LLVM="`$LLVMCONFIG --ldflags --system-libs --libs all | tr -d '\n'` $LIBS_LLVM"
     INCLUDES_LLVM="`$LLVMCONFIG --cxxflags | tr -d '\n'` $INCLUDES_LLVM"
 fi
 

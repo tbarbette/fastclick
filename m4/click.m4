@@ -502,8 +502,8 @@ AC_DEFUN([CLICK_CHECK_NUMA], [
         AC_SEARCH_LIBS([numa_available], [numa], [ac_have_libnuma=yes], [ac_have_libnuma=no])
 
         if test "$ac_have_libnuma" = yes; then
-            AC_DEFINE([HAVE_NUMA], [1], [Define if you have the <nuda.h> header file.])
-            LDFLAGS="$LDFLAGS -Lnuma"
+            AC_DEFINE([HAVE_NUMA], [1], [Define if you have the <numa.h> header file.])
+            LDFLAGS="$LDFLAGS -lnuma"
         fi
 
         if test "$HAVE_NUMA" = yes; then
