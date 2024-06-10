@@ -44,7 +44,8 @@ AverageCounterBase<Stats>::configure(Vector<String> &conf, ErrorHandler *errh)
 #endif
   if (Args(conf, this, errh)
           .read_p("IGNORE", ignore)
-          .read_p("LINK_FCS", _link_fcs)
+          .read_or_set_p("LINK_FCS", _link_fcs, true)
+          .read_or_set("OFFSET", _offset, 0)
           .read_or_set("MAX", max, 0)
           .read_or_set("THRESHOLD", threshold, 0)
           .complete() < 0)
@@ -124,11 +125,11 @@ template <typename Stats>
 uint64_t get_count(AverageCounterBase<Stats>* c, int user_data) {
   switch(user_data) {
     case 3:
-      return (c->byte_count() + (c->count() * (20 + (c->_link_fcs?4:0) )) ) << 3;
+      return (c->byte_count() + (c->count() * (20 + c->_offset + (c->_link_fcs?4:0) )) ) << 3;
     case 2:
-      return c->byte_count() * 8;
+      return (c->byte_count() + c->count() * c->_offset) * 8;
     case 1:
-      return c->byte_count();
+      return c->byte_count() + c->count() * c->_offset;
     default:
       return c->count();
   }

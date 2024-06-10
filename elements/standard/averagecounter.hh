@@ -68,6 +68,7 @@ class AverageCounterBase : public BatchElement { public:
 
 
     bool _link_fcs;
+    uint32_t _offset;
   private:
     static String averagecounter_read_rate_handler(Element *e, void *thunk);
     Stats _stats;
