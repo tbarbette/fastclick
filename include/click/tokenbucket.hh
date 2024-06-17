@@ -214,7 +214,7 @@ void TokenRateX<P>::assign(token_type rate, token_type capacity)
     token_type frequency = P::frequency();
     if (rate != 0) {
 	// constrain capacity so _tokens_per_tick fits in 1 limb
-	unsigned min_capacity = (rate - 1) / frequency + 1;
+	unsigned long long min_capacity = (rate - 1) / frequency + 1;
 	if (capacity < min_capacity)
 	    capacity = min_capacity;
     }
@@ -1009,9 +1009,9 @@ inline typename TokenBucketX<P>::ticks_type TokenBucketX<P>::epochs_until_contai
  * @brief Jiffy-based token bucket rate
  *
  * Equivalent to
- * @link TokenRateX TokenRateX<TokenBucketJiffyParameters<unsigned> >@endlink.
+ * @link TokenRateX TokenRateX<TokenBucketJiffyParameters<unsigned long long> >@endlink.
  * @sa TokenRateX, TokenBucketJiffyParameters */
-typedef TokenRateX<TokenBucketJiffyParameters<unsigned> > TokenRate;
+typedef TokenRateX<TokenBucketJiffyParameters<unsigned long long> > TokenRate;
 
 /** @class TokenCounter include/click/tokenbucket.hh <click/tokenbucket.hh>
  * @brief Jiffy-based token counter
@@ -1025,9 +1025,9 @@ typedef TokenCounterX<TokenRate> TokenCounter;
  * @brief Jiffy-based token bucket rate limiter
  *
  * Equivalent to
- * @link TokenBucketX TokenBucketX<TokenBucketJiffyParameters<unsigned> >@endlink.
+ * @link TokenBucketX TokenBucketX<TokenBucketJiffyParameters<unsigned long long> >@endlink.
  * @sa TokenBucketX, TokenBucketJiffyParameters */
-typedef TokenBucketX<TokenBucketJiffyParameters<unsigned> > TokenBucket;
+typedef TokenBucketX<TokenBucketJiffyParameters<unsigned long long> > TokenBucket;
 
 CLICK_ENDDECLS
 #endif
