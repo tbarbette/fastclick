@@ -528,10 +528,10 @@ typedef click_jiffies_t (*click_jiffies_fct_t)(void*);
 extern click_jiffies_fct_t click_jiffies_fct;
 extern void* click_jiffies_fct_data;
 #  define click_jiffies()      (click_jiffies_fct(click_jiffies_fct_data))
-#  define CLICK_HZ           1000
+#  define CLICK_HZ           1000000
 # else
 #  define click_jiffies()      (click_timestamp_jiffies(0))
-#  define CLICK_HZ           1000
+#  define CLICK_HZ           1000000
 # endif
 # define HAS_LONG_CLICK_JIFFIES_T  1
 # define click_jiffies_less(a, b)	((click_jiffies_difference_t) ((a) - (b)) < 0)

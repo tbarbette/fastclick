@@ -1589,10 +1589,10 @@ bool cp_time(const String &str, timeval *result)
  * otherwise, cp_errno is set to CPE_FORMAT (unparsable) or CPE_OK (if all was
  * well).
  */
-bool cp_bandwidth(const String &str, uint32_t *result)
+bool cp_bandwidth(const String &str, uint64_t *result)
 {
     BandwidthArg ba;
-    uint32_t x;
+    uint64_t x;
     if (!ba.parse(str, x)) {
 	cp_errno = CPE_FORMAT;
 	return false;
@@ -2592,7 +2592,7 @@ default_parsefunc(cp_value *v, const String &arg,
 
   case cpiBandwidth: {
       BandwidthArg ba;
-      if (!ba.parse(arg, v->v.u32))
+      if (!ba.parse(arg, v->v.u64))
 	  goto type_mismatch;
       else if (ba.status == NumArg::status_range) {
 	  String m = cp_unparse_bandwidth(v->v.u32);

@@ -39,8 +39,8 @@ class BandwidthMeter : public Element { protected:
 
   RateEWMA _rate;
 
-  unsigned _meter1;
-  unsigned *_meters;
+  uint64_t _meter1;
+  uint64_t *_meters;
   int _nmeters;
 
   static String meters_read_handler(Element *, void *) CLICK_COLD;

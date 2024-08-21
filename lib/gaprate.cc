@@ -24,7 +24,7 @@
 CLICK_DECLS
 
 void
-GapRate::set_rate(unsigned r, ErrorHandler *errh)
+GapRate::set_rate(uint64_t r, ErrorHandler *errh)
 {
     if (r > GapRate::MAX_RATE && errh)
 	errh->error("rate too large; lowered to %u", GapRate::MAX_RATE);
