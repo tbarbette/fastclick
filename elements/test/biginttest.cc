@@ -80,7 +80,7 @@ static bool test_div(uint64_t a, uint64_t b, ErrorHandler *errh) {
 }
 
 static bool test_inverse(uint64_t a, ErrorHandler *errh) {
-    assert(a & (1 << 63));
+    assert(a & (1UL << 63));
     uint64_t a_inverse = bigint::inverse(a);
     // "Inverse is floor((b * (b - a) - 1) / a), where b = 2^32."
     uint64_t b = (uint64_t) 1 << 32;
@@ -112,8 +112,8 @@ int
 BigintTest::initialize(ErrorHandler *errh)
 {
     for (int i = 0; i < 3000; i++) {
-        uint64_t a = click_random() | (click_random() << 63);
-        uint64_t b = click_random() | (click_random() << 63);
+        uint64_t a = click_random() | ((uint64_t) click_random() << 63);
+        uint64_t b = click_random() | ((uint64_t) click_random() << 63);
         CHECK(test_multiply(a, b, errh), a, b);
         CHECK(test_mul(a, b, errh), a, b);
     }
