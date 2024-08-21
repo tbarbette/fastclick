@@ -716,7 +716,7 @@ click_gettimeofday(timeval *tvp)
 click_jiffies_t
 click_timestamp_jiffies(void*)
 {
-    return Timestamp::now_steady().msecval() / (1000 / CLICK_HZ);
+    return Timestamp::now_steady().usecval() / (1000000 / CLICK_HZ);
 }
 
 #if HAVE_USER_TIMING

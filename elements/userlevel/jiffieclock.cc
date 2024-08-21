@@ -61,13 +61,13 @@ JiffieClock::initialize(ErrorHandler*) {
 
 void JiffieClock::run_timer(Timer* t) {
     Timestamp current_time = Timestamp::now_steady();
-    int64_t delta = (current_time - last_jiffies_update).msec() / (1000 / CLICK_HZ);
+    int64_t delta = (current_time - last_jiffies_update).usec() / (1000000 / CLICK_HZ);
     if (delta > 0) {
         if (unlikely(delta > _minprecision)) {//Accept a little jump from time to time, but not double jump
             //We try all the click threads
             int nt = (t->home_thread_id() + 1) % master()->nthreads();
             if (nt == home_thread_id()) {
-                click_chatter("Click tasks are too heavy and the jiffie accumulator cannot run at least once every %dmsec, the user jiffie clock is deactivated.",_minprecision);
+                click_chatter("Click tasks are too heavy and the jiffie accumulator cannot run at least once every %d jiffies, the user jiffie clock is deactivated.",_minprecision);
                 click_jiffies_fct = &click_timestamp_jiffies;
                 return;
             }
@@ -78,7 +78,7 @@ void JiffieClock::run_timer(Timer* t) {
         jiffies += delta;
         last_jiffies_update = current_time;
     }
-    t->schedule_at_steady(last_jiffies_update + Timestamp::make_msec(1000 / CLICK_HZ));
+    t->schedule_at_steady(last_jiffies_update + Timestamp::make_usec(1000000 / CLICK_HZ));
 }
 
 click_jiffies_t JiffieClock::read_jiffies(void* data) {
@@ -94,7 +94,7 @@ bool JiffieClock::run_task(Task*) {
     //TODO : this should be rcu protected
     click_jiffies_fct_data = this;
     click_jiffies_fct = &read_jiffies;
-    _timer.schedule_after_msec(1000 / CLICK_HZ);
+    _timer.schedule_after(Timestamp::make_usec(1000000 / CLICK_HZ));
     return true;
 }
 

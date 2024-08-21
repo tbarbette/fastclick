@@ -492,7 +492,7 @@ class RateEWMAXParameters : public FixedEWMAXParameters<STABILITY, SCALE, T, U> 
 /** @brief A RateEWMAX with stability shift 4 (alpha 1/16), scaling factor 10
  *  (10 bits of fraction), one rate, and underlying type <code>unsigned</code>
  *  that measures epochs in jiffies. */
-typedef RateEWMAX<RateEWMAXParameters<4, 10> > RateEWMA;
+typedef RateEWMAX<RateEWMAXParameters<4, 10, uint64_t, int64_t> > RateEWMA;
 
 
 template <typename P>

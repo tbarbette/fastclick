@@ -172,7 +172,7 @@ bool cp_seconds(const String& str, double* result);
 bool cp_time(const String &str, Timestamp *result, bool allow_negative = false);
 bool cp_time(const String& str, struct timeval* result);
 
-bool cp_bandwidth(const String& str, uint32_t* result);
+bool cp_bandwidth(const String& str, uint64_t* result);
 
 // network addresses
 class IPAddressList;
