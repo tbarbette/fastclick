@@ -146,7 +146,7 @@ static bool test_div64(uint64_t a[2], uint64_t b, ErrorHandler *errh) {
     rem = a[1] % b;
     // Lower 64 bits of the quotient
 #ifdef __x86_64__
-    __asm__("div %4" : "=d"(rem), "=a"(q[0]) : "d"(rem), "a"(a[0]), "rm"(b));
+    __asm__("divq %4" : "=d"(rem), "=a"(q[0]) : "d"(rem), "a"(a[0]), "rm"(b));
 #else
     if (rem) {
         unsigned ashift = 0;
