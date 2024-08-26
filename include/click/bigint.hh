@@ -384,7 +384,7 @@ class Bigint { public:
 
 };
 
-/** @brief Typical Bigint usage with uint32_t limb_type. */
+/** @brief Typical Bigint usage with uint64_t limb_type. */
 typedef Bigint<uint64_t> bigint;
 
 CLICK_ENDDECLS
