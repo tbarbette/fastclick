@@ -107,7 +107,7 @@ class GapRate { public:
 
 
     enum { UGAP_SHIFT = 43 };
-    enum { MAX_RATE = 1000000UL << UGAP_SHIFT };
+    enum { MAX_RATE = 1000000ULL << UGAP_SHIFT };
 
   private:
 

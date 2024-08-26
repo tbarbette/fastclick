@@ -168,7 +168,7 @@ static bool test_div64(uint64_t a[2], uint64_t b, ErrorHandler *errh) {
             if (rem < b) {
                 q[0] <<= 1;
                 ashift++;
-                rem = (rem << 1) + (bool) (a[0] & (1UL << (64 - ashift)));
+                rem = (rem << 1) + (bool) (a[0] & (1ULL << (64 - ashift)));
             }
             rem -= b;
             q[0]++;
@@ -196,7 +196,7 @@ static bool test_div64(uint64_t a[2], uint64_t b, ErrorHandler *errh) {
 }
 
 static bool test_inverse64(uint64_t a, ErrorHandler *errh) {
-    assert(a & (1UL << 63));
+    assert(a & (1ULL << 63));
     uint64_t a_inverse = bigint::inverse(a);
     // "Inverse is floor((b * (b - a) - 1) / a), where b = 2^64."
     uint64_t want_inverse[2] = {(uint64_t) -1, (uint64_t) -1};  // initialized to -1
@@ -244,7 +244,7 @@ BigintTest::initialize(ErrorHandler *errh)
     for (int i = 0; i < 8000; i++) {
         uint64_t a = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
         CHECK0(test_inverse(a | (1UL << 31), errh));
-        CHECK0(test_inverse64(a | (1UL << 63), errh));
+        CHECK0(test_inverse64(a | (1ULL << 63), errh));
     }
     CHECK0(test_inverse(0x80000000, errh));
     for (int i = 0; i < 8000; i++) {
@@ -263,7 +263,7 @@ BigintTest::initialize(ErrorHandler *errh)
         a[1] = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
         b = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
         CHECK(test_div(a[0], b | (1UL << 31), errh), (uint32_t) a[0], (uint32_t) b | (1UL << 31));
-        CHECKL(test_div64(a, b | (1UL << 63), errh), a, b | (1UL << 63));
+        CHECKL(test_div64(a, b | (1ULL << 63), errh), a, b | (1ULL << 63));
     }
     for (int i = 0; i < 3000; i++) {
         uint64_t a[2], b;
@@ -273,9 +273,9 @@ BigintTest::initialize(ErrorHandler *errh)
             b = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
         while (!b);
         CHECK(test_div(a[0], b & ~(1UL << 31), errh), (uint32_t) a[0], (uint32_t) b & ~(1UL << 31));
-        CHECKL(test_div64(a, b & ~(1UL << 63), errh), a, b & ~(1UL << 63));
+        CHECKL(test_div64(a, b & ~(1ULL << 63), errh), a, b & ~(1ULL << 63));
         CHECK(test_div(a[0], b | (1UL << 31), errh), (uint32_t) a[0], (uint32_t) b | (1UL << 31));
-        CHECKL(test_div64(a, b | (1UL << 63), errh), a, b | (1UL << 63));
+        CHECKL(test_div64(a, b | (1ULL << 63), errh), a, b | (1ULL << 63));
     }
 
     uint32_t x[3] = { 3481, 592182, 3024921038U };
