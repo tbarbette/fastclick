@@ -220,7 +220,7 @@ void TokenRateX<P>::assign(token_type rate, token_type capacity)
     }
     _token_scale = max_tokens / capacity;
 
-    // XXX on non-32 bit types
+    // XXX on non-64 bit types
     static_assert(sizeof(bigint::limb_type) == sizeof(token_type),
 		  "bigint::limb_type should have the same size as token_type.");
     bigint::limb_type l[2] = { 0, 0 };
