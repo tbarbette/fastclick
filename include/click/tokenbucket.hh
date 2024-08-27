@@ -32,6 +32,8 @@ CLICK_DECLS
  TokenRateX template parameter P defines the time tick unit and frequency.
  The provided TokenBucketJiffyParameters class is designed to be used as
  TokenRateX's parameter; it measures ticks in units of jiffies.
+ TokenBucketUsecParameters is also included, which measures ticks in
+ units of microseconds.
 
  @sa GapRate */
 
@@ -48,7 +50,7 @@ CLICK_DECLS
  token_max.  An <em>idle</em> TokenRateX never refills.
 
  Most users will be satisfied with the TokenRate type, which is equal to
- TokenRateX<TokenBucketJiffyParameters<unsigned> >.
+ TokenRateX<TokenBucketUsecParameters<unsigned long long> >.
 
  @sa TokenCounterX, TokenBucketX */
 
@@ -318,7 +320,7 @@ template<typename rate_type> struct TokenRateConverter<rate_type, false> {
  remove(), and similar functions act as normal for idle and unlimited rates.
 
  Most users will be satisfied with the TokenCounter type, which is equal to
- TokenCounterX<TokenRateX<TokenBucketJiffyParameters<unsigned> > >.
+ TokenCounterX<TokenRateX<TokenBucketUsecParameters<unsigned long long> > >.
 
  @sa TokenRateX, TokenBucketX */
 
@@ -693,6 +695,68 @@ class TokenBucketJiffyParameters { public:
 
 };
 
+/** @class TokenBucketUsecParameters include/click/tokenbucket.hh <click/tokenbucket.hh>
+ @brief  Helper class for token bucket rate limiter.
+
+ Pass this class as the parameter to TokenRateX.  TokenBucketUsecParameters
+ measures ticks in units of microseconds.  The template parameter is the type of
+ tokens. */
+
+template <typename T>
+class TokenBucketUsecParameters { public:
+
+    /** @brief The type of tokens.  Always unsigned. */
+    typedef T token_type;
+
+    /** @brief The type of a time point.  Always unsigned. */
+    typedef click_uintmax_t time_point_type;
+
+    /** @brief The type of a difference between time points.  Always signed. */
+    typedef click_intmax_t duration_type;
+
+    /** @brief Return the current time point.
+     * @note TokenBucketUsecParameters measures time points in microseconds. */
+    static time_point_type now() {
+	return Timestamp::now_steady().usecval();
+    }
+
+    static time_point_type time_point(time_point_type t) {
+	return t;
+    }
+
+    /** @brief Return @a b - @a a, assuming that @a b was measured after @a a.
+     *
+     * Some time measurements can, in rare cases, appear to jump backwards,
+     * as timestamps do when the user changes the current time.  If this
+     * happens, and @a b < @a a (even though @a b happened after @a a),
+     * time_monotonic_difference must return 0. */
+    static duration_type time_monotonic_difference(time_point_type a, time_point_type b) {
+	return (likely(a <= b) ? b - a : 0);
+    }
+
+    /** @brief Return true if @a a happened before @a b. */
+    static bool time_less(time_point_type a, time_point_type b) {
+	return (duration_type) (a - b) < 0;
+    }
+
+    /** @brief Return the number of time points per period.
+     *
+     * Here, this is the number of microseconds per second. */
+    static unsigned frequency() {
+	return 1000000;
+    }
+
+    /** @brief Return the Timestamp representing a given time point. */
+    static Timestamp timestamp(time_point_type x) {
+	return Timestamp::make_usec(x);
+    }
+
+    /** @brief Return the Timestamp representing a given tick count. */
+    static Timestamp timestamp(duration_type x) {
+	return Timestamp::make_usec(x);
+    }
+
+};
 
 /** @class TokenBucketX include/click/tokenbucket.hh <click/tokenbucket.hh>
  @brief  Token bucket rate limiter.
@@ -701,7 +765,7 @@ class TokenBucketJiffyParameters { public:
  implemented as a pair of TokenRateX and TokenCounterX.
 
  Most users will be satisfied with the TokenBucket type, which is equal to
- TokenBucketX<TokenBucketJiffyParameters<unsigned> >.
+ TokenBucketX<TokenBucketUsecParameters<unsigned long long> >.
 
  @sa GapRate */
 
@@ -1006,15 +1070,15 @@ inline typename TokenBucketX<P>::ticks_type TokenBucketX<P>::epochs_until_contai
 
 
 /** @class TokenRate include/click/tokenbucket.hh <click/tokenbucket.hh>
- * @brief Jiffy-based token bucket rate
+ * @brief Microsecond-based token bucket rate
  *
  * Equivalent to
- * @link TokenRateX TokenRateX<TokenBucketJiffyParameters<unsigned long long> >@endlink.
- * @sa TokenRateX, TokenBucketJiffyParameters */
-typedef TokenRateX<TokenBucketJiffyParameters<unsigned long long> > TokenRate;
+ * @link TokenRateX TokenRateX<TokenBucketUsecParameters<unsigned long long> >@endlink.
+ * @sa TokenRateX, TokenBucketUsecParameters */
+typedef TokenRateX<TokenBucketUsecParameters<unsigned long long> > TokenRate;
 
 /** @class TokenCounter include/click/tokenbucket.hh <click/tokenbucket.hh>
- * @brief Jiffy-based token counter
+ * @brief Microsecond-based token counter
  *
  * Equivalent to
  * @link TokenCounterX TokenCounterX<TokenRate>@endlink.
@@ -1022,12 +1086,12 @@ typedef TokenRateX<TokenBucketJiffyParameters<unsigned long long> > TokenRate;
 typedef TokenCounterX<TokenRate> TokenCounter;
 
 /** @class TokenBucket include/click/tokenbucket.hh <click/tokenbucket.hh>
- * @brief Jiffy-based token bucket rate limiter
+ * @brief Microsecond-based token bucket rate limiter
  *
  * Equivalent to
- * @link TokenBucketX TokenBucketX<TokenBucketJiffyParameters<unsigned long long> >@endlink.
- * @sa TokenBucketX, TokenBucketJiffyParameters */
-typedef TokenBucketX<TokenBucketJiffyParameters<unsigned long long> > TokenBucket;
+ * @link TokenBucketX TokenBucketX<TokenBucketUsecParameters<unsigned long long> >@endlink.
+ * @sa TokenBucketX, TokenBucketUsecParameters */
+typedef TokenBucketX<TokenBucketUsecParameters<unsigned long long> > TokenBucket;
 
 CLICK_ENDDECLS
 #endif
