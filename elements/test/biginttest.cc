@@ -113,7 +113,20 @@ static bool test_add(uint64_t a, uint64_t b, ErrorHandler *errh) {
 static bool test_multiply64(uint64_t a, uint64_t b, ErrorHandler *errh) {
     uint64_t x[2], y[2];
     bigint::multiply(x[1], x[0], a, b);
+#ifdef __x86_64__
     int_multiply(a, b, y[0], y[1]);
+#else
+    y[1] = (a >> 32) * (b >> 32);
+    y[0] = (a & ((1UL << 32) - 1)) * (uint32_t) b;
+    uint64_t tmp = (a >> 32) * (uint32_t) b;
+    bool carry = (tmp << 32) > -y[0];
+    y[0] += (tmp << 32);
+    y[1] += (tmp >> 32) + carry;
+    tmp = (uint32_t) a * (b >> 32);
+    carry = (tmp << 32) > -y[0];
+    y[0] += (tmp << 32);
+    y[1] += (tmp >> 32) + carry;
+#endif
     if (memcmp(x, y, sizeof(x))) {
         errh->error("%u * %u == %s, not %s", a, b, bigint::unparse_clear(y, 2).c_str(),
             bigint::unparse_clear(x, 2).c_str());
@@ -125,8 +138,8 @@ static bool test_multiply64(uint64_t a, uint64_t b, ErrorHandler *errh) {
 static bool test_mul64(uint64_t a[2], uint64_t b, ErrorHandler *errh) {
     uint64_t c[2] = {0, 0}, d[2], e[2];
     bigint::multiply_add(c, a, 2, b);
-    int_multiply(a[0], b, d[0], d[1]);
-    int_multiply(a[1], b, e[0], e[1]);
+    bigint::multiply(d[1], d[0], a[0], b);
+    bigint::multiply(e[1], e[0], a[1], b);
     d[1] += e[0];
     if (memcmp(c, d, sizeof(c))) {
         uint64_t tmp[2] = {a[0], a[1]};
