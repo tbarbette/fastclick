@@ -33,8 +33,8 @@ BigintTest::BigintTest()
 {
 }
 
-#define CHECK(x, a, b) if (!(x)) return errh->error("%s:%d: test `%s' failed [%llu, %llu]", __FILE__, __LINE__, #x, a, b);
-#define CHECKL(x, a, b) if (!(x)) return errh->error("%s:%d: test `%s' failed [%s, %llu]", __FILE__, __LINE__, #x, bigint::unparse_clear(a, 2).c_str(), b);
+#define CHECK(x, a, b) if (!(x)) return errh->error("%s:%d: test `%s' failed [%llu, %u]", __FILE__, __LINE__, #x, a, b);
+#define CHECKL(x, a, l, b) if (!(x)) return errh->error("%s:%d: test `%s' failed [%s, %llu]", __FILE__, __LINE__, #x, bigint::unparse_clear(a, l).c_str(), b);
 #define CHECK0(x) if (!(x)) return errh->error("%s:%d: test `%s' failed", __FILE__, __LINE__, #x);
 
 static bool test_multiply(uint32_t a, uint32_t b, ErrorHandler *errh) {
@@ -249,10 +249,10 @@ BigintTest::initialize(ErrorHandler *errh)
         a[0] = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
         a[1] = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
         b = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
-        CHECK(test_multiply(a[0], b, errh), (uint32_t) a[0], (uint32_t) b);
-        CHECK(test_multiply64(a[0], b, errh), a[0], b);
-        CHECK(test_mul(a[0], b, errh), (uint32_t) a[0], (uint32_t) b);
-        CHECKL(test_mul64(a, b, errh), a, b);
+        CHECK(test_multiply(a[0], b, errh), a[0] & UINT32_MAX, (uint32_t) b);
+        CHECKL(test_multiply64(a[0], b, errh), a, 1, b);
+        CHECK(test_mul(a[0], b, errh), a[0], (uint32_t) b);
+        CHECKL(test_mul64(a, b, errh), a, 2, b);
     }
     for (int i = 0; i < 8000; i++) {
         uint64_t a = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
@@ -275,8 +275,8 @@ BigintTest::initialize(ErrorHandler *errh)
         a[0] = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
         a[1] = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
         b = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
-        CHECK(test_div(a[0], b | (1UL << 31), errh), (uint32_t) a[0], (uint32_t) b | (1UL << 31));
-        CHECKL(test_div64(a, b | (1ULL << 63), errh), a, b | (1ULL << 63));
+        CHECK(test_div(a[0], b | (1UL << 31), errh), a[0], (uint32_t) b | (1UL << 31));
+        CHECKL(test_div64(a, b | (1ULL << 63), errh), a, 2, b | (1ULL << 63));
     }
     for (int i = 0; i < 3000; i++) {
         uint64_t a[2], b;
@@ -285,10 +285,10 @@ BigintTest::initialize(ErrorHandler *errh)
         do
             b = click_random() | ((uint64_t) click_random() << 31) | ((uint64_t) click_random() << 62);
         while (!b);
-        CHECK(test_div(a[0], b & ~(1UL << 31), errh), (uint32_t) a[0], (uint32_t) b & ~(1UL << 31));
-        CHECKL(test_div64(a, b & ~(1ULL << 63), errh), a, b & ~(1ULL << 63));
-        CHECK(test_div(a[0], b | (1UL << 31), errh), (uint32_t) a[0], (uint32_t) b | (1UL << 31));
-        CHECKL(test_div64(a, b | (1ULL << 63), errh), a, b | (1ULL << 63));
+        CHECK(test_div(a[0], b & ~(1UL << 31), errh), a[0], (uint32_t) b & ~(1UL << 31));
+        CHECKL(test_div64(a, b & ~(1ULL << 63), errh), a, 2, b & ~(1ULL << 63));
+        CHECK(test_div(a[0], b | (1UL << 31), errh), a[0], (uint32_t) b | (1UL << 31));
+        CHECKL(test_div64(a, b | (1ULL << 63), errh), a, 2, b | (1ULL << 63));
     }
 
     uint32_t x[3] = { 3481, 592182, 3024921038U };
