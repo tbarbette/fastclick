@@ -13,7 +13,7 @@ test a variety of modes :
 - FULLLESSALL:Same but replace all patterns
 
 %require
-click-buildtool provides flow ctx
+click-buildtool provides flow flow-dynamic ctx
 
 %script
 click CONFIG

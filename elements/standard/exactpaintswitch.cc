@@ -34,13 +34,23 @@ ExactPaintSwitch::~ExactPaintSwitch()
 int
 ExactPaintSwitch::configure(Vector<String> &conf, ErrorHandler *errh) {
     Vector<int> list;
+    int anno = PAINT_ANNO_OFFSET;
+    int def=-1;
 
     if (Args(conf, this, errh)
-	    .read_all("ANNO", list)
+        .read_p("ANNO", AnnoArg(1), anno)
+        .read("DEFAULT", def)
+	    .read_all("MAP", list)
         .complete() != 0)
 	return -1;
 
-    map.resize(256, (unsigned)-1);
+    if (def >= noutputs()) {
+        return errh->error("Default port cannot be higher than the number of ports!");
+    }
+
+    _anno = anno;
+
+    map.resize(256, (unsigned)def);
     for (int i = 0; i < list.size(); i++) {
         if (list[i] >= 256)
             return errh->error("Invalid Paint offset %d", list[i]);
@@ -59,8 +69,8 @@ ExactPaintSwitch::initialize(ErrorHandler* errh) {
 int
 ExactPaintSwitch::classify(Packet *p)
 {
-  int n = map.unchecked_at(PAINT_ANNO(p));
-  click_chatter("Out %d->%d",PAINT_ANNO(p),n);
+  int o = static_cast<int>(p->anno_u8(_anno));
+  int n = map.unchecked_at(o);
   return n;
 }
 

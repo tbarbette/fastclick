@@ -37,6 +37,14 @@
     #include <click/flowrulemanager.hh>
 #endif
 
+#if RTE_VERSION >= RTE_VERSION_NUM(22,07,0,0)
+#define DEV_RX_OFFLOAD_IPV4_CKSUM RTE_ETH_RX_OFFLOAD_IPV4_CKSUM
+#define DEV_RX_OFFLOAD_TCP_CKSUM RTE_ETH_RX_OFFLOAD_TCP_CKSUM
+#define DEV_RX_OFFLOAD_UDP_CKSUM RTE_ETH_RX_OFFLOAD_UDP_CKSUM
+#define DEV_RX_OFFLOAD_TIMESTAMP RTE_ETH_RX_OFFLOAD_TIMESTAMP
+#define ETH_LINK_FULL_DUPLEX RTE_ETH_LINK_FULL_DUPLEX
+#endif
+
 CLICK_DECLS
 
 #define LOAD_UNIT 10
@@ -247,15 +255,25 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
         return 0;
 
     ret = initialize_rx(errh);
-    if (ret != 0) return ret;
+    if (ret != 0)
+        return ret;
 
     for (unsigned i = (unsigned)firstqueue; i <= (unsigned)lastqueue; i++) {
         ret = _dev->add_rx_queue(i , _promisc, _vlan_filter, _vlan_strip, _vlan_extend, _lro, _jumbo, ndesc, errh);
         if (ret != 0) return ret;
     }
 
-    ret = initialize_tasks(_active,errh);
-    if (ret != 0) return ret;
+
+    if (queue_per_threads > 1
+#if HAVE_DPDK_INTERRUPT
+     || _rx_intr
+#endif
+     )
+        ret = initialize_tasks(_active, errh, multi_run_task);
+    else
+        ret = initialize_tasks(_active, errh);
+    if (ret != 0)
+        return ret;
 
     if (queue_share > 1)
         return errh->error(
@@ -334,12 +352,11 @@ extern "C" {
 }
 #endif
 
-bool FromDPDKDevice::run_task(Task *t) {
-  struct rte_mbuf *pkts[_burst];
-  int ret = 0;
+inline CLICK_ALWAYS_INLINE bool
+FromDPDKDevice::_run_task(int iqueue)
+{
+    struct rte_mbuf *pkts[_burst];
 
-  int iqueue = queue_for_thisthread_begin();
-  { //This version differs from multi by having support for one queue per thread only, which is extremly usual
 #if HAVE_BATCH
   PacketBatch *head = 0;
   WritablePacket *last;
@@ -374,7 +391,7 @@ for (unsigned i = 0; i < n; ++i) {
         data, rte_pktmbuf_data_len(pkts[i]), DPDKDevice::free_pkt, pkts[i],
         rte_pktmbuf_headroom(pkts[i]), rte_pktmbuf_tailroom(pkts[i]), _clear);
 # endif
-#else
+#else //!HAVE_ZEROCOPY
             WritablePacket *p = Packet::make(data,
                                      (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));
             rte_pktmbuf_free(pkts[i]);
@@ -406,27 +423,36 @@ for (unsigned i = 0; i < n; ++i) {
 #else
             output(0).push(p);
 #endif
-        }
-#if HAVE_BATCH
-        if (head) {
-            head->make_tail(last,n);
-            output_push_batch(0,head);
-        }
-#endif
-        if (n) {
-            add_count(n);
-            ret = 1;
-        }
     }
 
-#if HAVE_DPDK_INTERRUPT
-     if (ret == 0 && _rx_intr >= 0) {
+#if HAVE_BATCH
+    if (head) {
+        head->make_tail(last,n);
+        output_push_batch(0,head);
+    }
+#endif
+    if (n) {
+        add_count(n);
+    }
+    return n;
+}
+
+bool FromDPDKDevice::multi_run_task(Task *t, void* e) {
+    FromDPDKDevice* fd = static_cast<FromDPDKDevice*>(e);
+    bool ret = false;
+
+    for (int  iqueue = fd->queue_for_thisthread_begin(); iqueue <= fd->queue_for_thisthread_end(); iqueue++) {
+        ret |= fd->_run_task(iqueue);
+    }
+
+    #if HAVE_DPDK_INTERRUPT
+     if (!ret && _rx_intr >= 0) {
            for (int iqueue = queue_for_thisthread_begin();
                 iqueue<=queue_for_thisthread_end(); iqueue++) {
                if (rte_eth_dev_rx_intr_enable(_dev->port_id, iqueue) != 0) {
                    click_chatter("Could not enable interrupts");
                    t->fast_reschedule();
-                   return 0;
+                   return false;
                }
            }
            struct rte_epoll_event event[queue_per_threads];
@@ -447,6 +473,14 @@ for (unsigned i = 0; i < n; ++i) {
     return ret;
 }
 
+bool FromDPDKDevice::run_task(Task *t) {
+    int iqueue = queue_for_thisthread_begin();
+    bool ret = _run_task(iqueue);
+
+    t->fast_reschedule();
+    return ret;
+}
+
 #if HAVE_DPDK_INTERRUPT
 void FromDPDKDevice::selected(int fd, int mask) {
     for (int iqueue = queue_for_thisthread_begin();
@@ -459,6 +493,17 @@ void FromDPDKDevice::selected(int fd, int mask) {
     task_for_thread()->reschedule();
 }
 #endif
+
+ToDPDKDevice *
+FromDPDKDevice::find_output_element() {
+    for (auto e : router()->elements()) {
+        ToDPDKDevice *td = dynamic_cast<ToDPDKDevice *>(e);
+        if (td != 0 && (td->_dev->port_id == _dev->port_id)) {
+            return td;
+        }
+    }
+    return 0;
+}
 
 enum {
     h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
@@ -977,6 +1022,6 @@ void FromDPDKDevice::add_handlers()
 
 CLICK_ENDDECLS
 
-ELEMENT_REQUIRES(userlevel dpdk QueueDevice)
+ELEMENT_REQUIRES(userlevel dpdk QueueDevice ToDPDKDevice)
 EXPORT_ELEMENT(FromDPDKDevice)
 ELEMENT_MT_SAFE(FromDPDKDevice)

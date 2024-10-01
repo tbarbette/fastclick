@@ -34,6 +34,7 @@ public:
     FlowElement();
     ~FlowElement();
 
+    //Those should actually be in some kind of base CTXElement
 # if HAVE_CTX
     virtual FlowNode* get_table(int iport, Vector<FlowElement*> contextStack);
 
@@ -42,27 +43,7 @@ public:
     virtual FlowType getContext(int port);
 
     virtual bool stopClassifier() { return false; };
-};
 
-
-/**
- * Element that needs FCB space
- */
-class VirtualFlowSpaceElement : public FlowElement {
-public:
-    VirtualFlowSpaceElement();
-
-    virtual const size_t flow_data_size() const = 0;
-    virtual const int flow_data_index() const {
-        return -1;
-    }
-
-    inline void set_flow_data_offset(int offset) {_flow_data_offset = offset; }
-    inline int flow_data_offset() {return _flow_data_offset; }
-
-    int configure_phase() const        { return CONFIGURE_PHASE_DEFAULT + 5; }
-
-    void *cast(const char *name) override;
 #if HAVE_FLOW_DYNAMIC
     inline void fcb_acquire(int count = 1) {
         fcb_stack->acquire(count);
@@ -87,8 +68,32 @@ public:
     }
 #endif
 
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-    inline void fcb_acquire_timeout(int nmsec) {
+};
+
+/**
+ * Element that needs FCB space
+ */
+class VirtualFlowSpaceElement : public FlowElement {
+public:
+    VirtualFlowSpaceElement();
+
+    virtual const size_t flow_data_size() const = 0;
+    virtual const int flow_data_index() const {
+        return -1;
+    }
+    virtual const int flow_announce_manager(VirtualFlowManager* manager, ErrorHandler* errh)  const {
+        return 0;
+    }
+    inline void set_flow_data_offset(int offset) {_flow_data_offset = offset; }
+    inline int flow_data_offset() {return _flow_data_offset; }
+
+    int configure_phase() const        { return CONFIGURE_PHASE_DEFAULT + 5; }
+
+    void *cast(const char *name) override;
+
+
+#if HAVE_CTX_GLOBAL_TIMEOUT
+    inline void ctx_acquire_timeout(int nmsec) {
         //Do not set a smaller timeout
         if ((fcb_stack->flags & FLOW_TIMEOUT) && (nmsec <= (int)(fcb_stack->flags >> FLOW_TIMEOUT_SHIFT))) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
@@ -102,7 +107,7 @@ public:
         fcb_stack->flags = (nmsec << FLOW_TIMEOUT_SHIFT) | FLOW_TIMEOUT | ((fcb_stack->flags & FLOW_TIMEOUT_INLIST) ? FLOW_TIMEOUT_INLIST : 0);
     }
 
-    inline void fcb_release_timeout() {
+    inline void ctx_release_timeout() {
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
         click_chatter("Releasing timeout of %p",this);
 #endif
@@ -115,17 +120,17 @@ public:
             fcb_stack->flags = 0;
     }
 #else
-    inline void fcb_acquire_timeout(int nmsec) {
+    inline void ctx_acquire_timeout(int nmsec) {
         //TODO : use a local timer
         fcb_acquire();
     }
 
-    inline void fcb_release_timeout() {
+    inline void ctx_release_timeout() {
         fcb_release();
     }
 #endif
 
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
     inline void fcb_set_release_fnt(struct FlowReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt) {
         fcb_chain->previous_fnt = fcb_stack->release_fnt;
         fcb_chain->previous_thunk = fcb_stack->thunk;
@@ -164,7 +169,7 @@ public:
         }
     }
 #else
-    inline void fcb_set_release_fnt(struct FlowReleaseChain* fcb, SubFlowRealeaseFnt fnt) {
+    inline void fcb_set_release_fnt(struct FlowReleaseChain*, SubFlowRealeaseFnt) {
         click_chatter("ERROR: YOU MUST HAVE DYNAMIC FLOW RELEASE FNT fct setted !");
         assert(false);
     }
@@ -177,8 +182,8 @@ public:
     }
 
     int initialize(ErrorHandler *errh) override CLICK_COLD {
-	//The element itself is automatically posted by build_fcb via  fcb_builded_init_future
-	return 0;
+        //The element itself is automatically posted by build_fcb via  fcb_builded_init_future
+        return 0;
     }
 protected:
 
@@ -186,6 +191,17 @@ protected:
     friend class FlowBufferVisitor;
     friend class VirtualFlowManager;
 };
+
+# if HAVE_FLOW_DYNAMIC
+class UnstackVisitor : public RouterVisitor {
+public:
+    bool visit(Element *e, bool isoutput, int port,
+                   Element *from_e, int from_port, int distance);
+
+};
+# endif
+
+
 
 /**
  * This future will only trigger once it is called N times.
@@ -242,6 +258,7 @@ protected:
     friend class CTXElement;
 };
 
+
 template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {
 
 public :
@@ -275,6 +292,21 @@ public :
     virtual void push_flow(int port, T* flowdata, PacketBatch* head) = 0;
 };
 
+class DefaultChecker { public:
+    struct str  {
+        bool seen;
+    };
+    static inline bool seen(void*, str* s) {
+        return s->seen;;
+    }
+    static inline void mark_seen(void*, str* s) {
+        s->seen = true;
+    }
+    static inline void release(void*, str* s) {
+        s->seen = false;
+    }
+};
+
 /**
  * FlowStateElement is like FlowSpaceElement but handle a timeout and a release functions
  *
@@ -286,18 +318,26 @@ public :
  *
  * close_flow() can be called to release the flow now, remove timer etc It will not call your release_flow(); automatically, do it before. A packet coming for the same flow after close_flow() is called will be considered from a new flow (seen flag is reset).
  */
-template<class Derived, typename T> class FlowStateElement : public VirtualFlowSpaceElement {
+template<class Derived, typename T, typename Checker = DefaultChecker> class FlowStateElement : public VirtualFlowSpaceElement {
     struct AT : public FlowReleaseChain {
         T v;
-        bool seen;
+        typename Checker::str str;
     };
 public :
 
-    typedef FlowStateElement<Derived, T> derived;
+    typedef FlowStateElement<Derived, T, Checker> derived;
 
     FlowStateElement() CLICK_COLD;
 
     virtual const size_t flow_data_size()  const { return sizeof(AT); }
+    virtual const int flow_announce_manager(Element* manager, ErrorHandler* errh)  const {
+        if (Derived::timeout > 0) {
+            if (manager->cast("CTXManager") == 0) {
+                errh->warning("The timeout of %dms of %p{element} is ignored, only the flow manager %p{element} timeout is prevalent.", Derived::timeout, this, manager);
+            }
+        }
+        return 0;
+     }
 
     /**
      * CRTP virtual
@@ -306,7 +346,9 @@ public :
         return true;
     }
 
-
+    inline FlowControlBlock* stack_from_flow(void* ptr) {
+        return (FlowControlBlock*)(((uint8_t*)ptr) - _flow_data_offset - sizeof(FlowControlBlock));
+    }
 
     /**
      * Return the T type for a given FCB
@@ -333,12 +375,12 @@ public :
 
     void push_batch(int port, PacketBatch* head) {
          auto my_fcb = my_fcb_data();
-         if (!my_fcb->seen) {
+         if (!Checker::seen(&my_fcb->v, &my_fcb->str)) {
              if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
-                 my_fcb->seen = true;
+                 Checker::mark_seen(&my_fcb->v, &my_fcb->str);
                  if (Derived::timeout > 0)
-                     this->fcb_acquire_timeout(Derived::timeout);
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+                     this->ctx_acquire_timeout(Derived::timeout);
+#if HAVE_FLOW_DYNAMIC
                  this->fcb_set_release_fnt(my_fcb, &release_fnt);
 #endif
              } else { //TODO set early drop?
@@ -351,12 +393,12 @@ public :
 
     void close_flow() {
         if (Derived::timeout > 0) {
-            this->fcb_release_timeout();
+            this->ctx_release_timeout();
         }
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+#if HAVE_FLOW_DYNAMIC
         this->fcb_remove_release_fnt(my_fcb_data(), &release_fnt);
 #endif
-        my_fcb_data()->seen = false;
+        Checker::release(&my_fcb_data()->v, &my_fcb_data()->str);
     }
 
 private:
@@ -401,6 +443,9 @@ public:
 
 	bool visit(Element *e, bool isoutput, int port,
 			       Element *from_e, int from_port, int distance) {
+        (void)from_e;
+        (void)from_port;
+        (void)distance;
 		FlowElement* dispatcher = dynamic_cast<FlowElement*>(e);
 		if (dispatcher != NULL) {
 		    if (dispatcher == origin)
@@ -453,8 +498,8 @@ void FlowSpaceElement<T>::fcb_set_init_data(FlowControlBlock* fcb, const T data)
  * FlowSpaceElement
  */
 
-template<class Derived, typename T>
-FlowStateElement<Derived, T>::FlowStateElement() : VirtualFlowSpaceElement() {
+template<class Derived, typename T, typename Checker>
+FlowStateElement<Derived, T, Checker>::FlowStateElement() : VirtualFlowSpaceElement() {
 }
 
 /**

@@ -57,7 +57,7 @@ GTPTable()
 
 Find mapping of the GTP tunnel id return side
 
-=s gtp
+=s tunnel
 
 =d
 

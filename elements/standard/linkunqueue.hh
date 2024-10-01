@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_LINKUNQUEUE_HH
 #define CLICK_LINKUNQUEUE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/task.hh>
 #include <click/timer.hh>
 #include <click/notifier.hh>
@@ -56,7 +56,7 @@ When written, drops all packets in, or partially in, the emulated link.
 =a DelayUnqueue, Queue, Unqueue, RatedUnqueue, BandwidthRatedUnqueue,
 DelayShaper, SetTimestamp */
 
-class LinkUnqueue : public Element, public Storage { public:
+class LinkUnqueue : public BatchElement, public Storage { public:
 
     LinkUnqueue() CLICK_COLD;
 

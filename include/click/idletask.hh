@@ -43,6 +43,7 @@ public:
         _active = true;
 		_next = thread->_idletask;
 		thread->_idletask = this;
+        thread->_idle_dorun = 0;
 		thread->wake();
 	}
 

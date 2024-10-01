@@ -37,6 +37,7 @@ DriverManager(wait,wait)
 0.04 18.26.4.44 30 10.0.0.4 40 T "tack"
 
 %expect stderr
+WARNING: This element does not support timeout ! Flows will stay indefinitely in memory...
 {{Placing.*}}
 {{Placing.*}}
    8 | 74686973 20697320

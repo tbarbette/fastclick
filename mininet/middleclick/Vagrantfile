@@ -1,25 +1,14 @@
 $init = <<SCRIPT
-  apt update
-  DEBIAN_FRONTEND=noninteractive apt install -y build-essential fakeroot debhelper autoconf automake libssl-dev graphviz python-all python-qt4 python-twisted-conch libtool git tmux vim python-pip python-paramiko python-sphinx graphviz autoconf automake bzip2 debhelper dh-autoreconf libssl-dev libtool openssl procps python-all python-qt4 python-twisted-conch python-zopeinterface module-assistant dkms make libc6-dev python-argparse uuid-runtime netbase kmod python-twisted-web iproute2 ipsec-tools openvswitch-switch libpcap-dev libnuma-dev libmicrohttpd-dev python3-pip python3-matplotlib htop wireshark-gtk python3 linux-tools-generic lynx gdb evince nginx libre2-dev
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential fakeroot debhelper autoconf automake libssl-dev graphviz python-all libtool git tmux vim python3-pip python3-sphinx graphviz autoconf automake bzip2 debhelper dh-autoreconf libssl-dev libtool openssl procps python-all python-zopeinterface module-assistant dkms make libc6-dev python-argparse uuid-runtime netbase kmod  iproute2 openvswitch-switch libpcap-dev libnuma-dev libmicrohttpd-dev python3-pip python3-matplotlib htop wireshark-gtk python3 linux-tools-generic lynx gdb evince nginx libre2-dev openvswitch-switch
   pip install alabaster
   python3 -m pip install --upgrade pip
 SCRIPT
 
-$ovs = <<SCRIPT
-  wget http://openvswitch.org/releases/openvswitch-2.5.9.tar.gz
-  tar xf openvswitch-2.5.9.tar.gz
-  pushd openvswitch-2.5.9
-  DEB_BUILD_OPTIONS='parallel=8 nocheck' fakeroot debian/rules binary
-  popd
-  sudo dpkg -i openvswitch-common*.deb openvswitch-datapath-*.deb python-openvswitch*.deb openvswitch-pki*.deb openvswitch-switch*.deb
-  rm -rf *openvswitch*
-SCRIPT
-
-
 $mininet = <<SCRIPT
-  git clone git://github.com/mininet/mininet
+  git clone http://github.com/mininet/mininet.git
   pushd mininet
-  git checkout 2.2.2
+  git checkout 2.3.1b1
   ./util/install.sh -fn
   popd
   echo "PATH=$PATH:/home/vagrant/mininet/util/" >> ~/.bashrc
@@ -49,8 +38,9 @@ SCRIPT
 $middleclick = <<SCRIPT
   git clone https://github.com/tbarbette/fastclick.git middleclick
   pushd middleclick
+  git checkout PRmininet
   source ~/.profile
-  ./configure --enable-dpdk --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --enable-cpu-load --enable-ctx --enable-user-timestamp
+  ./configure --enable-dpdk --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --enable-cpu-load --enable-ctx --enable-user-timestamp --enable-flow-dynamic
   make -j 4
   popd
 SCRIPT
@@ -74,18 +64,17 @@ $cleanup = <<SCRIPT
 SCRIPT
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "ubuntu/xenial64"
+  config.vm.box = "ubuntu/focal64"
 
   config.vm.provider "virtualbox" do |v|
 	v.cpus = 3
 	v.memory = 3072
   end
 
-  config.vm.synced_folder "../conf", "/conf"
+  config.vm.synced_folder "../../conf", "/conf"
 
   ## Provisioning
   config.vm.provision :shell, :inline => $init
-  config.vm.provision :shell, privileged: false, :inline => $ovs
   config.vm.provision :shell, privileged: false, :inline => $mininet
   config.vm.provision :shell, privileged: false, :inline => $dpdk
   config.vm.provision :shell, :inline => $huge

@@ -16,11 +16,11 @@ struct FlowLockState {
 };
 
 /**
- * =s
+ * =c
  *
  * FlowLock()
  *
- * =c flow
+ * =s flow
  *
  * Flock the downards path per-flow, so packets of the same flow cannot go further at the same time.
  */

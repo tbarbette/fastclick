@@ -17,14 +17,21 @@ ${PARSE_PATH}.sentinel:
 	cp -u $(RTE_SDK)/app/test-pmd/testpmd.c $(PARSE_PATH)
 	cp -u $(RTE_SDK)/app/test-pmd/testpmd.h $(PARSE_PATH)
 	cp -u $(RTE_SDK)/app/test-pmd/config.c $(PARSE_PATH)
+	cp -u $(RTE_SDK)/app/test-pmd/cmdline.c $(PARSE_PATH)
 	# Strip the main function off to prevent complilation errors, while linking with Click
-	sed -i '/main(int/Q' $(PARSE_PATH)/testpmd.c
+	sed -i '$$!N;/main(int/,$$d' $(PARSE_PATH)/testpmd.c
+	sed -i 's/\([*(>]\)template\([= .,[;)]\)/\1ptemplate\2/g' $(PARSE_PATH)/config.c $(PARSE_PATH)/testpmd.h
+	sed -i 's/rte_os_shim/rte_os/' $(PARSE_PATH)/testpmd.h
+	sed -i 's/} template;/} ptemplate;/' $(PARSE_PATH)/testpmd.h
+	sed -i 's/static cmdline_parse_ctx_t/cmdline_parse_ctx_t/' $(PARSE_PATH)/cmdline.c
 	head -n -1 $(PARSE_PATH)/testpmd.c > $(PARSE_PATH)/testpmd_t.c;
 	mv $(PARSE_PATH)/testpmd_t.c $(PARSE_PATH)/testpmd.c
 	# Strip off testpmd report messages as our library prints its own report messages
 	sed -i '/printf("Flow rule #\%u created\\n", pf->id);/d' $(PARSE_PATH)/config.c
 	sed -i '/printf("Flow rule #\%u destroyed\\n", pf->id);/d' $(PARSE_PATH)/config.c
-
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 22 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 23 ] ) && echo true),true)
+	cp -u $(RTE_SDK)/drivers/net/mlx5/mlx5_testpmd.h $(PARSE_PATH)
+endif
 	touch $(PARSE_PATH)/.sentinel
 
 test-pmd/%.o: ${PARSE_PATH}.sentinel
@@ -48,6 +55,12 @@ endif
 PARSE_OBJS += test-pmd/noisy_vnf.o test-pmd/util.o
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 20 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 21 ] ) && echo true),true)
 	PARSE_OBJS += test-pmd/5tswap.o
+endif
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 21 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 22 ] ) && echo true),true)
+	PARSE_OBJS += test-pmd/shared_rxq_fwd.o test-pmd/cmd_flex_item.o
+endif
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 22 ] && [ "$(RTE_VER_MONTH)" -gt 11 ] ) || [ $(RTE_VER_YEAR) -ge 23 ] ) && echo true),true)
+	PARSE_OBJS += test-pmd/cmdline_cman.o
 endif
 
 CFLAGS += -I../lib/librte_parse_$(RTE_VERSION)

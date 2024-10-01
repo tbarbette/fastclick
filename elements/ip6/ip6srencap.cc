@@ -1,8 +1,8 @@
 /*
- * IP6SREncap.{cc,hh} -- element encapsulates packet in IP6 header
- * Roman Chertov
+ * ip6srencap.{cc,hh} -- element encapsulates packet in IP6 SRv6 header
+ * Tom Barbette, Louis Navarre
  *
- * Copyright (c) 2008 Santa Barbara Labs, LLC
+ * Copyright (c) 2024 UCLouvain
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -21,6 +21,7 @@
 #include <click/confparse.hh>
 #include <click/error.hh>
 #include <click/glue.hh>
+
 CLICK_DECLS
 
 IP6SREncap::IP6SREncap() : _do_encap_dst(true)
@@ -69,7 +70,7 @@ IP6SREncap::simple_action(Packet *p_in)
     WritablePacket *p = p_in->push(_sr_len);
     if (!p)
         return 0;
-   
+
     click_ip6 *ip6 = reinterpret_cast<click_ip6 *>(p->data());
     click_ip6_sr *sr = reinterpret_cast<click_ip6_sr *>(p->data() + sizeof(click_ip6));
     memcpy(ip6, p->data() + _sr_len, sizeof(click_ip6));

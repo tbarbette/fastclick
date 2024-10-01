@@ -1,5 +1,5 @@
-#ifndef CLICK_IP6SREncap_HH
-#define CLICK_IP6SREncap_HH
+#ifndef CLICK_IP6SRENCAP_HH
+#define CLICK_IP6SRENCAP_HH
 #include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>

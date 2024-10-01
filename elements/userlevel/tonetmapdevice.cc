@@ -24,8 +24,9 @@
 #include <click/error.hh>
 #include <click/standard/scheduleinfo.hh>
 #include <click/packet_anno.hh>
-#include <vector>
 #include <click/master.hh>
+#include <click/netmapdevice.hh>
+#include <vector>
 #include <sstream>
 
 CLICK_DECLS
@@ -114,7 +115,7 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 	if (input_is_pull(0)) {
 		if (_pull_use_select) {
 			for (int i = 0; i < n_queues; i++) {
-				master()->thread(thread_for_queue(i))->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
+				master()->thread(thread_for_queue_offset(i))->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
 			}
 		}
 
@@ -134,7 +135,7 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 		    _iodone[i] = false;
 		    _zctimers[i] = new Timer(this);
 		    _zctimers[i]->initialize(this,false);
-		    _zctimers[i]->move_thread(thread_for_queue(i));
+		    _zctimers[i]->move_thread(thread_for_queue_offset(i));
 	     }
 	}
 
@@ -197,16 +198,16 @@ ToNetmapDevice::push_batch(int port, PacketBatch *b_head)
 #endif
 	if (s.q != NULL) {
 		if (s.q_size < _internal_tx_queue_size) {
-			s.q->prev()->set_next(b_head);
+			s.q->prev()->set_next(b_head->first());
 			s.q_size += b_head->count();
-			s.q->set_prev(b_head->prev());
+			s.q->set_prev(b_head->first()->prev());
 		} else {
 		    //We don't have space to store these packets, but we'll try to send the awaiting packets before dropping them
 		    should_be_dropped = true;
 		}
 
 	} else {
-		s.q = b_head;
+		s.q = b_head->first();
 		s.q_size = b_head->count();
 
 		//If we are not struggling, ask a sync at the end of the batch
@@ -233,9 +234,9 @@ do_send_batch:
     } else {
         if (should_be_dropped) {
             if (s.q_size < _internal_tx_queue_size) {
-                s.q->prev()->set_next(b_head);
+                s.q->prev()->set_next(b_head->first());
                 s.q_size += b_head->count();
-                s.q->set_prev(b_head->prev());
+                s.q->set_prev(b_head->first()->prev());
             } else { //Still not enough place, drop !
 		if (_blocking) {
             		allow_txsync();
@@ -341,8 +342,8 @@ static inline int _send_packet(WritablePacket* p, struct netmap_ring* txring, st
 				if (p->headroom() > 0) {
 					complaint++;
 					if (complaint < 5)
-						click_chatter("Shifting data in ToNetmapDevice. You should avoid this case !");
-					p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
+						click_chatter("Shifting data in ToNetmapDevice. You should avoid sending non-netmap Packets !");
+					p = static_cast<WritablePacket*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
 				}
 #  if HAVE_NETMAP_PACKET_POOL //We must return the netmap buffer to the packet pool
 				uint32_t buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
@@ -504,11 +505,11 @@ ToNetmapDevice::run_task(Task* task)
 			PacketBatch* new_batch = input_pull_batch(0,_burst - batch_size);
 			if (new_batch) {
 				if (batch) {
-					batch->prev()->set_next(new_batch);
+					batch->prev()->set_next(new_batch->first());
 					batch_size += new_batch->count();
 					batch->set_prev(new_batch->tail());
 				} else {
-					batch = new_batch;
+					batch = new_batch->first();
 					batch_size = new_batch->count();
 				}
 			}

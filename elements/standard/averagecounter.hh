@@ -38,6 +38,9 @@ CLICK_DECLS
  *
  * =h reset write-only
  * Resets the count and rate to zero.
+ *
+ * =a
+ * AverageCounterMP, AverageCounterIMP
  */
 
 template <typename Stats>
@@ -56,7 +59,7 @@ class AverageCounterBase : public BatchElement { public:
     inline uint64_t first() const			{ return _stats.first(); }
     inline uint64_t last() const			{ return _stats.last(); }
     inline uint64_t ignore() const			{ return _ignore; }
-    inline void reset()	{ _stats.reset(); }
+    inline void reset(bool with_time=false);
 
 #if HAVE_BATCH
     PacketBatch *simple_action_batch(PacketBatch *batch);
@@ -108,7 +111,15 @@ struct AverageCounterStats {
 
 };
 
-
+template <typename Stats>
+inline void AverageCounterBase<Stats>::reset(bool with_time)	{
+    _stats.reset();
+    if (with_time) {
+        click_jiffies_t jpart = click_jiffies();
+        if (_stats.my_first() == 0)
+            _stats.set_first(jpart);
+    }
+};
 
 
 class AverageCounter : public AverageCounterBase<AverageCounterStats<uint64_t> > { public:
@@ -117,6 +128,20 @@ class AverageCounter : public AverageCounterBase<AverageCounterStats<uint64_t> >
     const char *class_name() const override		{ return "AverageCounter"; }
 };
 
+/*
+ * =c
+ * AverageCounterMP
+ *
+ * =s counters
+ * measures historical packet count and rate, atomic version
+ *
+ * =d
+ *
+ * Check AverageCounter for documentation*
+ * *
+ * =a
+ * AverageCounter, AverageCounterIMP
+ */
 class AverageCounterMP : public AverageCounterBase<AverageCounterStats<atomic_uint64_t> > { public:
     AverageCounterMP() CLICK_COLD;
 
@@ -173,6 +198,20 @@ struct AverageCounterStatsIMP {
     inline void set_last(uint64_t last){ _counts->last = last; }
 };
 
+/*
+ * =c
+ * AverageCounterIMP
+ *
+ * =s counters
+ * measures historical packet count and rate, per-thread version
+ *
+ * =d
+ *
+ * Check AverageCounter for documentation*
+ * *
+ * =a
+ * AverageCounter, AverageCounterMP
+ */
 class AverageCounterIMP : public AverageCounterBase<AverageCounterStatsIMP> { public:
     AverageCounterIMP() CLICK_COLD;
 

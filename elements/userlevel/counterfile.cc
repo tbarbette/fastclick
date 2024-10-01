@@ -63,7 +63,11 @@ CounterFile::initialize(ErrorHandler *errh)
         return -errno;
     }
 
-    void *mmap_data = mmap(0, sizeof(stats_atomic), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, 0);
+    unsigned long flags = MAP_SHARED;
+#ifdef MAP_POPULATE
+    flags |= MAP_POPULATE;
+#endif
+    void *mmap_data = mmap(0, sizeof(stats_atomic), PROT_READ | PROT_WRITE, flags, fd, 0);
 
     if (mmap_data == MAP_FAILED) {
         int e = -errno;
@@ -80,7 +84,7 @@ CounterFile::initialize(ErrorHandler *errh)
 }
 
 void
-CounterFile::cleanup()
+CounterFile::cleanup(CleanupStage)
 {
     void *mmap_data = static_cast<void *>(_mmapped_stats);
 

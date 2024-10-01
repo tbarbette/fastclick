@@ -27,10 +27,6 @@ Gilbert-Elliott drop model
 
 =a IP6Encap */
 
-enum state_e {
-  good,
-  bad
-};
 
 class IP6Drop : public BatchElement { 
  
@@ -45,30 +41,62 @@ class IP6Drop : public BatchElement {
   int  configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const     { return true; }
   void add_handlers() CLICK_COLD;
-  String read_handler(Element *e, void *thunk) CLICK_COLD;
+  static String read_handler(Element *e, void *thunk) CLICK_COLD;
 
   void push(int, Packet *p_in) override;
 #if HAVE_BATCH
   void push_batch(int, PacketBatch * batch_in) override;
-  Packet *drop_model(Packet *p_in);
-  Packet *drop_model(Packet *p_in, std::function<void(Packet*)>push);
-#else
-  void drop_model(Packet *p_in, std::function<void(Packet*)>push);
 #endif
-  bool gemodel() CLICK_COLD;
-  bool addr_eq(uint32_t *a1, uint32_t *a2) CLICK_COLD;
+  Packet *drop_model(Packet *p_in);
 
- private:
+  bool gemodel();
+  bool uniform_model();
+  bool addr_eq(uint32_t *a1, uint32_t *a2);
+  bool deterministic_drop();
+
+private:
+
   Vector<IP6Address> addrs;
-  uint16_t total_seen; // Number of analyzed packets
+
+  enum state_e {
+    good,
+    bad
+  };
+
+  struct Stats {
+    Stats() : total_seen(0), total_drop(0), total_drop_source(0), total_received(0) {
+
+    }
+
+    uint64_t total_seen; // Number of analyzed packets
+    uint64_t total_drop;
+    uint64_t total_drop_source;
+    uint64_t total_received;
+  };
+
+  struct Shared {
+    Shared() : state(good) {
+
+    }
+     uint64_t de_count;
+    state_e state; // State of the machine
+  };
+  SimpleSpinlock _lock;
+  per_thread<Stats> _stats;
+  Shared _protected;
+
+
   double p; // Good -> bad
   double r; // Bad -> good
   double h; // Don't drop in bad
   double k; // Don't drop in good
-  state_e state; // State of the machine
+
   uint16_t seed;
+  bool is_uniform;
+  double uniform_drop;
   bool is_in_good;
-  bool _use_dst_anno;
+  uint32_t nb_burst;
+  bool is_deterministic;
 };
 
 CLICK_ENDDECLS

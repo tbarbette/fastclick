@@ -32,9 +32,9 @@ my(@source_file, @header_file, @click_name, @cxx_name, @doc_name,
    %click_name_to_id, %cxx_name_to_id, $verbose);
 my(@includes) = ( );
 
-my(@base_elements) = ( 'Element', 'BatchElement', 'SimpleElement', 'ClassifyElement', 'SimpleBatchElement' );
+my(@base_elements) = ( 'Element', 'BatchElement', 'FlowElement', 'SimpleElement', 'ClassifyElement', 'SimpleBatchElement' );
 
-my(@batch_elements) = ( 'BatchElement', 'SimpleElement', 'ClassifyElement', 'SimpleBatchElement' );
+my(@batch_elements) = ( 'BatchElement', 'FlowElement', 'SimpleElement', 'ClassifyElement', 'SimpleBatchElement' );
 
 sub driver_mask ($) {
     my($m) = 0;

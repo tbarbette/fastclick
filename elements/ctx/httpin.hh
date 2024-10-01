@@ -39,9 +39,9 @@ enum fill_method{RESIZE_FILL_END, RESIZE_FILL, RESIZE_CHUNKED, RESIZE_HTTP10};
 /*
 =c
 
-HTPPIn()
+HTTPIn()
 
-=s middlebox
+=s ctx
 
 entry point of an HTTP path in the stack of the middlebox
 

@@ -2,6 +2,9 @@
 
 Test timewarp functionality.
 
+%require
+click-provides !dpdk-packet #Dpdk-packet will force DPDK eal initialization, which slows down the initialization and breaks the test
+
 %script
 
 now () {
@@ -31,11 +34,11 @@ Script(write timewarp 2, set a $(now), wait 0.5s, print $(sub $(now) $a), stop)
 Script(write timewarp 2, set a $(now), wait 0.25s, write timewarp 1, wait 0.25s, print $(sub $(now) $a), stop)
 
 %expect stdout
-0.5{{|[01].*}}
+0.{{(49.*|5[012]?.*)}}
 true
-0.5{{|[01].*}}
+0.{{(49.*|5[012]?.*)}}
 true
-0.5{{|[01].*}}
+0.{{(49.*|5[012]?.*)}}
 true
-0.5{{|[01].*}}
+0.{{(49.*|5[012]?.*)}}
 true

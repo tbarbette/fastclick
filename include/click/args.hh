@@ -440,19 +440,19 @@ class Args : public ArgContext {
         String str = find(keyword, 0, slot_status);
         if (!str) {
             x = static_value;
-		    return *this;
+            return *this;
         } else {
-		T *s = Args_parse_helper<DefaultArg<T> >::slot(x, *this);
-		postparse(s && (str ? Args_parse_helper<DefaultArg<T> >::parse(DefaultArg<T>(), str, *s, *this) : (*s = static_value, true)), slot_status);
+            T *s = Args_parse_helper<DefaultArg<T> >::slot(x, *this);
+            postparse(s && (str ? Args_parse_helper<DefaultArg<T> >::parse(DefaultArg<T>(), str, *s, *this) : (*s = static_value, true)), slot_status);
             if (*s != static_value) {
                 click_chatter("%s is not the expected value", keyword);
-                if (std::is_convertible<T,char *>::value)
+                if (std::is_convertible<T,char *>::value) {
                     click_chatter("Given %s", x);
-                 if (std::is_convertible<V,char *>::value)
+                }
+                if (std::is_convertible<V,char *>::value) {
                     click_chatter("Given %s", static_value);
-
-
-		    assert(*s == static_value);
+                }
+                assert(*s == static_value);
             }
         }
         return *this;
@@ -461,16 +461,15 @@ class Args : public ArgContext {
 
     template <typename T, typename V>
     Args &validate_f(const char *keyword, T &x, int flags, const V &static_value) {
-	//Todo : cleaner
-
+        //Todo : cleaner
         Slot *slot_status;
         String str = find(keyword, flags, slot_status);
         if (!str) {
-		    return *this;
+            return *this;
         } else {
-		T *s = Args_parse_helper<DefaultArg<T> >::slot(x, *this);
-		postparse(s && (str ? Args_parse_helper<DefaultArg<T> >::parse(DefaultArg<T>(), str, *s, *this) : (*s = static_value, true)), slot_status);
-		assert(*s == static_value);
+            T *s = Args_parse_helper<DefaultArg<T> >::slot(x, *this);
+            postparse(s && (str ? Args_parse_helper<DefaultArg<T> >::parse(DefaultArg<T>(), str, *s, *this) : (*s = static_value, true)), slot_status);
+            assert(*s == static_value);
         }
         return *this;
     }

@@ -25,6 +25,6 @@ Placing  fd2 :: CTXDispatcher at [8-11]
 Table of fc1 after optimization :
 ---
 10/FFFFFFFF (HASH-257, 0 children, dynamic)
-|-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000)
+|-> DEFAULT 4294967295 UC:{{0|1}} ED:0 (data ffffffff0000000000000000)
 ---
 A:   20 | 52616e64 6f6d2062 756c6c73 68697420 696e2061

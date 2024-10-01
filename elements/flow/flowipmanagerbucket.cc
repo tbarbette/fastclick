@@ -26,6 +26,11 @@
 #include "../userlevel/fromdpdkdevice.hh"
 #include <rte_ethdev.h>
 
+#if RTE_VERSION >= RTE_VERSION_NUM(22,07,0,0)
+#define PKT_RX_FDIR_ID RTE_MBUF_F_RX_FDIR_ID
+#endif
+
+
 CLICK_DECLS
 
 FlowIPManagerBucket::FlowIPManagerBucket() : _verbose(1), _tables(0), _groups(0), _def_thread(0), _mark(false), _do_migration(true), Router::ChildrenFuture(this) {

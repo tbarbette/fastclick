@@ -42,6 +42,62 @@ extern "C" {
 }
 #endif
 
+#if RTE_VERSION >= RTE_VERSION_NUM(22,07,0,0)
+#define ETH_RSS_RETA_SIZE_512 RTE_ETH_RSS_RETA_SIZE_512
+#define RTE_RETA_GROUP_SIZE RTE_ETH_RETA_GROUP_SIZE
+
+#define ETH_MQ_RX_NONE RTE_ETH_MQ_RX_NONE
+#define ETH_MQ_RX_RSS RTE_ETH_MQ_RX_RSS
+#define ETH_MQ_RX_RSS_FLAG RTE_ETH_MQ_RX_RSS_FLAG
+#define ETH_MQ_RX_VMDQ_ONLY RTE_ETH_MQ_RX_VMDQ_ONLY
+#define ETH_MQ_RX_VMDQ_RSS RTE_ETH_MQ_RX_VMDQ_RSS
+#define ETH_MQ_RX_VMDQ_DCB RTE_ETH_MQ_RX_VMDQ_DCB
+#define ETH_MQ_RX_VMDQ_DCB_RSS RTE_ETH_MQ_RX_VMDQ_DCB_RSS
+#define ETH_MQ_RX_VMDQ_FLAG RTE_ETH_MQ_RX_VMDQ_FLAG
+
+#define DEV_RX_OFFLOAD_CRC_STRIP RTE_ETH_RX_OFFLOAD_CRC_STRIP
+#define DEV_RX_OFFLOAD_TIMESTAMP RTE_ETH_RX_OFFLOAD_TIMESTAMP
+
+#define ETH_VMDQ_ACCEPT_UNTAG RTE_ETH_VMDQ_ACCEPT_UNTAG
+
+#define ETH_RSS_IP RTE_ETH_RSS_IP
+#define ETH_RSS_UDP RTE_ETH_RSS_UDP
+#define ETH_RSS_TCP RTE_ETH_RSS_TCP
+
+#define DEV_TX_OFFLOAD_IPV4_CKSUM RTE_ETH_TX_OFFLOAD_IPV4_CKSUM
+#define DEV_TX_OFFLOAD_TCP_CKSUM RTE_ETH_TX_OFFLOAD_TCP_CKSUM
+#define DEV_TX_OFFLOAD_TCP_TSO RTE_ETH_TX_OFFLOAD_TCP_TSO
+#define DEV_TX_OFFLOAD_MULTI_SEGS RTE_ETH_TX_OFFLOAD_MULTI_SEGS
+#ifndef RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE
+# define RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE DEV_TX_OFFLOAD_MBUF_FAST_FREE
+#endif
+
+//#define DEF_DEV_RXDESC DEF_RTE_ETH_RXDESC
+//#define DEF_DEV_TXDESC DEF_RTE_ETH_TXDESC
+
+#define ETH_TXQ_FLAGS_NOMULTMEMP RTE_ETH_TXQ_FLAGS_NOMULTMEMP
+#define ETH_TXQ_FLAGS_IGNORE RTE_ETH_TXQ_FLAGS_IGNORE
+#define ETH_TXQ_FLAGS_NOMULTSEGS RTE_ETH_TXQ_FLAGS_NOMULTSEGS
+#define ETH_TXQ_FLAGS_NOOFFLOADS RTE_ETH_TXQ_FLAGS_NOOFFLOADS
+
+#define RTE_FC_FULL RTE_ETH_FC_FULL
+#define RTE_FC_RX_PAUSE RTE_ETH_FC_RX_PAUSE
+#define RTE_FC_TX_PAUSE RTE_ETH_FC_TX_PAUSE
+#define RTE_FC_NONE RTE_ETH_FC_NONE
+
+#define ETH_VLAN_FILTER_OFFLOAD RTE_ETH_VLAN_FILTER_OFFLOAD
+#define ETH_VLAN_EXTEND_OFFLOAD RTE_ETH_VLAN_EXTEND_OFFLOAD
+#define ETH_VLAN_STRIP_OFFLOAD RTE_ETH_VLAN_STRIP_OFFLOAD
+
+#define DEV_RX_OFFLOAD_VLAN_FILTER RTE_ETH_RX_OFFLOAD_VLAN_FILTER
+#define DEV_RX_OFFLOAD_VLAN_STRIP RTE_ETH_RX_OFFLOAD_VLAN_STRIP
+#define DEV_RX_OFFLOAD_VLAN_EXTEND RTE_ETH_RX_OFFLOAD_VLAN_EXTEND
+#define DEV_RX_OFFLOAD_TCP_LRO RTE_ETH_RX_OFFLOAD_TCP_LRO
+#define DEV_RX_OFFLOAD_JUMBO_FRAME RTE_ETH_RX_OFFLOAD_JUMBO_FRAME
+
+#endif
+
+
 CLICK_DECLS
 
 static int dpdk_eth_set_rss_reta(EthernetDevice* eth, unsigned* table, unsigned table_sz) {
@@ -274,7 +330,7 @@ int DPDKDevice::alloc_pktmbufs(ErrorHandler* errh)
      * allocate a unused pool
      */
     int max_socket = -1;
-    for (HashTable<portid_t, DPDKDevice>::const_iterator it = _devs.begin();
+    for (HashTable<portid_t, DPDKDevice*>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it) {
         int numa_node = DPDKDevice::get_port_numa_node(it.key());
         if (numa_node > max_socket)
@@ -328,6 +384,10 @@ int DPDKDevice::alloc_pktmbufs(ErrorHandler* errh)
         // Create a pktmbuf pool for each active socket
         for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
                 if (!_pktmbuf_pools[i]) {
+                        if (get_nb_mbuf(i) <= 0) {
+                            continue;
+                        }
+
                         String mempool_name = DPDKDevice::MEMPOOL_PREFIX + String(i);
                         const char* name = mempool_name.c_str();
                         _pktmbuf_pools[i] =
@@ -643,7 +703,8 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     sprintf(vendor_and_dev, "%x:%x", info.vendor_id, info.device_id);
 
     // Retrieve more information about the vendor of this NIC
-    String dev_pci = shell_command_output_string("lspci -d " + String(vendor_and_dev), "", errh);
+
+    String dev_pci = shell_command_output_string("lspci -d " + String(vendor_and_dev) + " 2>/dev/null", "", errh);
     String long_vendor_name = parse_pci_info(dev_pci, "Ethernet controller");
     if (!long_vendor_name.empty()) {
         info.vendor_name = keep_token_left(long_vendor_name, ' ');
@@ -775,14 +836,22 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
                 i, port_id, numa_node);
 
     if (info.init_mtu != 0) {
+#if RTE_VERSION >= RTE_VERSION_NUM(21,11,0,0)
+        if (dev_conf.rxmode.mtu < info.init_mtu) {
+            dev_conf.rxmode.mtu = info.init_mtu;
+        }
+#else
         if (dev_conf.rxmode.max_rx_pkt_len < info.init_mtu) {
             dev_conf.rxmode.max_rx_pkt_len = info.init_mtu;
         }
+#endif
         if (rte_eth_dev_set_mtu(port_id, info.init_mtu) != 0) {
             return errh->error("Could not set MTU %d",info.init_mtu);
         }
     } else {
-    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+    #if RTE_VERSION >= RTE_VERSION_NUM(21,11,0,0)
+        dev_conf.rxmode.mtu = RTE_ETHER_MTU;
+    #elif RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
         dev_conf.rxmode.max_rx_pkt_len = RTE_ETHER_MAX_LEN;
     #else
         dev_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
@@ -932,13 +1001,20 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
     }
 #endif
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(21,11,0,0)
+    if (info.jumbo) {
+        if (dev_conf.rxmode.mtu < dev_info.max_rx_pktlen) {
+            return errh->error("Rx jumbo frame offload is not supported by this device!");
+        }
+    }
+#elif RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
     if (info.jumbo) {
     #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
         unsigned int min_rx_pktlen = (unsigned int) RTE_ETHER_MIN_LEN;
     #else
         unsigned int min_rx_pktlen = (unsigned int) ETHER_MIN_LEN;
     #endif
+
         if (!(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_JUMBO_FRAME)) {
             return errh->error("Rx jumbo frame offload is not supported by this device!");
         } else {
@@ -949,7 +1025,6 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
             }
             dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
         }
-        errh->message("Rx jumbo frames offloading enabled on port_id=%u with max_rx_pkt_len %u in [%u, %u]\n", port_id, dev_conf.rxmode.max_rx_pkt_len, min_rx_pktlen, dev_info.max_rx_pktlen);
     } else {
         dev_conf.rxmode.offloads &= ~DEV_RX_OFFLOAD_JUMBO_FRAME;
     }
@@ -1167,7 +1242,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     if (dev_count() == 0 && _devs.size() > 0)
         return errh->error("No DPDK-enabled ethernet port found");
 
-    for (HashTable<portid_t, DPDKDevice>::const_iterator it = _devs.begin();
+    for (HashTable<portid_t, DPDKDevice*>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it)
         if (it.key() >= dev_count())
             return errh->error("Cannot find DPDK port %u", it.key());
@@ -1177,9 +1252,9 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         return err;
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
-        for (HashTable<portid_t, DPDKDevice>::iterator it = _devs.begin();
+        for (HashTable<portid_t, DPDKDevice*>::iterator it = _devs.begin();
             it != _devs.end(); ++it) {
-            int ret = it.value().initialize_device(errh);
+            int ret = it.value()->initialize_device(errh);
             if (ret < 0)
                 return ret;
         }
@@ -1208,7 +1283,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         }
     }
 #endif
-
+    all_initialized.solve_initialize(errh);
     return 0;
 }
 
@@ -1500,10 +1575,11 @@ unsigned DPDKDevice::RING_POOL_CACHE_SIZE = 32;
 unsigned DPDKDevice::RING_PRIV_DATA_SIZE  = 0;
 
 bool DPDKDevice::_is_initialized = false;
-HashTable<portid_t, DPDKDevice> DPDKDevice::_devs;
+HashTable<portid_t, DPDKDevice*> DPDKDevice::_devs;
 struct rte_mempool** DPDKDevice::_pktmbuf_pools = 0;
 unsigned DPDKDevice::_nr_pktmbuf_pools = 0;
 bool DPDKDevice::no_more_buffer_msg_printed = false;
+Router::ChildrenFuture DPDKDevice::all_initialized;
 
 CLICK_ENDDECLS
 

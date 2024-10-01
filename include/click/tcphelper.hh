@@ -20,8 +20,16 @@
 #include <click/dpdkdevice.hh>
 #endif
 #include "iphelper.hh"
+
 #if HAVE_DPDK
 #include <rte_ip.h>
+
+#if RTE_VERSION >= RTE_VERSION_NUM(22,07,0,0)
+#define PKT_TX_TCP_CKSUM RTE_MBUF_F_TX_TCP_CKSUM
+#define PKT_TX_IP_CKSUM RTE_MBUF_F_TX_IP_CKSUM
+#define PKT_TX_IPV4 RTE_MBUF_F_TX_IPV4
+#endif
+
 #endif
 
 CLICK_DECLS
@@ -304,7 +312,12 @@ inline void TCPHelper::resetTCPChecksum(WritablePacket *packet)
         return;
     }
 #if HAVE_DPDK
+
+# if !CLICK_PACKET_USE_DPDK
     rte_mbuf* mbuf = (struct rte_mbuf *) packet->destructor_argument();
+# else
+    rte_mbuf* mbuf = (struct rte_mbuf *) packet;
+# endif
     mbuf->l2_len = packet->mac_header_length();
     mbuf->l3_len = packet->network_header_length();
     mbuf->l4_len = tcph->th_off << 2;

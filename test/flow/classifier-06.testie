@@ -26,9 +26,9 @@ Table of d1 after optimization :
 0/FF (TWOCASE, 1 children)
 |-> 16
 |  1/FF (TWOCASE, 1 children)
-|  |-> 32 UC:1 ED:0 (data 200000000000000000000000)
-|  |-> DEFAULT 0 UC:1 ED:0 (data 000000000100000000000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff00000000)
+|  |-> 32 UC:{{0|1}} ED:0 (data 200000000000000000000000)
+|  |-> DEFAULT 0 UC:{{0|1}} ED:0 (data 000000000100000000000000)
+|-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff00000000)
 ---
 B:    2 | 1030
 BE:    2 | 1030

@@ -11,7 +11,7 @@ CLICK_DECLS
 
 GTPLookup()
 
-=s gtp
+=s tunnel
 
 Encapsulates packets in their intended GTP return id.
 

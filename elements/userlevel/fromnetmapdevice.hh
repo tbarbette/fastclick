@@ -4,7 +4,6 @@
 #include <click/config.h>
 #include <click/task.hh>
 #include <click/etheraddress.hh>
-#include <click/netmapdevice.hh>
 #include "queuedevice.hh"
 #include <vector>
 #include <stdint.h>
@@ -14,6 +13,8 @@
 #include <fstream>
 
 CLICK_DECLS
+
+class NetmapDevice;
 
 /*
  * =c

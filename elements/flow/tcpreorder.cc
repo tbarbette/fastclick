@@ -26,7 +26,11 @@ TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
     .complete() < 0)
         return -1;
 
-    VirtualFlowManager::fcb_builded_init_future()->post([this](ErrorHandler* errh){return reorder_initialize(errh);},this);
+    VirtualFlowManager::fcb_builded_init_future()->post(
+        [this](ErrorHandler* errh){
+            return reorder_initialize(errh);
+        },this
+    );
 
     return 0;
 }
@@ -46,6 +50,7 @@ TCPReorder::reorder_initialize(ErrorHandler *errh) {
     if (track.size() > 0) {
         return errh->error("TCPIn now includes support for reordering. Use TCPReorder alone if you only want TCP Reordering");
     }
+    return 0;
 }
 
 void*
@@ -322,19 +327,23 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
         click_tcp *th = (click_tcp *) (((char *)ip) + hlen);
         //click_chatter("Last packet, releasing timeout");
         if (th->th_flags & (TH_FIN | TH_RST))
-                fcb_release_timeout();
+                ctx_release_timeout();
     }
 
   send_batch:
   if (!tcpreorder->packetList && had_awaiting) {
       //We don't have awaiting packets anymore, remove the fct
       //click_chatter("We are now in order, removing release fct");
+#if HAVE_FLOW_DYNAMIC
       fcb_remove_release_fnt(tcpreorder,&fcb_release_fnt);
+#endif
   } else if (tcpreorder->packetList && !had_awaiting) {
       //Set release fnt
       if (_verbose)
           click_chatter("Out of order, setting release fct");
+#if HAVE_FLOW_DYNAMIC
       fcb_set_release_fnt(static_cast<FlowReleaseChain*>(tcpreorder), &fcb_release_fnt);
+#endif
   }
     assert(tcpreorder->expectedPacketSeq);
     tcpreorder->packetList = packet;
@@ -427,7 +436,7 @@ bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, PacketBatch
 
         //If there is no better TCP manager, we must ensure the flow stays alive
         if (!_notimeout) {
-            fcb_acquire_timeout(2000);
+            ctx_acquire_timeout(2000);
         }
 
         // Ensure that the list of waiting packets is free
@@ -602,8 +611,10 @@ void TCPReorder::fcb_release_fnt(FlowControlBlock* fcb, void* thunk) {
 
     //click_chatter("Released %d",i);
     tcpreorder->packetList = 0;
+#if HAVE_FLOW_DYNAMIC
     if (tcpreorder->previous_fnt)
         tcpreorder->previous_fnt(fcb, tcpreorder->previous_thunk);
+#endif
 }
 
 CLICK_ENDDECLS

@@ -2278,12 +2278,11 @@ Lexer::create_router(Master *master)
 
 #if HAVE_CTX
   // expand context connections
-  bool change_made = false;
   if ( _c->_conn.size()) {
       for (int eidx = 0; eidx < router->_elements.size(); ++eidx) {
           Vector<Router::Connection*> connections;
           for (int cix = 0; cix < _c->_conn.size(); ++cix) {
-              int ci = cix; //_conn_output_sorter[cix];
+              //int ci = cix; //_conn_output_sorter[cix];
               if (_c->_conn[cix][1].idx == eidx && _c->_conn[cix]._is_context) {
                   connections.push_back(&_c->_conn[cix]);
                   //click_chatter("%d has conn %d %d as context / %d",eidx,_c->_conn[ci][0].idx,_c->_conn[cix][1].idx,router->_elements.size());
@@ -2293,7 +2292,6 @@ Lexer::create_router(Master *master)
               }
           }
           if (connections.size() > 0) {
-              change_made = true;
               int fdidx = router->_elements.size();
               FlowContextDispatcher* fd = new FlowContextDispatcher();
               String conf = "";

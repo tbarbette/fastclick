@@ -15,7 +15,7 @@ CLICK_DECLS
  * and that the Grid header length, length, and
  * checksum fields are valid.
  *
- * =back
+ * =over 8
  *
  * =h count read-only
  *
@@ -24,6 +24,8 @@ CLICK_DECLS
  * =h drops read-only
  *
  * Returns the number of incorrect packets CheckGridHeader has seen.
+ *
+ * =back
  *
  * =a
  * SetGridChecksum

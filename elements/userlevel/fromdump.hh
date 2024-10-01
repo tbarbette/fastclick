@@ -119,6 +119,21 @@ This can result in slightly better performance on some machines. FromDump's
 regular file discipline is pretty optimized, so the difference is often small
 in practice. Default is true on most operating systems, but false on Linux.
 
+=item ACCELERATION
+Integer. Accelerate the timing of the trace, given in percent. Ineffective
+if TIMING is not true. Defaults to 100, the original time.
+
+=item TIMING_FNT
+String. A function that can be used to change the ACCELERATION according to 
+the current time. The parsing uses TinyFNT and therefore follows the format.
+The variable containing the time is x. E.g. "10 + min(90,10*x)" will have an
+acceleration from 10 to 100% in 9 seconds. See ReplayUnqueue for more details.
+Ineffective if TIMING is not true. Defaults to an empty string (inactive).
+
+=item BURST
+Amount of packets to read and send together as a batch. Likely useless with TIMING, but can 
+enhance performance without TIMING when a trace is used to replay packets as fast as possible.
+
 =back
 
 You can supply at most one of START and START_AFTER, and at most one of END,

@@ -25,7 +25,11 @@ struct fcb_transmit_buffer {
 
 SimpleTCPRetransmitter([INITIALBUFFERSIZE])
 
-=s middlebox
+=s ctx
+
+Retransmit TCP packets for the ctx subsystem
+
+=d
 
 TCPRetransmitter to use with TCPIn. Keeps reference of packets pushed
 on port 0 in the middleclick sractchpad until the ack is received on the other

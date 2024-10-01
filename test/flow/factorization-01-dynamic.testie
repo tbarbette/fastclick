@@ -1,0 +1,42 @@
+%require
+click-buildtool provides flow flow-dynamic ctx
+
+%info
+Simple session factorization
+
+%script
+click CONF
+
+%file CONF
+InfiniteSource(DATA \<0123>, LIMIT 1, STOP true)
+    -> fcA :: CTXManager(VERBOSE 3, VERBOSE_FCB 0) -> CTXDispatcher(0/00/ff) -> CTXDispatcher(0/00/ff) -> Print(PASSED) -> Discard;
+
+
+%expect stderr
+Reachable VirtualFlowSpaceElement element list :
+Reachable from fcA :: CTXManager : CTXDispatcher@3 :: CTXDispatcher, max offset -1
+Reachable from fcA :: CTXManager : CTXDispatcher@4 :: CTXDispatcher, max offset 3
+Placing  CTXDispatcher@3 :: CTXDispatcher at [4-7]
+Placing  CTXDispatcher@4 :: CTXDispatcher at [8-11]
+Table of fcA before optimization :
+---
+0/FF (DEFINITION, 0 children, dynamic)
+|-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000)
+---
+Table of fcA after optimization :
+---
+0/FF (ARRAY, 0 children, dynamic)
+|-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000)
+---
+Table of fcA after replacing nodes :
+---
+0/FF (ARRAY, 0 children, dynamic)
+|-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000)
+---
+Table of fcA after getting new packet (length 2) :
+---
+0/FF (ARRAY, 1 children, dynamic)
+|-> 1 UC:0 ED:0 (data 010000000000000000000000)
+|-> DEFAULT 4294967295 UC:1 ED:0 (data ffffffff0000000000000000)
+---
+PASSED:    2 | 0123

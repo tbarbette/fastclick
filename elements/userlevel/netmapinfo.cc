@@ -18,6 +18,7 @@
 #include <click/config.h>
 #include <click/args.hh>
 #include <click/error.hh>
+#include <click/netmapdevice.hh>
 #include "netmapinfo.hh"
 
 CLICK_DECLS

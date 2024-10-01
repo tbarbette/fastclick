@@ -130,6 +130,14 @@ FlowRuleManager::~FlowRuleManager()
     delete_error_handler();
 }
 
+
+
+#if RTE_VERSION >= RTE_VERSION_NUM(22,11,0,0)
+#define RTE_FLOW_ITEM_TYPE_VF RTE_FLOW_ITEM_TYPE_REPRESENTED_PORT
+#define RTE_FLOW_ITEM_TYPE_PHY_PORT RTE_FLOW_ITEM_TYPE_REPRESENTED_PORT
+#define RTE_FLOW_ACTION_TYPE_PHY_PORT RTE_FLOW_ACTION_TYPE_REPRESENTED_PORT
+#endif
+
 void
 FlowRuleManager::populate_supported_flow_items_and_actions()
 {
@@ -194,12 +202,15 @@ FlowRuleManager::populate_supported_flow_items_and_actions()
 #if RTE_VERSION >= RTE_VERSION_NUM(18,5,0,0)
     flow_action.insert((int) RTE_FLOW_ACTION_TYPE_PHY_PORT, "PHY_PORT");
     flow_action.insert((int) RTE_FLOW_ACTION_TYPE_PORT_ID, "PORT_ID");
+
+# if RTE_VERSION < RTE_VERSION_NUM(22,11,0,0)
     flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_SET_MPLS_TTL, "OF_SET_MPLS_TTL");
     flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_DEC_MPLS_TTL, "OF_DEC_MPLS_TTL");
     flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_SET_NW_TTL, "OF_SET_NW_TTL");
     flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_DEC_NW_TTL, "OF_DEC_NW_TTL");
     flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_COPY_TTL_OUT, "OF_COPY_TTL_OUT");
     flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_COPY_TTL_IN, "OF_COPY_TTL_IN");
+# endif
     flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_POP_VLAN, "OF_POP_VLAN");
     flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_PUSH_VLAN, "OF_PUSH_VLAN");
     flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_SET_VLAN_VID, "OF_SET_VLAN_VID");
@@ -272,11 +283,13 @@ FlowRuleManager::get_flow_rule_mgr(const portid_t &port_id, ErrorHandler *errh)
 {
     if (!errh) {
         errh = ErrorHandler::default_handler();
+        if(!errh)
+            errh = new ErrorHandler();
     }
 
     // Invalid port ID
     if (port_id >= DPDKDevice::dev_count()) {
-        errh->error("DPDK Flow Rule Manager (port %u): Denied to create instance for invalid port", port_id);
+	    errh->error("DPDK Flow Rule Manager (port %u): Denied to create instance for invalid port", port_id);
         return NULL;
     }
 

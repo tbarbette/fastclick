@@ -765,7 +765,7 @@ bool optimizeIR(std::string input) {
   llvm::LLVMContext context;
   llvm::SMDiagnostic error;
   std::unique_ptr<llvm::Module> M =
-      llvm::parseIRFile(input + ".0.5.precodegen.bc", error, context);
+  llvm::parseIRFile(input + ".0.5.precodegen.bc", error, context);
   bool changed = false;
   if (M) {
     /* Removing module flags to avoid linking error */
@@ -784,7 +784,7 @@ bool optimizeIR(std::string input) {
     /* Write the output */
     if (changed) {
       std::error_code EC;
-      llvm::raw_fd_ostream OS(input + ".ll", EC, llvm::sys::fs::F_None);
+      llvm::raw_fd_ostream OS(input + ".ll", EC);
       OS << *M;
       return true;
     }

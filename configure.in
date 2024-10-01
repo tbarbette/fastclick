@@ -54,26 +54,14 @@ AC_PROG_CXXCPP
 
 AX_CHECK_COMPILE_FLAG(-Winconsistent-missing-override,CXXFLAGS="$CXXFLAGS -Wno-inconsistent-missing-override",:,[-Werror])
 
-case "$target" in
-        *x86*)
-                AX_CHECK_X86_FEATURES([CFLAGS="$CFLAGS $X86_FEATURE_CFLAGS";CXXFLAGS="$CXXFLAGS $X86_FEATURE_CFLAGS"])
-        ;;
-        *)
-                # AC_MSG_WARN(["Skipping x86 tests since target is $target"])
-        ;;
-esac
-
-
-
-
-AC_TRY_RUN([#include <new>
+AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <new>
 
 int main() {
     std::size_t sz = 8;
     std::align_val_t al{64};
     void* a = operator new(sz,al);
     return (a == nullptr?1:0);
-}],AC_DEFINE([HAVE_ALIGNED_NEW]))
+}]])],[AC_DEFINE(HAVE_ALIGNED_NEW)],[],[])
 
 CLICK_PROG_KERNEL_CC
 CLICK_PROG_KERNEL_CXX
@@ -213,13 +201,25 @@ else
     LIBS="$save_libs"
 fi
 
+AC_ARG_ENABLE([bpf],
+    [AS_HELP_STRING([  --disable-bpf], [Compile without BPF support])],
+    [:], [enable_bpf=yes])
+
+
 AC_SEARCH_LIBS([bpf_prog_load_xattr], [bpf], [ac_have_libbpf=yes], [ac_have_libbpf=no])
 AC_CHECK_HEADERS([bpf/bpf.h], [ac_have_libbpf_h=yes], [ac_have_libbpf_h=no])
-if test "x$ac_have_libbpf$ac_have_libbpf_h" = "xyesyes"; then
+if test "x$ac_have_libbpf$ac_have_libbpf_h$enable_bpf" = "xyesyesyes"; then
     AC_DEFINE([HAVE_BPF])
     have_libbpf=yes
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <bpf/bpf.h>
+    enum bpf_stats_type test;
+]], [[]])], ac_cv_bpf_has_bpf_stats_type=yes, ac_cv_bpf_has_bpf_stats_type=no)
+    if test "x$ac_cv_bpf_has_bpf_stats_type" = "xyes"; then
+        AC_DEFINE([HAVE_BPF_STATS_TYPE])
+    fi
 else
     have_libbpf=no
+    enable_bpf=no
 fi
 
 AC_SEARCH_LIBS([curl_global_init], [curl], [ac_have_curl=yes], [ac_have_curl=no])
@@ -254,7 +254,7 @@ AC_CHECK_HEADERS([hs/hs.h], [ac_have_hyperscan_h=yes], [ac_have_hyperscan_h=no])
 if test "x$ac_have_hyperscan$ac_have_hyperscan_h" = "xyesyes"; then
     have_hyperscan=yes
     LIBS="$LIBS -lhs"
-    AC_DEFINE([HAVE_HYPERSCAN])
+    AC_DEFINE([HAVE_HYPERSCAN],[1],[Have the hyperscan library for regex matching.])
 else
     have_hyperscan=no
 fi
@@ -262,7 +262,7 @@ fi
 AC_SEARCH_LIBS([PAPI_start_counters], [papi], [ac_have_papi=yes], [ac_have_papi=no])
 AC_CHECK_HEADERS([papi.h], [ac_have_papi_h=yes], [ac_have_papi_h=no])
 if test "x$ac_have_papi_h$ac_have_papi" = "xyesyes"; then
-    AC_DEFINE([HAVE_PAPI])
+    AC_DEFINE([HAVE_PAPI],[1],[Have the libpapi library for performance counters.])
     have_papi=yes
 else
     have_papi=no
@@ -348,7 +348,7 @@ AC_ARG_ENABLE([flow-api], [AS_HELP_STRING([    --enable-flow-api], [Support for 
 
 AC_ARG_ENABLE([click-pool],
     [AS_HELP_STRING([    --disable-click-pool], [allow usage of Click Packet pool. It will still only be effectively enabled in specific (but most) cases, see packet.hh])],
-    [:], [enable_click_pool=yes;AC_DEFINE(ALLOW_CLICK_PACKET_POOL)])
+    [:], [enable_click_pool=yes;AC_DEFINE(HAVE_ALLOW_CLICK_PACKET_POOL,[1],[Define if Click packet pool can be used if others flags allow it (see packet.hh).])])
 
 
 AC_ARG_ENABLE([pool-inlining],
@@ -664,7 +664,7 @@ dnl
 
 AC_ARG_ENABLE([all-elements], [AS_HELP_STRING([--enable-all-elements], [include all provided element groups])])
 
-dnl ELEMENTS_ARG_ENABLE(COLLECTION, HELP-STRING, DEFAULT-VALUE, IF_YES, COND)
+dnl ELEMENTS_ARG_ENABLE(COLLECTION, HELP-STRING, DEFAULT-VALUE, IF_YES, COND_FOR_ENABLE_ALL)
 element_groups=""
 AC_SUBST(element_groups)
 AC_DEFUN([ELEMENTS_ARG_ENABLE],
@@ -681,8 +681,8 @@ ELEMENTS_ARG_ENABLE(app, [include application-level elements], yes)
 ELEMENTS_ARG_ENABLE(aqm, [include active queue management elements], yes)
 ELEMENTS_ARG_ENABLE(ethernet, [include Ethernet elements], yes)
 ELEMENTS_ARG_ENABLE(etherswitch, [include Ethernet switch elements], NO)
-ELEMENTS_ARG_ENABLE(flow, [include Enable flow system and elements], NO)
-ELEMENTS_ARG_ENABLE(ctx, [include Context-based elements], no, enable_ctx=no , [ -a "x$enable_flow" = xyes ] )
+ELEMENTS_ARG_ENABLE(flow, [include Enable flow system and elements], NO, enable_flow=yes, [ -a "x$enable_batch" = xyes ] )
+ELEMENTS_ARG_ENABLE(ctx, [include Context-based elements], NO, enable_ctx=yes , [ -a "x$enable_flow" = xyes ] )
 ELEMENTS_ARG_ENABLE(grid, [include Grid elements (see FAQ)], NO)
 ELEMENTS_ARG_ENABLE(icmp, [include ICMP elements], yes)
 ELEMENTS_ARG_ENABLE(ip, [include IP elements], yes)
@@ -705,7 +705,7 @@ AC_ARG_ENABLE(skip-elements, [AS_HELP_STRING([--enable-skip-elements=ELTS], [dis
 all_element_groups=
 for i in `(cd $srcdir/elements; ls | sed '/^CVS$/d;/^\.git/d;/^bsdmodule$/d;/^linuxmodule$/d;/^ns$/d;/^userlevel$/d;/^minios$/d')`; do
     enableval=`eval 'echo $'"enable_$i"`
-    test "x$enable_all_elements" = xyes -a "x$enableval" '!=' xno && enableval=yes
+    test "x$enable_all_elements" = xyes -a "x$enableval" '=' xyes && enableval=yes
     test -d "$srcdir/elements/$i" -a "$enableval" = "yes" && element_groups="$element_groups $i"
     test -d "$srcdir/elements/$i" && all_element_groups="$all_element_groups$i "
 done
@@ -780,19 +780,25 @@ dnl
 
 AC_CACHE_CHECK([whether we are compiling for Linux], [ac_cv_under_linux],
     [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[#ifndef __linux__
-#error "fuckers! fuckers!"
+#error "unsupported"
 #endif
 return 0;]])], ac_cv_under_linux=yes, ac_cv_under_linux=no)])
+
+AC_CACHE_CHECK([whether we are compiling for Apple Mach], [ac_cv_under_mach],
+    [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[#if !(defined(__MACH__) && defined(__APPLE__))
+#error "unsupported"
+#endif
+return 0;]])], ac_cv_under_mach=yes, ac_cv_under_mach=no)])
 
 
 dnl
 dnl functions
 dnl
 
-AC_LANG_C
+AC_LANG([C])
 AC_REPLACE_FUNCS(strerror)
 AC_CHECK_FUNCS(random snprintf strnlen strtof strtold strtoul tcgetpgrp vsnprintf aligned_alloc)
-AC_LANG_CPLUSPLUS
+AC_LANG([C++])
 
 
 dnl
@@ -825,6 +831,8 @@ CLICK_CHECK_ENDIAN
 CLICK_CHECK_SIGNED_SHIFT
 CLICK_CHECK_ADDRESSABLE_VA_LIST
 CLICK_CHECK_COMPILER_INTRINSICS
+
+AX_CXX_COMPILE_STDCXX(17,[],optional)
 
 
 dnl
@@ -894,6 +902,7 @@ if test "x$have_aligned_new" = xyes; then
     CXXFLAGS="$CXXFLAGS -faligned-new"
 fi
 
+
 if test "x$enable_flow" = xyes; then
     if test "x$enable_batch" != xyes; then
         AC_MSG_ERROR([--enable-flow needs --enable-batch! Flow subsystem will be disabled.])
@@ -910,11 +919,13 @@ else
     enable_ctx="no"
 fi
 
-AC_ARG_ENABLE([sloppy],
-    [AS_HELP_STRING([  --disable-sloppy], [disable Sloppy flow timeouts])],
-    [:], [enable_sloppy=yes])
-if test "x$enable_sloppy" = xyes; then
-    AC_DEFINE(HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT)
+m4_divert_once([HELP_ENABLE], [[  Optional features about flow and context:]])
+
+AC_ARG_ENABLE([ctx-global-timeout],
+    [AS_HELP_STRING([  --disable-ctx-global-timeout], [disable sloppy CTX timeouts. Enabled if CTX is enabled by default.])],
+    [:], [enable_ctx_global_timeout=$enable_ctx])
+if test "x$enable_ctx_global_timeout" = xyes; then
+    AC_DEFINE(HAVE_CTX_GLOBAL_TIMEOUT)
 fi
 
 AC_ARG_ENABLE([flow-atomic],
@@ -925,8 +936,8 @@ if test "x$enable_flow_atomic" = xyes; then
 fi
 
 AC_ARG_ENABLE([flow-dynamic],
-    [AS_HELP_STRING([  --disable-flow-dynamic], [allow dynamic flow system])],
-    [:], [enable_flow_dynamic=yes])
+    [AS_HELP_STRING([  --enable-flow-dynamic], [enable dynamic reference counting to automatically acquire and relealse flow control blocksic flow system])],
+    [:], [enable_flow_dynamic=no])
 if test "x$enable_flow$enable_flow_dynamic" = xyesyes; then
     AC_DEFINE(HAVE_FLOW_DYNAMIC)
 fi
@@ -957,7 +968,7 @@ else
 fi
 
 AC_ARG_ENABLE(tools,
-  [AC_HELP_STRING([--enable-tools=WHERE], [enable tools (host/build/mixed/no) [[mixed]]])],
+  [AS_HELP_STRING([--enable-tools=WHERE],[enable tools (host/build/mixed/no) [[mixed]]])],
   :, enable_tools=mixed)
 
 if test "$enable_tools" != mixed -a "$enable_tools" != host -a "$enable_tools" != build -a "$enable_tools" != no; then
@@ -1020,7 +1031,7 @@ dnl
 dnl sockets
 dnl
 
-AC_LANG_C
+AC_LANG([C])
 SOCKET_LIBS=
 if test "$enable_userlevel" = yes; then
     savelibs="$LIBS"; LIBS=
@@ -1038,7 +1049,7 @@ if test "$enable_userlevel" = yes; then
     fi
 fi
 AC_SUBST(SOCKET_LIBS)
-AC_LANG_CPLUSPLUS
+AC_LANG([C++])
 
 
 dnl
@@ -1052,10 +1063,10 @@ dnl
 dnl mmap
 dnl
 
-AC_LANG_C
+AC_LANG([C])
 AC_CHECK_HEADERS_ONCE([sys/mman.h])
 AC_FUNC_MMAP
-AC_LANG_CPLUSPLUS
+AC_LANG([C++])
 AC_CHECK_FUNCS(madvise)
 AC_CHECK_DECLS(madvise, [], [], [#if HAVE_SYS_MMAN_H
 #include <sys/types.h>
@@ -1228,6 +1239,12 @@ else ac_cv_linux_sb_lock=no; fi])
 if test $ac_cv_linux_sb_lock = yes; then
     AC_DEFINE(HAVE_LINUX_SB_LOCK)
 fi
+
+AC_CHECK_HEADERS(asm/ioctl.h, have_asm_ioctl_h=yes, have_asm_ioctl_h=no)
+if test "$have_asm_ioctl_h" = yes; then
+    AC_DEFINE([HAVE_ASM_IOCTL_H])
+fi
+
 
 AC_CACHE_CHECK([for dev_ioctl kernel symbol], ac_cv_linux_dev_ioctl,
 [if grep "__ksymtab_dev_ioctl" $linux_system_map >/dev/null 2>&1; then
@@ -1462,6 +1479,11 @@ if test "$value" != 0; then
     AC_DEFINE_UNQUOTED([CLICK_DEBUG_SCHEDULING], [$value], [Define to enable debugging support for Click scheduling.])
 fi
 
+AC_ARG_ENABLE(hash-allocator-poisoning, [  --enable-hash-allocator-poisoning      enable HashAllocator block poisoning], :, enable_hash_allocator_poisoning=no)
+if test $enable_hash_allocator_poisoning = yes; then
+    AC_DEFINE(HAVE_HASH_ALLOCATOR_POISONING)
+fi
+
 
 dnl Compile for the native architecture
 AC_ARG_ENABLE(portable-binary, [AS_HELP_STRING([--enable-portable-binary], [disable compiler optimizations that would produce unportable binaries])],
@@ -1479,6 +1501,12 @@ fi
 
 dnl Support AVX2 instructions
 
+AC_COMPILE_IFELSE([
+#ifndef __AVX2__
+#error
+#endif
+         ], [cpu_supports_avx2="yes"], [cpu_supports_avx2="no"])
+
 AC_ARG_ENABLE([avx2],
         AS_HELP_STRING([--disable-avx2],
                    [Do not check whether AVX2 is enabled]),
@@ -1486,15 +1514,45 @@ AC_ARG_ENABLE([avx2],
           [check_avx2=yes])
 
 AC_MSG_CHECKING([if AVX2 should be used])
-if test "x$ax_cv_gcc_x86_cpu_supports_avx2$check_avx2" = "xyesyes"; then
+if test "x$cpu_supports_avx2$check_avx2" = "xyesyes"; then
     AC_MSG_RESULT([yes])
     AC_DEFINE([HAVE_AVX2],1)
+    save_cflags="$CFLAGS"
+    CFLAGS="$save_cflags -mavx2"
+    save_cxxflags="$CXXFLAGS"
+    CXXFLAGS="$save_cxxflags -mavx2"
 else
     AC_MSG_RESULT([no])
 fi
 
-dnl Support SSE4.2 instructions
+AC_COMPILE_IFELSE([
+#ifndef __SSE2__
+#error
+#endif
+         ], [cpu_supports_sse2="yes"], [cpu_supports_sse2="no"])
+AC_ARG_ENABLE([sse2],
+        AS_HELP_STRING([--disable-sse2],
+                   [Do not check whether SSE2 is enabled]),
+          [check_sse2=no],
+          [check_sse2=yes])
 
+AC_MSG_CHECKING([if SSE2 should be used])
+if test "x$cpu_supports_sse2$check_sse2" = "xyesyes"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([HAVE_SSE2],1)
+    save_cflags="$CFLAGS"
+    CFLAGS="$save_cflags -msse2"
+    save_cxxflags="$CXXFLAGS"
+    CXXFLAGS="$save_cxxflags -msse2"
+else
+    AC_MSG_RESULT([no])
+fi
+
+AC_COMPILE_IFELSE([
+#ifndef __SSE4_2__
+#error
+#endif
+         ], [cpu_supports_sse42="yes"], [cpu_supports_sse42="no"])
 AC_ARG_ENABLE([sse42],
         AS_HELP_STRING([--disable-sse42],
                    [Do not check whether SSE4.2 is enabled]),
@@ -1502,9 +1560,13 @@ AC_ARG_ENABLE([sse42],
           [check_sse42=yes])
 
 AC_MSG_CHECKING([if SSE4.2 should be used])
-if test "x$ax_cv_gcc_x86_cpu_supports_sse4_2$check_sse42" = "xyesyes"; then
+if test "x$cpu_supports_sse42$check_sse42" = "xyesyes"; then
     AC_MSG_RESULT([yes])
     AC_DEFINE([HAVE_SSE42],1)
+    save_cflags="$CFLAGS"
+    CFLAGS="$save_cflags -msse4.2"
+    save_cxxflags="$CXXFLAGS"
+    CXXFLAGS="$save_cxxflags -msse4.2"
 else
     AC_MSG_RESULT([no])
 fi
@@ -1569,7 +1631,7 @@ dnl
 dnl kernel interfaces
 dnl
 
-AC_CHECK_HEADERS_ONCE([ifaddrs.h linux/if_tun.h linux/if_packet.h net/if_dl.h net/if_tap.h net/if_tun.h net/if_types.h net/bpf.h netpacket/packet.h])
+AC_CHECK_HEADERS_ONCE([ifaddrs.h linux/ethtool.h linux/sockios.h linux/if_tun.h linux/if_packet.h linux/netlink.h net/if_dl.h net/if_tap.h net/if_tun.h net/if_types.h net/bpf.h netpacket/packet.h])
 
 
 dnl
@@ -1651,6 +1713,7 @@ if test "x$enable_dpdk" != "xno"; then
 
 
     if test "x$enable_dpdk" = "xyes" && pkg-config --exists libdpdk; then
+      dpdk_sys="meson"
       AC_SUBST(RTE_USE_PKGCONFIG, 1)
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
@@ -1667,6 +1730,7 @@ if test "x$enable_dpdk" != "xno"; then
 	  DPDK_CFLAGS=$(pkg-config --cflags libdpdk)
       AC_MSG_RESULT([yes])
     else
+      dpdk_sys="make"
       AC_SUBST(RTE_USE_PKGCONFIG, 0)
       RTE_INCLUDE=${RTE_SDK_BIN}/include/
       RTE_LIB="$RTE_SDK_BIN/lib"
@@ -1725,7 +1789,16 @@ version (dpdk-dev or dpdk-devel).
       AC_DEFINE([HAVE_DPDK_READ_CLOCK])
     else
       AC_MSG_RESULT([no])
+    fi    
+   
+    AC_MSG_CHECKING([whether DPDK has rte_flow_update])
+    if ${READELF} -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_flow_update &> /dev/null; then
+      AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_RTE_FLOW_UPDATE])
+    else
+      AC_MSG_RESULT([no])
     fi
+
 fi
 
 if test "x$enable_dpdk_pool" = xyes; then
@@ -1790,6 +1863,10 @@ pcap.h and/or -lpcap not found; user-level driver can't steal packets.
     HAVE_USERLEVEL_DRIVER=1
 fi
 
+if test "x$enable_dpdk_packet" = "xyes" -a "x$HAVE_NETMAP" = "xyes"; then
+        AC_MSG_ERROR([--with-netmap is not compatible with --enable-dpdk-packet ])
+fi
+
 if test "x$enable_netmap_pool" = "xyes"; then
     if test "x$HAVE_NETMAP" != "xyes"; then
         AC_MSG_ERROR([
@@ -1837,19 +1914,15 @@ AC_ARG_WITH(proper, [[  --with-proper[=PREFIX]  use PlanetLab Proper library (op
   [properprefix=$withval; if test -z "$withval" -o "$withval" = yes; then properprefix=; fi],
   [properprefix=no; explicit_proper=no])
 if test "$properprefix" != no; then
-    dnl Proper requires libcurl
-    dnl AC_CHECK_HEADER(curl/curl.h, have_curl_h=yes, have_curl_h=no)
-    dnl AC_CHECK_LIB(curl, curl_easy_init)
-
     saveflags="$CPPFLAGS"; test -n "$properprefix" && CPPFLAGS="$CPPFLAGS -I$properprefix/include"
     AC_CHECK_HEADER(prop.h, have_prop_h=yes, have_prop_h=no)
     CPPFLAGS="$saveflags"
 
-    AC_LANG_C
+    AC_LANG([C])
     saveflags="$LDFLAGS"; test -n "$properprefix" && LDFLAGS="$LDFLAGS -L$properprefix/lib"
     AC_CHECK_LIB(proper, prop_open, have_libproper=yes, have_libproper=no)
     LDFLAGS="$saveflags"
-    AC_LANG_CPLUSPLUS
+    AC_LANG([C++])
 
     if test $have_prop_h = yes -a $have_libproper = yes; then
         AC_DEFINE(HAVE_PROPER)
@@ -1884,7 +1957,7 @@ if test "$expatprefix" != no; then
     AC_CHECK_HEADER(expat.h, have_expat_h=yes, have_expat_h=no)
     CPPFLAGS="$saveflags"
 
-    AC_LANG_C
+    AC_LANG([C])
     saveflags="$LDFLAGS"; test -n "$expatprefix" && LDFLAGS="$LDFLAGS -L$expatprefix/lib"
     AC_CHECK_LIB(expat, XML_ParserCreateNS, have_libexpat=yes, have_libexpat=no)
     LDFLAGS="$saveflags"
@@ -2030,7 +2103,7 @@ $linux_autoconf_include
 
 
     AC_CACHE_CHECK([for C++-includable kernel header files], [ac_cv_cxx_aware_system],
-        [AC_LANG_CPLUSPLUS
+        [AC_LANG([C++])
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <linux/signal.h>
 #include <linux/skbuff.h>
@@ -2135,7 +2208,7 @@ void f1(int64_t) { // will fail if long long and int64_t are the same type
     fi
 
     AC_CACHE_CHECK([for <asm/alternative.h>], [ac_cv_linux_asm_alternative_h],
-        [AC_LANG_C
+        [AC_LANG([C])
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <asm/alternative.h>]],
 [[]])],
@@ -2145,7 +2218,7 @@ void f1(int64_t) { // will fail if long long and int64_t are the same type
     fi
 
     AC_CACHE_CHECK([for <asm/scatterlist.h>], [ac_cv_linux_asm_scatterlist_h],
-        [AC_LANG_C
+        [AC_LANG([C])
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <asm/scatterlist.h>]],
 [[]])],
@@ -2155,7 +2228,7 @@ void f1(int64_t) { // will fail if long long and int64_t are the same type
     fi
 
     AC_CACHE_CHECK([for <asm/system.h>], [ac_cv_linux_asm_system_h],
-        [AC_LANG_C
+        [AC_LANG([C])
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <asm/system.h>]],
 [[]])],
@@ -2173,7 +2246,7 @@ void f1(int64_t) { // will fail if long long and int64_t are the same type
 
     dnl Linux kernel network configuration
 
-    AC_LANG_CPLUSPLUS
+    AC_LANG([C++])
     AC_CACHE_CHECK([whether struct sk_buff has a security member], [ac_cv_linuxmodule_skbuff_security],
         [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <linux/skbuff.h>]],
@@ -2383,7 +2456,7 @@ CFLAGS="$save_cflags"
     dnl Linux kernel file system configuration
 
     AC_CACHE_CHECK([whether struct super_block has an s_d_op member], [ac_cv_linuxmodule_super_block_s_d_op],
-        [AC_LANG_C
+        [AC_LANG([C])
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <linux/fs.h>]],
 [[extern struct super_block *sb; sb->s_d_op = 0;]])],
@@ -2400,7 +2473,7 @@ CFLAGS="$save_cflags"
     fi
 
     AC_CACHE_CHECK([whether struct dentry has a d_child member], [ac_cv_linuxmodule_dentry_d_child],
-        [AC_LANG_C
+        [AC_LANG([C])
         AC_COMPILE_IFELSE([AC_LANG_PROGRAM([CLICK_LINUXMODULE_PROLOGUE()[
 #include <linux/fs.h>
 #include <linux/dcache.h>]],
@@ -2447,7 +2520,6 @@ if test "x$enable_minios" = xyes; then
     AC_DEFINE(HAVE_MINIOS_DRIVER)
     HAVE_MINIOS_DRIVER=1
 fi
-
 
 dnl check tools
 
@@ -2623,11 +2695,21 @@ if test "x$enable_auto_batch" == "xport" ; then
     provisions="$provisions autobatch_port"
 fi
 
+dnl add 'bpf' if BPF is found
+if test "x$enable_bpf" = xyes; then
+    provisions="$provisions bpf"
+fi
+
 dnl add 'batch' if compiled with --enable-batch
 if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
 else
     enable_batch="no"
+fi
+
+dnl add 'cxx17' if compiled a C++17 compiler
+if test "x$ax_cv_cxx_compile_cxx17" = xyes; then
+    provisions="$provisions cxx17"
 fi
 
 dnl add 'dpdk' if compiled with --enable-dpdk
@@ -2664,6 +2746,9 @@ fi
 dnl add 'flow' if compiled with --enable-flow
 if test "x$enable_flow" = xyes; then
     provisions="$provisions flow"
+    if test "x$enable_flow_dynamic" = xyes; then
+        provisions="$provisions flow-dynamic"
+    fi
 else
     enable_flow="no"
 fi
@@ -2674,6 +2759,12 @@ if test "x$enable_ctx" = xyes; then
 else
     enable_ctx="no"
 fi
+
+dnl add 'ctx-global-timeout', HAVE_CTX_GLOBAL_TIMEOUT if compiled with --enable-ctx-global-timeout
+if test "x$enable_ctx_global_timeout" = xyes; then
+    provisions="$provisions ctx-global-timeout"
+fi
+
 
 
 dnl add 'experimental' if --enable-experimental was supplied
@@ -2817,6 +2908,8 @@ test -f $srcdir/minios/Makefile.in && AC_CONFIG_FILES([minios/Makefile minios/co
 test -f $srcdir/ns/Makefile.in && AC_CONFIG_FILES([ns/Makefile])
 test -f $srcdir/userlevel/Makefile.in && AC_CONFIG_FILES([userlevel/Makefile])
 
+test -f $srcdir/lib/json.cc && provisions="$provisions Json"
+
 test -d $srcdir/tools/click-align && AC_CONFIG_FILES([tools/click-align/Makefile])
 test -d $srcdir/tools/click-check && AC_CONFIG_FILES([tools/click-check/Makefile])
 test -d $srcdir/tools/click-combine && AC_CONFIG_FILES([tools/click-combine/Makefile])
@@ -2846,7 +2939,10 @@ fi
 if test "x$enable_dpdk" != "xno"; then
     dpdk_info="${enable_dpdk}
     DPDK    Target:              ${RTE_TARGET}
-    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}"
+    DPDK   Version:              ${RTE_VER_YEAR}.${RTE_VER_MONTH}
+    DPDK      Path:              ${RTE_SDK}
+    DPDK     build:              ${dpdk_sys}
+    DPDK  Location:              ${RTE_LIB}"
 else
     dpdk_info=${enable_dpdk}
 fi
@@ -2856,9 +2952,12 @@ echo "
 Configuration Summary:
     C     Compiler:              ${CC}
     C++   Compiler:              ${CXX}
+    CFLAGS:                      ${CFLAGS}
+    CXXFLAGS:                    ${CXXFLAGS}
 
           Batching:              ${enable_batch}
     Flow Subsystem:              ${enable_flow}
+ Context Subsystem:              ${enable_ctx}
        HW Flow API:              ${have_flow_api}
 
     DPDK   support:              ${dpdk_info}

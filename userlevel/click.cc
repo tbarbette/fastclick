@@ -430,18 +430,20 @@ main(int argc, char **argv)
         args.dpdk_arg.push_back((char*)(new String("--no-huge"))->c_str());
         args.dpdk_arg.push_back((char*)(new String("-l"))->c_str());
         char* s = (char*)malloc(14);
-        snprintf(s,14,"0-%d",click_nthreads - 1);
+        if (args.click_affinity_offset < 0)
+            args.click_affinity_offset = 0;
+        snprintf(s,14,"%d-%d", args.click_affinity_offset, args.click_affinity_offset + click_nthreads - 1);
         args.dpdk_arg.push_back(s);
 
         args.dpdk_arg.push_back((char*)(new String("-m"))->c_str());
 
         args.dpdk_arg.push_back((char*)(new String("512M"))->c_str());
 
-        args.dpdk_arg.push_back((char*)(new String("--log-level=0"))->c_str());
+        args.dpdk_arg.push_back((char*)(new String("--log-level=1"))->c_str());
 
         args.dpdk_arg.push_back((char*)(new String("--"))->c_str());
 #ifdef HAVE_VERBOSE_BATCH
-        click_chatter("ERROR: Click was compiled with --enable-dpdk-packet, and must therefore be launched with the '--dpdk --' arguments. We'll try to run with --dpdk %s %s %s -m 512M --log-level=0 -- but it's likely to fail... This is only to allow automatic testing.",args.dpdk_arg[1],args.dpdk_arg[2], args.dpdk_arg[3]);
+        click_chatter("ERROR: Click was compiled with --enable-dpdk-packet, and must therefore be launched with the '--dpdk --' arguments. We'll try to run with --dpdk %s %s %s -m 512M -v --log-level=debug -- but it's likely to fail... This is only to allow automatic testing.",args.dpdk_arg[1],args.dpdk_arg[2], args.dpdk_arg[3]);
 #endif
 #endif
     }

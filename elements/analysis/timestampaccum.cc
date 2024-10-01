@@ -35,6 +35,17 @@ TimestampAccumBase<T>::~TimestampAccumBase()
 }
 
 template <template <typename> class T> int
+TimestampAccumBase<T>::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    _steady = true;
+    if (Args(conf, this, errh)
+	.read_or_set("STEADY", _steady, true)
+	.complete() < 0)
+	return -1;
+    return 0;
+}
+
+template <template <typename> class T> int
 TimestampAccumBase<T>::initialize(ErrorHandler *)
 {
     PER_THREAD_MEMBER_SET(_state, nsec_accum, 0);
@@ -46,7 +57,12 @@ template <template <typename> class T> void
 TimestampAccumBase<T>::push(int port, Packet *p)
 {
     State& state = *_state;
-    uint64_t val = (Timestamp::now() - p->timestamp_anno()).nsecval();
+    Timestamp src;
+    if (_steady)
+        src = Timestamp::now_steady();
+    else
+        src = Timestamp::now();
+    uint64_t val = (src - p->timestamp_anno()).nsecval();
     if (val > state.nsec_max)
         state.nsec_max = val;
     if (val < state.nsec_min)

@@ -13,7 +13,7 @@
 #include <click/flow/common.hh>
 #include <click/timerwheel.hh>
 
-#include "../flow/flowipmanager.hh"
+#include "../research/flowipmanager.hh"
 
 CLICK_DECLS
 
@@ -44,8 +44,11 @@ class FlowIPManagerHMP: public VirtualFlowManager, Router::InitFuture {
 
         void push_batch(int, PacketBatch* batch) override;
 
-        void init_assignment(Vector<unsigned> table);
+        void init_assignment(Vector<unsigned> table) CLICK_COLD;
 
+        static String read_handler(Element *e, void *thunk);
+
+        void add_handlers() override CLICK_COLD;
     private:
         HashTableMP<IPFlow5ID,int> _hash;
         atomic_uint32_t _current;

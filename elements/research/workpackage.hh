@@ -10,11 +10,14 @@ CLICK_DECLS
 /*
 =c
 
-WorkPackage(W, N)
+WorkPackage([S, N, R, PAYLOAD, W])
 
 =s test
 
-Compute a random number for a certain amount of W time, and makes N accesses to
+Compute W random numbers, then makes N accesses to an array of S bytes if R = 0 for every packets
+passing by.
+If R is bigger than 0, R% of the accesses will be made to the payload of the packet
+instead of the array of bytes.
 
 */
 class WorkPackage : public BatchElement {

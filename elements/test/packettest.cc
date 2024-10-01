@@ -178,8 +178,8 @@ PacketTest::initialize(ErrorHandler *errh)
     PacketBatch* batch = PacketBatch::make_from_packet(Packet::make(1, lowers, 60, 2));
     for (int i = 2; i <= 100; i++)
         batch->append_packet(Packet::make(i, lowers, 60, 2));
-    int i = 0;
-    auto fnt = [](Packet *p_in, std::function<void(Packet*)>add){
+        int i = 0;
+        auto fnt = [](Packet *p_in, std::function<void(Packet*)>add){
             int r = click_random() % 3;
             if (r == 0) {
                 add(p_in->clone()->uniqueify());

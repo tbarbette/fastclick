@@ -4,9 +4,16 @@
 #include <click/string.hh>
 #include <click/straccum.hh>
 #include <click/packet.hh>
+#if HAVE_IP6
+#include <clicknet/ip6.h>
+#endif
+
 CLICK_DECLS
 class Element;
 class IPFlowID;
+#if HAVE_IP6
+class IP6FlowID;
+#endif
 
 namespace IPSummaryDump {
 
@@ -21,6 +28,9 @@ enum { MAJOR_VERSION = 1, MINOR_VERSION = 3 };
 struct PacketDesc {
     const Packet *p;
     const click_ip *iph;
+#if HAVE_IP6
+    const click_ip6 *ip6;
+#endif
     const click_udp *udph;
     const click_tcp *tcph;
     const click_icmp *icmph;
@@ -64,6 +74,9 @@ struct PacketDesc {
 struct PacketOdesc {
     WritablePacket* p;
     bool is_ip;
+#if HAVE_IP6
+    bool is_ip6;
+#endif
     bool have_icmp_type : 1;
     bool have_icmp_code : 1;
     bool have_ip_hl : 1;
@@ -80,16 +93,33 @@ struct PacketOdesc {
     const Element *e;
     int default_ip_p;
     const IPFlowID *default_ip_flowid;
+#if HAVE_IP6
+    const IP6FlowID *default_ip6_flowid;
+#endif
     int minor_version;
     uint32_t want_len;
 
-    inline PacketOdesc(const Element *e, WritablePacket *p, int default_ip_p, const IPFlowID *default_ip_flowid, int minor_version);
+    inline PacketOdesc(const Element *e, WritablePacket *p, int default_ip_p, const IPFlowID *default_ip_flowid, 
+#if HAVE_IP6
+        const IP6FlowID *default_ip6_flowid, 
+#endif
+        int minor_version);
     void clear_values()                 { vptr[0] = vptr[1] = 0; }
     bool make_ip(int ip_p);
+#if HAVE_IP6
+    bool make_ip6(int ip_p);
+#endif
     bool make_transp();
+#if HAVE_IP6
+    bool make_transp6();
+#endif
   private:
     bool hard_make_ip();
     bool hard_make_transp();
+#if HAVE_IP6
+    bool hard_make_ip6();
+    bool hard_make_transp6();
+#endif
 };
 
 
@@ -217,10 +247,21 @@ inline PacketDesc::PacketDesc(const Element *e_, Packet* p_, StringAccum* sa_, S
 {
 }
 
-inline PacketOdesc::PacketOdesc(const Element *e_, WritablePacket* p_, int default_ip_p_, const IPFlowID *default_ip_flowid_, int minor_version_)
-    : p(p_), is_ip(true), have_icmp_type(false), have_icmp_code(false),
+inline PacketOdesc::PacketOdesc(const Element *e_, WritablePacket* p_, int default_ip_p_, const IPFlowID *default_ip_flowid_,
+#if HAVE_IP6
+ const IP6FlowID *default_ip6_flowid_,
+#endif
+  int minor_version_)
+    : p(p_), is_ip(true),
+    #if HAVE_IP6
+    is_ip6(false),
+    #endif
+    have_icmp_type(false), have_icmp_code(false),
       have_ip_hl(false), have_tcp_hl(false),
       e(e_), default_ip_p(default_ip_p_), default_ip_flowid(default_ip_flowid_),
+      #if HAVE_IP6
+       default_ip6_flowid(default_ip6_flowid_),
+    #endif
       minor_version(minor_version_), want_len(0)
 {
 }
@@ -234,6 +275,17 @@ inline bool PacketOdesc::make_ip(int ip_p)
     return !ip_p || !p->ip_header()->ip_p || p->ip_header()->ip_p == ip_p;
 }
 
+#if HAVE_IP6
+inline bool PacketOdesc::make_ip6(int nxt)
+{
+    if ((!is_ip6 || !p->has_network_header()
+         || p->network_length() < (int) sizeof(click_ip6))
+        && !hard_make_ip6())
+        return false;
+    return !nxt || !p->ip6_header()->ip6_nxt || p->ip6_header()->ip6_nxt == nxt;
+}
+#endif
+
 inline bool PacketOdesc::make_transp()
 {
     // assumes make_ip()
@@ -245,6 +297,18 @@ inline bool PacketOdesc::make_transp()
     else
         return true;
 }
+
+#if HAVE_IP6
+inline bool PacketOdesc::make_transp6()
+{
+    // assumes make_ip6()
+    assert(is_ip6 && p->network_header());
+    if (p->transport_length() < 8)
+        return hard_make_transp6();
+    else
+        return true;
+}
+#endif
 
 inline bool field_missing(const PacketDesc &d, int proto, int l)
 {

@@ -164,13 +164,37 @@ RatedUnqueue::read_handler(Element *e, void *thunk)
     return String();
 }
 
+enum {h_active};
+int
+RatedUnqueue::write_param(const String &conf, Element *e, void *user_data,
+		     ErrorHandler *errh)
+{
+    RatedUnqueue *u = static_cast<RatedUnqueue *>(e);
+    switch (reinterpret_cast<intptr_t>(user_data)) {
+    case h_active:
+	    click_chatter("Active handler");
+	if (!BoolArg().parse(conf, u->_active))
+	    return errh->error("syntax error");
+    if (u->_active && !u->_task.scheduled()) {
+
+	    click_chatter("Scheduling");
+	u->_task.reschedule();
+    }
+
+	break;
+
+    }
+    return 0;
+}
+
 void
 RatedUnqueue::add_handlers()
 {
     add_read_handler("calls", read_handler, h_calls);
     add_read_handler("rate", read_handler, h_rate);
     add_write_handler("rate", reconfigure_keyword_handler, "0 RATE");
-    add_data_handlers("active", Handler::OP_READ | Handler::OP_WRITE | Handler::CHECKBOX, &_active);
+    add_data_handlers("active", Handler::OP_READ | Handler::CHECKBOX, &_active);
+    add_write_handler("active", write_param, h_active);
     add_task_handlers(&_task);
     add_read_handler("config", read_handler, h_rate);
     set_handler_flags("config", 0, Handler::CALM);

@@ -7,7 +7,7 @@ Then, run `vagrant ssh` to jump into the VM.
 Then, simply run the Mininet topology with:
 
 ```
-sudo mn -c ; cd /vagrant &&  udo python topology.py
+sudo mn -c ; cd /vagrant && sudo python2 topology.py
 ```
 
 If in a separate window (you have to leave mininet running) you run `sudo ~/mininet/util/m h1 curl http://10.221.0.5/` you should see the default nginx welcome page.

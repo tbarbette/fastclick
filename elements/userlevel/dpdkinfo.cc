@@ -52,14 +52,14 @@ int DPDKInfo::configure(Vector<String> &conf, ErrorHandler *errh) {
 
     if (has_mbuf) {
             if (!is_pow2(DPDKDevice::DEFAULT_NB_MBUF + 1)) {
-                errh->warning("The number of MBUFs is not a power of 2 minus one. This will decrease performances.");
+                errh->warning("The number of MBUFs is (%d) not a power of 2 minus one. This will decrease performances.", DPDKDevice::DEFAULT_NB_MBUF );
             }
     }
 
     if (has_socket_mbuf) {
         for (int i = 0; i < DPDKDevice::NB_MBUF.size(); i++) {
             if (!is_pow2(DPDKDevice::NB_MBUF[i] + 1)) {
-                errh->warning("The number of MBUFs is not a power of 2 minus one. This will decrease performances.");
+                errh->warning("The number of MBUFs for socket %d (%d) is not a power of 2 minus one. This will decrease performances.", i, DPDKDevice::NB_MBUF[i] );
             }
         }
     }

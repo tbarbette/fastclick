@@ -23,7 +23,8 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-ReplayBase::ReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1),_stop_time(0),  _quick_clone(false), _task(this), _limit(-1), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true), _timing_packet(), _timing_real(), _startsent(), _fnt_expr() {
+ReplayBase::ReplayBase() : _active(true), _loaded(false),
+    _burst(64), _stop(-1),_stop_time(0),  _quick_clone(false), _task(this), _limit(-1), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true), _timing_packet(), _timing_real(), _startsent(), _fnt_expr() {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
 #endif
@@ -175,9 +176,10 @@ Replay::initialize(ErrorHandler * errh) {
     _notifier.initialize(Notifier::EMPTY_NOTIFIER, router());
     _notifier.set_active(false,false);
     _input.resize(1);
-     _input[0].signal = Notifier::upstream_empty_signal(this, 0, (Task*)NULL);
+    _input[0].signal = Notifier::upstream_empty_signal(this, 0, (Task*)NULL);
     _output.ring.initialize(_queue);
     ScheduleInfo::initialize_task(this,&_task,_active,errh);
+
     return 0;
 }
 

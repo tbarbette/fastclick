@@ -12,7 +12,7 @@ GTPDecap()
 
 decapsulates GTP packet
 
-=s gtp
+=s tunnel
 
 =d
 

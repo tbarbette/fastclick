@@ -1,0 +1,152 @@
+%require
+click-buildtool provides FlowIPManager_CuckooPP flow-dynamic
+
+%script
+
+for FM in FlowIPManager_CuckooPP FlowIPManager_DPDK FlowIPManagerMP FlowIPManager ; do
+echo $FM >&2
+$VALGRIND click --dpdk --no-huge -m 512 --log-level=1 -- --simtime  -e "
+fd :: FromIPSummaryDump(IN1, STOP false, CHECKSUM true, TIMING true, BURST 2)
+         -> Print(BEFORE)
+         -> fm :: $FM(RESERVE 2, VERBOSE 1, TIMEOUT 5)
+         -> Print(AFTER)
+         -> ftest :: TestFlowSpace
+         -> fprint :: FlowPrint
+         -> Discard;
+         DriverManager( read fm.count,
+         wait 2s,
+         read fm.count, read fm.count_fids,
+         wait 10s,
+         read fm.count, read fm.count_fids);
+
+"
+done
+
+%file IN1
+!data timestamp src dst proto payload
+1 18.26.4.44 18.26.4.44 U thisisan
+3 18.26.4.44 18.26.4.45 U at
+3 18.26.4.44 18.26.4.45 U ati
+3.1 18.26.4.44 18.26.4.45 U ato
+5 18.26.4.44 18.26.4.46 U tack
+
+%expect stderr
+FlowIPManager_CuckooPP
+
+Placing  ftest :: TestFlowSpace at [30-33]
+Real capacity for each table will be 65536
+fm.count:
+0
+BEFORE:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
+AFTER:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
+fprint :: FlowPrint: 1 packets from flow 65535. Count : 1
+fm.count:
+1
+fm.count_fids:
+65535
+BEFORE:   30 | 4500001e 00000000 64112a43 121a042c 121a042d 00000000
+BEFORE:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+AFTER:   30 | 4500001e 00000000 64112a43 121a042c 121a042d 00000000
+AFTER:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+fprint :: FlowPrint: 2 packets from flow 65534. Count : 2
+BEFORE:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+AFTER:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+fprint :: FlowPrint: 1 packets from flow 65534. Count : 1
+BEFORE:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
+AFTER:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
+fprint :: FlowPrint: 1 packets from flow 65533. Count : 1
+fm.count:
+0
+fm.count_fids:
+65536
+
+
+FlowIPManager_DPDK
+
+Placing  ftest :: TestFlowSpace at [26-29]
+Real capacity for each table will be 65536
+fm.count:
+0
+BEFORE:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
+AFTER:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
+fprint :: FlowPrint: 1 packets from flow 738466322. Count : 1
+fm.count:
+1
+fm.count_fids:
+
+BEFORE:   30 | 4500001e 00000000 64112a43 121a042c 121a042d 00000000
+BEFORE:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+AFTER:   30 | 4500001e 00000000 64112a43 121a042c 121a042d 00000000
+AFTER:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+fprint :: FlowPrint: 2 packets from flow 738466322. Count : 2
+BEFORE:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+AFTER:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+fprint :: FlowPrint: 1 packets from flow 738466322. Count : 1
+BEFORE:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
+AFTER:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
+fprint :: FlowPrint: 1 packets from flow 738466322. Count : 1
+fm.count:
+0
+fm.count_fids:
+
+
+
+FlowIPManagerMP
+
+Placing  ftest :: TestFlowSpace at [14-17]
+Per-flow size is 18
+warning: This element uses a timer wheel that will use a global lock. Consider using FlowIPManager_CuckooPP instead which uses per-thread timer wheels.
+fm.count:
+0
+BEFORE:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
+AFTER:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
+fprint :: FlowPrint: 1 packets from flow 63. Count : 1
+fm.count:
+1
+While executing 'DriverManager@8 :: DriverManager':
+  no 'fm.count_fids' read handler
+BEFORE:   30 | 4500001e 00000000 64112a43 121a042c 121a042d 00000000
+BEFORE:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+AFTER:   30 | 4500001e 00000000 64112a43 121a042c 121a042d 00000000
+AFTER:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+fprint :: FlowPrint: 2 packets from flow 62. Count : 2
+BEFORE:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+AFTER:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+fprint :: FlowPrint: 1 packets from flow 62. Count : 1
+BEFORE:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
+AFTER:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
+fprint :: FlowPrint: 1 packets from flow 61. Count : 1
+fm.count:
+0
+While executing 'DriverManager@8 :: DriverManager':
+  no 'fm.count_fids' read handler
+
+
+FlowIPManager
+
+Placing  ftest :: TestFlowSpace at [14-17]
+Per-flow size is 18
+fm.count:
+0
+BEFORE:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
+AFTER:   36 | 45000024 00000000 64112a3e 121a042c 121a042c 00000000
+fprint :: FlowPrint: 1 packets from flow 0. Count : 1
+fm.count:
+1
+While executing 'DriverManager@8 :: DriverManager':
+  no 'fm.count_fids' read handler
+BEFORE:   30 | 4500001e 00000000 64112a43 121a042c 121a042d 00000000
+BEFORE:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+AFTER:   30 | 4500001e 00000000 64112a43 121a042c 121a042d 00000000
+AFTER:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+fprint :: FlowPrint: 2 packets from flow 1. Count : 2
+BEFORE:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+AFTER:   31 | 4500001f 00000000 64112a42 121a042c 121a042d 00000000
+fprint :: FlowPrint: 1 packets from flow 1. Count : 1
+BEFORE:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
+AFTER:   32 | 45000020 00000000 64112a40 121a042c 121a042e 00000000
+fprint :: FlowPrint: 1 packets from flow 2. Count : 1
+fm.count:
+0
+While executing 'DriverManager@8 :: DriverManager':
+  no 'fm.count_fids' read handler

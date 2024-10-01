@@ -49,7 +49,7 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
     for (int i = 0; i < _array.size(); i++) {
         _array[i] = rd();
     }
-    for (int i = 0; i < _gens.weight(); i ++) {
+    for (unsigned i = 0; i < _gens.weight(); i ++) {
         _gens.set_value_for_thread(i, std::mt19937{rd()});
     }
     return 0;
@@ -58,7 +58,6 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 WorkPackage::rmaction(Packet* p, int &n_data)
 {
-    uint32_t sum = 0;
     unsigned r = 0;
     for (int i = 0; i < _w; i ++) {
         r = (*_gens)();
@@ -70,10 +69,8 @@ WorkPackage::rmaction(Packet* p, int &n_data)
             data = *(uint32_t*)(p->data() + pos);
             //n_data++;
         } else {
-            if (_array.size() > 0) {
                 unsigned pos = r / ((FRAND_MAX / (_array.size() + 1)) + 1);
                 data = _array[pos];
-            }
         }
         r = data ^ (r << 24 ^ r << 16  ^ r << 8 ^ r >> 16);
     }

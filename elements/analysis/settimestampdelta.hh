@@ -1,7 +1,7 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_SETTIMESTAMPDELTA_HH
 #define CLICK_SETTIMESTAMPDELTA_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -44,7 +44,7 @@ relative to the next nonzero timestamp encountered.
 
 SetTimestamp, AdjustTimestamp, TimeFilter */
 
-class SetTimestampDelta : public Element { public:
+class SetTimestampDelta : public SimpleElement<SetTimestampDelta> { public:
 
     SetTimestampDelta() CLICK_COLD;
     ~SetTimestampDelta() CLICK_COLD;

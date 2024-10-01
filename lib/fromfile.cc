@@ -39,8 +39,8 @@ CLICK_DECLS
 FromFile::FromFile()
     : _fd(-1),
 #if !CLICK_PACKET_USE_DPDK
-     _buffer(0),
-    _data_packet(0),
+      _data_packet(0),
+      _buffer(0),
 #endif
 #ifdef ALLOW_MMAP
       _mmap(true),
@@ -577,12 +577,20 @@ FromFile::get_packet(size_t size, uint32_t sec, uint32_t subsec, ErrorHandler *e
 #else
     if (_pos + size <= _len) {
 
+#ifndef CLICK_NOINDIRECT
         if (Packet *p = _data_packet->clone()) {
             p->shrink_data(_buffer + _pos, size);
             p->timestamp_anno().assign(sec, subsec);
             _pos += size;
             return p;
         }
+#else
+        if (Packet *p = Packet::make(_buffer + _pos, size)) {
+            p->timestamp_anno().assign(sec, subsec);
+            _pos += size;
+            return p;
+        }
+#endif
     } else
 #endif
     {

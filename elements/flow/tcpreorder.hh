@@ -57,8 +57,11 @@ CLICK_DECLS
 
 TCPReorder(FLOWDIRECTION [, MERGESORT])
 
-=s middlebox
+=s flow
 
+Reorders TCP packets. Compatible with the flow subsystem.
+
+=d
 reorders TCP packets. This element is deprecated, the functionality has
 been merged in TCPIn. Still, it is interesting to see how to make
 a standalone TCP reorderer that will not do much more than that.
@@ -69,11 +72,11 @@ is reused after a RST, the other side will see packets out of order.
 Proper implementation needs a "dual" state, something only accessible after
 TCPIn
 
-=d
-
 This element reorders TCP packets before sending them on its first output. It can be used outside
 of the stack of the middlebox. The second output is optional and is used to push retransmitted
 packets. If the second output is not used, retransmitted packets are dropped.
+
+=over 8
 
 =item FLOWDIRECTION
 
@@ -91,6 +94,8 @@ Complexity to process a batch without this option: O(k * (n + k))
 Where k is the number of packets in the batch and n is the number of packets in the waiting list
 
 Default value: true.
+
+=back
 
 =a TCPIn, TCPOut, TCPRetransmitter */
 

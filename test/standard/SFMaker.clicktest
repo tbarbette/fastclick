@@ -1,0 +1,54 @@
+%require
+click-buildtool provides dpdk
+click-buildtool provides flow
+click-buildtool provides SFMaker
+
+%script
+click --dpdk -m 2048M --no-huge --vdev net_ring0 -- CONFIG
+
+%file CONFIG
+
+FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
+-> EnsureDPDKBuffer
+-> Unqueue
+-> Print(F, -1)
+-> fh1 :: FlowIPManagerIMP(CAPACITY 2000000, VERBOSE 99, TIMEOUT 0)
+-> fc :: FlowCounter 
+-> sfb :: FlowPrint
+-> Print(A, -1)
+-> sf :: SFMaker(VERBOSE 1, PROTO_COMPRESS true, DELAY_LAST 0, DELAY 1000, REMANAGE true)
+-> Print(B, -1)
+-> sfp :: FlowPrint
+//-> fh2 :: FlowIPManagerIMP(CAPACITY 2000000, VERBOSE 99)
+-> Print(OUT)
+-> ToIPSummaryDump(OUT1, FIELDS src sport dst dport proto tcp_seq tcp_ack payload tcp_opt);
+Script(TYPE ACTIVE, print fc.count, print fc2.count, wait 1s, loop);
+DriverManager(wait, wait 1ms, write sf.flush);
+
+%expect OUT1
+!IPSummaryDump 1.3
+!data ip_src sport ip_dst dport ip_proto tcp_seq tcp_ack payload tcp_opt
+2.0.0.2 21 1.0.0.1 1024 T 0 0 "A" .
+2.0.0.2 21 2.0.0.1 1025 T 0 0 "B" .
+2.0.0.2 21 1.0.0.1 1024 T 1 2 "A" .
+2.0.0.2 21 1.0.0.1 1024 T 2 2 "A" .
+2.0.0.2 21 1.0.0.1 1024 T 3 2 "A" .
+2.0.0.2 21 1.0.0.1 1024 T 4 2 "A" .
+2.0.0.2 21 1.0.0.1 1024 T 4 2 "" .
+2.0.0.2 21 2.0.0.1 1025 T 1 0 "B" .
+2.0.0.2 21 2.0.0.1 1025 T 2 0 "B" .
+
+%file IN1
+!IPSummaryDump 1.3
+!data src sport dst dport proto tcp_seq tcp_ack payload tcp_flags
+2.0.0.2 21 1.0.0.1 1024 T 0 0 "A" .
+2.0.0.2 21 2.0.0.1 1025 T 0 0 "B" .
+2.0.0.2 21 1.0.0.1 1024 T 1 0 "A" .
+2.0.0.2 21 2.0.0.1 1025 T 1 0 "B" .
+2.0.0.2 21 1.0.0.1 1024 T 2 0 "A" .
+2.0.0.2 21 2.0.0.1 1025 T 2 0 "B" .
+2.0.0.2 21 1.0.0.1 1024 T 3 0 "A" .
+2.0.0.2 21 1.0.0.1 1024 T 3 1 "" A
+2.0.0.2 21 1.0.0.1 1024 T 3 2 "" A
+2.0.0.2 21 1.0.0.1 1024 T 4 2 "A" .
+2.0.0.2 21 1.0.0.1 1024 T 4 2 "" A

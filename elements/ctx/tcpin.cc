@@ -824,17 +824,19 @@ void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
 
 }
 
+
 void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
     TCPIn* tin = static_cast<TCPIn*>(thunk);
     auto fcb_in = tin->fcb_data_for(fcb);
 
     tin->release_tcp_internal(fcb);
 
+#if HAVE_FLOW_DYNAMIC
     if (fcb_in->previous_fnt) {
         flow_assert(fcb_in->previous_fnt != &release_tcp);
         fcb_in->previous_fnt(fcb, fcb_in->previous_thunk);
     }
-
+#endif
 }
 
 /**
@@ -843,8 +845,10 @@ void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
  */
 void TCPIn::releaseFCBState() {
     //click_chatter("TCP is closing, killing state");
-    fcb_release_timeout();
+    ctx_release_timeout();
+#if HAVE_FLOW_DYNAMIC
     fcb_remove_release_fnt(fcb_data(), &release_tcp);
+#endif
     SFCB_STACK(
             release_tcp_internal(fcb_save);
     );
@@ -1168,8 +1172,10 @@ inline void TCPIn::initializeFcbSide(fcb_tcpin* fcb_in, Packet* packet, bool kee
     fcb_in->expectedPacketSeq = getSequenceNumber(packet); //Not next because this one will be checked just after
 
     if (!keep_fct) {
-        fcb_acquire_timeout(TCP_TIMEOUT);
+        ctx_acquire_timeout(TCP_TIMEOUT);
+#if HAVE_FLOW_DYNAMIC
         fcb_set_release_fnt(fcb_in, release_tcp);
+#endif
     }
 
     // Set information about the flow
@@ -1182,10 +1188,13 @@ inline void TCPIn::initializeFcbSide(fcb_tcpin* fcb_in, Packet* packet, bool kee
 
 inline void TCPIn::releaseFcbSide(FlowControlBlock* fcb, fcb_tcpin* fcb_in) {
     fcb_in->fin_seen = false;
+
+#if HAVE_FLOW_DYNAMIC
     if (fcb_in->conn_release_fnt) {
         fcb_in->conn_release_fnt(fcb,fcb_in->conn_release_thunk);
         fcb_in->conn_release_fnt = 0;
     }
+#endif
     resetReorderer(fcb_in);
     if (fcb_in->modificationLists) {
         for(HashTable<tcp_seq_t, ModificationList*>::iterator it = fcb_in->modificationLists->begin();
@@ -1221,10 +1230,12 @@ inline void TCPIn::initializeFcbSyn(fcb_tcpin* fcb_in, const click_ip *iph , con
 bool TCPIn::registerConnectionClose(StackReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt, void* thunk)
 {
     auto fcb_in = fcb_data();
+#if HAVE_FLOW_DYNAMIC
     fcb_chain->previous_fnt = fcb_in->conn_release_fnt;
     fcb_chain->previous_thunk = fcb_in->conn_release_thunk;
     fcb_in->conn_release_fnt = fnt;
     fcb_in->conn_release_thunk = thunk;
+#endif
     return true;
 }
 

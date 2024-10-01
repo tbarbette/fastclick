@@ -606,7 +606,8 @@ reset_count:
         click_chatter("Reseting XDP table");
         int cpus = balancer->num_max_cpus();
         unsigned int nr_cpus = bpf_num_possible_cpus();
-        uint64_t values[nr_cpus] = {0};
+        uint64_t values[nr_cpus];
+        bzero(values, sizeof(uint64_t) * nr_cpus);
         for (uint32_t key = 0; key < _count.size(); key++) {
             if (bpf_map_update_elem(_xdp_table_fd, &key, values, BPF_ANY)) {
                 click_chatter("XDP set failed");

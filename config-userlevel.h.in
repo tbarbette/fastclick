@@ -26,6 +26,9 @@
 /* Define if you have the <bpf.h> header file and libbpf. */
 #undef HAVE_BPF
 
+/* Define if bpf.h has bpf_stats_type. */
+#undef HAVE_BPF_STATS_TYPE
+
 /* Define if <pcap.h> uses bpf_timeval. */
 #undef HAVE_BPF_TIMEVAL
 
@@ -36,7 +39,7 @@
 #undef HAVE_CLICK_LOAD
 
 /* Define if Click can use a packet pool */
-#undef ALLOW_CLICK_PACKET_POOL
+#undef HAVE_ALLOW_CLICK_PACKET_POOL
 
 /* Define if context system is enabled. */
 #undef HAVE_CTX
@@ -113,11 +116,20 @@
 /* Define if your C library contains large file support. */
 #undef HAVE_LARGE_FILE_SUPPORT
 
+/* Define if you have the <linux/ethtool.h> header file. */
+#undef HAVE_LINUX_ETHTOOL_H
+
+/* Define if you have the <linux/sockios.h> header file. */
+#undef HAVE_LINUX_SOCKIOS_H
+
 /* Define if you have the <linux/if_tun.h> header file. */
 #undef HAVE_LINUX_IF_TUN_H
 
 /* Define if you have the <linux/if_packet.h> header file. */
 #undef HAVE_LINUX_IF_PACKET_H
+
+/* Define if you have the <linux/netlink.h> header file. */
+#undef HAVE_LINUX_NETLINK_H
 
 /* Define if you have the madvise function. */
 #undef HAVE_MADVISE
@@ -254,7 +266,7 @@
 #undef HAVE_ZEROCOPY
 
 /* Define if Flow sloppy timeout is enabled. */
-#undef HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#undef HAVE_CTX_GLOBAL_TIMEOUT
 
 /* Enable dynamic flow system */
 #undef HAVE_FLOW_DYNAMIC
@@ -279,6 +291,12 @@
 
 /* Define if you use only DPDK buffer as data buffer. */
 #undef HAVE_DPDK_PACKET_POOL
+
+/* Define if DPDK has the read_clock function. */
+#undef HAVE_DPDK_READ_CLOCK
+
+/* Define if DPDK has the rte_flow_update function. */
+#undef HAVE_RTE_FLOW_UPDATE
 
 /* Define if DPDK have XCHG API. */
 #undef HAVE_DPDK_XCHG
@@ -306,6 +324,9 @@
 
 /* Define if you have the <valgrind/memcheck.h> header file. */
 #undef HAVE_VALGRIND_MEMCHECK_H
+
+/* Define to 1 to enable poisoning of freed HashAllocator blocks. */
+#undef HAVE_HASH_ALLOCATOR_POISONING
 
 /* Define if you have the vsnprintf function. */
 #undef HAVE_VSNPRINTF

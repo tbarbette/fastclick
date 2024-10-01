@@ -38,7 +38,7 @@ you can pin to different thread using StaticThreadSched.
 
 Arguments:
 
-=over 20
+=over 8
 
 =item PORT
 
@@ -393,8 +393,6 @@ This list is a subset of the list returned by rules_list handler.
 
 Returns the number of flow rules being installed.
 
-=h
-
 =a DPDKInfo, ToDPDKDevice */
 
 class ToDPDKDevice;
@@ -424,6 +422,8 @@ public:
     void selected(int fd, int mask) override;
 #endif
 
+    ToDPDKDevice *find_output_element();
+
     void clear_buffers() CLICK_COLD;
     inline DPDKDevice *get_device() {
         return _dev;
@@ -438,6 +438,8 @@ public:
     }
 
 protected:
+    static bool multi_run_task(Task *t, void* e);
+    inline bool _run_task(int iqueue);
     static int reset_load_handler(
         const String &, Element *, void *, ErrorHandler *
     ) CLICK_COLD;

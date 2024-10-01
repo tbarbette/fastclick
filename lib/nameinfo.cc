@@ -110,6 +110,7 @@ static NameInfo *the_name_info;
 
 static const StaticNameDB::Entry annotation_entries[] = {
     { "AGGREGATE", MKAI(AGGREGATE) },
+	{ "BATCH_COUNT", MKAI(BATCH_COUNT) },
     { "DST_IP", MKAI(DST_IP) },
     { "DST_IP6", MKAI(DST_IP6) },
     { "EXTRA_LENGTH", MKAI(EXTRA_LENGTH) },
@@ -119,6 +120,7 @@ static const StaticNameDB::Entry annotation_entries[] = {
     { "FWD_RATE", MKAI(FWD_RATE) },
     { "GRID_ROUTE_CB", MKAI(GRID_ROUTE_CB) },
     { "ICMP_PARAMPROB", MKAI(ICMP_PARAMPROB) },
+	{ "IP6_NXT", MKAI(IP6_NXT) },
     { "IPREASSEMBLER", MKAI(IPREASSEMBLER) },
 #ifdef IPSEC_SA_DATA_REFERENCE_ANNO_OFFSET
     { "IPSEC_SA_DATA_REFERENCE", MKAI(IPSEC_SA_DATA_REFERENCE) },

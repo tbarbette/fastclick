@@ -15,18 +15,16 @@ Announcements
 -------------
 Be sure to watch the repository and check out the [GitHub Discussions](https://github.com/tbarbette/fastclick/discussions) to stay up to date!
 
-Quick start for DPDK
---------------------
+Quick start (using DPDK for I/O)
+--------------------------------
 
- * Install DPDK's dependencies (`sudo apt install libelf-dev build-essential pkg-config zlib1g-dev libnuma-dev`)
- * Install DPDK (http://core.dpdk.org/doc/quick-start/). Since 20.11 you have to use meson : `meson build && cd build && ninja && sudo ninja install`
+ * Install DPDK and FastClick optional dependencies at once with `./deps.sh`  (or just for DPDK with `sudo apt install libelf-dev build-essential pkg-config zlib1g-dev libnuma-dev python3-pyelftools`). To install DPDK, either follow http://core.dpdk.org/doc/quick-start/. In short, just download it, and since 20.11 you have to compile with meson : `meson setup build && cd build && ninja && sudo ninja install`
  * Build FastClick, with support for DPDK using the following command:
 
 ```
 ./configure CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3" --enable-dpdk --enable-intel-cpu --disable-dynamic-linking --enable-bound-port-transfer --enable-flow --disable-task-stats --disable-cpu-load
 make
 ```
-  * Since DPDK is using Meson and pkg-config, to compile against various, or non-globally installed DPDK versions, one can prepend `PKG_CONFIG_PATH=path/to/libpdpdk.pc/../` to both configure and make.
 
 *You will find more information in the [High-Speed I/O wiki page](https://github.com/tbarbette/fastclick/wiki/High-speed-I-O).*
 
@@ -44,6 +42,18 @@ make
  * Disable DPDK softqueue will disable buffering in ToDPDKDevice. Everything it gets will be sent to DPDK, and the NIC right away. When using batching, it's actually not a problem because when the CPU is busy, FromDPDKDevice will take multiple packets at once (limited to BURST), and you'll effectively send batches in ToDPDKDevice. When the CPU is not busy, and you have one packet per batch because there's no more meat then ... well it's not busy so who cares?
  
 Ultimately, FastClick will still be impacted by its high flexibility and the many options it supports in each elements. This is adressed by [PacketMill](#packetmill) by embedding constant parameters, and other stuffs to produce one efficient binary.
+
+Docker
+------
+We provide a Dockerfile to build FastClick with DPDK. Public images are available too in [docker hub](https://hub.docker.com/r/tbarbette/fastclick-dpdk).
+
+The docker container must run in priviledged mode, and most often in network host mode.
+
+```
+sudo docker run -v /mnt/huge:/dev/hugepages -it --privileged --network host tbarbette/fastclick-dpdk:generic --dpdk -- -e "FromDPDKDevice(0) -> Discard;"
+```
+
+Note: the default image is build for the "default" arch, it will be suboptimal in term of performances. Check the [Docker wiki page for more information.](https://github.com/tbarbette/fastclick/wiki/Docker)
 
 Contribution
 ------------

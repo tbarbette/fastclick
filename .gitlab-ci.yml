@@ -1,73 +1,105 @@
-#This file is quite deprecated, but we keep it there in case someone has an internal GitLab CI pipeline and wants to reuse this
-variables:
-    DPDK_VERSION: "20.05"
-    NETMAP_VERSION: "11.1"
-    CONFIG: "--enable-gtp --enable-json"
-
 default:
+    image: ubuntu:22.04
     tags:
-        - sudo
         - docker
-    image: ubuntu:20.04
+
+stages:
+    - normal
+    - user
+    - io
+
+variables:
+    CONFIG: "--enable-all-elements --disable-verbose-batch --enable-simtime"
+
+.common:
+    stage: user
+    parallel:
+        matrix:
+            - HOST: ["x86_64","aarch64"]
+
+normal:
+    extends: .common
+    stage: normal
+    script:
+        - ./configure $CONFIG_HOST CXXFLAGS="-std=gnu++11" $CONFIG --disable-verbose-batch && make
 
 batch:
+    extends: .common
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-batch $CONFIG --disable-verbose-batch && make && make check
+        - ./configure $CONFIG_HOST CXXFLAGS="-std=gnu++11" --enable-batch $CONFIG --disable-verbose-batch && make && make check
 autobatch:
+    extends: .common
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-batch $CONFIG --disable-verbose-batch --enable-auto-batch=port && make && make check
-
+        - ./configure $CONFIG_HOST CXXFLAGS="-std=gnu++11" --enable-batch $CONFIG --disable-verbose-batch --enable-auto-batch=port && make && make check
 ip6:
+    extends: .common
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-ip6 --enable-json $CONFIG --disable-batch && make && make check
+        - ./configure $CONFIG_HOST CXXFLAGS="-std=gnu++11" --enable-ip6 --enable-json $CONFIG --disable-batch && make && make check
 mt:
+    extends: .common
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG --disable-batch && make && make check
-dpdk-batch:
+        - ./configure $CONFIG_HOST CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG --disable-batch && make && make check
+noclone:
+    extends: .common
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk $CONFIG --enable-batch --disable-verbose-batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
-
-dpdk-nobatch:
-    script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk $CONFIG --disable--batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
-
-netmap_single:
-    script:
-        - ./configure CXXFLAGS="-std=gnu++11" $CONFIG_NETMAP $CONFIG --disable-verbose-batch && make
-netmap:
-    script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --enable-netmap-pool --enable-zerocopy $CONFIG --disable-verbose-batch && make
-netmap_nopool:
-    script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --disable-netmap-pool --enable-zerocopy $CONFIG --disable-verbose-batch && make && make check
-netmap_nopool_nozc:
-    script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --disable-netmap-pool --disable-zerocopy $CONFIG --disable-verbose-batch && make && make check
+        - ./configure $CONFIG_HOST CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG --disable-clone && make && make check
 fbatch:
+    extends: .common
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --enable-flow --enable-batch  $CONFIG --disable-verbose-batch && make
-fnetmap:
+        - ./configure $CONFIG_HOST CXXFLAGS="-std=gnu++11" --enable-user-multithread --enable-flow --enable-batch  $CONFIG --disable-verbose-batch && make
+
+dpdk:
+    stage: io
+    parallel:
+        matrix:
+            - DPDK_VERSION: ["20.11", "23.03"]
+              DPDK_CONFIG: ["--enable-dpdk-packet --enable-batch", "--enable-batch", "--disable-batch", "--enable-dpdk-pool"]
+    before_script:
+        - echo "Running global pre-install..."
+        - !reference [before_script]
+        - echo "Running local pre-install..."
+        - mkdir /dpdk
+        - pushd /dpdk
+        -   export RTE_SDK=`pwd`/dpdk-$DPDK_VERSION;
+            export RTE_TARGET=x86_64-native-linuxapp-gcc;
+            export PKG_CONFIG_PATH=${RTE_SDK}/install/lib/x86_64-linux-gnu/pkgconfig/;
+            export LD_LIBRARY_PATH=${RTE_SDK}/install/lib/x86_64-linux-gnu/:${RTE_SDK}/install/lib/:$LD_LIBRARY_PATH;
+            if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" ]; then
+                    wget http://dpdk.org/browse/dpdk/snapshot/dpdk-$DPDK_VERSION.tar.gz &&
+                    tar -zxf dpdk-$DPDK_VERSION.tar.gz &&
+                    cd dpdk-$DPDK_VERSION ;
+                    pip3 install meson ninja &&
+                    meson -Dprefix=$(pwd)/install/ -Dmachine=default build &&
+                    cd build && ( ninja && ninja install ) ;  cd .. ; cd .. ;
+            fi;
+            ldconfig
+        - popd
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --enable-flow --enable-batch  --enable-netmap-pool --enable-zerocopy $CONFIG --disable-verbose-batch && make
+        - ls $PKG_CONFIG_PATH
+        - echo $LD_LIBRARY_PATH
+        - ./configure $CONFIG_HOST CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk ${DPDK_CONFIG} $CONFIG RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
+        - if [[ "$DPDK_CONFIG" != *"--enable-dpdk-pool"* ]] && [[ "$DPDK_CONFIG" != *"--enable-dpdk-packet"* ]] ; then make check ; fi
+
+netmap:
+    stage: io
+    parallel:
+        matrix:
+            - NETMAP_VERSION: ["11.1"]
+              CONFIG_NETMAP_MODE: ["--enable-netmap-pool --enable-zerocopy","--disable-netmap-pool --enable-zerocopy","--disable-netmap-pool --disable-zerocopy","--enable-flow --enable-batch  --enable-netmap-pool --enable-zerocopy"]
+    script:
+        - if [ ! -e "netmap-$NETMAP_VERSION/sys/net/netmap.h" ] ; then wget https://github.com/luigirizzo/netmap/archive/v$NETMAP_VERSION.tar.gz && tar -xvf v$NETMAP_VERSION.tar.gz && ( cd netmap-$NETMAP_VERSION && cd LINUX && ./configure --no-drivers ; cd .. && cd .. ) ; fi
+        - ls -al
+        - if [ `sudo -n whoami` = "root" ] && command -v insmod ; then sudo insmod netmap-$NETMAP_VERSION/LINUX/netmap.ko && sudo chmod 666 /dev/netmap ; fi
+        - export CONFIG_NETMAP="--with-netmap=`pwd`/netmap-$NETMAP_VERSION/sys/"
+        - ./configure CXXFLAGS="-std=gnu++11" $CONFIG_NETMAP_MODE $CONFIG_NETMAP $CONFIG --disable-verbose-batch && make
 
 cache:
     paths:
-        - dpdk-$DPDK_VERSION
+        - /dpdk
         - netmap-$NETMAP_VERSION
+
 before_script:
-    - if [ `whoami` = "root" ] ; then apt-get update && apt-get -y install build-essential libnuma-dev sudo wget linux-headers-$(uname -r) ; fi
+    - DEBIAN_FRONTEND=noninteractive sh deps.sh
     - gcc -v
-    - export RTE_SDK=`pwd`/dpdk-$DPDK_VERSION;
-      export RTE_TARGET=x86_64-native-linuxapp-gcc;
-      if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" ]; then
-        wget http://dpdk.org/browse/dpdk/snapshot/dpdk-$DPDK_VERSION.tar.gz &&
-            tar -zxf dpdk-$DPDK_VERSION.tar.gz &&
-            cd dpdk-$DPDK_VERSION ;
-            make config T=$RTE_TARGET &&
-            make install T=$RTE_TARGET ;
-            cd ..;
-      fi;
-    - if [ ! -e "netmap-$NETMAP_VERSION/sys/net/netmap.h" ] ; then wget https://github.com/luigirizzo/netmap/archive/v$NETMAP_VERSION.tar.gz && tar -xvf v$NETMAP_VERSION.tar.gz && cd netmap-$NETMAP_VERSION && cd LINUX && ./configure --no-drivers && cd .. && cd .. ; fi
-    - ls -al
-    - if [ `sudo -n whoami` = "root" ] && command -v insmod ; then sudo insmod netmap-$NETMAP_VERSION/LINUX/netmap.ko && sudo chmod 666 /dev/netmap ; fi
-    - export CONFIG_NETMAP="--with-netmap=`pwd`/netmap-$NETMAP_VERSION/sys/"
+    - if [ "$HOST" = "x86_64" ] ; then export CONFIG_HOST="--build x86_64-native-linuxapp-gcc" ; fi
+    - if [ "$HOST" = "aarch64" ] ; then apt-get -yqq install gcc-aarch64-linux-gnu && export CONFIG_HOST="--build aarch64-linux-gnu" ; fi

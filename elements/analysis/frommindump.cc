@@ -53,7 +53,7 @@ int FromMinDump::configure(Vector<String> &conf, ErrorHandler *errh) {
           .read_or_set("BURST", _burst, 32)
           .read_or_set("VERBOSE", _verbose, 0)
           .read_or_set("LIMIT", _limit, -1) // By default read all the file
-          .read_or_set("TIMES", _times,1) // For 1 time only. -1 is infinite loop
+          .read_or_set("TIMES", _times, 1) // For 1 time only. -1 is infinite loop
           .read_or_set("LOOP_CALL", loop_call, "")
           .read_or_set("DPDK", _dpdk, false)
 
@@ -106,10 +106,10 @@ int FromMinDump::initialize(ErrorHandler *errh) {
     return errh->error("Could not allocate memory to preload file!");
 
   fseek(_f, 0, SEEK_SET);
-  int ret = fread(_file_data, 1, _file_size, _f);
+  size_t ret = fread(_file_data, 1, _file_size, _f);
   if (ret != _file_size)
-    return errh->error("Error while reading the file in memory to %p (read %d "
-                       "bytes, expected %d)!",
+    return errh->error("Error while reading the file in memory to %p (read %lld "
+                       "bytes, expected %lld)!",
                        _file_data, ret, _file_size);
 
   fclose(_f);
@@ -161,8 +161,13 @@ Packet *FromMinDump::read_packet(ErrorHandler *errh, uint8_t *data) {
     rte_mbuf *mb = DPDKDevice::get_pkt(_node);
     assert(mb);
     unsigned char *pdata = rte_pktmbuf_mtod(mb, unsigned char *);
+    //p = Packet::make(rte_pktmbuf_headroom(mb), mb, packet_len, rte_pktmbuf_tailroom(mb));
+    
     p = Packet::make(pdata, packet_len, DPDKDevice::free_pkt, mb,
                      rte_pktmbuf_headroom(mb), rte_pktmbuf_tailroom(mb));
+
+
+
   } else {
     p = Packet::make(14, 0, packet_len, 0);
   }

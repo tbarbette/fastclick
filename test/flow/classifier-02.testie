@@ -26,16 +26,16 @@ Table of a after optimization :
 0/FF (TWOCASE, 1 children)
 |-> 16
 |  4/FF (TWOCASE, 1 children)
-|  |-> 32 UC:1 ED:0 (data 2000000000000000)
-|  |-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
-|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+|  |-> 32 UC:{{0|1}} ED:0 (data 2000000000000000)
+|  |-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff)
+|-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff)
 ---
 Table of b after optimization :
 ---
 4/FF (TWOCASE, 1 children)
 |-> 32
 |  0/FF (TWOCASE, 1 children)
-|  |-> 16 UC:1 ED:0 (data 1000000000000000)
-|  |-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
-|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+|  |-> 16 UC:{{0|1}} ED:0 (data 1000000000000000)
+|  |-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff)
+|-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff)
 ---

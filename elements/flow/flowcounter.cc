@@ -11,7 +11,7 @@
 
 CLICK_DECLS
 
-FlowCounter::FlowCounter()
+FlowCounter::FlowCounter() : StatVector(Vector<int>(32768,0))
 {
 
 }
@@ -32,7 +32,7 @@ void FlowCounter::push_flow(int, int* fcb, PacketBatch* flow)
 }
 
 
-enum { h_count };
+enum { h_count, h_open };
 
 String
 FlowCounter::read_handler(Element *e, void *thunk)
@@ -43,6 +43,10 @@ FlowCounter::read_handler(Element *e, void *thunk)
           PER_THREAD_MEMBER_SUM(uint64_t,count, fd->_state, count);
           return String(count);
                     }
+       case h_open: {
+          PER_THREAD_MEMBER_SUM(uint64_t,open, fd->_state, open);
+          return String(open);
+            }
       default:
           return "<error>";
     }
@@ -57,6 +61,8 @@ FlowCounter::write_handler(const String &s_in, Element *e, void *thunk, ErrorHan
 void
 FlowCounter::add_handlers() {
     add_read_handler("count", read_handler, h_count);
+    add_read_handler("open", read_handler, h_open);
+    add_stat_handler(this);
 }
 
 CLICK_ENDDECLS

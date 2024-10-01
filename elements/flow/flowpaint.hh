@@ -8,7 +8,7 @@ CLICK_DECLS
 
 FlowPaint(COLOR [, ANNO])
 
-=s FlowPaint
+=s flow
 
 sets packet FlowPaint annotations
 

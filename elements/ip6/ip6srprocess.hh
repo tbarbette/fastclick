@@ -1,5 +1,5 @@
-#ifndef CLICK_IP6SRProcess_HH
-#define CLICK_IP6SRProcess_HH
+#ifndef CLICK_IP6SRPROCESS_HH
+#define CLICK_IP6SRPROCESS_HH
 #include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
@@ -15,7 +15,8 @@ IP6SRProcess(ADDR[, ADDR, ...])
 
 =s ip
 
-Processes the Segment Routing Header of the IPv6 packet
+Processes the Segment Routing Header of the IPv6 packet. For now it simply set the IP address
+to the next one in the list.
 
 =d
 

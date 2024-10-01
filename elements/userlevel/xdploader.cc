@@ -1,9 +1,9 @@
+#include <net/if.h>
+#include <linux/if.h>
 #include <click/config.h>
 #include <click/args.hh>
 
-
 #include "xdploader.hh"
-
 
 
 XDPLoader::XDPLoader() : _path(), _dev() {

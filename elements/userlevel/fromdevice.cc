@@ -43,13 +43,22 @@
 #include <click/packet_anno.hh>
 #include <click/standard/scheduleinfo.hh>
 #include <click/userutils.hh>
+#include <netinet/if_ether.h>
+#ifndef define
+# define _LINUX_IF_ETHER_H 1
+#endif
+#ifdef HAVE_LINUX_ETHTOOL_H
 #include <linux/ethtool.h>
+#endif
+#if HAVE_LINUX_NETLINK_H
 #include <linux/netlink.h>
+#endif
 #include <unistd.h>
-#include <linux/sockios.h>
 #include <fcntl.h>
 #include "fakepcap.hh"
+#if HAVE_LINUX_SOCKIOS_H
 #include <linux/sockios.h>
+#endif
 
 #if FROMDEVICE_ALLOW_LINUX
 # include <sys/socket.h>
@@ -81,6 +90,7 @@ CLICK_DECLS
 
 #define offset_of_base(base,derived,derived_member) ((unsigned char*)(&(reinterpret_cast<base *>(0)->derived_member)) - (unsigned char*)(base *)0)
 
+#if HAVE_LINUX_ETHTOOL_H
 static int dev_eth_set_rss_reta(EthernetDevice* eth, unsigned* reta, unsigned reta_sz) {
 	FromDevice* fd = (FromDevice*)((unsigned char*)eth - offset_of_base(FromDevice,EthernetDevice,get_rss_reta_size));
 	return fd->dev_set_rss_reta(reta, reta_sz);
@@ -90,6 +100,7 @@ static int dev_eth_get_rss_reta_size(EthernetDevice* eth) {
 	FromDevice* fd = (FromDevice*)((unsigned char*)eth - offset_of_base(FromDevice,EthernetDevice,get_rss_reta_size));
 	return fd->dev_get_rss_reta_size();
 }
+#endif
 
 FromDevice::FromDevice()
     :
@@ -107,8 +118,10 @@ FromDevice::FromDevice()
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
 #endif
+#if HAVE_LINUX_ETHTOOL_H
 	set_rss_reta = &dev_eth_set_rss_reta;
 	get_rss_reta_size = &dev_eth_get_rss_reta_size;
+#endif
 }
 
 FromDevice::~FromDevice()
@@ -600,7 +613,9 @@ FromDevice::selected(int, int)
                 } else
                     p->take(_snaplen - len);
                 p->set_packet_type_anno((Packet::PacketType)sa.sll_pkttype);
+#ifdef SIOCGSTAMP
                 p->timestamp_anno().set_timeval_ioctl(_fd, SIOCGSTAMP);
+#endif
                 p->set_mac_header(p->data());
                 ++nlinux;
                 ++_count;
@@ -697,8 +712,10 @@ FromDevice::read_handler(Element* e, void *thunk)
 {
     FromDevice* fd = static_cast<FromDevice*>(e);
     switch ((intptr_t)thunk) {
+#if HAVE_LINUX_ETHTOOL_H
     case h_rss_reta_size:
 	return String(fd->dev_get_rss_reta_size());
+#endif
     case h_kernel_drops: {
         int max_drops;
         bool known;
@@ -723,6 +740,7 @@ FromDevice::write_handler(const String &input, Element *e, void *thunk, ErrorHan
 {
     FromDevice* fd = static_cast<FromDevice*>(e);
     switch ((intptr_t)thunk) {
+#if HAVE_LINUX_ETHTOOL_H
 	case h_rss_max: {
             int max;
             if (!IntArg().parse<int>(input,max))
@@ -734,6 +752,7 @@ FromDevice::write_handler(const String &input, Element *e, void *thunk, ErrorHan
             }
             return fd->dev_set_rss_reta(table.data(), table.size());
         }
+#endif
 		case h_reset_count:
 			fd->_count = 0;
 			return 0;
@@ -742,6 +761,7 @@ FromDevice::write_handler(const String &input, Element *e, void *thunk, ErrorHan
     }
 }
 
+#ifdef HAVE_LINUX_ETHTOOL_H
 int
 FromDevice::dev_get_rss_reta_size()
 {
@@ -842,6 +862,7 @@ free:
 	return err;
 }
 
+#endif
 
 void
 FromDevice::add_handlers()

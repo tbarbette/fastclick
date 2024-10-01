@@ -260,51 +260,51 @@ shell_command_output_string(String cmdline, const String &input, ErrorHandler *e
     StringAccum sa;
 
     if (!(f = tmpfile())) {
-	errh->error("%<%s%>: tmpfile: %s", cmdline.c_str(), strerror(errno));
-	goto out;
+	    errh->error("%<%s%>: tmpfile: %s", cmdline.c_str(), strerror(errno));
+	    goto out;
     }
     ignore_result(fwrite(input.data(), 1, input.length(), f));
     fflush(f);
     rewind(f);
 
     if (pipe(pfd) == -1) {
-	errh->error("%<%s%>: pipe: %s", cmdline.c_str(), strerror(errno));
-	fclose(f);
-	goto out;
+	    errh->error("%<%s%>: pipe: %s", cmdline.c_str(), strerror(errno));
+	    fclose(f);
+	    goto out;
     }
 
     child = fork();
     if (child == -1)
-	errh->error("%<%s%>: fork: %s", cmdline.c_str(), strerror(errno));
+	    errh->error("%<%s%>: fork: %s", cmdline.c_str(), strerror(errno));
     else if (child == 0) {
-	close(0);
-	close(1);
-	close(pfd[0]);
-	dup2(fileno(f), 0);
-	dup2(pfd[1], 1);
-	close(fileno(f));
-	close(pfd[1]);
+	    close(0);
+        close(1);
+        close(pfd[0]);
+        dup2(fileno(f), 0);
+        dup2(pfd[1], 1);
+        close(fileno(f));
+        close(pfd[1]);
 
-	execl("/bin/sh", "sh", "-c", cmdline.c_str(), (char *) 0);
-	exit(127);
+        execl("/bin/sh", "sh", "-c", cmdline.c_str(), (char *) 0);
+        exit(127);
     }
 
     close(pfd[1]);
     fclose(f);
     while (1) {
-	char *s = sa.reserve(4096);
-	if (!s) {
-	    errh->error("%<%s%>: out of memory", cmdline.c_str());
-	    sa.clear();
-	    break;
-	}
-	ssize_t r = read(pfd[0], s, 4096);
-	if (r == 0 || (r == -1 && errno != EAGAIN && errno != EINTR)) {
-	    if (r == -1)
-		errh->error("%<%s%>: %s", cmdline.c_str(), strerror(errno));
-	    break;
-	} else if (r != -1)
-	    sa.adjust_length(r);
+        char *s = sa.reserve(4096);
+        if (!s) {
+            errh->error("%<%s%>: out of memory", cmdline.c_str());
+            sa.clear();
+            break;
+        }
+        ssize_t r = read(pfd[0], s, 4096);
+        if (r == 0 || (r == -1 && errno != EAGAIN && errno != EINTR)) {
+            if (r == -1)
+            errh->error("%<%s%>: %s", cmdline.c_str(), strerror(errno));
+            break;
+        } else if (r != -1)
+            sa.adjust_length(r);
     }
 
     close(pfd[0]);

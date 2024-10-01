@@ -7,10 +7,10 @@ test ! $TRAVIS
 test ! $NODPDKTEST
 
 %script
-click --dpdk --no-huge -m 128MB -c 0x3 -n 1 --vdev=eth_ring0 -- CONFIG
+click --dpdk --no-pci --no-huge -m 128MB -c 0x3 -n 1 --log-level=1 --vdev=eth_ring0 -- CONFIG
 
 %file CONFIG
-DPDKInfo(2048)
+DPDKInfo(2047)
 
 i :: InfiniteSource("A", LIMIT 2, ACTIVE false, STOP false) -> ToDPDKDevice(0)
 FromDPDKDevice(0) -> Print() -> Discard

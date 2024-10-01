@@ -201,9 +201,9 @@ NetmapDevice::~NetmapDevice() {
 WritablePacket* NetmapDevice::make_netmap(unsigned char* data, struct netmap_ring* rxring, struct netmap_slot* slot) {
     WritablePacket* p = WritablePacket::pool_data_allocate();
     if (!p) return NULL;
-    p->initialize();
+    p->initialize(true);
     slot->buf_idx = NETMAP_BUF_IDX(rxring, p->buffer());
-    p->set_buffer(data,rxring->nr_buf_size,slot->len);
+    p->init_buffer(data,rxring->nr_buf_size,slot->len);
     slot->flags = NS_BUF_CHANGED;
     return p;
 }
@@ -215,10 +215,11 @@ PacketBatch* NetmapDevice::make_netmap_batch(unsigned int n, struct netmap_ring*
     if (n <= 0) return NULL;
     struct netmap_slot* slot;
     WritablePacket* last = 0;
+    const bool clear = true;
 
     Timestamp ts = Timestamp::make_usec(rxring->ts.tv_sec, rxring->ts.tv_usec);
 
-    PacketPool& packet_pool = *WritablePacket::make_local_packet_pool();
+    PacketPool& packet_pool = WritablePacket::get_local_packet_pool();
 
     WritablePacket*& _head = packet_pool.pd;
     unsigned int & _count = packet_pool.pdcount;
@@ -231,7 +232,7 @@ PacketBatch* NetmapDevice::make_netmap_batch(unsigned int n, struct netmap_ring*
     //Next is the current packet in the batch
     Packet* next = _head;
     //P_batch_saved is the saved head of the batch.
-    PacketBatch* p_batch = static_cast<PacketBatch*>(_head);
+    PacketBatch* p_batch = PacketBatch::start_head(_head);
 
     int toreceive = n;
     while (toreceive > 0) {
@@ -248,9 +249,9 @@ PacketBatch* NetmapDevice::make_netmap_batch(unsigned int n, struct netmap_ring*
         slot->flags = NS_BUF_CHANGED;
 
         next = last->next(); //Correct only if count != 0
-        last->initialize();
+        last->initialize(clear);
 
-        last->set_buffer(data,NetmapBufQ::buffer_size(),slot->len);
+        last->init_buffer(data,NetmapBufQ::buffer_size(),slot->len);
         cur = nm_ring_next(rxring, cur);
         toreceive--;
         _count --;

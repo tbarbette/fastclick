@@ -198,6 +198,7 @@ class ARPQuerier : public FlowElement { public:
             return FLOW_ARP;
         if (port == 0)
             return FLOW_IP;
+        return FLOW_NONE;
     }
 #endif
 

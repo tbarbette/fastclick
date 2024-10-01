@@ -36,6 +36,7 @@ class MethodRSS : public BalanceMethodDevice { public:
 
     bool _use_group;
     bool _use_mark;
+    bool _use_ipv6;
     int _epoch;
 
     //RSSVerifier* _verifier;

@@ -1,6 +1,6 @@
 #ifndef CLICK_IP6MIRROR_HH
 #define CLICK_IP6MIRROR_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -24,7 +24,7 @@ swap operations do not affect checksums.
 
 */
 
-class IP6Mirror : public Element {
+class IP6Mirror : public SimpleElement<IP6Mirror> {
 
  public:
 

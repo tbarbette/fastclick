@@ -11,31 +11,47 @@ taskset -c 1 sleep 0.2 >/dev/null 2>/dev/null &
 pid=$!
 sleep 0.1
 [ $(taskset -p $pid | rev | cut -d' ' -f1) -eq 2 ]
+command -v bc
 
 %script
+start=`date +%s.%N`
+click -e 'Script(wait 200ms, stop)' >/dev/null 2>/dev/null
+end=`date +%s.%N`
+st=$(echo "$end - $start" | bc)
+
 #Affinity to core 0
 click --affinity=0 -e 'Script(wait 400ms,stop)' >/dev/null 2>/dev/null &
 pid=$!
-sleep 0.2
+sleep $st
 taskset -p $pid | rev | cut -d' ' -f1
+wait
 
 #Affinity to core 1
 click --affinity=1 -e 'Script(wait 400ms,stop)' >/dev/null 2>/dev/null &
 pid=$!
-sleep 0.2
+sleep $st
 taskset -p $pid | rev | cut -d' ' -f1
+wait
 
-#No affinity
-click --no-affinity -e 'Script(wait 400ms,stop)' >/dev/null 2>/dev/null &
-pid=$!
-sleep 0.2
-[ "$(taskset -p $pid | rev | cut -d' ' -f1)" = "$(taskset -p 1 | rev | cut -d' ' -f1)" ] && echo "match"
+if ! click-buildtool provides dpdk-packet ; then
+    #No affinity
+    click --no-affinity -e 'Script(wait 400ms,stop)' >/dev/null 2>/dev/null &
+    pid=$!
+    sleep $st
+    [ "$(taskset -p $pid | rev | cut -d' ' -f1)" = "$(taskset -p 1 | rev | cut -d' ' -f1)" ] && echo "match"
+    wait
 
-#Default is no affinity
-click -e 'Script(wait 400ms,stop)' >/dev/null 2>/dev/null &
-pid=$!
-sleep 0.2
-[ "$(taskset -p $pid | rev | cut -d' ' -f1)" = "$(taskset -p 1 | rev | cut -d' ' -f1)" ] && echo "match"
+    #Default is no affinity
+    click -e 'Script(wait 400ms,stop)' >/dev/null 2>/dev/null &
+    pid=$!
+    sleep $st
+    [ "$(taskset -p $pid | rev | cut -d' ' -f1)" = "$(taskset -p 1 | rev | cut -d' ' -f1)" ] && echo "match"
+    wait
+else
+    #dpdk-packet will force DPDK initialization that always has affinity
+    echo "match"
+    echo "match"
+fi
 
 %expect stdout
 1

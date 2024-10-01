@@ -29,6 +29,7 @@ public:
 private:
   int _count;
   int _dport;
+  bool _check_length;
 };
 
 CLICK_ENDDECLS

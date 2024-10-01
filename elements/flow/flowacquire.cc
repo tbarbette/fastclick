@@ -39,7 +39,6 @@ FlowAcquire::push_flow(int port, bool* seen, PacketBatch* head)
 void
 FlowAcquire::add_handlers()
 {
-    //add_data_handlers("color", Handler::OP_READ | Handler::OP_WRITE, &_color);
 }
 
 CLICK_ENDDECLS

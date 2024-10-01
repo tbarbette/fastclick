@@ -9,7 +9,10 @@
 CLICK_DECLS
 
 /**
+ * =c
  * CTXDispatcher
+ *
+ * =s ctx
  *
  * =d
  * Define a context to classify packets among its outputs. It works much like Classifier, except the context will

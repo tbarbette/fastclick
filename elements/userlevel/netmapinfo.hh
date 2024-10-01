@@ -2,7 +2,6 @@
 #define CLICK_NETMAPINFO_HH
 
 #include <click/element.hh>
-#include <click/netmapdevice.hh>
 
 CLICK_DECLS
 

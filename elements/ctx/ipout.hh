@@ -11,7 +11,7 @@ CLICK_DECLS
 
 IPOut()
 
-=s middlebox
+=s ctx
 
 exit point of an IP path in the stack of the middlebox
 

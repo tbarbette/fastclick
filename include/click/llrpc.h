@@ -14,6 +14,9 @@ CLICK_CXX_UNPROTECT
 #else
 # include <errno.h>
 # include <sys/ioctl.h>
+# if HAVE_ASM_IOCTL_H
+#  include <asm/ioctl.h>
+# endif
 #endif
 
 /* Click low-level RPC interface */

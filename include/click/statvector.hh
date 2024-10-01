@@ -14,7 +14,7 @@ class StatVector {
 
 
 
-    enum{H_MEDIAN,H_AVERAGE,H_DUMP,H_MAX_OBS,H_N_OBS,H_NZ,H_MAX,H_MAX_OBS_VAL};
+    enum{H_MEDIAN=736,H_AVERAGE,H_DUMP,H_MAX_OBS,H_N_OBS,H_NZ,H_MAX,H_MAX_OBS_VAL};
 
     static String read_handler(Element *e, void *thunk)
     {
@@ -29,7 +29,7 @@ class StatVector {
             int max_nz = -1;
             int nz=0;
 
-            for (unsigned j = 0; j < sums.size(); j++) {
+            for (unsigned j = 0; j < (unsigned)sums.size(); j++) {
                 for (unsigned i = 0; i < fd->stats.weight(); i++) {
                     sums[j] += fd->stats.get_value(i)[j];
                 }
@@ -53,7 +53,7 @@ class StatVector {
         case H_MEDIAN: {
             Vector<T> sums(fd->stats.get_value(0).size(),0);
             T total = 0;
-            for (unsigned j = 0; j < sums.size(); j++) {
+            for (unsigned j = 0; j < (unsigned)sums.size(); j++) {
                 for (unsigned i = 0; i < fd->stats.weight(); i++) {
                     sums[j] += fd->stats.get_value(i)[j];
                 }

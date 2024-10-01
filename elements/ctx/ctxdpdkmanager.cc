@@ -6,6 +6,10 @@
 #include <click/flow/flow.hh>
 #include <click/flow/node/flow_nodes.hh>
 
+#if RTE_VERSION >= RTE_VERSION_NUM(22,07,0,0)
+#define PKT_RX_FDIR_ID RTE_MBUF_F_RX_FDIR_ID
+#endif
+
 CLICK_DECLS
 
 

@@ -297,7 +297,7 @@ IPRewriterBase::get_entry(int ip_p, const IPFlowID &flowid, int input)
         } else {
 	        IPRewriterInput &is = _input_specs[input];
             rewritten_flowid = IPFlowID::uninitialized_t();
-	        if (!is.rewrite_flowid(flowid, rewritten_flowid, 0) == rw_addmap) {
+	        if (!(is.rewrite_flowid(flowid, rewritten_flowid, 0) == rw_addmap)) {
                 return 0;
             }
         }

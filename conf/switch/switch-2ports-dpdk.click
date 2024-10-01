@@ -2,8 +2,8 @@
  * Configuration for a simple 2-ports switch without STP support
  * it is intended for userlevel Click using DPDK
  * Eg launch with:
- *     click switch-2ports-dpdk.click dev1=00:11:00.0 dev2=00:11:00.1
- * or omit dev1 and dev2 parameters and change it below
+ *     click --dpdk -- switch-2ports-dpdk.click dev1=00:11:00.0 dev2=00:11:00.1
+ * or omit dev1 and dev2 parameters and change them below
  */
 
 

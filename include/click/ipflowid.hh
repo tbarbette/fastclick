@@ -3,6 +3,7 @@
 #define CLICK_IPFLOWID_HH
 #include <click/ipaddress.hh>
 #include <click/hashcode.hh>
+#include <functional>
 CLICK_DECLS
 class Packet;
 
@@ -14,7 +15,7 @@ class IPFlowID { public:
     /** @brief Construct an empty flow ID.
      *
      * The empty flow ID has zero-valued addresses and ports. */
-    IPFlowID()
+    explicit IPFlowID()
 	: _saddr(), _daddr(), _sport(0), _dport(0) {
     }
 
@@ -23,7 +24,7 @@ class IPFlowID { public:
      * @param sport source port, in network order
      * @param daddr destination address
      * @param dport destination port, in network order */
-    IPFlowID(IPAddress saddr, uint16_t sport, IPAddress daddr, uint16_t dport)
+    explicit IPFlowID(IPAddress saddr, uint16_t sport, IPAddress daddr, uint16_t dport)
 	: _saddr(saddr), _daddr(daddr), _sport(sport), _dport(dport) {
     }
 
@@ -162,7 +163,6 @@ inline hashcode_t IPFlowID::hashcode() const
 	^ ((d << 16) | s);
 }
 
-#undef ROT
 
 inline bool operator==(const IPFlowID &a, const IPFlowID &b)
 {
@@ -204,15 +204,69 @@ class IPFlow5ID : public IPFlowID { public:
      * UDP-like positions; TCP, UDP, and DCCP fit the bill. */
     explicit IPFlow5ID(const Packet *p, bool reverse = false);
 
-    explicit IPFlow5ID() {};
+    explicit IPFlow5ID() {
+        _zero = 0;
+    };
 
     uint8_t proto() const {
-	return _proto;
+	    return _proto;
     }
+
+    /** @brief Hash function.
+     * @return The hash value of this IPFlowID.
+     *
+     * Equal IPFlowID objects always have equal hashcode() values. */
+    inline hashcode_t hashcode() const;
+
+
+    /** @brief Unparse this address into a String.
+     *
+     * Returns a string with formatted like "(SADDR, SPORT, DADDR, DPORT)". */
+    String unparse() const;
+
 
 protected:
 	uint8_t _proto;
-};
+    uint8_t _zero;
+
+    int unparse(char *s) const;
+}  CLICK_SIZE_PACKED_ATTRIBUTE ;
+
+inline bool operator==(const IPFlow5ID &a, const IPFlow5ID &b)
+{
+    return a.sport() == b.sport() && a.dport() == b.dport()
+	&& a.saddr() == b.saddr() && a.daddr() == b.daddr() && a.proto() == b.proto();
+}
+
+
+inline hashcode_t IPFlow5ID::hashcode() const
+{
+    // more complicated hashcode, but causes less collision
+    uint16_t s = ntohs(sport());
+    uint16_t d = ntohs(dport());
+    hashcode_t sx = CLICK_NAME(hashcode)(saddr());
+    hashcode_t dx = CLICK_NAME(hashcode)(daddr());
+    return (ROT(sx, (s % 16) + 1) ^ ROT(dx, 31 - (d % 16)))
+	^ ((d << 16) | s) ^ proto();
+}
+
+#undef ROT
+inline bool operator!=(const IPFlow5ID &a, const IPFlow5ID &b)
+{
+    return a.sport() != b.sport() || a.dport() != b.dport()
+	|| a.saddr() != b.saddr() || a.daddr() != b.daddr() || a.proto() != b.proto();
+}
+
+
+namespace std {
+  template <> struct hash<IPFlow5ID>
+  {
+    size_t operator()(const IPFlow5ID & x) const
+    {
+      return x.hashcode();
+    }
+  };
+}
 
 CLICK_ENDDECLS
 #endif

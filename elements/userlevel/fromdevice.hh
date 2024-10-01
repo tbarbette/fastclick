@@ -5,8 +5,8 @@
 #include "elements/userlevel/kernelfilter.hh"
 
 #if HAVE_BPF
+#include <click/bpf.hh>
 # define PCAP_DONT_INCLUDE_PCAP_BPF_H 1
-#include <bpf/bpf.h>
 struct bpf_program {
     u_int bf_len;
     struct bpf_insn *bf_insns;
@@ -216,9 +216,10 @@ class FromDevice : public BatchElement, public EthernetDevice { public:
 
     void kernel_drops(bool& known, int& max_drops) const;
 
+#if HAVE_LINUX_ETHTOOL_H
     int dev_set_rss_reta(unsigned *reta, unsigned reta_sz);
     int dev_get_rss_reta_size();
-
+#endif
 
   private:
 

@@ -74,10 +74,11 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
     bool stop = false, active = true, zero = true, checksum = false, multipacket = false, timing = false, allow_nonexistent = false;
     uint8_t default_proto = IP_PROTO_TCP;
     _sampling_prob = (1 << SAMPLING_SHIFT);
-    String default_contents, default_flowid, data;
+    String default_contents, default_flowid, default_flowid6, data;
     unsigned burst = 1;
     bool migrate = false;
     bool timestamp = true;
+    bool ipv6 = false;
 
     if (_ff.configure_keywords(conf, this, errh) < 0)
 	return -1;
@@ -87,6 +88,9 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("STOP", stop)
         .read("ACTIVE", active)
         .read("ZERO", zero)
+#if HAVE_IP6
+        .read("IPV6", ipv6)
+#endif
         .read("TIMING", timing)
         .read("CHECKSUM", checksum)
         .read("SAMPLE", FixedPointArg(SAMPLING_SHIFT), _sampling_prob)
@@ -95,9 +99,11 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("DEFAULT_CONTENTS", AnyArg(), default_contents)
         .read("DEFAULT_FIELDS", AnyArg(), default_contents)
         .read("DEFAULT_FLOWID", AnyArg(), default_flowid)
+        .read("DEFAULT_FLOWID6", AnyArg(), default_flowid6)
         .read("CONTENTS", AnyArg(), default_contents)
         .read("FIELDS", AnyArg(), default_contents)
         .read("FLOWID", AnyArg(), default_flowid)
+        .read("FLOWID6", AnyArg(), default_flowid6)
         .read("ALLOW_NONEXISTENT", allow_nonexistent)
         .read("DATA", data)
         .read("BURST", burst)
@@ -109,19 +115,21 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
     if (_sampling_prob > (1 << SAMPLING_SHIFT)) {
 		errh->warning("SAMPLE probability reduced to 1");
 		_sampling_prob = (1 << SAMPLING_SHIFT);
-    } else if (_sampling_prob == 0)
-	errh->warning("SAMPLE probability is 0; emitting no packets");
+    } else if (_sampling_prob == 0) {
+	    errh->warning("SAMPLE probability is 0; emitting no packets");
+    }
 
     _default_proto = default_proto;
     _stop = stop;
     _active = active;
     _zero = zero;
+    _ipv6 = ipv6;
     _checksum = checksum;
     _timing = timing;
     _allow_nonexistent = allow_nonexistent;
     _have_timing = false;
     _multipacket = multipacket;
-    _have_flowid = _have_aggregate = _binary = false;
+    _have_flowid = _have_flowid6 = _have_aggregate = _binary = false;
     _burst = burst;
     _migrate = migrate;
     _set_timestamp = timestamp;
@@ -130,8 +138,12 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (default_contents)
     bang_data(default_contents, errh);
-    if (default_flowid)
-    bang_flowid(default_flowid, errh);
+    if (!ipv6 && default_flowid)
+            bang_flowid(default_flowid, errh);
+#if HAVE_IP6
+    if (ipv6 && default_flowid6)
+            bang_flowid6(default_flowid6, errh);
+#endif
     if (data && _ff.filename())
         return errh->error("FILENAME and DATA conflict");
     else if (data && _ff.set_data(data, errh) < 0)
@@ -204,7 +216,8 @@ FromIPSummaryDump::initialize(ErrorHandler *errh)
         && !line.substring(0, 5).equals("!data", 5)
         && !line.substring(0, 9).equals("!contents", 9)
         && !line.substring(0, 6).equals("!proto", 6)
-        && !line.substring(0, 7).equals("!flowid", 7)) {
+        && !line.substring(0, 7).equals("!flowid", 7)
+        && !line.substring(0, 7).equals("!flowid6", 8)) {
         if (!_fields.size() /* don't warn on DEFAULT_CONTENTS */)
         _ff.warning(errh, "missing banner line; is this an IP summary dump?");
     }
@@ -315,6 +328,31 @@ FromIPSummaryDump::bang_flowid(const String &line, ErrorHandler *errh)
     _have_flowid = true;
     }
 }
+#if HAVE_IP6
+void
+FromIPSummaryDump::bang_flowid6(const String &line, ErrorHandler *errh)
+{
+    Vector<String> words;
+    cp_spacevec(line, words);
+
+    IP6Address src, dst;
+    uint32_t sport = 0, dport = 0;
+    if (words.size() < 5
+    || (!IP6AddressArg().parse(words[1], src) && words[1] != "-")
+    || (!IntArg().parse(words[2], sport) && words[2] != "-")
+    || (!IP6AddressArg().parse(words[3], dst) && words[3] != "-")
+    || (!IntArg().parse(words[4], dport) && words[4] != "-")
+    || sport > 65535 || dport > 65535) {
+    _ff.error(errh, "bad !flowid specification");
+    _have_flowid = false;
+    } else {
+    if (words.size() >= 6)
+        bang_proto(String::make_stable("! ", 2) + words[5], "!flowid", errh);
+    _given_flowid6 = IP6FlowID(src, htons(sport), dst, htons(dport));
+    _have_flowid6 = true;
+    }
+}
+#endif
 
 void
 FromIPSummaryDump::bang_aggregate(const String &line, ErrorHandler *errh)
@@ -419,6 +457,10 @@ FromIPSummaryDump::read_packet(ErrorHandler *errh)
         bang_data(line, errh);
         else if (data + 8 <= end && memcmp(data, "!flowid", 7) == 0 && isspace((unsigned char) data[7]))
         bang_flowid(line, errh);
+    #if HAVE_IP6
+        else if (data + 9 <= end && memcmp(data, "!flowid6", 8) == 0 && isspace((unsigned char) data[8]))
+        bang_flowid6(line, errh);
+    #endif
         else if (data + 7 <= end && memcmp(data, "!proto", 6) == 0 && isspace((unsigned char) data[6]))
         bang_proto(line, "!proto", errh);
         else if (data + 11 <= end && memcmp(data, "!aggregate", 10) == 0 && isspace((unsigned char) data[10]))
@@ -441,7 +483,11 @@ FromIPSummaryDump::read_packet(ErrorHandler *errh)
 
     // prepare packet data
     StringAccum sa;
-    IPSummaryDump::PacketOdesc d(this, q, _default_proto, (_have_flowid ? &_flowid : 0), _minor_version);
+    IPSummaryDump::PacketOdesc d(this, q, _default_proto, (_have_flowid ? &_flowid : 0),
+    #if HAVE_IP6
+      (_have_flowid6 ? &_flowid6 : 0),
+      #endif
+      _minor_version);
     int nfields = 0;
 
     // new code goes here
@@ -554,50 +600,69 @@ FromIPSummaryDump::read_packet(ErrorHandler *errh)
     }
 
     // set source and destination ports even if no transport info on packet
-    if (d.p && d.default_ip_flowid)
-    (void) d.make_ip(0);    // may fail
+    if (!_ipv6 && d.p && d.default_ip_flowid)
+        (void) d.make_ip(0);    // may fail
+#if HAVE_IP6
+    if (_ipv6 && d.p && d.default_ip6_flowid)
+        (void) d.make_ip6(0);    // may fail
+#endif
 
     // set up transport header if necessary
-    if (d.p && d.is_ip && d.p->ip_header())
-    (void) d.make_transp();
-
-    if (d.p && d.is_ip && d.p->ip_header()) {
-    // set IP length
-    uint32_t ip_len;
-    if (!d.p->ip_header()->ip_len) {
-        ip_len = d.want_len;
-        if (ip_len >= (uint32_t) d.p->network_header_offset())
-        ip_len -= d.p->network_header_offset();
-        if (ip_len > 0xFFFF)
-        ip_len = 0xFFFF;
-        else if (ip_len == 0)
-        ip_len = d.p->network_length();
-        d.p->ip_header()->ip_len = htons(ip_len);
-    } else
-        ip_len = ntohs(d.p->ip_header()->ip_len);
-
-    // set UDP length
-    if (d.p->ip_header()->ip_p == IP_PROTO_UDP
-        && IP_FIRSTFRAG(d.p->ip_header())
-        && !d.p->udp_header()->uh_ulen) {
-        int len = ip_len - d.p->network_header_length();
-        d.p->udp_header()->uh_ulen = htons(len);
-    }
-
-    // set destination IP address annotation
-    d.p->set_dst_ip_anno(d.p->ip_header()->ip_dst);
-
-    // set checksum
-    if (_checksum) {
-        uint32_t xlen = 0;
-        if (ip_len > (uint32_t) d.p->network_length())
-        xlen = ip_len - d.p->network_length();
-        if (!xlen || (d.p = d.p->put(xlen))) {
-        if (xlen && _zero)
-            memset(d.p->end_data() - xlen, 0, xlen);
-        set_checksums(d.p, d.p->ip_header());
+    if (d.p) {
+        if (d.is_ip && d.p->ip_header())
+            (void) d.make_transp();
+#if HAVE_IP6
+        else if (d.is_ip6 && d.p->ip6_header()) {
+            (void) d.make_transp6();
         }
+#endif
     }
+
+    if (d.p && d.p->network_header()) {
+        if (d.is_ip) {
+            // set IP length
+            uint32_t ip_len;
+            if (!d.p->ip_header()->ip_len) {
+                ip_len = d.want_len;
+                if (ip_len >= (uint32_t) d.p->network_header_offset())
+                ip_len -= d.p->network_header_offset();
+                if (ip_len > 0xFFFF)
+                ip_len = 0xFFFF;
+                else if (ip_len == 0)
+                ip_len = d.p->network_length();
+                d.p->ip_header()->ip_len = htons(ip_len);
+            } else
+                ip_len = ntohs(d.p->ip_header()->ip_len);
+
+            // set UDP length
+            if (d.p->ip_header()->ip_p == IP_PROTO_UDP
+                && IP_FIRSTFRAG(d.p->ip_header())
+                && !d.p->udp_header()->uh_ulen) {
+                int len = ip_len - d.p->network_header_length();
+                d.p->udp_header()->uh_ulen = htons(len);
+            }
+
+            // set destination IP address annotation
+            d.p->set_dst_ip_anno(d.p->ip_header()->ip_dst);
+
+            // set checksum
+            if (_checksum) {
+                    uint32_t xlen = 0;
+                    if (ip_len > (uint32_t) d.p->network_length())
+                    xlen = ip_len - d.p->network_length();
+                    if (!xlen || (d.p = d.p->put(xlen))) {
+                        if (xlen && _zero)
+                            memset(d.p->end_data() - xlen, 0, xlen);
+                        set_checksums(d.p, d.p->ip_header());
+                }
+            }
+        }
+#if HAVE_IP6
+        else if (d.is_ip6) {
+
+            //TODO XXX
+        }
+#endif
     }
 
     // set extra length annotation (post-other length adjustments)

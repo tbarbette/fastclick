@@ -48,11 +48,11 @@ Table of fc after optimization :
 12/FFFF (THREECASE, 2 children)
 |-> 1544
 |  20/FFFF (THREECASE, 2 children)
-|  |-> 512 UC:1 ED:0 (data 0002000000000000)
-|  |-> 256 UC:1 ED:0 (data 0001000001000000)
-|  |-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
-|-> 8 UC:1 ED:0 (data 0800000002000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
+|  |-> 512 UC:{{0|1}} ED:0 (data 0002000000000000)
+|  |-> 256 UC:{{0|1}} ED:0 (data 0001000001000000)
+|  |-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff)
+|-> 8 UC:{{0|1}} ED:0 (data 0800000002000000)
+|-> DEFAULT 0 UC:{{0|1}} ED:1 (data 00000000ffffffff)
 ---
 R:   60 | ffffffff ffff3cfd fe9e5b60 08060001 08000604 00013cfd
 Q:   42 | 3cfdfe9e 5b603cfd fe9e5c40 08060001 08000604 00023cfd
@@ -65,10 +65,10 @@ Table of fc after optimization :
 12/FFFF (TWOCASE, 1 children)
 |-> 1544
 |  20/FFFF (THREECASE, 2 children)
-|  |-> 512 UC:1 ED:0 (data 0002000000000000)
-|  |-> 256 UC:1 ED:0 (data 0001000001000000)
-|  |-> DEFAULT 0 UC:1 ED:0 (data 0000000002000000)
-|-> DEFAULT 0 UC:1 ED:0 (data 0000000002000000)
+|  |-> 512 UC:{{0|1}} ED:0 (data 0002000000000000)
+|  |-> 256 UC:{{0|1}} ED:0 (data 0001000001000000)
+|  |-> DEFAULT 0 UC:{{0|1}} ED:0 (data 0000000002000000)
+|-> DEFAULT 0 UC:{{0|1}} ED:0 (data 0000000002000000)
 ---
 R:   60 | ffffffff ffff3cfd fe9e5b60 08060001 08000604 00013cfd
 Q:   42 | 3cfdfe9e 5b603cfd fe9e5c40 08060001 08000604 00023cfd

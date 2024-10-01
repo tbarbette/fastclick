@@ -37,6 +37,7 @@
 #include <click/args.hh>
 #include <click/etheraddress.hh>
 #include <click/timer.hh>
+#include <click/router.hh>
 
 #if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
 #define rte_ipv4_hdr ipv4_hdr
@@ -75,6 +76,12 @@ typedef uint32_t counter_t;
 
 extern bool dpdk_enabled;
 
+#ifdef RTE_PCI_ANY_ID
+#define MY_PCI_ANY_ID RTE_PCI_ANY_ID
+#else
+#define MY_PCI_ANY_ID PCI_ANY_ID
+#endif
+
 class DPDKDevice : public DPDKEthernetDevice {
 public:
 
@@ -83,13 +90,13 @@ public:
 
     struct DevInfo {
         inline DevInfo() :
-            vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
+            vendor_id(MY_PCI_ANY_ID), vendor_name(), device_id(MY_PCI_ANY_ID), driver(0),
             init_mac(), init_mtu(0), init_rss(-1), init_reta_size(-1), init_fc_mode(FC_UNSET),
             rx_queues(0, false), tx_queues(0, false), n_rx_descs(0), n_tx_descs(0),
             num_pools(0), promisc(false),
-	    mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
+	        mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
             rx_offload(0), tx_offload(0),	
-	    flow_isolate(false),
+	        flow_isolate(false),
             vlan_filter(false), vlan_strip(false), vlan_extend(false), vf_vlan(),
             lro(false), jumbo(false)
         {
@@ -98,7 +105,7 @@ public:
         }
 
         void print_device_info() {
-            if (device_id == PCI_ANY_ID) {
+            if (device_id == MY_PCI_ANY_ID) {
                 return;
             }
             click_chatter("                Vendor   ID: %d", vendor_id);
@@ -226,6 +233,8 @@ public:
 
     static int get_port_numa_node(portid_t port_id);
 
+    static Router::ChildrenFuture all_initialized;
+
 #if HAVE_FLOW_API
     int set_mode(
         String mode, int num_pools, Vector<int> vf_vlan,
@@ -267,6 +276,9 @@ public:
         ;
     }
 #endif
+
+
+    inline void kill_ref(Packet* p);
 
     inline static rte_mbuf* get_pkt(unsigned numa_node);
     inline static rte_mbuf* get_pkt();
@@ -352,7 +364,7 @@ private:
 
     static int get_nb_mbuf(int socket);
     static bool _is_initialized;
-    static HashTable<portid_t, DPDKDevice> _devs;
+    static HashTable<portid_t, DPDKDevice*> _devs;
     static unsigned _nr_pktmbuf_pools;
     static bool no_more_buffer_msg_printed;
 
@@ -364,11 +376,13 @@ private:
     static int alloc_pktmbufs(ErrorHandler* errh) CLICK_COLD;
 
     static DPDKDevice *ensure_device(const portid_t &port_id) {
-        return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
+        auto it = _devs.find_insert(port_id, new DPDKDevice(port_id));
+
+        return it.value();
     }
 
-    static DPDKDevice *get_device(const portid_t &port_id) {
-        return &(_devs.find(port_id).value());
+    static DPDKDevice* get_device(const portid_t &port_id) {
+        return _devs.find(port_id).value();
     }
 
 #if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
@@ -494,6 +508,14 @@ inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node, b
     }
     #endif
     return mbuf;
+}
+
+inline void DPDKDevice::kill_ref(Packet* p) {
+    struct rte_mbuf* mbuf = get_mbuf(p,false,-1);
+    if (rte_mbuf_refcnt_read(mbuf) > 1)
+        rte_mbuf_refcnt_update(mbuf, -1);
+    else
+        p->kill();
 }
 
 inline rte_mbuf* DPDKDevice::get_pkt(unsigned numa_node) {

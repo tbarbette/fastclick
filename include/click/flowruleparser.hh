@@ -37,8 +37,9 @@ extern "C" {
 #include <rte_flow.h>
 #include <cmdline.h>
 #include <cmdline_parse.h>
+extern "C" {
 #include <testpmd.h>
-
+}
 /**
  * Denotes that portid_t is defined
  * in <testpmd.h>.

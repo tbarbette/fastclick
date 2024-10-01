@@ -32,6 +32,9 @@ CLICK_DECLS
 LinkUnqueue::LinkUnqueue()
     : _qhead(0), _qtail(0), _task(this), _timer(&_task)
 {
+#if HAVE_BATCH
+	in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 void *
@@ -117,67 +120,79 @@ LinkUnqueue::run_task(Task *)
 
     // Read a new packet if there's room.  Room is measured by the latency
     while (!_qtail || _qtail->timestamp_anno() <= now_delayed) {
-	// try to pull a packet
-	Packet *p = input(0).pull();
-	if (!p) {
-	    _back_to_back = false;
-	    break;
-	}
+        // try to pull a packet
+        Packet *p = input(0).pull();
+        if (!p) {
+            _back_to_back = false;
+            break;
+        }
 
-	// set new timestamp to delayed timestamp
-	if (_qtail) {
-	    _qtail->set_next(p);
-	    delay_by_bandwidth(p, (_back_to_back ? _qtail->timestamp_anno() : now_delayed));
-	} else {
-	    _qhead = p;
-	    delay_by_bandwidth(p, now_delayed);
-	}
+        // set new timestamp to delayed timestamp
+        if (_qtail) {
+            _qtail->set_next(p);
+            delay_by_bandwidth(p, (_back_to_back ? _qtail->timestamp_anno() : now_delayed));
+        } else {
+            _qhead = p;
+            delay_by_bandwidth(p, now_delayed);
+        }
 
-	// hook up, and remember we were doing this back to back
-	_qtail = p;
-	p->set_next(0);
-	Storage::set_tail(Storage::tail() + 1);
-	worked = _back_to_back = true;
+        // hook up, and remember we were doing this back to back
+        _qtail = p;
+        p->set_next(0);
+        Storage::set_tail(Storage::tail() + 1);
+        worked = _back_to_back = true;
     }
 
     // Emit packets if it's time
+#if HAVE_BATCH
+    BATCH_CREATE_INIT(batch);
+#endif
     while (_qhead && _qhead->timestamp_anno() <= now) {
-	Packet *p = _qhead;
-	_qhead = p->next();
-	if (!_qhead)
-	    _qtail = 0;
-	p->set_next(0);
-	//click_chatter("%p{timestamp}: RELEASE %p{timestamp}", &now, &p->timestamp_anno());
+        Packet *p = _qhead;
+        _qhead = p->next();
+        if (!_qhead)
+            _qtail = 0;
+        p->set_next(0);
+        //click_chatter("%p{timestamp}: RELEASE %p{timestamp}", &now, &p->timestamp_anno());
+#if HAVE_BATCH
+	BATCH_CREATE_APPEND(batch, p);
+#else
 	output(0).push(p);
+#endif
 	Storage::set_tail(Storage::tail() - 1);
-	worked = true;
+        worked = true;
     }
+#if HAVE_BATCH
+    BATCH_CREATE_FINISH(batch);
+    if (batch)
+	output(0).push_batch(batch);
+#endif
 
     // Figure out when to schedule next
     //print_queue(_qhead);
     if (_qhead) {
-	Timestamp expiry = _qhead->timestamp_anno();
-	if (_signal) {
-	    Timestamp expiry2 = _qtail->timestamp_anno() - _latency;
-	    if (expiry2 < expiry)
-		expiry = expiry2;
-	}
-	//{ Timestamp diff = expiry - now; click_chatter("%p{timestamp}: %p{timestamp} > + %p{timestamp}", &now, &expiry, &diff); }
-	expiry -= Timer::adjustment();
-	if (expiry <= now) {
-	    // small delay, reschedule Task
-	    //_state = S_TASK;
-	    _task.fast_reschedule();
-	} else {
-	    // large delay, schedule Timer instead
-	    //_state = S_TIMER;
-	    _timer.schedule_at(expiry);
-	}
+        Timestamp expiry = _qhead->timestamp_anno();
+        if (_signal) {
+            Timestamp expiry2 = _qtail->timestamp_anno() - _latency;
+            if (expiry2 < expiry)
+            expiry = expiry2;
+        }
+        //{ Timestamp diff = expiry - now; click_chatter("%p{timestamp}: %p{timestamp} > + %p{timestamp}", &now, &expiry, &diff); }
+        expiry -= Timer::adjustment();
+        if (expiry <= now) {
+            // small delay, reschedule Task
+            //_state = S_TASK;
+            _task.fast_reschedule();
+        } else {
+            // large delay, schedule Timer instead
+            //_state = S_TIMER;
+            _timer.schedule_at(expiry);
+        }
     } else if (_signal) {
-	//_state = S_TASK;
-	_task.fast_reschedule();
+        //_state = S_TASK;
+        _task.fast_reschedule();
     } else {
-	//_state = S_ASLEEP;
+	    //_state = S_ASLEEP;
     }
 
     return worked;

@@ -6,6 +6,11 @@
 #include <click/pair.hh>
 #if HAVE_DPDK
 #include <rte_mbuf.h>
+
+#if RTE_VERSION >= RTE_VERSION_NUM(22,07,0,0)
+#define PKT_RX_FDIR_ID RTE_MBUF_F_RX_FDIR_ID
+#endif
+
 #endif
 CLICK_DECLS
 class HandlerCall;

@@ -68,7 +68,7 @@ static unsigned long greedy_schedule_jiffies;
  */
 
 RouterThread::RouterThread(Master *master, int id)
-    : _stop_flag(false),  _idletask(0), _idle_dorun(0), _master(master), _id(id), _driver_entered(false)
+    : _stop_flag(false),  _idletask(0), _idle_dorun(-1), _master(master), _id(id), _driver_entered(false)
 #if HAVE_CLICK_LOAD
     , _load_state()
 #endif
@@ -518,6 +518,17 @@ float
 RouterThread::load() {
   return (float) _load_state.read().load.unscaled_average() / 1024;
 }
+
+int
+RouterThread::load_unscaled() {
+  return _load_state.read().load.unscaled_average();
+}
+
+int
+RouterThread::load_max_scale() {
+  return 1024;
+}
+
 
 unsigned long long
 RouterThread::load_cycles() {

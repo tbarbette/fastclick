@@ -21,6 +21,18 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <stdlib.h>
+#if defined(__aarch64__) && defined(__mach__)
+static __inline uint32_t __bswap_32(uint32_t __x)
+{
+	return __x>>24 | __x>>8&0xff00 | __x<<8&0xff0000 | __x<<24;
+}
+static __inline uint64_t __bswap_64(uint64_t __x)
+{
+	return __bswap_32(__x)+0ULL<<32 | __bswap_32(__x>>32);
+}
+#else
+#include <byteswap.h>
+#endif
 #include <regex>
 #include <click/flow/flow.hh>
 #include <click/flow/flowelement.hh>
@@ -46,7 +58,7 @@ void FlowClassificationTable::set_root(FlowNode* node) {
     assert(node);
     assert(_classifier_release_fnt);
     _root = node;
-/*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+/*#if HAVE_FLOW_DYNAMIC
     auto fnt = [this](FlowControlBlock* fcb){
         fcb->release_fnt = _classifier_release_fnt;
     };
@@ -59,7 +71,7 @@ FlowNode* FlowClassificationTable::get_root() {
 }
 
 FlowTableHolder::FlowTableHolder() :
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
 old_flows(fcb_list()),
 #endif
 _pool(), _classifier_release_fnt(0), _classifier_thunk(0)
@@ -67,7 +79,7 @@ _pool(), _classifier_release_fnt(0), _classifier_thunk(0)
 
     }
 
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
 void
 FlowTableHolder::delete_all_flows() {
     for (int i = 0; i < old_flows.weight(); i++) {
@@ -96,7 +108,7 @@ FlowTableHolder::delete_all_flows() {
 FlowTableHolder::~FlowTableHolder() {
     auto previous = fcb_table;
     fcb_table = this;
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
     //TODO : same, do from the right thread
     //delete_all_flows();
 #endif
@@ -327,7 +339,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(Element* owner, Str
                     }
 #endif
 
-                    if (maskv & valuev == 0)
+                    if ((maskv & valuev) == 0)
                         dynamic = true;
                 }
                 FlowNodeDefinition* node = new FlowNodeDefinition(owner);
@@ -423,7 +435,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(Element* owner, Str
     return FlowClassificationTable::Rule{.root = root, .output = output, .is_default = is_default};
 }
 
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if HAVE_CTX_GLOBAL_TIMEOUT
 
 
 /**
@@ -1297,7 +1309,7 @@ FlowNode* FlowNode::optimize(Bitvector threads) {
 	    newnode->_level = thread;
 	    newnode->_parent = parent();
 	    newnode->default_ptr()->ptr = 0; //BUG if an unexpected thread classify, this is expected
-	    for (int i = 0; i < click_max_cpu_ids(); i++) {
+	    for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
 		 Bitvector tb(threads.size(), false);
 		 tb[i] = true;
 		 FlowNode* newNode = this->duplicate(true,1,true)->optimize(tb);

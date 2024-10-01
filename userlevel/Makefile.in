@@ -86,8 +86,8 @@ USE_CTX = @USE_CTX@
 ifeq ($(USE_FLOW),yes)
 GENERIC_OBJS += flow.o flowelement.o flownode.o
 ifeq ($(USE_CTX),yes)
-GENERIC_OBJS += flowbuffer.o bytestreammaintainer.o modificationlist.o \
-	circularbuffer.o rbt.o bufferpool.o bufferpoolnode.o ctxelement.o
+GENERIC_OBJS += flowbuffer.o bytestreammaintainer.o modificationlist.o ctxelement.o \
+	circularbuffer.o rbt.o bufferpool.o bufferpoolnode.o
 endif
 endif
 
@@ -158,10 +158,26 @@ ifeq ($(USE_DPDK),yes)
 	include rte_parse.mk
 	CFLAGS := $(CFLAGS) @DPDK_CFLAGS@
 	CXXFLAGS := $(CXXFLAGS) @DPDK_CFLAGS@
-	EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
+	EXTRA_DRIVER_OBJS := dpdkdevice.o rte_cuckoo_hash_bloom.o rte_cuckoo_hash_lazy_bloom.o $(EXTRA_DRIVER_OBJS)
 	ifeq ($(shell [ ${HAVE_FLOW_API} -eq 1 ] && echo true),true)
 		EXTRA_DRIVER_OBJS := flowrulemanager.o flowrulecache.o flowruleparser.o $(EXTRA_DRIVER_OBJS)
 	endif
+endif
+
+
+
+USE_DPDK = @USE_DPDK@
+ifeq ($(USE_DPDK),yes)
+	RTE_SDK = @RTE_SDK@
+	RTE_TARGET = @RTE_TARGET@
+	RTE_VER_MAJOR = @RTE_VER_MAJOR@
+	RTE_VER_MINOR = @RTE_VER_MINOR@
+	RTE_VER_YEAR = @RTE_VER_YEAR@
+	RTE_VER_MONTH = @RTE_VER_MONTH@
+	RTE_USE_PKGCONFIG = @RTE_USE_PKGCONFIG@
+	CFLAGS := $(CFLAGS) @DPDK_CFLAGS@
+	CXXFLAGS := $(CXXFLAGS) @DPDK_CFLAGS@
+	EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
 endif
 
 
@@ -171,6 +187,10 @@ ifneq ($(shell $(ELEMENT_CHECKSUMCOMMAND)),$(ELEMENT_CHECKSUM))
 $(shell rm -f $(ELEMENTSCONF).conf $(ELEMENTSCONF).csmk)
 endif
 endif
+
+CUCKOOPP_PATH=../vendor/cuckoopp
+CPPFLAGS += -I ${CUCKOOPP_PATH}
+VPATH += :${CUCKOOPP_PATH}
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
@@ -183,10 +203,18 @@ ddeps: Makefile librte_parse.a libclick.a $(OBJS)
 $(DRIVER): ${PARSE_PATH}.sentinel ddeps
 	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a librte_parse.a $(LIBS),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+packetmill: packetmill.cc $(DRIVER)
+	$(call cxxcompile,-o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS) $(LLVM_OBJS)) libclick.a librte_parse.a packetmill.cc $(LIBS) $(LDFLAGS) $(LIBS_LLVM),CXXLINK)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 else
 $(DRIVER): Makefile libclick.a $(OBJS)
 	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a $(LIBS),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+packetmill: packetmill.cc $(DRIVER)
+	$(call cxxcompile,-o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS) $(LLVM_OBJS)) libclick.a packetmill.cc $(LIBS) $(LDFLAGS) $(LIBS_LLVM),CXXLINK)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+
+
 endif
 click-opt: Makefile click.ll libclick.a
 	$(call cxxlink,$(DL_LDFLAGS) click.ll libclick.a $(LIBS_IR),LINK)
@@ -202,11 +230,6 @@ libclick.a: Makefile $(LIBOBJS)
 
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-
-
-packetmill: packetmill.cc $(DRIVER)
-	$(call cxxcompile,-o $@ $(DL_LDFLAGS) $(subst click.o,,$(OBJS) $(LLVM_OBJS)) libclick.a packetmill.cc $(LIBS) $(LDFLAGS) $(LIBS_LLVM),CXXLINK)
-	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 
 elemlist:
 	@rm -f elements.conf elements.csmk

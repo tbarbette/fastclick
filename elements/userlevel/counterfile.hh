@@ -153,10 +153,10 @@ class CounterFile : public BatchElement { public:
     PacketBatch *simple_action_batch(PacketBatch* batch);
 #endif
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *) CLICK_COLD;
-    void cleanup() CLICK_COLD;
-    void add_handlers() CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+    int initialize(ErrorHandler *) override CLICK_COLD;
+    void cleanup(CleanupStage) override CLICK_COLD;
+    void add_handlers() override CLICK_COLD;
 
   protected:
 

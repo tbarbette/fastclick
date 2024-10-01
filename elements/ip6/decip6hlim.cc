@@ -30,16 +30,6 @@ DecIP6HLIM::~DecIP6HLIM()
 {
 }
 
-void
-DecIP6HLIM::drop_it(Packet *p)
-{
-  _drops++;
-  if (noutputs() == 2)
-    output(1).push(p);
-  else
-    p->kill();
-}
-
 inline Packet *
 DecIP6HLIM::simple_action(Packet *p_in)
 {
@@ -47,12 +37,21 @@ DecIP6HLIM::simple_action(Packet *p_in)
   const click_ip6 *ip_in = p_in->ip6_header();
 
   if (ip_in->ip6_hlim <= 1) {
-    drop_it(p_in);
+    _drops++;
+    if (noutputs() == 2) {
+#if HAVE_BATCH
+      if (in_batch_mode == BATCH_MODE_YES)
+        output(1).push_batch(PacketBatch::make_from_packet(p_in));
+      else
+#endif
+        output(1).push(p_in);
+    } else
+      p_in->kill();
     return 0;
   } else {
-     WritablePacket *p = p_in->uniqueify();
-     click_ip6 *ip = p->ip6_header();
-     ip->ip6_hlim--;
+    WritablePacket *p = p_in->uniqueify();
+    click_ip6 *ip = p->ip6_header();
+    ip->ip6_hlim--;
     return p;
   }
 }

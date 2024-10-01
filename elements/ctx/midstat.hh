@@ -29,11 +29,13 @@ struct mstat
 
 MidStat([CLOSECONNECTION])
 
-=s middlebox
+=s ctx
 
 Count the number of bytes and packets in sessions.
 
-This element is not context aware. So it would count dups etc. FlowCounter is.
+=d
+
+This element is not context aware. So it would count dups etc.
 
 =a FlowCounter
  */

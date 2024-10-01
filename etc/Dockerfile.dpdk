@@ -1,0 +1,53 @@
+FROM alpine:3.17
+
+ARG machine=corei7
+ARG source=0
+
+MAINTAINER tom.barbette@uclouvain.be
+
+WORKDIR /
+COPY ./deps.sh /
+RUN sh deps.sh #apt-get -qq clean && rm --recursive --force /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN mkdir -p /dpdk-install
+
+WORKDIR /dpdk
+
+ENV DPDK_VERSION 23.03
+#ENV RTE_SDK /dpdk/dpdk-${DPDK_VERSION}
+# To allow deleting DPDK source code we copy what is needed by --enable-flow-api in the dpdk-install folder and RTE_SDK points to the install folder even if it's supposed to be the source
+ENV RTE_SDK /dpdk-install
+ENV RTE_TARGET x86_64-native-linuxapp-gcc
+ENV PKG_CONFIG_PATH /dpdk-install/lib/pkgconfig/
+ENV LD_LIBRARY_PATH /dpdk-install/lib/:$LD_LIBRARY_PATH
+
+
+RUN  <<-EOF
+    if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" ]; then
+             wget http://dpdk.org/browse/dpdk/snapshot/dpdk-$DPDK_VERSION.tar.gz
+            tar -zxf dpdk-$DPDK_VERSION.tar.gz
+            cd dpdk-$DPDK_VERSION
+            pip install meson ninja && echo "Compiling DPDK for $machine"
+            meson setup -Dprefix=/dpdk-install/ -Dcpu_instruction_set=$machine build
+            cd build
+            ninja &&  ninja install && ninja clean
+            cd .. && cd ..
+      fi
+      mkdir -p ${RTE_SDK}/app/test-pmd/ ${RTE_SDK}/drivers/net/mlx5/ && cp -rf /dpdk/dpdk-${DPDK_VERSION}/app/test-pmd/* ${RTE_SDK}/app/test-pmd/ && cp -f /dpdk/dpdk-${DPDK_VERSION}/drivers/net/mlx5/mlx5_testpmd.h ${RTE_SDK}/drivers/net/mlx5/
+      if [ $source != "1" ] ; then rm -rf /dpdk ; fi
+      test -e $PKG_CONFIG_PATH/libdpdk.pc || ( cat /dpdk/dpdk-${DPDK_VERSION}/build/meson-logs/meson-log.txt && exit 1 )
+EOF
+
+WORKDIR /fastclick
+
+COPY ./ /fastclick/
+
+RUN echo "DPDK in $RTE_SDK" && ./configure --enable-dpdk --enable-intel-cpu --verbose --enable-select=poll CFLAGS="-O3 -march=$machine" CXXFLAGS="-std=c++11 -O3 -march=$machine"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-flow-atomic --disable-flow-dynamic --disable-ctx-global-timeout --disable-ctx --disable-task-stats --disable-cpu-load --disable-dpdk-softqueue --enable-flow-api --enable-portable-binary --prefix=/fastclick-install/ && \
+    make clean && make && make install && \
+    if [ $source != "1" ] ; then rm -rf /fastclick ; fi
+
+WORKDIR /fastclick-install
+
+RUN echo "Cleaning..." && rm -rf /tmp/* /var/tmp/*
+
+ENTRYPOINT ["/fastclick-install/bin/click"]

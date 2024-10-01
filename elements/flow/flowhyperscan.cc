@@ -268,7 +268,7 @@ void FlowHyperScan::push_flow(int port, FlowHyperScanState* flowdata, PacketBatc
             goto err;
         }
     } else if (unlikely(flowdata->found)) {
-        if (kill)
+        if (_kill)
             goto err;
         output_push_batch(0, batch);
         return;

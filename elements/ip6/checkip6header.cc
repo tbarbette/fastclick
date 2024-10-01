@@ -144,11 +144,11 @@ CheckIP6Header::simple_action(Packet *p)
 
     nxt = ip->ip6_nxt;
     if (_process_eh) {
-	auto fnt = [&nxt,&ip6_totallen,ip] (const uint8_t type, unsigned char* hdr) __attribute__((always_inline)) {
-            nxt = type;
-            ip6_totallen = hdr - (unsigned char*)ip;
-            return true;
-	};
+        auto fnt = [&nxt,&ip6_totallen,ip] (const uint8_t type, unsigned char* hdr) __attribute__((always_inline)) {
+                nxt = type;
+                ip6_totallen = hdr - (unsigned char*)ip;
+                return true;
+        };
         ip6_follow_eh<decltype(fnt)>(ip, (unsigned char*)p->end_data(), fnt);
     }
 
@@ -178,7 +178,7 @@ CheckIP6Header::read_handler(Element *e, void *thunk)
     switch (reinterpret_cast<uintptr_t>(thunk)) {
         case h_count: {
             PER_THREAD_SUM(uint64_t, count, c->_count);
-	    return String(count);
+            return String(count);
         }
         case h_drops: {
             return String(c->_drops);

@@ -22,6 +22,7 @@
 #include <click/error.hh>
 #include <click/glue.hh>
 #include <click/standard/alignmentinfo.hh>
+#include <click/router.hh>
 
 const unsigned FastUDPSource::NO_LIMIT;
 
@@ -31,6 +32,7 @@ FastUDPSource::FastUDPSource()
   _rate_limited = true;
   _first = _last = 0;
   _count = 0;
+  _stop = false;
 }
 
 FastUDPSource::~FastUDPSource()
@@ -45,19 +47,21 @@ FastUDPSource::configure(Vector<String> &conf, ErrorHandler *errh)
   _interval = 0;
   unsigned rate;
   int limit;
+  IPAddress defip = IPAddress("127.0.0.1");
   if (Args(conf, this, errh)
-      .read_mp("RATE", rate)
-      .read_mp("LIMIT", limit)
-      .read_mp("LENGTH", _len)
-      .read_mp("SRCETH", EtherAddressArg(), _ethh.ether_shost)
-      .read_mp("SRCIP", _sipaddr)
-      .read_mp("SPORT", IPPortArg(IP_PROTO_UDP), _sport)
-      .read_mp("DSTETH", EtherAddressArg(), _ethh.ether_dhost)
-      .read_mp("DSTIP", _dipaddr)
-      .read_mp("DPORT", IPPortArg(IP_PROTO_UDP), _dport)
-      .read_p("CHECKSUM", _cksum)
-      .read_p("INTERVAL", _interval)
-      .read_p("ACTIVE", _active)
+      .read_or_set_p("RATE", rate, 0)
+      .read_or_set_p("LIMIT", limit, NO_LIMIT)
+      .read_or_set_p("LENGTH", _len, 64)
+      .read_p("SRCETH", EtherAddressArg(), _ethh.ether_shost)
+      .read_or_set_p("SRCIP", _sipaddr, defip)
+      .read_or_set_p("SPORT", IPPortArg(IP_PROTO_UDP), _sport, 1000)
+      .read_p("DSTETH", EtherAddressArg(), _ethh.ether_dhost)
+      .read_or_set_p("DSTIP", _dipaddr, defip)
+      .read_or_set_p("DPORT", IPPortArg(IP_PROTO_UDP), _dport, 1000)
+      .read_or_set_p("CHECKSUM", _cksum, true)
+      .read_or_set_p("INTERVAL", _interval, 0)
+      .read_or_set_p("ACTIVE", _active, true)
+      .read_or_set("STOP", _stop, false)
       .complete() < 0)
     return -1;
   if (_len < 60) {
@@ -150,7 +154,13 @@ FastUDPSource::pull(int)
 {
   Packet *p = 0;
 
-  if (!_active || (_limit != NO_LIMIT && _count >= _limit)) return 0;
+  if (unlikely(!_active)) {
+      return 0;
+  } else if (unlikely((_limit != NO_LIMIT && _count >= _limit))) {
+    if (_stop)
+        router()->please_stop_driver();
+    return 0;
+  }
 
   if(_rate_limited){
     if (_rate.need_update(Timestamp::now())) {

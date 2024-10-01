@@ -15,6 +15,8 @@ int
 FlowPrint::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
+            .read_or_set_p("CONTINUE", _continue, false)
+            .read_or_set("PTR", _show_ptr, false)
 	 .complete() < 0)
 	return -1;
 
@@ -33,9 +35,15 @@ int FlowPrint::initialize(ErrorHandler *errh) {
 void FlowPrint::push_batch(int port, PacketBatch* batch) {
 	if (!fcb_stack){
 		click_chatter("%d packets not from a specific flow...",batch->count());
-		return;
+		if (_continue)
+	        output_push_batch(0,batch);
+
+        return;
 	}
-	click_chatter("%d packets from flow %lu. Count : %d.",batch->count(),fcb_stack->node_data[0], fcb_stack->count());
+    if (_show_ptr)
+	click_chatter("%p{element}: %d packets from flow %lu. Count : %d. Ptr %p", this, batch->count(),fcb_stack->node_data[0], fcb_stack->count(), fcb_stack);
+    else
+	click_chatter("%p{element}: %d packets from flow %lu. Count : %d", this, batch->count(),fcb_stack->node_data[0], fcb_stack->count());
 	output_push_batch(0,batch);
 }
 

@@ -630,10 +630,11 @@ SimpleSpinlock::acquire()
 #if CLICK_LINUXMODULE
     spin_lock(&_lock);
 #elif CLICK_MULTITHREAD_SPINLOCK
-    while (_lock.swap(1) != 0)
-	do {
-	    click_relax_fence();
-	} while (_lock != 0);
+    while (_lock.swap(1) != 0) {
+        do {
+            click_relax_fence();
+        } while (_lock != 0);
+    }
 #endif
 }
 

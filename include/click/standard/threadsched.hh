@@ -9,7 +9,7 @@ CLICK_DECLS
 
 class ThreadSched { public:
 
-    enum { THREAD_QUIESCENT = -1, THREAD_UNKNOWN = -1000 };
+    enum { THREAD_QUIESCENT = -1, THREAD_UNKNOWN = -1000, THREAD_AUTO = -1001 };
 
     ThreadSched()			{ }
     virtual ~ThreadSched()		{ }

@@ -43,7 +43,10 @@ Loop over the file TIMES time. Default is 1: read one the whole file. -1 to loop
 A handler to call on each loop, e.g. a Script to print a message. Default is disabled.
 
 =item DPDK
-Force the generation of DPDK packets
+Force the generation of DPDK packets. Defaults to false.
+
+=item ACTIVE.
+Boolean. The element is not reading packets if false. To be used with the active handler. Default true.
 
 =a ToMinDump, FromIPSummaryDump
 
@@ -105,11 +108,10 @@ class FromMinDump : public BatchElement{ public:
     Timer _timer;
     String _filename;
     FILE * _f;
-    
     int _iterations;
     uint8_t * _file_data;
-    uint64_t _file_size;
-    uint64_t _file_pos;
+    size_t _file_size;
+    size_t _file_pos;
 
     int _minor_version;
     unsigned _burst;

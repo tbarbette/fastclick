@@ -12,6 +12,9 @@ test ! $NODPDKTEST
 $VALGRIND click --dpdk --no-huge --no-pci -m 128MB -- CONFIG
 
 %file CONFIG
+
+DPDKInfo(4095)
+
 FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
 	-> CheckIPHeader(VERBOSE true)
 	-> CheckTCPHeader(VERBOSE true)

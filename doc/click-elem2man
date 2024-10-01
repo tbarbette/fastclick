@@ -72,6 +72,8 @@ my(@section_headers) =
       'classification'          => 'Basic Classification and Selection',
       'basictransfer'           => 'Basic Packet Transfer',
       'counters'                => 'Counters',
+      'ctx'                     => 'Context Sybsystem',
+      'flow'                    => 'Flow Subsystem',
       'timestamps'              => 'Timestamps',
       'basicmod'                => 'Basic Packet Modification',
       'storage'                 => 'Packet Storage',
@@ -103,6 +105,7 @@ my(@section_headers) =
       'debugging'               => 'Debugging',
       'control'                 => 'Control',
       'threads'                 => 'Thread Management',
+      'tunnel'                  => 'Tunneling',
       'test'                    => 'Regression Tests'
       );
 my(%section_headers);
@@ -115,8 +118,10 @@ my(%default_packages) =
       'app'                     => 'app (core)',
       'aqm'                     => 'aqm (core)',
       'bsdmodule'               => 'bsdmodule (core)',
+      'ctx'                     => 'ctx (core)',
       'ethernet'                => 'ethernet (core)',
       'etherswitch'             => 'etherswitch (core)',
+      'flow'                    => 'flow (core)',
       'grid'                    => 'grid (core)',
       'icmp'                    => 'icmp (core)',
       'ip'                      => 'ip (core)',
@@ -129,6 +134,7 @@ my(%default_packages) =
       'research'                => 'research (core)',
       'simple'                  => 'simple (core)',
       'standard'                => 'standard (core)',
+      'tunnel'                  => 'tunnel (core)',
       'tcpudp'                  => 'tcpudp (core)',
       'test'                    => 'test (core)',
       'userlevel'               => 'userlevel (core)',
@@ -1326,13 +1332,11 @@ sub process_comment ($$$) {
     # close output file & make links if appropriate
     if ($filename_func) {
         close OUT;
-	$zcat = "gzcat";
-	eval
-	{
-	  require File::Which;
-	  $zcat = File::Which::which("gzcat") ? "gzcat" : "zcat";
-	};
-
+        sub check_exists_command {
+           my $check = `sh -c 'command -v $_[0]'`;
+            return $check;
+        }
+        $zcat = check_exists_command("gzcat") ? "gzcat" : "zcat";
         if ($gzip ? open(INX, "-|", $zcat, $main_outname) : open(INX, "<", $main_outname)) {
             $gzip ? open(OUTX, "-|", $zcat, $main_outname . "~") : open(OUTX, "<", $main_outname . "~");
             local($/) = undef;

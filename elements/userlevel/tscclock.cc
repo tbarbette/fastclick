@@ -40,7 +40,13 @@ struct UserClockSource tsc_source {
 };
 
 TSCClock::TSCClock() :
-_verbose(1), _install(true), _nowait(false), _allow_offset(false),_correction_timer(this), _sync_timers(0), _base(0)
+    _verbose(1),
+
+#if HAVE_USER_TIMING
+    _install(true),
+#endif
+    _nowait(false),
+    _allow_offset(false),_correction_timer(this), _sync_timers(0), _base(0)
 {
     _source = tsc_source;
     _source_thunk = this;
@@ -58,19 +64,26 @@ TSCClock::configure(Vector<String> &conf, ErrorHandler *errh)
 #if HAVE_DPDK
     _allow_offset = true;
 #endif
+    bool install = true;
     Element* basee = 0;
     Element* sourcee = 0;
     if (Args(conf, this, errh)
             .read("VERBOSE", _verbose)
-            .read("INSTALL", _install)
-            .read("NOWAIT", _nowait)
+            .read("INSTALL", install)
+           .read("NOWAIT", _nowait)
             .read("BASE",basee)
             .read("SOURCE", sourcee)
             .read("CONVERT_STEADY", _convert_steady)
             .read("READY_CALL", HandlerCallArg(HandlerCall::writable), _ready_h)
             .complete() < 0)
         return -1;
-
+#if HAVE_USER_TIMING
+        _install = install;
+#else
+        if (install) {
+            return errh->error("Cannot install if Click is not compiled with --enable-user-timing");
+        }
+#endif
     if (basee)
         if (!(_base = static_cast<UserClock*>(basee->cast("UserClock"))))
             return errh->error("%p{element} is not a UserClock",basee);
@@ -84,8 +97,10 @@ TSCClock::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
 
+#if HAVE_USER_TIMING
     if (_nowait && !_install)
         return errh->error("You want to install without waiting but do not want to install?!");
+#endif
     return 0;
 }
 
@@ -174,13 +189,17 @@ TSCClock::initialize(ErrorHandler* errh) {
     _correction_timer.initialize(this);
     _correction_timer.schedule_now();
 
+#if HAVE_USER_TIMING
     if (_install && _nowait) {
         initialize_clock();
+
         if (_verbose)
             click_chatter("Installing TSC clock right away");
 
         Timestamp::set_clock(&now,(void*)this);
     }
+
+#endif
 
     return 0;
 }
@@ -272,8 +291,11 @@ bool TSCClock::accumulate_tick(Timer* t) {
         if (nt == home_thread()->thread_id()) {
             if (_verbose)
                 click_chatter("Click tasks are too heavy and the TSC clock cannot run at least once every %dmsec, the TSC clock is deactivated.");
+
+#if HAVE_USER_TIMING
             if (_install)
                 Timestamp::set_clock(0,0);
+#endif
             return false;
         }
         t->move_thread(nt);
@@ -437,10 +459,14 @@ void TSCClock::run_timer(Timer* timer) {
             if (_synchronize_ok == (unsigned)master()->nthreads()) {
                 //Start using the clock !
                 _phase = RUNNING;
+
                 if (_verbose)
                     click_chatter("Switching to TSC clock");
+
+#if HAVE_USER_TIMING
                 if (_install && !_nowait)
                     Timestamp::set_clock(&now,(void*)this);
+#endif
                 if (_ready_h) {
                     (void) _ready_h.call_write();
                 }
@@ -515,6 +541,5 @@ void TSCClock::add_handlers() {
 
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(usertiming)
 EXPORT_ELEMENT(TSCClock)
 ELEMENT_MT_SAFE(TSCClock)

@@ -311,6 +311,7 @@ public:
 
     class NodeIteratorBase {
     public:
+        virtual ~NodeIteratorBase() = default;
         virtual FlowNodePtr* next() = 0;
     };
 
@@ -810,9 +811,8 @@ class FlowNodeDummy : public FlowNode {
 
     class DummyIterator : public NodeIteratorBase{
         FlowNode* _node;
-        int cur;
     public:
-        DummyIterator(FlowNode* n) : cur(0) {
+        DummyIterator(FlowNode* n) {
             _node = n;
         }
 
