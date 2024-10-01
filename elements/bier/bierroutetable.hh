@@ -9,6 +9,7 @@ CLICK_DECLS
 class BierRouteTable : public BatchElement {
   public:
     void* cast(const char*) override;
+    const char *port_count() const override { return PORTS_0_0; }
 
     virtual int add_route(bfrid, bitstring, IP6Address, ErrorHandler*);
     virtual String dump_routes();
