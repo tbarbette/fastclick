@@ -254,7 +254,7 @@ AC_CHECK_HEADERS([hs/hs.h], [ac_have_hyperscan_h=yes], [ac_have_hyperscan_h=no])
 if test "x$ac_have_hyperscan$ac_have_hyperscan_h" = "xyesyes"; then
     have_hyperscan=yes
     LIBS="$LIBS -lhs"
-    AC_DEFINE([HAVE_HYPERSCAN])
+    AC_DEFINE([HAVE_HYPERSCAN],[1],[Have the hyperscan library for regex matching.])
 else
     have_hyperscan=no
 fi
@@ -262,7 +262,7 @@ fi
 AC_SEARCH_LIBS([PAPI_start_counters], [papi], [ac_have_papi=yes], [ac_have_papi=no])
 AC_CHECK_HEADERS([papi.h], [ac_have_papi_h=yes], [ac_have_papi_h=no])
 if test "x$ac_have_papi_h$ac_have_papi" = "xyesyes"; then
-    AC_DEFINE([HAVE_PAPI])
+    AC_DEFINE([HAVE_PAPI],[1],[Have the libpapi library for performance counters.])
     have_papi=yes
 else
     have_papi=no
@@ -348,7 +348,7 @@ AC_ARG_ENABLE([flow-api], [AS_HELP_STRING([    --enable-flow-api], [Support for 
 
 AC_ARG_ENABLE([click-pool],
     [AS_HELP_STRING([    --disable-click-pool], [allow usage of Click Packet pool. It will still only be effectively enabled in specific (but most) cases, see packet.hh])],
-    [:], [enable_click_pool=yes;AC_DEFINE(ALLOW_CLICK_PACKET_POOL)])
+    [:], [enable_click_pool=yes;AC_DEFINE(HAVE_ALLOW_CLICK_PACKET_POOL,[1],[Define if Click packet pool can be used if others flags allow it (see packet.hh).])])
 
 
 AC_ARG_ENABLE([pool-inlining],
@@ -780,9 +780,15 @@ dnl
 
 AC_CACHE_CHECK([whether we are compiling for Linux], [ac_cv_under_linux],
     [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[#ifndef __linux__
-#error "fuckers! fuckers!"
+#error "unsupported"
 #endif
 return 0;]])], ac_cv_under_linux=yes, ac_cv_under_linux=no)])
+
+AC_CACHE_CHECK([whether we are compiling for Apple Mach], [ac_cv_under_mach],
+    [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[#if !(defined(__MACH__) && defined(__APPLE__))
+#error "unsupported"
+#endif
+return 0;]])], ac_cv_under_mach=yes, ac_cv_under_mach=no)])
 
 
 dnl
@@ -1234,6 +1240,12 @@ if test $ac_cv_linux_sb_lock = yes; then
     AC_DEFINE(HAVE_LINUX_SB_LOCK)
 fi
 
+AC_CHECK_HEADERS(asm/ioctl.h, have_asm_ioctl_h=yes, have_asm_ioctl_h=no)
+if test "$have_asm_ioctl_h" = yes; then
+    AC_DEFINE([HAVE_ASM_IOCTL_H])
+fi
+
+
 AC_CACHE_CHECK([for dev_ioctl kernel symbol], ac_cv_linux_dev_ioctl,
 [if grep "__ksymtab_dev_ioctl" $linux_system_map >/dev/null 2>&1; then
     ac_cv_linux_dev_ioctl=yes
@@ -1514,6 +1526,29 @@ else
 fi
 
 AC_COMPILE_IFELSE([
+#ifndef __SSE2__
+#error
+#endif
+         ], [cpu_supports_sse2="yes"], [cpu_supports_sse2="no"])
+AC_ARG_ENABLE([sse2],
+        AS_HELP_STRING([--disable-sse2],
+                   [Do not check whether SSE2 is enabled]),
+          [check_sse2=no],
+          [check_sse2=yes])
+
+AC_MSG_CHECKING([if SSE2 should be used])
+if test "x$cpu_supports_sse2$check_sse2" = "xyesyes"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([HAVE_SSE2],1)
+    save_cflags="$CFLAGS"
+    CFLAGS="$save_cflags -msse2"
+    save_cxxflags="$CXXFLAGS"
+    CXXFLAGS="$save_cxxflags -msse2"
+else
+    AC_MSG_RESULT([no])
+fi
+
+AC_COMPILE_IFELSE([
 #ifndef __SSE4_2__
 #error
 #endif
@@ -1596,7 +1631,7 @@ dnl
 dnl kernel interfaces
 dnl
 
-AC_CHECK_HEADERS_ONCE([ifaddrs.h linux/if_tun.h linux/if_packet.h net/if_dl.h net/if_tap.h net/if_tun.h net/if_types.h net/bpf.h netpacket/packet.h])
+AC_CHECK_HEADERS_ONCE([ifaddrs.h linux/ethtool.h linux/sockios.h linux/if_tun.h linux/if_packet.h linux/netlink.h net/if_dl.h net/if_tap.h net/if_tun.h net/if_types.h net/bpf.h netpacket/packet.h])
 
 
 dnl
@@ -1879,10 +1914,6 @@ AC_ARG_WITH(proper, [[  --with-proper[=PREFIX]  use PlanetLab Proper library (op
   [properprefix=$withval; if test -z "$withval" -o "$withval" = yes; then properprefix=; fi],
   [properprefix=no; explicit_proper=no])
 if test "$properprefix" != no; then
-    dnl Proper requires libcurl
-    dnl AC_CHECK_HEADER(curl/curl.h, have_curl_h=yes, have_curl_h=no)
-    dnl AC_CHECK_LIB(curl, curl_easy_init)
-
     saveflags="$CPPFLAGS"; test -n "$properprefix" && CPPFLAGS="$CPPFLAGS -I$properprefix/include"
     AC_CHECK_HEADER(prop.h, have_prop_h=yes, have_prop_h=no)
     CPPFLAGS="$saveflags"
@@ -2489,7 +2520,6 @@ if test "x$enable_minios" = xyes; then
     AC_DEFINE(HAVE_MINIOS_DRIVER)
     HAVE_MINIOS_DRIVER=1
 fi
-
 
 dnl check tools
 

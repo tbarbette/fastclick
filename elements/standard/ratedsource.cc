@@ -49,8 +49,8 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
 
     String data =
       "Random bullshit in a packet, at least 64 bytes long. Well, now it is.";
-    uint64_t rate = 10;
-    uint64_t bandwidth = 0;
+    unsigned rate = 10;
+    unsigned bandwidth = 0;
     int limit = -1;
     int datasize = -1;
     bool active = true, stop = false;
@@ -179,7 +179,7 @@ RatedSource::run_task(Task *)
 
             count++;
         } else {
-            _timer.schedule_after(Timestamp::make_usec(_tb.time_until_contains(_batch_size)));
+            _timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(_batch_size)));
             return false;
         }
     }
@@ -194,7 +194,7 @@ RatedSource::run_task(Task *)
     } else {
         if (_end_h && _limit >= 0 && _count >= (ucounter_t) _limit)
             (void) _end_h->call_write();
-        _timer.schedule_after(Timestamp::make_usec(_tb.time_until_contains(1)));
+        _timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(1)));
 
         return false;
     }
@@ -209,7 +209,7 @@ RatedSource::run_task(Task *)
     } else {
         if (_end_h && _limit >= 0 && _count >= (ucounter_t) _limit)
             (void) _end_h->call_write();
-        _timer.schedule_after(Timestamp::make_usec(_tb.time_until_contains(1)));
+        _timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(1)));
 
         return false;
     }

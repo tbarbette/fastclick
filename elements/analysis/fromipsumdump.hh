@@ -6,6 +6,9 @@
 #include <click/timer.hh>
 #include <click/notifier.hh>
 #include <click/ipflowid.hh>
+#if HAVE_IP6
+#include <click/ip6flowid.hh>
+#endif
 #include <click/fromfile.hh>
 #include "ipsumdumpinfo.hh"
 CLICK_DECLS
@@ -189,15 +192,20 @@ class FromIPSummaryDump : public BatchElement, public IPSummaryDumpInfo { public
     uint16_t _default_proto;
     uint32_t _sampling_prob;
     IPFlowID _flowid;
+    #if HAVE_IP6
+    IP6FlowID _flowid6;
+    #endif
     uint32_t _aggregate;
 
     bool _stop : 1;
     bool _format_complaint : 1;
     bool _zero : 1;
+    bool _ipv6 : 1;
     bool _checksum : 1;
     bool _active : 1;
     bool _multipacket : 1;
     bool _have_flowid : 1;
+    bool _have_flowid6 : 1;
     bool _have_aggregate : 1;
     bool _binary : 1;
     bool _timing : 1;
@@ -219,6 +227,9 @@ class FromIPSummaryDump : public BatchElement, public IPSummaryDumpInfo { public
 
     int _minor_version;
     IPFlowID _given_flowid;
+    #if HAVE_IP6
+    IP6FlowID _given_flowid6;
+    #endif
 
     per_thread<Vector<const unsigned char *>> _args;
     unsigned _burst;
@@ -229,6 +240,9 @@ class FromIPSummaryDump : public BatchElement, public IPSummaryDumpInfo { public
     void bang_data(const String &, ErrorHandler *);
     void bang_proto(const String &line, const char *type, ErrorHandler *errh);
     void bang_flowid(const String &, ErrorHandler *);
+    #if HAVE_IP6
+    void bang_flowid6(const String &, ErrorHandler *);
+    #endif
     void bang_aggregate(const String &, ErrorHandler *);
     void bang_binary(const String &, ErrorHandler *);
     void check_defaults();

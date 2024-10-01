@@ -86,8 +86,24 @@ static void link_inject(PacketOdesc& d, const FieldReader *f)
 	break;
     case T_ETH_TYPE:
 	d.p->ether_header()->ether_type = htons(d.v);
-	if (d.v != ETHERTYPE_IP && d.v != ETHERTYPE_IP6)
-	    d.is_ip = false;
+
+	if (d.v == ETHERTYPE_IP) {
+	    d.is_ip = true;
+        #if HAVE_IP6
+        d.is_ip6 = false;
+        #endif
+    } else if (d.v == ETHERTYPE_IP6) {
+        d.is_ip = false;
+        #if HAVE_IP6
+        d.is_ip6 = true;
+        #endif
+    } else {
+        d.is_ip = false;
+        #if HAVE_IP6
+        d.is_ip6 = false;
+        #endif
+    }
+
 	break;
     }
 }

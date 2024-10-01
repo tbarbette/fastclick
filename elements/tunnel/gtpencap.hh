@@ -12,7 +12,7 @@ GTPEncap(TEID eid)
 
 encapsulates GTP packets
 
-=s gtp
+=s tunnel
 
 =d
 

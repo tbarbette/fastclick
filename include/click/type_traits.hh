@@ -58,7 +58,9 @@ struct conditional<false, T, F> {
 
   has_trivial_copy<T> is equivalent to true_type if T has a trivial
   copy constructor, false_type if it does not. */
-#if HAVE___HAS_TRIVIAL_COPY
+#if HAVE___IS_TRIVIALLY_COPYABLE
+template <typename T> struct has_trivial_copy : public integral_constant<bool, __is_trivially_copyable(T)> {};
+#elif HAVE___HAS_TRIVIAL_COPY
 template <typename T> struct has_trivial_copy : public integral_constant<bool, __has_trivial_copy(T)> {};
 #else
 template <typename T> struct has_trivial_copy : public false_type {};

@@ -71,6 +71,9 @@
 /* Define if you have the __has_trivial_copy compiler intrinsic. */
 #undef HAVE___HAS_TRIVIAL_COPY
 
+/* Define if you have the __is_trivially_copyable compiler intrinsic. */
+#undef HAVE___IS_TRIVIALLY_COPYABLE
+
 /* Define if you have the __sync_synchronize function. */
 #undef HAVE___SYNC_SYNCHRONIZE
 
@@ -199,6 +202,9 @@
 
 /* The size of a `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
+
+/* Define if SSE2 instruction is available. */
+#undef HAVE_SSE2
 
 /* Define if SSE4.2 instruction is available. */
 #undef HAVE_SSE42

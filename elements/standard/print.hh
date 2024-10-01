@@ -90,7 +90,7 @@ class Print : public BatchElement { public:
     bool _active;
     bool _timestamp : 1;
     bool _headroom : 1;
-#ifdef CLICK_LINUXMODULE
+#if defined(CLICK_LINUXMODULE) || defined(CLICK_USERLEVEL)
     bool _cpu : 1;
 #endif
     bool _print_anno;

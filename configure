@@ -938,6 +938,7 @@ enable_hash_allocator_poisoning
 enable_portable_binary
 enable_intel_cpu
 enable_avx2
+enable_sse2
 enable_sse42
 enable_atomic_builtins
 with_numa
@@ -1710,6 +1711,7 @@ Optional Features:
                           unportable binaries
   --enable-intel-cpu      enable Intel-specific machine instructions
   --disable-avx2          Do not check whether AVX2 is enabled
+  --disable-sse2          Do not check whether SSE2 is enabled
   --disable-sse42         Do not check whether SSE4.2 is enabled
   --enable-atomic-builtins
                           Use GCC builtins atomic functions instead of Click
@@ -3680,8 +3682,11 @@ as_fn_append ac_header_c_list " sys/mman.h sys_mman_h HAVE_SYS_MMAN_H"
 as_fn_append ac_header_c_list " sys/param.h sys_param_h HAVE_SYS_PARAM_H"
 as_fn_append ac_func_c_list " getpagesize HAVE_GETPAGESIZE"
 as_fn_append ac_header_cxx_list " ifaddrs.h ifaddrs_h HAVE_IFADDRS_H"
+as_fn_append ac_header_cxx_list " linux/ethtool.h linux_ethtool_h HAVE_LINUX_ETHTOOL_H"
+as_fn_append ac_header_cxx_list " linux/sockios.h linux_sockios_h HAVE_LINUX_SOCKIOS_H"
 as_fn_append ac_header_cxx_list " linux/if_tun.h linux_if_tun_h HAVE_LINUX_IF_TUN_H"
 as_fn_append ac_header_cxx_list " linux/if_packet.h linux_if_packet_h HAVE_LINUX_IF_PACKET_H"
+as_fn_append ac_header_cxx_list " linux/netlink.h linux_netlink_h HAVE_LINUX_NETLINK_H"
 as_fn_append ac_header_cxx_list " net/if_dl.h net_if_dl_h HAVE_NET_IF_DL_H"
 as_fn_append ac_header_cxx_list " net/if_tap.h net_if_tap_h HAVE_NET_IF_TAP_H"
 as_fn_append ac_header_cxx_list " net/if_tun.h net_if_tun_h HAVE_NET_IF_TUN_H"
@@ -8030,7 +8035,8 @@ done
 if test "x$ac_have_hyperscan$ac_have_hyperscan_h" = "xyesyes"; then
     have_hyperscan=yes
     LIBS="$LIBS -lhs"
-    printf "%s\n" "#define HAVE_HYPERSCAN 1" >>confdefs.h
+
+printf "%s\n" "#define HAVE_HYPERSCAN 1" >>confdefs.h
 
 else
     have_hyperscan=no
@@ -8109,7 +8115,8 @@ fi
 
 done
 if test "x$ac_have_papi_h$ac_have_papi" = "xyesyes"; then
-    printf "%s\n" "#define HAVE_PAPI 1" >>confdefs.h
+
+printf "%s\n" "#define HAVE_PAPI 1" >>confdefs.h
 
     have_papi=yes
 else
@@ -8308,7 +8315,8 @@ if test ${enable_click_pool+y}
 then :
   enableval=$enable_click_pool; :
 else $as_nop
-  enable_click_pool=yes;printf "%s\n" "#define ALLOW_CLICK_PACKET_POOL 1" >>confdefs.h
+  enable_click_pool=yes;
+printf "%s\n" "#define HAVE_ALLOW_CLICK_PACKET_POOL 1" >>confdefs.h
 
 fi
 
@@ -9124,7 +9132,7 @@ int
 main (void)
 {
 #ifndef __linux__
-#error "fuckers! fuckers!"
+#error "unsupported"
 #endif
 return 0;
   ;
@@ -9141,6 +9149,37 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_under_linux" >&5
 printf "%s\n" "$ac_cv_under_linux" >&6; }
+
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether we are compiling for Apple Mach" >&5
+printf %s "checking whether we are compiling for Apple Mach... " >&6; }
+if test ${ac_cv_under_mach+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main (void)
+{
+#if !(defined(__MACH__) && defined(__APPLE__))
+#error "unsupported"
+#endif
+return 0;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"
+then :
+  ac_cv_under_mach=yes
+else $as_nop
+  ac_cv_under_mach=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_under_mach" >&5
+printf "%s\n" "$ac_cv_under_mach" >&6; }
 
 
 
@@ -10551,6 +10590,39 @@ printf "%s\n" "$ac_cv_have___sync_synchronize_args" >&6; }
     if test $ac_cv_have___sync_synchronize_args = yes; then
 
 printf "%s\n" "#define HAVE___SYNC_SYNCHRONIZE_ARGUMENTS 1" >>confdefs.h
+
+    fi
+
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for __is_trivially_copyable" >&5
+printf %s "checking for __is_trivially_copyable... " >&6; }
+if test ${ac_cv_have___is_trivially_copyable+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main (void)
+{
+long x = 1; if (__is_trivially_copyable(long)) x = 0;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"
+then :
+  ac_cv_have___is_trivially_copyable=yes
+else $as_nop
+  ac_cv_have___is_trivially_copyable=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_have___is_trivially_copyable" >&5
+printf "%s\n" "$ac_cv_have___is_trivially_copyable" >&6; }
+    if test $ac_cv_have___is_trivially_copyable = yes; then
+
+printf "%s\n" "#define HAVE___IS_TRIVIALLY_COPYABLE 1" >>confdefs.h
 
     fi
 
@@ -14845,6 +14917,24 @@ if test $ac_cv_linux_sb_lock = yes; then
 
 fi
 
+       for ac_header in asm/ioctl.h
+do :
+  ac_fn_cxx_check_header_compile "$LINENO" "asm/ioctl.h" "ac_cv_header_asm_ioctl_h" "$ac_includes_default"
+if test "x$ac_cv_header_asm_ioctl_h" = xyes
+then :
+  printf "%s\n" "#define HAVE_ASM_IOCTL_H 1" >>confdefs.h
+ have_asm_ioctl_h=yes
+else $as_nop
+  have_asm_ioctl_h=no
+fi
+
+done
+if test "$have_asm_ioctl_h" = yes; then
+    printf "%s\n" "#define HAVE_ASM_IOCTL_H 1" >>confdefs.h
+
+fi
+
+
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for dev_ioctl kernel symbol" >&5
 printf %s "checking for dev_ioctl kernel symbol... " >&6; }
 if test ${ac_cv_linux_dev_ioctl+y}
@@ -15490,6 +15580,46 @@ fi
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
+#ifndef __SSE2__
+#error
+#endif
+
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"
+then :
+  cpu_supports_sse2="yes"
+else $as_nop
+  cpu_supports_sse2="no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+# Check whether --enable-sse2 was given.
+if test ${enable_sse2+y}
+then :
+  enableval=$enable_sse2; check_sse2=no
+else $as_nop
+  check_sse2=yes
+fi
+
+
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking if SSE2 should be used" >&5
+printf %s "checking if SSE2 should be used... " >&6; }
+if test "x$cpu_supports_sse2$check_sse2" = "xyesyes"; then
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+    printf "%s\n" "#define HAVE_SSE2 1" >>confdefs.h
+
+    save_cflags="$CFLAGS"
+    CFLAGS="$save_cflags -msse2"
+    save_cxxflags="$CXXFLAGS"
+    CXXFLAGS="$save_cxxflags -msse2"
+else
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+fi
+
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
 #ifndef __SSE4_2__
 #error
 #endif
@@ -15578,6 +15708,9 @@ for i in bin clickdata data dataroot include lib sbin; do
     shell_expand ${i}dir
     shell_mkbuild ${i}dir
 done
+
+
+
 
 
 
@@ -16438,7 +16571,6 @@ else $as_nop
 fi
 
 if test "$properprefix" != no; then
-
     saveflags="$CPPFLAGS"; test -n "$properprefix" && CPPFLAGS="$CPPFLAGS -I$properprefix/include"
     ac_fn_c_check_header_compile "$LINENO" "prop.h" "ac_cv_header_prop_h" "$ac_includes_default"
 if test "x$ac_cv_header_prop_h" = xyes
@@ -18508,7 +18640,6 @@ if test "x$enable_minios" = xyes; then
 
     HAVE_MINIOS_DRIVER=1
 fi
-
 
 
 if test "x$enable_tools" != xno; then

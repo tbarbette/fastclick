@@ -69,11 +69,11 @@ class FlowMinLoadSwitch : public BatchElement {
                     return _id;
                 }
 
-                uint32_t size() {
+                uint32_t size() const {
                     return _size_bytes;
                 }
 
-                const uint8_t output_port() {
+                uint8_t output_port() const {
                     return _out_port;
                 }
 

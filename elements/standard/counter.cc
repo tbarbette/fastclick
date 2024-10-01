@@ -68,7 +68,6 @@ CounterBase::configure(Vector<String> &conf, ErrorHandler *errh)
             errh->warning("NO_RATE cannot be set when handlers are used. It will be ignored");
     }
 
-
     if (count_call) {
         IntArg ia;
         if (!ia.parse_saturating(cp_shift_spacevec(count_call), _count_trigger))

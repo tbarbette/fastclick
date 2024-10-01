@@ -21,7 +21,18 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <stdlib.h>
+#if defined(__aarch64__) && defined(__mach__)
+static __inline uint32_t __bswap_32(uint32_t __x)
+{
+	return __x>>24 | __x>>8&0xff00 | __x<<8&0xff0000 | __x<<24;
+}
+static __inline uint64_t __bswap_64(uint64_t __x)
+{
+	return __bswap_32(__x)+0ULL<<32 | __bswap_32(__x>>32);
+}
+#else
 #include <byteswap.h>
+#endif
 #include <regex>
 #include <click/flow/flow.hh>
 #include <click/flow/flowelement.hh>

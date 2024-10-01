@@ -30,7 +30,7 @@ TokenBucketTest::TokenBucketTest()
 int
 TokenBucketTest::initialize(ErrorHandler *errh)
 {
-    TokenBucketX<TokenBucketJiffyParameters<unsigned long long> > tb;
+    TokenBucket tb;
     tb.assign(1024, 2048);
     CHECK(tb.rate() >= 1022 && tb.rate() <= 1026);
     CHECK(tb.capacity() >= 2046 && tb.capacity() <= 2050);

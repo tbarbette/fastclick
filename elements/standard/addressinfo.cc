@@ -46,7 +46,7 @@
 #  endif
 #  if HAVE_NETPACKET_PACKET_H && !HAVE_LINUX_IF_PACKET_H
 #   include <netpacket/packet.h>
-#  else
+#  elif HAVE_LINUX_IF_PACKET_H
 #   include <linux/if_packet.h>
 #  endif
 #  include <ifaddrs.h>

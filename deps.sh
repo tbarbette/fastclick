@@ -2,7 +2,7 @@
 # This installs dependencies for both DPDK and FastClick, support for apt-get(Debian, Ubuntu, ...) and apk (Alpine) for now. PRs are welcome.
 
 opt=0
-if [ $1 = "--optional" ] ; then
+if [ "$1" = "--optional" ] ; then
     opt=1
 fi
 

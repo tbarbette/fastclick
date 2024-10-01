@@ -216,9 +216,10 @@ class FromDevice : public BatchElement, public EthernetDevice { public:
 
     void kernel_drops(bool& known, int& max_drops) const;
 
+#if HAVE_LINUX_ETHTOOL_H
     int dev_set_rss_reta(unsigned *reta, unsigned reta_sz);
     int dev_get_rss_reta_size();
-
+#endif
 
   private:
 

@@ -75,6 +75,8 @@ class alignas(CLICK_CACHE_LINE_SIZE) RouterThread { public:
 
 #if HAVE_CLICK_LOAD
     float load();
+    int load_unscaled();
+    int load_max_scale();
     unsigned long long load_cycles();
     unsigned long long useful_kcycles();
 #endif

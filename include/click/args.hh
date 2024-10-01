@@ -1376,7 +1376,7 @@ class UnitArg { public:
 
   Handles suffixes such as "Gbps", "k", etc. */
 class BandwidthArg : public NumArg { public:
-    bool parse(const String &str, uint64_t &result, const ArgContext & = blank_args);
+    bool parse(const String &str, uint32_t &result, const ArgContext & = blank_args);
     static String unparse(uint32_t x);
     int status;
 };

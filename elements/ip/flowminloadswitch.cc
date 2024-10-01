@@ -75,7 +75,7 @@ FlowMinLoadSwitch::round_robin()
 }
 
 int
-FlowMinLoadSwitch::process(int port, Packet *p)
+FlowMinLoadSwitch::process(int, Packet *p)
 {
     // Create a flow signature for this packet
     IPFlowID id(p);

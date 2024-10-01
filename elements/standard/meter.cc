@@ -29,12 +29,12 @@ Meter::push(int, Packet *p)
 {
   _rate.update(1);		// packets, not bytes
 
-  uint64_t r = _rate.scaled_average();
+  unsigned r = _rate.scaled_average();
   if (_nmeters < 2) {
     int n = (r >= _meter1);
     output(n).push(p);
   } else {
-    uint64_t *meters = _meters;
+    unsigned *meters = _meters;
     int nmeters = _nmeters;
     for (int i = 0; i < nmeters; i++)
       if (r < meters[i]) {

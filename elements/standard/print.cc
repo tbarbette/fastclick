@@ -39,7 +39,7 @@ int
 Print::configure(Vector<String> &conf, ErrorHandler* errh)
 {
   bool timestamp = false;
-#ifdef CLICK_LINUXMODULE
+#if defined(CLICK_LINUXMODULE) || defined(CLICK_USERLEVEL)
   bool print_cpu = false;
 #endif
   bool print_anno = false, headroom = false, bcontents;
@@ -57,7 +57,7 @@ Print::configure(Vector<String> &conf, ErrorHandler* errh)
 	.read("PRINTANNO", print_anno)
 	.read("ACTIVE", _active)
 	.read("HEADROOM", headroom)
-#if CLICK_LINUXMODULE
+#if defined(CLICK_LINUXMODULE) || defined(CLICK_USERLEVEL)
 	.read("CPU", print_cpu)
 #endif
 	.complete() < 0)
@@ -79,7 +79,7 @@ Print::configure(Vector<String> &conf, ErrorHandler* errh)
   _timestamp = timestamp;
   _headroom = headroom;
   _print_anno = print_anno;
-#ifdef CLICK_LINUXMODULE
+#if defined(CLICK_LINUXMODULE) || defined(CLICK_USERLEVEL)
   _cpu = print_cpu;
 #endif
   return 0;
@@ -115,6 +115,12 @@ Print::rmaction(Packet* p) {
 	click_processor_t my_cpu = click_get_processor();
 	sa << '(' << my_cpu << ')';
 	click_put_processor();
+	sep = ": ";
+    }
+#elif CLICK_USERLEVEL
+    if (_cpu) {
+	click_processor_t my_cpu = click_current_cpu_id();
+	sa << '(' << my_cpu << ')';
 	sep = ": ";
     }
 #endif

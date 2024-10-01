@@ -519,6 +519,17 @@ RouterThread::load() {
   return (float) _load_state.read().load.unscaled_average() / 1024;
 }
 
+int
+RouterThread::load_unscaled() {
+  return _load_state.read().load.unscaled_average();
+}
+
+int
+RouterThread::load_max_scale() {
+  return 1024;
+}
+
+
 unsigned long long
 RouterThread::load_cycles() {
   const LoadState &ls = _load_state.read_begin();

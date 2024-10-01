@@ -11,7 +11,7 @@ CLICK_DECLS
 
 NumberPacket() Set an increasing number inside packet
 
-=s timestamps
+=s analysis
 
 =d
 

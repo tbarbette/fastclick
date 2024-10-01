@@ -110,7 +110,7 @@ KernelFilter::device_filter6(const String &devname, bool add_filter,
     if (iptables_command)
 	cmda << iptables_command;
     else if (access("/sbin/ip6tables", X_OK) == 0)
-	cmda << "/sbin/iptables";
+	cmda << "/sbin/ip6tables";
     else if (access("/usr/sbin/ip6tables", X_OK) == 0)
 	cmda << "/usr/sbin/ip6tables";
     else

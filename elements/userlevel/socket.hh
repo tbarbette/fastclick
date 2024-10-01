@@ -7,6 +7,7 @@
 #include <click/notifier.hh>
 #include "../ip/iproutetable.hh"
 #include <sys/un.h>
+
 CLICK_DECLS
 
 /*
@@ -232,6 +233,8 @@ private:
   bool _verbose;		// be verbose
   bool _client;			// client or server
   bool _proper;			// (PlanetLab only) use Proper to bind port
+  bool _wait_learn; // Does not set the remote addr before receiving a first message on local port
+  bool _set_soreuse;// Set SO_REUSEPORT & SO_REUSEADDR
   IPRouteTable *_allow;		// lookup table of good hosts
   IPRouteTable *_deny;		// lookup table of bad hosts
 

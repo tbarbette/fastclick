@@ -1,5 +1,5 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
-#ifndef CLICK_TRUNCATECS_HH
+#ifndef CLICK_TRUNCATEFCS_HH
 #define CLICK_TRUNCATEFCS_HH
 #include <click/element.hh>
 CLICK_DECLS

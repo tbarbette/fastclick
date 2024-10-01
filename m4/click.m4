@@ -502,7 +502,7 @@ AC_DEFUN([CLICK_CHECK_NUMA], [
         AC_SEARCH_LIBS([numa_available], [numa], [ac_have_libnuma=yes], [ac_have_libnuma=no])
 
         if test "$ac_have_libnuma" = yes; then
-            AC_DEFINE([HAVE_NUMA], [1], [Define if you have the <numa.h> header file.])
+            AC_DEFINE([HAVE_NUMA], [1], [Define if you have the <nuda.h> header file.])
             LDFLAGS="$LDFLAGS -lnuma"
         fi
 
@@ -840,6 +840,12 @@ AC_DEFUN([CLICK_CHECK_COMPILER_INTRINSICS], [
         [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[long x = 11;]], [[long *y = &x; __sync_synchronize(*y);]])], [ac_cv_have___sync_synchronize_args=yes], [ac_cv_have___sync_synchronize_args=no])])
     if test $ac_cv_have___sync_synchronize_args = yes; then
         AC_DEFINE([HAVE___SYNC_SYNCHRONIZE_ARGUMENTS], [1], [Define if the __sync_synchronize function supports arguments.])
+    fi
+
+    AC_CACHE_CHECK([for __is_trivially_copyable], [ac_cv_have___is_trivially_copyable],
+        [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [[long x = 1; if (__is_trivially_copyable(long)) x = 0;]])], [ac_cv_have___is_trivially_copyable=yes], [ac_cv_have___is_trivially_copyable=no])])
+    if test $ac_cv_have___is_trivially_copyable = yes; then
+        AC_DEFINE([HAVE___IS_TRIVIALLY_COPYABLE], [1], [Define if you have the __is_trivially_copyable compiler intrinsic.])
     fi
 
     AC_CACHE_CHECK([for __has_trivial_copy], [ac_cv_have___has_trivial_copy],
