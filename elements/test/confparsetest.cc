@@ -236,10 +236,10 @@ ConfParseTest::initialize(ErrorHandler *errh)
 #endif
 
     BandwidthArg bwarg;
-    CHECK(bwarg.parse("8", u64) == true && bwarg.status == NumArg::status_unitless && u64 == 8);
-    CHECK(bwarg.parse("8 baud", u64) == true && bwarg.status == NumArg::status_ok && u64 == 1);
-    CHECK(bwarg.parse("8Kbps", u64) == true && bwarg.status == NumArg::status_ok && u64 == 1000);
-    CHECK(bwarg.parse("8KBps", u64) == true && bwarg.status == NumArg::status_ok && u64 == 8000);
+    CHECK(bwarg.parse("8", u32) == true && bwarg.status == NumArg::status_unitless && u32 == 8);
+    CHECK(bwarg.parse("8 baud", u32) == true && bwarg.status == NumArg::status_ok && u32 == 1);
+    CHECK(bwarg.parse("8Kbps", u32) == true && bwarg.status == NumArg::status_ok && u32 == 1000);
+    CHECK(bwarg.parse("8KBps", u32) == true && bwarg.status == NumArg::status_ok && u32 == 8000);
 
     {
 	IPAddress a, m;

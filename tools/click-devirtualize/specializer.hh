@@ -86,14 +86,14 @@ class Specializer { public:
   bool _do_replace;
   bool _do_inline;
   bool _do_static;
-  bool _do_unroll;
   bool _do_switch;
-  bool _verbose;
+  bool _do_unroll;
   int _unroll_val;
   int _switch_burst;
   int _do_jmps;
   int _jmp_burst;
   int _do_align;
+  bool _verbose;
 
   CxxInfo _cxxinfo;
 

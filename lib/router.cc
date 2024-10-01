@@ -2572,7 +2572,13 @@ Router::router_handler(int operation, String &data, Element *e,
         int index;
         IntArg arg;
         if (data && arg.parse(data, index, errh)) {
-            sa << r->master()->thread(index)->load();
+
+            if (opt == GH_LOAD) {
+		sa << r->master()->thread(index)->load();
+                } else if (opt == GH_LOAD_CYCLES)
+                    sa << String(r->master()->thread(index)->load_cycles());
+                else
+                    sa << String(r->master()->thread(index)->useful_kcycles());
         } else {
             int n = r->master()->nthreads();
             for (int i = 0; i < n; i++) {

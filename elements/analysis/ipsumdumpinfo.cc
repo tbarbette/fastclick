@@ -24,6 +24,9 @@
 #include <click/packet_anno.hh>
 #include <click/args.hh>
 #include <click/ipflowid.hh>
+#if HAVE_IP6
+#include <click/ip6flowid.hh>
+#endif
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
 #include <clicknet/udp.h>
@@ -441,51 +444,125 @@ bool PacketOdesc::hard_make_ip()
     return true;
 }
 
+#if HAVE_IP6
+bool PacketOdesc::hard_make_ip6()
+{
+	click_chatter("Hard make ip 6");
+    if (!is_ip6)
+	return false;
+    if (!p->has_network_header())
+		p->set_network_header(p->data(), 0);
+    if (p->network_length() < (int) sizeof(click_ip6)) {
+		if (!(p = p->put(sizeof(click_ip6) - p->network_length())))
+			return false;
+		p->set_network_header(p->network_header(), sizeof(click_ip6));
+		click_ip6 *iph = p->ip6_header();
+		iph->ip6_flow = htonl(6 << IP6_V_SHIFT);
+		iph->ip6_plen = htons(p->network_length() - sizeof(click_ip6));
+		iph->ip6_nxt = default_ip_p;
+		iph->ip6_hlim = 51;
+		iph->ip6_v = 6;
+
+		if (default_ip6_flowid) {
+			iph->ip6_src = default_ip6_flowid->saddr();
+			iph->ip6_dst = default_ip6_flowid->daddr();
+		}
+    }
+    return true;
+}
+#endif
+
 bool PacketOdesc::hard_make_transp()
 {
     click_ip *iph = p->ip_header();
     if (IP_FIRSTFRAG(iph)) {
-	int len;
-	switch (iph->ip_p) {
-	case IP_PROTO_TCP:
-	    len = sizeof(click_tcp);
-	    break;
-	case IP_PROTO_UDP:
-	case IP_PROTO_UDPLITE:
-	    len = sizeof(click_udp);
-	    break;
-	case IP_PROTO_DCCP:
-	    len = 12;
-	    break;
-	case IP_PROTO_ICMP:
-	    len = sizeof(click_icmp);
-	    break;
-	default:
-	    return true;
-	}
-	if (want_len > 0
-	    && want_len < (uint32_t) p->transport_header_offset() + len)
-	    len = want_len - p->transport_header_offset();
+		int len;
+		switch (iph->ip_p) {
+		case IP_PROTO_TCP:
+			len = sizeof(click_tcp);
+			break;
+		case IP_PROTO_UDP:
+		case IP_PROTO_UDPLITE:
+			len = sizeof(click_udp);
+			break;
+		case IP_PROTO_DCCP:
+			len = 12;
+			break;
+		case IP_PROTO_ICMP:
+			len = sizeof(click_icmp);
+			break;
+		default:
+			return true;
+		}
+		if (want_len > 0
+			&& want_len < (uint32_t) p->transport_header_offset() + len)
+			len = want_len - p->transport_header_offset();
 
-	if (p->transport_length() < len) {
-	    int xlen = (len < 4 ? 4 : len);
-	    if (!(p = p->put(xlen - p->transport_length())))
-		return false;
-	    if (p->ip_header()->ip_p == IP_PROTO_TCP && len >= 13)
-		p->tcp_header()->th_off = sizeof(click_tcp) >> 2;
-	    if (default_ip_flowid) {
-		click_udp *udph = p->udp_header();
-		udph->uh_sport = default_ip_flowid->sport();
-		udph->uh_dport = default_ip_flowid->dport();
-	    }
-	    if (xlen > len)
-		p->take(xlen - len);
-	}
+		if (p->transport_length() < len) {
+			int xlen = (len < 4 ? 4 : len);
+			if (!(p = p->put(xlen - p->transport_length())))
+			return false;
+			if (p->ip_header()->ip_p == IP_PROTO_TCP && len >= 13)
+			p->tcp_header()->th_off = sizeof(click_tcp) >> 2;
+			if (default_ip_flowid) {
+			click_udp *udph = p->udp_header();
+			udph->uh_sport = default_ip_flowid->sport();
+			udph->uh_dport = default_ip_flowid->dport();
+			}
+			if (xlen > len)
+			p->take(xlen - len);
+		}
     }
 
     return true;
 }
 
+#if HAVE_IP6
+bool PacketOdesc::hard_make_transp6()
+{
+	click_chatter("Make transp 6 : len %d", p->transport_length());
+    click_ip6 *iph = p->ip6_header();
+
+	int len;
+	switch (iph->ip6_nxt) {
+	case IP_PROTO_TCP:
+		len = sizeof(click_tcp);
+		break;
+	case IP_PROTO_UDP:
+	case IP_PROTO_UDPLITE:
+		len = sizeof(click_udp);
+		break;
+	case IP_PROTO_DCCP:
+		len = 12;
+		break;
+	case IP_PROTO_ICMP:
+		len = sizeof(click_icmp);
+		break;
+	default:
+		return true;
+	}
+	if (want_len > 0
+		&& want_len < (uint32_t) p->transport_header_offset() + len)
+		len = want_len - p->transport_header_offset();
+
+	if (p->transport_length() < len) {
+		int xlen = (len < 4 ? 4 : len);
+		if (!(p = p->put(xlen - p->transport_length())))
+		return false;
+		if (p->ip6_header()->ip6_nxt == IP_PROTO_TCP && len >= 13)
+		p->tcp_header()->th_off = sizeof(click_tcp) >> 2;
+		if (default_ip6_flowid) {
+			click_udp *udph = p->udp_header();
+			udph->uh_sport = default_ip6_flowid->sport();
+			udph->uh_dport = default_ip6_flowid->dport();
+		}
+		if (xlen > len)
+		p->take(xlen - len);
+	}
+
+    return true;
+}
+#endif
 
 const char tcp_flags_word[] = "FSRPAUECN";
 

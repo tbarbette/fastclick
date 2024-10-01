@@ -34,8 +34,8 @@ Specializer::Specializer(RouterT *router, const ElementMap &em)
   : _router(router), _nelements(router->nelements()),
     _ninputs(router->nelements(), 0), _noutputs(router->nelements(), 0),
     _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1), _do_inline(false),
-    _do_static(false), _do_unroll(false), _unroll_val(0), _do_switch(false), _verbose(false), _switch_burst(0),
-    _do_jmps(false), _jmp_burst(0), _do_align(0)
+    _do_static(false), _do_switch(false), _do_unroll(false), _unroll_val(0), _switch_burst(0),
+    _do_jmps(false), _jmp_burst(0), _do_align(0), _verbose(false)
 {
   _etinfo.push_back(ElementTypeInfo());
 

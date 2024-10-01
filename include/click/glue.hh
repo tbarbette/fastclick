@@ -103,6 +103,9 @@ extern "C" {
     #include <rte_cycles.h>
 }
 #endif
+#if defined(__MACH__) && defined(__APPLE__)
+# include <mach/mach_time.h>
+#endif
 
 #endif
 
@@ -721,8 +724,9 @@ typedef uint32_t click_cycles_t;
 inline click_cycles_t
 click_get_cycles()
 {
-
-#if CLICK_LINUXMODULE && HAVE_INT64_TYPES && __i386__
+#if defined(__MACH__) && defined(__APPLE__)
+    return mach_absolute_time();
+#elif CLICK_LINUXMODULE && HAVE_INT64_TYPES && __i386__
     uint64_t x;
     __asm__ __volatile__ ("rdtsc" : "=A" (x));
     return x;
@@ -748,6 +752,10 @@ click_get_cycles()
     uint32_t xlo, xhi;
     __asm__ __volatile__ ("rdtsc" : "=a" (xlo), "=d" (xhi));
     return xlo;
+#elif CLICK_USERLEVEL && __aarch64__
+    uint64_t val;
+    asm volatile("mrs %0, cntvct_el0" : "=r" (val));
+    return val;
 #elif CLICK_USERLEVEL && HAVE_DPDK && defined(_RTE_CYCLES_H_)
     // On other architectures we use DPDK implementation, if available
     return rte_get_tsc_cycles();
@@ -768,6 +776,10 @@ inline click_cycles_t cycles_hz() {
         return rte_get_timer_hz();
     }
     return 0;
+#elif defined(__MACH__) && defined(__APPLE__)
+    mach_timebase_info_data_t _clock_timebase;
+    mach_timebase_info(&_clock_timebase); // Initialize timebase_info
+    return _clock_timebase.denom / _clock_timebase.numer;
 #endif
     if (click_cycles_hz == 0) {
         click_cycles_t tsc_freq = click_get_cycles();
@@ -783,6 +795,7 @@ inline click_cycles_t cycles_hz() {
 #define TYPE_LITEND 1
 #define TYPE_BIGEND 2
 
+#ifndef htonll
 inline unsigned long long htonll(unsigned long long src) {
     static int typ = TYPE_INIT;
     unsigned char c;
@@ -807,6 +820,7 @@ inline unsigned long long htonll(unsigned long long src) {
 
     return x.ull;
 }
+#endif
 
 CLICK_ENDDECLS
 

@@ -89,6 +89,9 @@ class IP6Address { public:
     int mask_to_prefix_len() const;
     inline bool matches_prefix(const IP6Address &addr, const IP6Address &mask) const;
     inline bool mask_as_specific(const IP6Address &) const;
+    static inline IP6Address make_zero() {
+	    return IP6Address();
+    }
 
     /** @brief Test if this address contains an embedded Ethernet address.
      *
@@ -447,10 +450,7 @@ inline void ip6_follow_eh(const click_ip6* ip6, const unsigned char* end, F fn) 
 inline void* ip6_find_header(const click_ip6* ip6, const uint8_t type, const unsigned char* end) {
 	unsigned char* pos = 0;
 	auto fnt = [&pos,type] (const uint8_t next, unsigned char* hdr)
-
-#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
-        __attribute__((always_inline))
-#endif
+CLICK_ALWAYS_INLINE
         -> bool {
 		if (next == type) {
 			pos = hdr;

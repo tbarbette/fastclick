@@ -1,6 +1,6 @@
 #ifndef CLICK_CHECKLENGTH_HH
 #define CLICK_CHECKLENGTH_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -19,7 +19,7 @@ no larger than LENGTH, it is sent to output 0; otherwise, it is sent to
 output 1 (or dropped if there is no output 1).
 */
 
-class CheckLength : public Element { public:
+class CheckLength : public BatchElement { public:
 
   CheckLength() CLICK_COLD;
 
@@ -31,6 +31,10 @@ class CheckLength : public Element { public:
 
   void push(int, Packet *);
   Packet *pull(int);
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch *);
+  PacketBatch *pull_batch(int, unsigned);
+#endif
 
   void add_handlers() CLICK_COLD;
 

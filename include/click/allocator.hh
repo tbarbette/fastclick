@@ -391,7 +391,9 @@ pool_allocator_mt<T,ZERO,POOL_SIZE,POOL_COUNT>::pool_allocator_mt() : _pool(Pool
 template <typename T, bool ZERO, int POOL_SIZE, int POOL_COUNT>
 pool_allocator_mt<T,ZERO,POOL_SIZE,POOL_COUNT>::~pool_allocator_mt() {
         static_assert(sizeof(T) >= sizeof(Pool), "Allocator object is too small");
+#if CLICK_DEBUG_ALLOCATOR
         int n_release = 0;
+#endif
         while (_global_pool) {
             item* p = (item*)_global_pool;
             _global_pool = _global_pool->next;
@@ -400,7 +402,9 @@ pool_allocator_mt<T,ZERO,POOL_SIZE,POOL_COUNT>::~pool_allocator_mt() {
                 next = p->next;
                 CLICK_LFREE(p,sizeof(T));
                 p = next;
+#if CLICK_DEBUG_ALLOCATOR
                 n_release++;
+#endif
             }
         }
         for (unsigned i = 0 ; i < _pool.weight(); i++) {
@@ -411,7 +415,9 @@ pool_allocator_mt<T,ZERO,POOL_SIZE,POOL_COUNT>::~pool_allocator_mt() {
                 next = p-> next;
                 CLICK_LFREE(p,sizeof(T));
                 p = next;
+#if CLICK_DEBUG_ALLOCATOR
                 n_release++;
+#endif
             }
         }
 #if CLICK_DEBUG_ALLOCATOR
@@ -432,7 +438,9 @@ pool_allocator_aware_mt<T,POOL_SIZE,POOL_COUNT>::pool_allocator_aware_mt() : _po
 template <typename T, int POOL_SIZE, int POOL_COUNT>
 pool_allocator_aware_mt<T,POOL_SIZE,POOL_COUNT>::~pool_allocator_aware_mt() {
         static_assert(sizeof(T) >= sizeof(Pool), "Allocator object is too small");
+#if CLICK_DEBUG_ALLOCATOR
         int n_release = 0;
+#endif
         while (_global_pool) {
             T* p = _global_pool;
             _global_pool = (T*)_global_pool->pool_next_pool;
@@ -441,7 +449,9 @@ pool_allocator_aware_mt<T,POOL_SIZE,POOL_COUNT>::~pool_allocator_aware_mt() {
                 next = (T*)p->pool_next_item;
                 delete p;
                 p = next;
+#if CLICK_DEBUG_ALLOCATOR
                 n_release++;
+#endif
             }
         }
         for (unsigned i = 0 ; i < _pool.weight(); i++) {
@@ -452,7 +462,9 @@ pool_allocator_aware_mt<T,POOL_SIZE,POOL_COUNT>::~pool_allocator_aware_mt() {
                 next = (T*)p->pool_next_item;
                 delete p;
                 p = next;
+#if CLICK_DEBUG_ALLOCATOR
                 n_release++;
+#endif
             }
         }
 #if CLICK_DEBUG_ALLOCATOR

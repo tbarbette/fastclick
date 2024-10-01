@@ -204,6 +204,41 @@ CLICK_DECLS
 
 
 /**
+ * Execute a function for each packet, passing parameters to easily add multiple packets to the list
+ *
+ * An example that does nothing in practice :
+ * void fnt(Packet *p, std::function<void(Packet*)>push) {
+ *    push(p);
+ * }
+ * EXECUTE_FOR_EACH_PACKET_ADD( fnt, batch );
+ */
+#define EXECUTE_FOR_EACH_PACKET_ADD(fnt,batch) {\
+            Packet* next = ((batch != 0)? batch->first()->next() : 0 );\
+            Packet* p = batch->first();\
+            Packet* last = 0;\
+            int count = 0;\
+            for (;p != 0;p=next,next=(p==0?0:p->next())) {\
+                auto add = [&batch,&last,&count](Packet*q) {\
+                    if (last) { \
+                        last->set_next(q); \
+                    } else { \
+                        batch = reinterpret_cast<PacketBatch*>(q);\
+                    }\
+                    last = q;\
+                    count++;\
+                };\
+                fnt(p,add);\
+            }\
+            if (likely(last)) {\
+                batch->set_count(count);\
+                batch->set_tail(last);\
+                last->set_next(0);\
+            } else {\
+	        batch = 0;\
+	    }\
+        }\
+
+/**
  * Split a batch into multiple batch according to a given function which will
  * give the index of an output to choose.
  *
@@ -751,7 +786,7 @@ inline void PacketBatch::kill() {
 
 #if HAVE_DPDK_PACKET_POOL
 #define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
-	if (p->data_packet() == 0 && p->buffer_destructor() == DPDKDevice::free_pkt && p->buffer() != 0) {\
+	if (p->data_packet() == 0 && (DPDKDevice::is_dpdk_packet(p)) && p->buffer() != 0) {\
 		BATCH_RECYCLE_ADD_DATA_PACKET(p);\
 	} else {\
 		BATCH_RECYCLE_ADD_PACKET(p);}}

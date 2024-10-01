@@ -42,7 +42,7 @@ BandwidthMeter::configure(Vector<String> &conf, ErrorHandler *errh)
   if (conf.size() == 0)
     return errh->error("too few arguments to BandwidthMeter(bandwidth, ...)");
 
-  Vector<uint64_t> vals(conf.size(), 0);
+  Vector<unsigned> vals(conf.size(), 0);
   BandwidthArg ba;
   for (int i = 0; i < conf.size(); i++)
     if (!ba.parse(conf[i], vals[i]))
@@ -63,8 +63,8 @@ BandwidthMeter::configure(Vector<String> &conf, ErrorHandler *errh)
     _meter1 = vals[0];
     _nmeters = 1;
   } else {
-    _meters = new uint64_t[vals.size()];
-    memcpy(_meters, &vals[0], vals.size() * sizeof(uint64_t));
+    _meters = new unsigned[vals.size()];
+    memcpy(_meters, &vals[0], vals.size() * sizeof(int));
     _nmeters = vals.size();
   }
 
@@ -83,7 +83,7 @@ BandwidthMeter::push(int, Packet *p)
     int n = (r >= _meter1);
     output(n).push(p);
   } else {
-    uint64_t *meters = _meters;
+    unsigned *meters = _meters;
     int nmeters = _nmeters;
     for (int i = 0; i < nmeters; i++)
       if (r < meters[i]) {

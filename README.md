@@ -22,7 +22,7 @@ Quick start (using DPDK for I/O)
  * Build FastClick, with support for DPDK using the following command:
 
 ```
-./configure --enable-dpdk --enable-intel-cpu --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --disable-cpu-load
+./configure CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3" --enable-dpdk --enable-intel-cpu --disable-dynamic-linking --enable-bound-port-transfer --enable-flow --disable-task-stats --disable-cpu-load
 make
 ```
 
@@ -32,7 +32,7 @@ FastClick "Light"
 -----------------
 FastClick, like Click comes with a lot of features that you may not use. The following options will improve performance further :
 ```
-./configure --enable-dpdk --enable-intel-cpu --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --disable-cpu-load --enable-dpdk-packet --disable-clone --disable-dpdk-softqueue
+./configure  CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3" --enable-dpdk --enable-intel-cpu --disable-dynamic-linking --enable-bound-port-transfer --enable-flow --disable-task-stats --disable-cpu-load --enable-dpdk-packet --disable-clone --disable-dpdk-softqueue
 make
 ```
  * Disable task stats suppress statistics tracking for advanced task scheduling with e.g. BalancedThreadSched. With DPDK, it's polling anyway... And as far as scheduling is concerned, [RSS++](#rss) has a better solution.

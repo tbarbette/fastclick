@@ -628,7 +628,7 @@ inline bool WritablePacket::is_from_data_pool(WritablePacket *p) {
             !p->_data_packet &&
 # endif
             p->_head
-			&& (p->_destructor == DPDKDevice::free_pkt));
+			&& (p->buffer_destructor() == DPDKDevice::free_pkt));
 #else
     if (likely(
 # ifndef CLICK_NOINDIRECT
@@ -1512,14 +1512,14 @@ cleanup_pool(PacketPool *pp, int global)
         ::operator delete((void *) p);
     }
     while (WritablePacket *pd = pp->pd) {
-    ++pdcount;
-    pp->pd = static_cast<WritablePacket *>(pd->next());
+        ++pdcount;
+        pp->pd = static_cast<WritablePacket *>(pd->next());
 # if HAVE_DPDK_PACKET_POOL
-    rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
+        rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
 # else
-    Packet::release_buffer(pd->buffer());
+        Packet::release_buffer(pd->buffer());
 # endif
-    ::operator delete((void *) pd);
+        ::operator delete((void *) pd);
     }
 # if !HAVE_BATCH_RECYCLE
     assert(pcount <= CLICK_PACKET_POOL_SIZE);

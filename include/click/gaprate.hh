@@ -49,17 +49,17 @@ class GapRate { public:
 
     /** @brief  Construct a GapRate object with initial rate @a r.
      *  @param  r  initial rate (events per second) */
-    inline GapRate(uint64_t r);
+    inline GapRate(unsigned r);
 
     /** @brief  Return the current rate. */
-    inline uint64_t rate() const;
+    inline unsigned rate() const;
 
     /** @brief  Set the current rate to @a r.
      *  @param  r  desired rate (events per second)
      *
      *  Rates larger than MAX_RATE are reduced to MAX_RATE.  Also performs the
      *  equivalent of a reset() to flush old state. */
-    inline void set_rate(uint64_t r);
+    inline void set_rate(unsigned r);
 
     /** @brief  Set the current rate to @a r.
      *  @param  r     desired rate (events per second)
@@ -67,7 +67,7 @@ class GapRate { public:
      *
      *  Acts like set_rate(@a r), except that an warning is reported to @a errh
      *  if @a r is larger than MAX_RATE. */
-    void set_rate(uint64_t r, ErrorHandler *errh);
+    void set_rate(unsigned r, ErrorHandler *errh);
 
 
     /** @brief  Returns whether the user's rate is behind the true rate.
@@ -97,7 +97,7 @@ class GapRate { public:
      *
      *  @note This may be faster than calling update() @a delta times.
      *  Furthermore, @a delta can be negative. */
-    inline void update_with(int64_t delta);
+    inline void update_with(int delta);
 
     /** @brief  Resets the true rate counter.
      *
@@ -106,20 +106,20 @@ class GapRate { public:
     inline void reset();
 
 
-    enum { UGAP_SHIFT = 43 };
-    enum { MAX_RATE = 1000000ULL << UGAP_SHIFT };
+    enum { UGAP_SHIFT = 12 };
+    enum { MAX_RATE = 1000000U << UGAP_SHIFT };
 
   private:
 
-    uint64_t _ugap;		// (1000000 << UGAP_SHIFT) / _rate
-    int64_t _sec_count;		// number of updates this second so far
+    unsigned _ugap;		// (1000000 << UGAP_SHIFT) / _rate
+    int _sec_count;		// number of updates this second so far
     Timestamp::seconds_type _tv_sec;	// current second
-    uint64_t _rate;		// desired rate
+    unsigned _rate;		// desired rate
 #if DEBUG_GAPRATE
     Timestamp _last;
 #endif
 
-    inline void initialize_rate(uint64_t rate);
+    inline void initialize_rate(unsigned rate);
 
 };
 
@@ -134,7 +134,7 @@ GapRate::reset()
 }
 
 inline void
-GapRate::initialize_rate(uint64_t r)
+GapRate::initialize_rate(unsigned r)
 {
     _rate = r;
     _ugap = (r == 0 ? MAX_RATE + 1 : MAX_RATE / r);
@@ -144,7 +144,7 @@ GapRate::initialize_rate(uint64_t r)
 }
 
 inline void
-GapRate::set_rate(uint64_t r)
+GapRate::set_rate(unsigned r)
 {
     if (r > MAX_RATE)
 	r = MAX_RATE;
@@ -152,7 +152,7 @@ GapRate::set_rate(uint64_t r)
 	initialize_rate(r);
 	if (_tv_sec >= 0 && r != 0) {
 	    Timestamp now = Timestamp::now();
-	    _sec_count = (static_cast<uint64_t>(now.usec()) << UGAP_SHIFT) / _ugap;
+	    _sec_count = (now.usec() << UGAP_SHIFT) / _ugap;
 	}
     }
 }
@@ -165,14 +165,14 @@ GapRate::GapRate()
 }
 
 inline
-GapRate::GapRate(uint64_t r)
+GapRate::GapRate(unsigned r)
     : _rate(0)
 {
     initialize_rate(r);
     reset();
 }
 
-inline uint64_t
+inline unsigned
 GapRate::rate() const
 {
     return _rate;
@@ -182,15 +182,15 @@ inline bool
 GapRate::need_update(const Timestamp &now)
 {
     // this is an approximation of:
-    // uint64_t need = (uint64_t) ((now.usec() / 1000000.0) * _rate)
-    uint64_t need = (static_cast<uint64_t>(now.usec()) << UGAP_SHIFT) / _ugap;
+    // unsigned need = (unsigned) ((now.usec() / 1000000.0) * _rate)
+    unsigned need = (now.usec() << UGAP_SHIFT) / _ugap;
 
     if (_tv_sec < 0) {
 	// 27.Feb.2005: often OK to send a packet after reset unless rate is
 	// 0 -- requested by Bart Braem
 	// check include/click/gaprate.hh (1.2)
 	_tv_sec = now.sec();
-	_sec_count = need + ((static_cast<uint64_t>(now.usec()) << UGAP_SHIFT) - (need * _ugap) > _ugap / 2);
+	_sec_count = need + ((now.usec() << UGAP_SHIFT) - (need * _ugap) > _ugap / 2);
     } else if (now.sec() > _tv_sec) {
 	_tv_sec = now.sec();
 	if (_sec_count > 0)
@@ -200,7 +200,7 @@ GapRate::need_update(const Timestamp &now)
 #if DEBUG_GAPRATE
     click_chatter("%p{timestamp} -> %u @ %u [%d]", &now, need, _sec_count, (int)need >= _sec_count);
 #endif
-    return ((int64_t)need >= _sec_count);
+    return ((int)need >= _sec_count);
 }
 
 inline void
@@ -210,7 +210,7 @@ GapRate::update()
 }
 
 inline void
-GapRate::update_with(int64_t delta)
+GapRate::update_with(int delta)
 {
     _sec_count += delta;
 }
@@ -224,8 +224,8 @@ GapRate::expiry() const
 	return Timestamp(_tv_sec, 0);
     else {
 	Timestamp::seconds_type sec = _tv_sec;
-	int64_t count = _sec_count;
-	if ((uint64_t) count >= _rate) {
+	int count = _sec_count;
+	if ((unsigned) count >= _rate) {
 	    sec += count / _rate;
 	    count = count % _rate;
 	}

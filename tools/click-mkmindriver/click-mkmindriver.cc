@@ -655,6 +655,9 @@ particular purpose.\n");
 	md.require("Error", &lerrh);
 	md.require("PortInfo", &lerrh);
 	md.require("ScheduleInfo", &lerrh);
+#if HAVE_CTX
+    md.require("FlowContextDispatcher", &lerrh);
+#endif
 	if (driver == Driver::USERLEVEL)
 	    md.require("ControlSocket", &lerrh);
     }

@@ -13,7 +13,7 @@ bindir = @bindir@
 sbindir = @sbindir@
 libdir = @libdir@
 
-VPATH = .:$(top_srcdir)/lib:$(top_srcdir)/vendor/tinyexpr:$(top_srcdir)/vendor/nicscheduler:$(top_srcdir)/lib/metron:$(top_srcdir)/$(subdir):$(top_srcdir)/elements/standard
+VPATH = .:$(top_srcdir)/lib:$(top_srcdir)/vendor/tinyexpr:$(top_srcdir)/vendor/tinymt32:$(top_srcdir)/vendor/swifsymbol:$(top_srcdir)/vendor/nicscheduler:$(top_srcdir)/lib/metron:$(top_srcdir)/$(subdir):$(top_srcdir)/elements/standard
 
 CC = @CC@
 CPP = @CPP@
@@ -78,6 +78,7 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	integers.o md5.o crc32.o in_cksum.o iptable.o \
 	archive.o userutils.o driver.o \
 	tinyexpr.o \
+	tinymt32.o swifsymbol.o \
 	$(EXTRA_DRIVER_OBJS) $(LLVM_OBJS)
 
 USE_FLOW = @USE_FLOW@

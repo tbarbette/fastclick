@@ -42,7 +42,7 @@
 # include <linux/types.h>
 # include <linux/icmp.h>
 
-# if __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1
+# if HAVE_NETPACKET_PACKET_H && !HAVE_LINUX_IF_PACKET_H
 #  include <netpacket/packet.h>
 #  include <net/ethernet.h>
 # else

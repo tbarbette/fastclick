@@ -638,7 +638,7 @@ inline size_t sse42_strstr_anysize(const char* s, size_t n, const char* needle, 
 
     return std::string::npos;
 }
-#else
+#elif HAVE_SSE2
 inline size_t sse2_strstr_anysize(const char* s, size_t n, const char* needle, size_t k) {
 
     assert(k > 0);
@@ -671,6 +671,54 @@ inline size_t sse2_strstr_anysize(const char* s, size_t n, const char* needle, s
 
     return std::string::npos;
 }
+#elif __aarch64__
+#include <arm_neon.h>
+inline size_t aarch64_strstr_anysize(const char* s, size_t n, const char* needle, size_t k) {
+
+    assert(k > 0);
+    assert(n > 0);
+
+    const uint8x16_t first = vdupq_n_u8(needle[0]);
+    const uint8x16_t last  = vdupq_n_u8(needle[k - 1]);
+
+    const uint8_t* ptr = reinterpret_cast<const uint8_t*>(s);
+
+    for (size_t i = 0; i < n; i += 16) {
+
+        const uint8x16_t block_first = vld1q_u8(ptr + i);
+        const uint8x16_t block_last  = vld1q_u8(ptr + i + k - 1);
+
+        const uint8x16_t eq_first = vceqq_u8(first, block_first);
+        const uint8x16_t eq_last  = vceqq_u8(last, block_last);
+        const uint8x16_t pred_16  = vandq_u8(eq_first, eq_last);
+
+        uint64_t mask;
+
+        mask = vgetq_lane_u64(vreinterpretq_u64_u8(pred_16), 0);
+        if (mask) {
+            for (int j=0; j < 8; j++) {
+                if ((mask & 0xff) && (memcmp(s + i + j + 1, needle + 1, k - 2) == 0)) {
+                    return i + j;
+                }
+
+                mask >>= 8;
+            }
+        }
+
+        mask = vgetq_lane_u64(vreinterpretq_u64_u8(pred_16), 1);
+        if (mask) {
+            for (int j=0; j < 8; j++) {
+                if ((mask & 0xff) && (memcmp(s + i + j + 8 + 1, needle + 1, k - 2) == 0)) {
+                    return i + j + 8;
+                }
+
+                mask >>= 8;
+            }
+        }
+    }
+
+    return std::string::npos;
+}
 #endif
 
 //Inline functions
@@ -679,8 +727,10 @@ inline char* CTXElement::searchInContent(char *content, const StringRef &pattern
     size_t pos = avx2_strstr_anysize(content, length, pattern.data(), pattern.length());
 #elif HAVE_SSE42
     size_t pos = sse42_strstr_anysize(content, length, pattern.data(), pattern.length());
-#else
+#elif HAVE_SSE2
     size_t pos = sse2_strstr_anysize(content, length, pattern.data(), pattern.length());
+#elif __aarch64__
+    size_t pos = aarch64_strstr_anysize(content, length, pattern.data(), pattern.length());
 #endif
     if (pos == std::string::npos)
         return 0;

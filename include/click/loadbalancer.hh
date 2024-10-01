@@ -4,6 +4,7 @@
 
 #include <click/ipflowid.hh>
 #include <algorithm>
+#include <random>
 #include <iterator>
 #if HAVE_DPDK
 #include <click/dpdk_glue.hh>
@@ -38,6 +39,10 @@ class LoadBalancer { public:
         lsttrans.find_insert("packets",packets);
         lsttrans.find_insert("bytes",bytes);
         lsttrans.find_insert("cpu",cpu);
+#if __cplusplus > 201402L
+        std::random_device rd;
+        _gen= std::mt19937(rd());
+#endif
     }
 
     enum LBMode {
@@ -102,6 +107,9 @@ protected:
     int _awrr_interval;
     float _alpha;
     bool _autoscale;
+#if __cplusplus > 201402L
+    std::mt19937 _gen;
+#endif
 
     uint64_t get_load_metric(int idx) {
         return get_load_metric(idx, _lst_case);
@@ -533,7 +541,11 @@ protected:
                 weights_helper.push_back(i);
             }
         }
+#if __cplusplus > 201402L
+        std::shuffle(weights_helper.begin(), weights_helper.end(), _gen);
+#else
         std::random_shuffle(weights_helper.begin(), weights_helper.end());
+#endif
         auto& v = _weights_helper.write_begin();
         v = weights_helper;
         _weights_helper.write_commit();
@@ -543,7 +555,7 @@ protected:
         switch(_mode_case) {
             case round_robin: {
                 int b = _selector.unchecked_at((*_current)++);
-                if (*_current == (unsigned)_selector.size()) {
+                if ((unsigned)*_current == (unsigned)_selector.size()) {
                     *_current = 0;
                 }
                 return b;

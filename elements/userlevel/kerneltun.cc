@@ -791,7 +791,7 @@ KernelTunMP::push_batch(int, PacketBatch *batch) {
 #endif
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(userlevel FakePcap)
+ELEMENT_REQUIRES(userlevel FakePcap linux)
 EXPORT_ELEMENT(KernelTun)
 EXPORT_ELEMENT(KernelTunMP)
 ELEMENT_MT_SAFE(KernelTunMP)

@@ -23,7 +23,10 @@
 #if CLICK_NS
 # include <click/simclick.h>
 #endif
-#if !CLICK_PACKET_USE_DPDK && (CLICK_USERLEVEL || CLICK_NS || CLICK_MINIOS) && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS) && !(NETMAP_PACKET_POOL) && ALLOW_CLICK_PACKET_POOL
+#if !CLICK_PACKET_USE_DPDK && \
+    (CLICK_USERLEVEL || CLICK_NS || CLICK_MINIOS) && \
+    (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS) && \
+    HAVE_ALLOW_CLICK_PACKET_POOL
 # define HAVE_CLICK_PACKET_POOL 1
 #endif
 #ifndef CLICK_PACKET_DEPRECATED_ENUM
@@ -1780,7 +1783,7 @@ Packet::kill()
 			b->list = 0;
 		# endif
 		skbmgr_recycle_skbs(b);
-    #elif CLICK_PACKET_USE_DPDK
+#elif CLICK_PACKET_USE_DPDK
         # if HAVE_FLOW_DYNAMIC
         if (fcb_stack) {
             fcb_stack->release(1);
@@ -1788,24 +1791,26 @@ Packet::kill()
         # endif
 		//Dpdk takes care of indirect and related things
 		rte_pktmbuf_free(mb());
-	#elif HAVE_CLICK_PACKET_POOL && !defined(CLICK_FORCE_EXPENSIVE)
+#elif HAVE_CLICK_PACKET_POOL && !defined(CLICK_FORCE_EXPENSIVE)
         # ifndef CLICK_NOINDIRECT
 		if (_use_count.dec_and_test())
         # endif
         {
 			WritablePacket::recycle(static_cast<WritablePacket *>(this));
 		}
-	#else
+#else
         # if HAVE_FLOW_DYNAMIC
         if (fcb_stack) {
                 fcb_stack->release(1);
         }
         # endif
         SFCB_STACK(
-        if (_use_count.dec_and_test()) {
-
-            delete this;
-        }
+# ifndef CLICK_NOINDIRECT
+            if (_use_count.dec_and_test())
+# endif
+            {
+                delete this;
+            }
         )
     #endif
 }
@@ -1852,9 +1857,12 @@ Packet::kill_nonatomic()
         }
 # endif
         SFCB_STACK(
-        if (_use_count.nonatomic_dec_and_test()) {
-            delete this;
-        }
+#ifndef CLICK_NOINDIRECT
+        if (_use_count.nonatomic_dec_and_test())
+#endif
+            {
+                delete this;
+            }
         )
 #endif
 }

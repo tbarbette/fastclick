@@ -277,6 +277,9 @@ public:
     }
 #endif
 
+
+    inline void kill_ref(Packet* p);
+
     inline static rte_mbuf* get_pkt(unsigned numa_node);
     inline static rte_mbuf* get_pkt();
     inline static struct rte_mbuf* get_mbuf(Packet* p, bool create, int node, bool reset = true);
@@ -505,6 +508,14 @@ inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node, b
     }
     #endif
     return mbuf;
+}
+
+inline void DPDKDevice::kill_ref(Packet* p) {
+    struct rte_mbuf* mbuf = get_mbuf(p,false,-1);
+    if (rte_mbuf_refcnt_read(mbuf) > 1)
+        rte_mbuf_refcnt_update(mbuf, -1);
+    else
+        p->kill();
 }
 
 inline rte_mbuf* DPDKDevice::get_pkt(unsigned numa_node) {

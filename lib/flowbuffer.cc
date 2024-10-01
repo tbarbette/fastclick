@@ -10,7 +10,9 @@
 #include <click/glue.hh>
 #include <click/flowbuffer.hh>
 #include <click/flow/ctxelement.hh>
+#ifndef __aarch64__
 #include <immintrin.h>
+#endif
 
 CLICK_DECLS
 

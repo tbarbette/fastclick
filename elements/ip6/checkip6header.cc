@@ -178,7 +178,7 @@ CheckIP6Header::read_handler(Element *e, void *thunk)
     switch (reinterpret_cast<uintptr_t>(thunk)) {
         case h_count: {
             PER_THREAD_SUM(uint64_t, count, c->_count);
-	    return String(count);
+            return String(count);
         }
         case h_drops: {
             return String(c->_drops);

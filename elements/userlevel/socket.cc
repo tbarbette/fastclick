@@ -93,6 +93,7 @@ Socket::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read_mp("PORT", IPPortArg(_protocol), _remote_port)
 	.read_p("LOCAL_ADDR", _local_ip)
 	.read_p("LOCAL_PORT", IPPortArg(_protocol), _local_port)
+  .read_p("WAIT_LEARN", _wait_learn)
 	.complete() < 0)
       return -1;
   }
@@ -118,6 +119,10 @@ Socket::configure(Vector<String> &conf, ErrorHandler *errh)
 
   else
     return errh->error("unknown socket type `%s'", socktype.c_str());
+
+  if (_wait_learn) {
+    _client = false;
+  }
 
   return 0;
 }
@@ -194,6 +199,18 @@ Socket::initialize(ErrorHandler *errh)
   if (!_client) {
     memcpy(&_local, &_remote, _remote_len);
     _local_len = _remote_len;
+  }
+
+  int one = 1;
+  if (_set_soreuse) {
+    if (setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int)) < 0) {
+      errh->warning("CANNOT SET REUSR ADDR");
+    }
+
+
+    if (setsockopt(_fd, SOL_SOCKET, SO_REUSEPORT, &one, sizeof(int)) < 0) {
+      errh->warning("CANNOT SET REUSR PORT");
+    }
   }
 
   // if a server, or if the optional local arguments have been
@@ -357,6 +374,9 @@ Socket::selected(int fd, int)
       else {
 	// datagram server, find out who we are talking to
 	len = recvfrom(_active, _rq->data(), _rq->length(), MSG_TRUNC, (struct sockaddr *)&from, &from_len);
+  if (_wait_learn) {
+    _remote.in.sin_port = from.in.sin_port;
+ }
 
 	if (_family == AF_INET && !allowed(IPAddress(from.in.sin_addr))) {
 	  if (_verbose)

@@ -1220,7 +1220,7 @@ static const char byte_bandwidth_units[] = "\
 static const char byte_bandwidth_prefixes[] = "\
 k\103K\103M\106G\111";
 
-static uint64_t
+static uint32_t
 multiply_factor(uint32_t ix, uint32_t fx, uint32_t factor, int &status)
 {
     if (factor == 1) {
@@ -1233,14 +1233,14 @@ multiply_factor(uint32_t ix, uint32_t fx, uint32_t factor, int &status)
         if (int32_t(flow) < 0)
             ++ftoint;
         int_multiply(ix, factor, ilow, ihigh);
-        /* if (ihigh != 0 || ilow + ftoint < ftoint)
-            status = NumArg::status_range; */
-        return ((uint64_t) ihigh << 32) + ilow + ftoint;
+        if (ihigh != 0 || ilow + ftoint < ftoint)
+            status = NumArg::status_range;
+        return ilow + ftoint;
     }
 }
 
 bool
-BandwidthArg::parse(const String &str, uint64_t &result, const ArgContext &args)
+BandwidthArg::parse(const String &str, uint32_t &result, const ArgContext &args)
 {
     int power, factor;
     const char *unit_end = UnitArg(byte_bandwidth_units, byte_bandwidth_prefixes).parse(str.begin(), str.end(), power, factor);
@@ -1258,7 +1258,7 @@ BandwidthArg::parse(const String &str, uint64_t &result, const ArgContext &args)
     ix = multiply_factor(ix, fx, factor, status);
     if (status == status_range) {
         args.error("out of range");
-        result = UINT64_MAX;
+        result = 0xFFFFFFFFU;
         return false;
     } else {
         if (unit_end == str.end() && ix)
