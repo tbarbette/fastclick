@@ -388,6 +388,7 @@ archive.hh
 args.hh
 array_memory.hh
 atomic.hh
+biertable.cc
 bighashmap.cc
 bighashmap.hh
 bighashmap_arena.hh
@@ -474,6 +475,7 @@ storage.hh
 threadsched.hh
 
 ./include/clicknet:
+bier.h
 dhcp.h
 ether.h
 fddi.h
@@ -493,6 +495,7 @@ wifi.h
 archive.cc
 args.cc
 atomic.cc
+biertable.cc
 bighashmap_arena.cc
 bitvector.cc
 clp.c

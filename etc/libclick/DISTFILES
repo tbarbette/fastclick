@@ -28,6 +28,7 @@ include/click/archive.hh
 include/click/args.hh
 include/click/array_memory.hh
 include/click/atomic.hh
+include/click/biertable.hh
 include/click/bitvector.hh
 include/click/bighashmap.cc
 include/click/bighashmap.hh
@@ -108,6 +109,7 @@ include/click/standard/storage.hh
 include/click/standard/threadsched.hh
 
 include/clicknet
+include/clicknet/bier.h
 include/clicknet/ether.h
 include/clicknet/fddi.h
 include/clicknet/icmp.h
@@ -126,6 +128,7 @@ etc/libclick/lc-libsrc-Makefile.in:libsrc/Makefile.in
 lib/archive.cc:libsrc/archive.cc
 lib/args.cc:libsrc/args.cc
 lib/atomic.cc:libsrc/atomic.cc
+lib/biertable.cc:libsrc/biertable.cc
 lib/bighashmap_arena.cc:libsrc/bighashmap_arena.cc
 lib/bitvector.cc:libsrc/bitvector.cc
 lib/clp.c:libsrc/clp.c
