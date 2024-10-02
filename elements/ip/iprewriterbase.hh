@@ -428,7 +428,8 @@ template<class T> inline IPRewriterEntry *
 IPRewriterBase::search_migrate_entry(const IPFlowID &flowid, per_thread<T> &vstate)
 {
     //If the flow does not exist, it may be in other thread's stack if there was a migration
-    if (vstate->rebalance > 0 && click_jiffies() - vstate->rebalance < THREAD_MIGRATION_TIMEOUT * CLICK_HZ ) {
+    if (vstate->rebalance > 0 &&
+			click_jiffies() - vstate->rebalance < THREAD_MIGRATION_TIMEOUT * CLICK_HZ / 1000) {
         //Search in other thread's stacks for the flow
         for (int i = 0; i < vstate.weight(); i++) {
             if (vstate.get_mapping(i) == click_current_cpu_id())

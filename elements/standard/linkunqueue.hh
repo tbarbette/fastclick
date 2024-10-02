@@ -79,7 +79,7 @@ class LinkUnqueue : public BatchElement, public Storage { public:
     Timestamp _latency;
     // enum { S_TASK, S_TIMER, S_ASLEEP } _state;
     bool _back_to_back;
-    uint32_t _bandwidth;
+    uint64_t _bandwidth;
     Task _task;
     Timer _timer;
     NotifierSignal _signal;

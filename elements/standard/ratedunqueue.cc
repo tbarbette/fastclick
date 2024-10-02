@@ -48,9 +48,9 @@ RatedUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 RatedUnqueue::configure_helper(TokenBucket *tb, bool is_bandwidth, Element *elt, Vector<String> &conf, ErrorHandler *errh)
 {
-    unsigned r;
+    uint64_t r;
     unsigned dur_msec = 20;
-    unsigned tokens;
+    uint64_t tokens;
     bool dur_specified, tokens_specified;
     const char *burst_size = is_bandwidth ? "BURST_BYTES" : "BURST_SIZE";
 
@@ -133,7 +133,7 @@ RatedUnqueue::run_task(Task *)
             }
 #endif
     } else {
-	_timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(1)));
+	_timer.schedule_after(Timestamp::make_usec(_tb.time_until_contains(1)));
 	_empty_runs++;
 	return false;
     }
