@@ -144,6 +144,9 @@ LinkUnqueue::run_task(Task *)
     }
 
     // Emit packets if it's time
+#if HAVE_BATCH
+    BATCH_CREATE_INIT(batch);
+#endif
     while (_qhead && _qhead->timestamp_anno() <= now) {
 	Packet *p = _qhead;
 	_qhead = p->next();
@@ -151,10 +154,19 @@ LinkUnqueue::run_task(Task *)
 	    _qtail = 0;
 	p->set_next(0);
 	//click_chatter("%p{timestamp}: RELEASE %p{timestamp}", &now, &p->timestamp_anno());
+#if HAVE_BATCH
+	BATCH_CREATE_APPEND(batch, p);
+#else
 	output(0).push(p);
+#endif
 	Storage::set_tail(Storage::tail() - 1);
 	worked = true;
     }
+#if HAVE_BATCH
+    BATCH_CREATE_FINISH(batch);
+    if (batch)
+	output(0).push_batch(batch);
+#endif
 
     // Figure out when to schedule next
     //print_queue(_qhead);
