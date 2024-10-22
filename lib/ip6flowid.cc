@@ -40,7 +40,6 @@ IP6FlowID::IP6FlowID(const Packet *p, bool reverse)
       assign(IP6Address(ip6h->ip6_dst), udph->uh_dport, IP6Address(ip6h->ip6_src), udph->uh_sport);
     }
   } else {
-    assert(IP_FIRSTFRAG(iph));
     if (likely(!reverse))
       assign(iph->ip_src, udph->uh_sport,
              iph->ip_dst, udph->uh_dport);
