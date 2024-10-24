@@ -70,12 +70,12 @@ RatedUnqueue::configure_helper(TokenBucket *tb, bool is_bandwidth, Element *elt,
 	bigint::limb_type res[2];
 	bigint::multiply(res[1], res[0], r, dur_msec);
 	bigint::divide(res, res, 2, 1000);
-	tokens = res[1] ? UINT_MAX : res[0];
+	tokens = res[1] ? UINT64_MAX : res[0];
     }
 
     if (is_bandwidth) {
-	unsigned new_tokens = tokens + tb_bandwidth_thresh;
-	tokens = (tokens < new_tokens ? new_tokens : UINT_MAX);
+	uint64_t new_tokens = tokens + tb_bandwidth_thresh;
+	tokens = (tokens < new_tokens ? new_tokens : UINT64_MAX);
     }
 
     tb->assign(r, tokens ? tokens : 1);
