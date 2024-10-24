@@ -78,7 +78,7 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
         rate = bandwidth / (_datasize < 0 ? _data.length() : _datasize);
     }
 
-    int burst = rate < 200 ? 2 : rate / 100;
+    uint64_t burst = rate < 200 ? 2 : rate / 100;
     if (bandwidth > 0 && burst < 2 * datasize) {
         burst = 2 * datasize;
     }

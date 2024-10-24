@@ -52,7 +52,7 @@ BandwidthMeter::configure(Vector<String> &conf, ErrorHandler *errh)
     else if (ba.status == NumArg::status_unitless)
       errh->warning("no units for bandwidth argument %d, assuming Bps", i+1);
 
-  unsigned max_value = 0xFFFFFFFF >> _rate.scale();
+  uint64_t max_value = UINT64_MAX >> _rate.scale();
   for (int i = 0; i < conf.size(); i++) {
     if (vals[i] > max_value)
       return errh->error("rate %d too large (max %u)", i+1, max_value);
@@ -78,7 +78,7 @@ BandwidthMeter::push(int, Packet *p)
 {
   _rate.update(p->length());
 
-  unsigned r = _rate.scaled_average();
+  uint64_t r = _rate.scaled_average();
   if (_nmeters < 2) {
     int n = (r >= _meter1);
     output(n).push(p);
