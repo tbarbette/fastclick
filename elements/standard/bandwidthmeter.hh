@@ -37,7 +37,7 @@ CLICK_DECLS
 
 class BandwidthMeter : public Element { protected:
 
-  RateEWMA _rate;
+  RateEWMAX<RateEWMAXParameters<4, 10, uint64_t, int64_t>> _rate;
 
   uint64_t _meter1;
   uint64_t *_meters;
@@ -55,7 +55,7 @@ class BandwidthMeter : public Element { protected:
   const char *port_count() const override		{ return "1/2-"; }
   const char *processing() const override		{ return PUSH; }
 
-  unsigned scaled_rate() const		{ return _rate.scaled_average(); }
+  uint64_t scaled_rate() const		{ return _rate.scaled_average(); }
   unsigned rate_scale() const		{ return _rate.scale(); }
   unsigned rate_freq() const		{ return _rate.epoch_frequency(); }
 
