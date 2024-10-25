@@ -37,7 +37,7 @@ CLICK_DECLS
 
 class BandwidthMeter : public Element { protected:
 
-  RateEWMAX<RateEWMAXParameters<4, 10, uint64_t, int64_t>> _rate;
+  RateEWMA _rate;
 
   uint64_t _meter1;
   uint64_t *_meters;
