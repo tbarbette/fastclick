@@ -13,7 +13,7 @@ void* BierRouteTable::cast(const char *name) {
     return Element::cast(name);
 }
 
-int BierRouteTable::add_route(bfrid, bitstring, IP6Address, ErrorHandler *errh) {
+int BierRouteTable::add_route(bfrid, bitstring, IP6Address, int, String, ErrorHandler *errh) {
   return errh->error("cannot add routes to this routing table");
 }
 
@@ -29,17 +29,22 @@ int BierRouteTable::add_route_handler(const String &conf, Element *e, void *, Er
   bfrid dst;
   bitstring fbm;
   IP6Address nxt;
+  int output;
+  String ifname;
 
   int ok;
 
+  // TODO: read_all for BFRID and define dst as an array for route addition batching
   ok = Args(words, r, errh)
        .read_mp("BFRID", dst)
        .read_mp("BITSTRING", fbm)
        .read_mp("NXT", nxt)
+       .read_mp("IFIDX", output)
+       .read_mp("IFNAME", ifname)
        .complete();
 
   if (ok >= 0)
-    ok = r->add_route(dst, fbm, nxt, errh);
+    ok = r->add_route(dst, fbm, nxt, output, ifname, errh);
 
   return ok;
 }

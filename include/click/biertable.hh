@@ -12,10 +12,10 @@ class BierTable {
     BierTable();
     ~BierTable();
 
-    bool lookup(const bfrid &dst) const;
+    bool lookup(const bfrid &dst, bitstring &fbm, IP6Address &nxt, int &index, String &ifname) const;
 
     void del(const bfrid &dst);
-    void add(const bfrid &dst, const bitstring fbm, const IP6Address &nxt);
+    void add(const bfrid &dst, const bitstring fbm, const IP6Address &nxt, int output, String ifname);
     void clear() { _v.clear(); }
     String dump();
 
@@ -24,8 +24,9 @@ class BierTable {
       bfrid _dst;
       bitstring _fbm;
       IP6Address _nxt;
+      int _if_idx;
+      String _if_name;
       int _valid;
-      // String 
     };
 
     Vector<Entry> _v;

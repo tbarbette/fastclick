@@ -388,7 +388,7 @@ archive.hh
 args.hh
 array_memory.hh
 atomic.hh
-biertable.cc
+biertable.hh
 bighashmap.cc
 bighashmap.hh
 bighashmap_arena.hh
