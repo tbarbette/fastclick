@@ -42,11 +42,6 @@ void CheckBIERHeader::drop(Packet *p) {
 Packet *CheckBIERHeader::simple_action(Packet *p) {
   const click_bier *bier;
   unsigned plen;
-  // const click_ip6 *iph = (click_ip6*) p->ip_header();
-  // if (iph->ip6_nxt != IP6PROTO_BIERIN6) {
-    // click_chatter("Not a BIERin6 packet");
-    // goto drop;
-  // }
 
   bier = reinterpret_cast<const click_bier*>(p->data());
   plen = p->length();
@@ -55,6 +50,10 @@ Packet *CheckBIERHeader::simple_action(Packet *p) {
     click_chatter("BIERin6 header too small");
     goto drop;
   }
+
+  // TODO: check that BSL is different from 0
+
+  // TODO: check that BS is not NULL
   
   return(p);
 
