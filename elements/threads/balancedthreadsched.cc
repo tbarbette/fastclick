@@ -96,7 +96,7 @@ BalancedThreadSched::run_timer(Timer *)
 	total_load += thread_load;
 	load.push_back(thread_load);
     }
-    task_offset.push_back(task_offset.size());
+    task_offset.push_back(tasks.size());
     int avg_load = total_load / m->nthreads();
 
     for (int rounds = 0; rounds < m->nthreads(); rounds++) {
