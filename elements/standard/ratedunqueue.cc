@@ -38,7 +38,7 @@ int
 RatedUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(this, errh).bind(conf)
-	    .read_or_set("BURST", _burst, 32)
+	    .read_or_set("BURST", _burst, -1)
         .read_or_set("ACTIVE", _active, true)
         .consume() < 0)
         return -1;
@@ -86,6 +86,10 @@ int
 RatedUnqueue::initialize(ErrorHandler *errh)
 {
     ScheduleInfo::initialize_task(this, &_task, errh);
+
+    if (_burst == -1)
+        _burst = (is_bandwidth()?1:32);
+
     _signal = Notifier::upstream_empty_signal(this, 0, &_task);
     _timer.initialize(this);
     return 0;
@@ -172,17 +176,12 @@ RatedUnqueue::write_param(const String &conf, Element *e, void *user_data,
     RatedUnqueue *u = static_cast<RatedUnqueue *>(e);
     switch (reinterpret_cast<intptr_t>(user_data)) {
     case h_active:
-	    click_chatter("Active handler");
-	if (!BoolArg().parse(conf, u->_active))
-	    return errh->error("syntax error");
-    if (u->_active && !u->_task.scheduled()) {
-
-	    click_chatter("Scheduling");
-	u->_task.reschedule();
-    }
-
-	break;
-
+        if (!BoolArg().parse(conf, u->_active))
+            return errh->error("syntax error");
+        if (u->_active && !u->_task.scheduled()) {
+            u->_task.reschedule();
+        }
+        break;
     }
     return 0;
 }
