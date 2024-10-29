@@ -25,7 +25,7 @@ CLICK_DECLS
 BierTable::BierTable(){}
 BierTable::~BierTable(){}
 
-bool BierTable::lookup(const bfrid &dst, bitstring &fbm, IP6Address &nxt, int &index, String &ifname) const {
+bool BierTable::lookup(const bfrid &dst, IP6Address &bfr_prefix, bitstring &fbm, IP6Address &nxt, int &index, String &ifname) const {
   int best = -1;
 
   for (int i = 0; i < _v.size(); i++) {
@@ -39,6 +39,7 @@ bool BierTable::lookup(const bfrid &dst, bitstring &fbm, IP6Address &nxt, int &i
     return false;
   else {
     nxt = _v[best]._nxt;
+    bfr_prefix = _v[best]._bfr_prefix;
     fbm = _v[best]._fbm;
     index = _v[best]._if_idx;
     ifname = _v[best]._if_name;
@@ -53,9 +54,10 @@ void BierTable::del(const bfrid &dst) {
   }
 }
 
-void BierTable::add(const bfrid &dst, const bitstring fbm, const IP6Address &nxt, int output, String ifname) {
+void BierTable::add(const bfrid &dst, const IP6Address bfr_prefix, const bitstring fbm, const IP6Address &nxt, int output, String ifname) {
   struct Entry e;
   e._dst = dst;
+  e._bfr_prefix = bfr_prefix;
   e._fbm = fbm;
   e._nxt = nxt;
   e._valid = 1;
@@ -76,10 +78,11 @@ void BierTable::add(const bfrid &dst, const bitstring fbm, const IP6Address &nxt
 String BierTable::dump() {
   StringAccum sa;
   if (_v.size())
-    sa << "# Active routes\n# BFR-id    F-BM    Nexthop    Ifindex\n";
+    sa << "# Active routes\n# BFR-id   BFR-prefix     F-BM    Nexthop    Ifindex\n";
   for (int i=0; i< _v.size(); i++) {
     if (_v[i]._valid) {
       sa << "    " << _v[i]._dst;
+      sa << "    " << _v[i]._bfr_prefix;
       sa << "      " << _v[i]._fbm.unparse();
       sa << "      " << _v[i]._nxt;
       sa << "      " << _v[i]._if_idx;

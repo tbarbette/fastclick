@@ -96,8 +96,7 @@ struct click_bier {
     bier_un.bier_un1.bier_un1_l3  = htonl(bier_un.bier_un1.bier_un1_l3);
     // FIXME: Do not use BSL per RFC8296. BSL should be provided as an argument.
     size_t bsl = _click_bier_expand_bsl(bier_bsl) / 32;
-    click_chatter("bsl %u %u", bier_bsl, bsl);
-    uint32_t _bitstring[bsl] = {0};
+    uint32_t _bitstring[bsl];
     for (size_t i=0; i<bsl; i++) _bitstring[bsl-1-i] = htonl(bitstring[i]);
     memcpy(bitstring, _bitstring, bsl*sizeof(uint32_t));
 #endif
@@ -105,9 +104,14 @@ struct click_bier {
 
   void encode() {
 #if CLICK_BYTE_ORDER == CLICK_LITTLE_ENDIAN
+    // FIXME: Do not use BSL per RFC8296. BSL should be provided as an argument.
+    size_t bsl = _click_bier_expand_bsl(bier_bsl) / 32;
     bier_un.bier_un1.bier_un1_l1  = ntohl(bier_un.bier_un1.bier_un1_l1); 
     bier_un.bier_un1.bier_un1_l2  = ntohl(bier_un.bier_un1.bier_un1_l2); 
     bier_un.bier_un1.bier_un1_l3  = ntohl(bier_un.bier_un1.bier_un1_l3); 
+    uint32_t _bitstring[bsl];
+    for (size_t i=0; i<bsl; i++) _bitstring[bsl-1-i] = ntohl(bitstring[i]);
+    memcpy(bitstring, _bitstring, bsl*sizeof(uint32_t));
 #endif
   }
 

@@ -18,6 +18,7 @@
 #include <click/config.h>
 #include <click/args.hh>
 #include <click/glue.hh>
+#include <click/ip6address.hh>
 #include <click/packet.hh>
 #include <click/straccum.hh>
 #include <clicknet/bier.h>
@@ -72,7 +73,7 @@ int LookupBierTable::classify(Packet *p_in) {
 
   unsigned short k = 0;
   uint16_t bift_id;
-  IP6Address nxt;
+  IP6Address nxt, bfr_prefix;
   bitstring fbm;
   bfrid bfr_id;
   int index;
@@ -106,7 +107,10 @@ int LookupBierTable::classify(Packet *p_in) {
   );
 
   // Sanity check: the BIFT ID specified in the BIER packet corresponds to the current BIFT. 
-  if (bier->bier_bift_id != _bift_id) return -1;
+  if (bier->bier_bift_id != _bift_id) {
+    click_chatter("Unknown BIFT-ID %x. Ignoring.", bier->bier_bift_id);
+    return -1;
+  }
 
   // RFC8279 Section 6.5 Step 2
   while (bs != 0) {
@@ -134,20 +138,20 @@ int LookupBierTable::classify(Packet *p_in) {
     // the BIER packet's BIFT ID already has been verified earlier.
 
     // RFC8279 Section 6.5 Step 6
-    if (_t.lookup(bfr_id, fbm, nxt, index, ifname)) {
+    if (_t.lookup(bfr_id, bfr_prefix, fbm, nxt, index, ifname)) {
       fbm.resize(bsl);
   
       // RFC8279 Section 6.5 Step 7
       WritablePacket *p2 = p->duplicate();
+      SET_DST_IP6_ANNO(p2, nxt);
       click_ip6 *ip6 = reinterpret_cast<click_ip6*>(p2->data());
-      ip6->ip6_dst = nxt;
-      click_bier *bier_dup = reinterpret_cast<click_bier*>(p2->data()+sizeof(click_ip6));
-      memcpy(bier_dup->bitstring, (bs & fbm).data_words(), bsl/(sizeof(Bitvector::word_type)*8));
-      bier_dup->encode();
-      // TODO: Add ethernet header to the packet
+      ip6->ip6_dst = bfr_prefix;
+      click_bier *bier = reinterpret_cast<click_bier*>(p2->data()+sizeof(click_ip6));
+      memcpy(bier->bitstring, (bs & fbm).data_words(), bsl/(sizeof(Bitvector::word_type)*8));
+      bier->encode();
       
       // ifname is ensured to be in _ifaces because of the check upon route addition.
-      output(_ifaces[ifname]).push(p2->duplicate());
+      output(_ifaces[ifname]).push(p2);
 
       // RFC8279 Section 6.5 Step 8
       bs &= ~fbm;
@@ -165,11 +169,11 @@ int LookupBierTable::classify(Packet *p_in) {
     return -1;
 }
 
-int LookupBierTable::add_route(bfrid dst, bitstring fbm, IP6Address nxt, int output, String ifname, ErrorHandler *errh) {
+int LookupBierTable::add_route(bfrid dst, IP6Address bfr_prefix, bitstring fbm, IP6Address nxt, int output, String ifname, ErrorHandler *errh) {
   // if (output < 0 || output >= noutputs())
     // return errh->error("port number <%u> out of range", output);
   // TODO: Check if ifname is in table
-  _t.add(dst, fbm, nxt, output, ifname);
+  _t.add(dst, bfr_prefix, fbm, nxt, output, ifname);
   return 0;
 }
 

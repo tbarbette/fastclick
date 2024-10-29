@@ -11,7 +11,7 @@ class BierRouteTable : public BatchElement {
     void* cast(const char*) override;
     const char *port_count() const override { return PORTS_0_0; }
 
-    virtual int add_route(bfrid, bitstring, IP6Address, int, String, ErrorHandler*);
+    virtual int add_route(bfrid, IP6Address, bitstring, IP6Address, int, String, ErrorHandler*);
     virtual String dump_routes();
 
     static int add_route_handler(const String&, Element*, void*, ErrorHandler*);

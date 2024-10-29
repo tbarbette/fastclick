@@ -21,6 +21,7 @@
 #include <click/error.hh>
 #include <click/glue.hh>
 #include <click/ip6address.hh>
+#include <click/ipaddress.hh>
 CLICK_DECLS
 
 void* BierRouteTable::cast(const char *name) {
@@ -30,7 +31,7 @@ void* BierRouteTable::cast(const char *name) {
     return Element::cast(name);
 }
 
-int BierRouteTable::add_route(bfrid, bitstring, IP6Address, int, String, ErrorHandler *errh) {
+int BierRouteTable::add_route(bfrid, IP6Address, bitstring, IP6Address, int, String, ErrorHandler *errh) {
   return errh->error("cannot add routes to this routing table");
 }
 
@@ -44,6 +45,7 @@ int BierRouteTable::add_route_handler(const String &conf, Element *e, void *, Er
   cp_spacevec(conf, words);
 
   bfrid dst;
+  IP6Address bfr_prefix;
   bitstring fbm;
   IP6Address nxt;
   int output;
@@ -54,6 +56,7 @@ int BierRouteTable::add_route_handler(const String &conf, Element *e, void *, Er
   // TODO: read_all for BFRID and define dst as an array for route addition batching
   ok = Args(words, r, errh)
        .read_mp("BFRID", dst)
+       .read_mp("BFRPREFIX", bfr_prefix)
        .read_mp("BITSTRING", fbm)
        .read_mp("NXT", nxt)
        .read_mp("IFIDX", output)
@@ -61,7 +64,7 @@ int BierRouteTable::add_route_handler(const String &conf, Element *e, void *, Er
        .complete();
 
   if (ok >= 0)
-    ok = r->add_route(dst, fbm, nxt, output, ifname, errh);
+    ok = r->add_route(dst, bfr_prefix, fbm, nxt, output, ifname, errh);
 
   return ok;
 }
