@@ -87,8 +87,15 @@ RatedUnqueue::initialize(ErrorHandler *errh)
 {
     ScheduleInfo::initialize_task(this, &_task, errh);
 
-    if (_burst == -1)
-        _burst = (is_bandwidth()?1:32);
+    if (_burst == -1) {
+        if (is_bandwidth()) {
+            _burst = 1;
+#if HAVE_VERBOSE_BATCH
+            errh->warning("BURST parameter is not set. To avoid unexpected behavior, it will pull batches of one packet at maximum to avoid imprecision (e.g. pulling 32 packets which might be way over the amount of available tokens). Set BURST to a value to silence this message.", this);
+#endif
+        } else
+            _burst = 32;
+    }
 
     _signal = Notifier::upstream_empty_signal(this, 0, &_task);
     _timer.initialize(this);
