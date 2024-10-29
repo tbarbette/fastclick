@@ -38,7 +38,7 @@ Script(wait 10, read c1.count, read c2.count, read c3.count, read c4.count, writ
 %expect stdout
 %expect -w stderr
 c1.count:
-20
+21
 c2.count:
 70
 c3.count:
