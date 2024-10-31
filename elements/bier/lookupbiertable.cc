@@ -177,9 +177,14 @@ int LookupBierTable::add_route(bfrid dst, IP6Address bfr_prefix, bitstring fbm, 
   return 0;
 }
 
+int LookupBierTable::del_route(bfrid bfrid, ErrorHandler *errh) {
+  _t.del(bfrid);
+  return 0;
+}
+
 void LookupBierTable::add_handlers() {
   add_write_handler("add", add_route_handler, 0);
-  // TODO: implement route deletion
+  add_write_handler("del", del_route_handler, 0);
   add_read_handler("table", table_handler, 0);
 }
 

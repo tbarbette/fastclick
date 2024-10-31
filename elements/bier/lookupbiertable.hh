@@ -22,6 +22,7 @@ class LookupBierTable : public ClassifyElement<LookupBierTable, BierRouteTable> 
 		void add_handlers() override CLICK_COLD;
 
 		int add_route(bfrid dst, IP6Address bfr_prefix, bitstring fbm, IP6Address nxt, int, String, ErrorHandler*);
+		int del_route(bfrid, ErrorHandler*);
 		String dump_routes() { return _t.dump(); }
 
 	private:

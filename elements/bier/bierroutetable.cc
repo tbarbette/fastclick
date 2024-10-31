@@ -35,6 +35,10 @@ int BierRouteTable::add_route(bfrid, IP6Address, bitstring, IP6Address, int, Str
   return errh->error("cannot add routes to this routing table");
 }
 
+int BierRouteTable::del_route(bfrid, ErrorHandler *errh) {
+  return errh->error("cannot del routes to this routing table");
+}
+
 String BierRouteTable::dump_routes() {
   return String();
 }
@@ -82,6 +86,20 @@ int BierRouteTable::add_route_handler(const String &conf, Element *e, void *, Er
 String BierRouteTable::table_handler(Element *e, void *) {
   BierRouteTable *r = static_cast<BierRouteTable *>(e);
   return r->dump_routes();
+}
+
+int BierRouteTable::del_route_handler(const String &conf, Element *e, void *, ErrorHandler *errh) {
+  BierRouteTable *r = static_cast<BierRouteTable *>(e);
+  Vector<String> words;
+  cp_spacevec(conf, words);
+
+  bfrid bfrid;
+
+  if (Args(words, r, errh).read_mp("BFR-ID", bfrid).complete() < 0)
+    return -1;
+
+  return r->del_route(bfrid, errh);
+
 }
 
 CLICK_ENDDECLS
