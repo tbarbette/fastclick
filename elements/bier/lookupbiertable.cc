@@ -1,5 +1,5 @@
 /*
- * lookupbiertable.{cc,hh} -- element encapsulates packet in IP6 SRv6 header
+ * lookupbiertable.{cc,hh} -- duplicates and forwards BIER packets
  * Nicolas Rybowski
  *
  * Copyright (c) 2024 UCLouvain
@@ -170,9 +170,12 @@ int LookupBierTable::classify(Packet *p_in) {
 }
 
 int LookupBierTable::add_route(bfrid dst, IP6Address bfr_prefix, bitstring fbm, IP6Address nxt, int output, String ifname, ErrorHandler *errh) {
-  // if (output < 0 || output >= noutputs())
-    // return errh->error("port number <%u> out of range", output);
-  // TODO: Check if ifname is in table
+  if (output < 0 || output >= noutputs())
+    return errh->error("port number <%u> out of range", output);
+
+  if (!_ifaces.find(ifname))
+    return errh->error("unknown interface <%s>", ifname.c_str());
+
   _t.add(dst, bfr_prefix, fbm, nxt, output, ifname);
   return 0;
 }

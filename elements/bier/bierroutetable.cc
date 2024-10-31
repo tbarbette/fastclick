@@ -1,5 +1,5 @@
 /*
- * bierroutetable.{cc,hh} -- element encapsulates packet in IP6 SRv6 header
+ * bierroutetable.{cc,hh} -- implement handlers for BIFT element
  * Nicolas Rybowski
  *
  * Copyright (c) 2024 UCLouvain

@@ -7,6 +7,49 @@
 #include "bierroutetable.hh"
 CLICK_DECLS
 
+/*
+ * =c
+ * LookupBierTable(BIFT_ID BFR_ID IFACE ...)
+ * =s bier
+ *
+ * =d
+ * Input: IP6 packets (no ether header).
+ * Expects a destination IP6 address annotation with each packet.
+ *
+ * Implements the forwarding procedure of BIER packets as defined in RFC8279 Section 6.
+ * Outputs 0 and 1 are reserved: discarded packets are pushed on output 0 while packets destined
+ * to the current BFR are pushed on output 1.
+ *
+ * Keyword arguments are:
+ *
+ * =over 8
+ *
+ * =item BIFT_ID
+ *
+ * The identifier of the current BIFT. This identifier defines the bitstring length (BSL),
+ * set identifier (SI) and sub-domain identifier (SD).
+ *
+ * =item BFR_ID
+ *
+ * The identifier of the current BFR.
+ *
+ * =item IFACE
+ *
+ * A mapping of a physical interface with the output number of the element.
+ *
+ * =back
+ *
+ * =e
+ *
+ *   bift :: LookupBierTable(BIFT_ID 0x01234 BFR_ID 1 IFACE eth0:2 IFACE eth1:3);
+ *   rt[0] -> Discard;
+ *   rt[1] -> ... -> ToDevice(lo);
+ *   rt[2] -> ... -> ToDevice(eth0);
+ *   rt[3] -> ... -> ToDevice(eth1);
+ *   ...
+ *
+ */
+
 class LookupBierTable : public ClassifyElement<LookupBierTable, BierRouteTable> {
 	public:
 		LookupBierTable();

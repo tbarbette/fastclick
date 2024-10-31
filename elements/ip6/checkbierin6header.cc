@@ -1,5 +1,5 @@
 /*
- * checkbierin6header.{cc,hh} -- element encapsulates packet in IP6 SRv6 header
+ * checkbierin6header.{cc,hh} -- checks BIERin6 header for correctness
  * Nicolas Rybowski
  *
  * Copyright (c) 2024 UCLouvain
@@ -57,7 +57,6 @@ Packet *CheckBIERin6Header::simple_action(Packet *p) {
   
   const click_ip6 *iph = (click_ip6*) p->ip_header();
   if (iph->ip6_nxt != IP6PROTO_BIERIN6) {
-    click_chatter("Not a BIERin6 packet");
     goto drop;
   }
 

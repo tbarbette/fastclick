@@ -1,5 +1,5 @@
 /*
- * checkbierheader.{cc,hh} -- element encapsulates packet in IP6 SRv6 header
+ * checkbierheader.{cc,hh} -- checks BIER header for correctness
  * Nicolas Rybowski
  *
  * Copyright (c) 2024 UCLouvain

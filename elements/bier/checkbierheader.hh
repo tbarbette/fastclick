@@ -8,13 +8,13 @@ CLICK_DECLS
 /*
  * =c
  * CheckBIERHeader([OFFSET])
- * =s ip6
+ * =s bier
  *
  * =d
  * 
  * Expects BIER packets as input starting at OFFSET bytes. Default OFFSET is zero.
  * Checks that thet packet's length is reasonable.
- * Pushes invalid or non BIERin6 packets out on output 1, unless output 1 was unused; if so,
+ * Pushes invalid or non BIER packets out on output 1, unless output 1 was unused; if so,
  * drop the packets.
  *
  * Keyword arguments are:

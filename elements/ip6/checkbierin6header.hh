@@ -4,6 +4,29 @@
 #include <click/atomic.hh>
 CLICK_DECLS
 
+/*
+ * =c
+ * CheckBIERin6Header([OFFSET])
+ * =s ip6
+ *
+ * =d
+ *
+ * Expects BIER packets encapsulated in IPv6 packets as input starting at OFFSET bytes. Default OFFSET is zero.
+ * Checks that the IPv6 packet contains a BIER packet.
+ * Pushes invalid or non BIERin6 packets out on output 1, unless output 1 was unused; if so,
+ * drop the packets.
+ *
+ * Keyword arguments are:
+ *
+ * =over 8
+ *
+ * =item OFFSET
+ *
+ * Unsigned integer. Byte position at which the BIER header begins. Default is 0.
+ *
+ * =back
+ *
+ */
 class CheckBIERin6Header : public SimpleElement<CheckBIERin6Header> {
   public:
    CheckBIERin6Header();
