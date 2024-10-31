@@ -44,29 +44,39 @@ int BierRouteTable::add_route_handler(const String &conf, Element *e, void *, Er
   Vector<String> words;
   cp_spacevec(conf, words);
 
-  bfrid dst;
-  IP6Address bfr_prefix;
   bitstring fbm;
   IP6Address nxt;
   int output;
   String ifname;
+  String raw_bfrs;
 
-  int ok;
-
-  // TODO: read_all for BFRID and define dst as an array for route addition batching
-  ok = Args(words, r, errh)
-       .read_mp("BFRID", dst)
-       .read_mp("BFRPREFIX", bfr_prefix)
+  if (
+    Args(words, r, errh)
        .read_mp("BITSTRING", fbm)
        .read_mp("NXT", nxt)
        .read_mp("IFIDX", output)
        .read_mp("IFNAME", ifname)
-       .complete();
+       .read_mp("BFR", raw_bfrs)
+       .complete() < 0
+  )
+    return -1;
 
-  if (ok >= 0)
-    ok = r->add_route(dst, bfr_prefix, fbm, nxt, output, ifname, errh);
+  Vector<String> bfrs;
+  cp_argvec(raw_bfrs, bfrs);
 
-  return ok;
+  for (int i=0; i<bfrs.size(); i++) {
+    Vector<String> bfr = bfrs[i].split('_');
+    if (bfr.size() != 2) {
+      click_chatter("Invalid BFR specification. Should be \"BFR <bfr-id>_<bfr-prefix>\"");
+      continue;
+    }
+    if (r->add_route((bfrid) atoi(bfr[0].c_str()), IP6Address(bfr[1]), fbm, nxt, output, ifname, errh)) {
+      click_chatter("Failed to add BIFT entry. Ignoring.");
+      continue;
+    }
+  }
+
+  return 0;
 }
 
 String BierRouteTable::table_handler(Element *e, void *) {
