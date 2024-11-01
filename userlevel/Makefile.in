@@ -99,7 +99,7 @@ LLVM_OBJS = @LLVM_OBJS@
 LIBOBJS = $(GENERIC_OBJS) $(STD_ELEMENT_OBJS) clp.o exportstub.o
 STD_ELEMENT_OBJS = addressinfo.o alignmentinfo.o \
 	errorelement.o portinfo.o scheduleinfo.o
-OBJS = $(ELEMENT_OBJS) $(ELEMENTSCONF)$(ELEMENTSSUFFIX).o click.o
+OBJS = $(ELEMENT_OBJS) $(ELEMENTSCONF)$(ELEMENTSSUFFIX).o clp.o click.o
 
 CPPFLAGS = @CPPFLAGS@ -DCLICK_USERLEVEL
 CFLAGS = @CFLAGS@
