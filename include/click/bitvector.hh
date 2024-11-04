@@ -32,6 +32,7 @@ class Bitvector {
     explicit inline Bitvector(bool bit);
     inline Bitvector(int n, bool bit);
     inline Bitvector(const Bitvector &x);
+    inline Bitvector(word_type *array, int n);
     inline ~Bitvector();
 
     inline int size() const;
@@ -155,6 +156,21 @@ inline Bitvector::Bitvector(int n)
     } else {
 	_max = -1;
 	resize(n);
+    }
+}
+
+inline Bitvector::Bitvector(word_type *array, int n) : _data(_f){
+    assert(n >= 0);
+    if (n <= inlinebits) {
+        _max = n - 1;
+        memset(_f, 0, sizeof(_f));
+    } else {
+        _max = -1;
+        resize(n);
+    }
+    for (unsigned int i = 0; i < n / (sizeof(word_type)*8); i++) {
+        _data[i] = array[i];
+        click_chatter("bv %i %x %x", i, _data[i], array[i]);
     }
 }
 
