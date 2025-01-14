@@ -838,9 +838,9 @@ void WritablePacket::pool_transfer(int from, int to) {
     (void)to;
 }
 
-#if HAVE_DPDK
+#if HAVE_DPDK && !CLICK_PACKET_USE_DPDK
 /**
- * @brief Make a Packet with a DPDK-backed buffer
+ * @brief Make a click Packet with a DPDK-backed buffer
  *
  * @param headroom
  * @param data
@@ -857,8 +857,11 @@ Packet::make_dpdk_packet(uint32_t headroom, uint32_t length, uint32_t tailroom, 
         n = min_buffer_length;
     }
 
+#if HAVE_CLICK_PACKET_POOL
     WritablePacket* p = WritablePacket::pool_allocate();
-
+#else
+    WritablePacket* p = new WritablePacket;
+#endif
     unsigned char *d = 0;
 
     struct rte_mbuf *mb = DPDKDevice::get_pkt();

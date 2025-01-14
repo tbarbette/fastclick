@@ -433,9 +433,7 @@ FromFile::set_data(const String& data, ErrorHandler* errh)
 int
 FromFile::initialize(ErrorHandler *errh, bool allow_nonexistent)
 {
-#if CLICK_PACKET_USE_DPDK
-    assert(BUFFER_SIZE <= DPDKDevice::MBUF_DATA_SIZE);
-#endif
+
     // if set_data, initialize is noop
     if (_fd == -2)
         return 0;
@@ -592,10 +590,10 @@ FromFile::get_string(size_t size, ErrorHandler *errh)
 Packet *
 FromFile::get_packet(size_t size, uint32_t sec, uint32_t subsec, ErrorHandler *errh)
 {
-#if HAVE_DPDK
+#if CLICK_PACKET_USE_DPDK
+#elif HAVE_DPDK
     if (_dpdk) {
         WritablePacket *p = Packet::make_dpdk_packet(0, size, 0, 0);
-        //click_chatter("P %p, %d %d %d %d", p, p->length(), p->buffer_length(), p->headroom(), p->tailroom());
         assert(DPDKDevice::is_dpdk_packet(p));
 	    if (read(p->data(), size, errh) < (int)size) {
 		    p->kill();
@@ -605,28 +603,26 @@ FromFile::get_packet(size_t size, uint32_t sec, uint32_t subsec, ErrorHandler *e
             return p;
 	    }
     }
-#endif
-#if CLICK_PACKET_USE_DPDK
 #else
     if (_pos + size <= _len) {
-#ifndef CLICK_NOINDIRECT
+# ifndef CLICK_NOINDIRECT
         if (Packet *p = _data_packet->clone()) {
             p->shrink_data(_buffer + _pos, size);
             p->timestamp_anno().assign(sec, subsec);
             _pos += size;
             return p;
         }
-#else
+# else
         if (Packet *p = Packet::make(_buffer + _pos, size)) {
             p->timestamp_anno().assign(sec, subsec);
             _pos += size;
             return p;
         }
-#endif
+# endif
     } else
 #endif
     {
-        if (WritablePacket *p = Packet::make(0, 0, size, 0)) {
+        if (WritablePacket *p = Packet::make(0, 0, size, 0, 0)) {
             if (read(p->data(), size, errh) < (int)size) {
                 p->kill();
                 return 0;

@@ -81,7 +81,7 @@ class Packet { public:
 				uint32_t length, uint32_t tailroom, bool clear = true) CLICK_WARN_UNUSED_RESULT;
     static inline WritablePacket *make(const void *data, uint32_t length) CLICK_WARN_UNUSED_RESULT;
     static inline WritablePacket *make(uint32_t length) CLICK_WARN_UNUSED_RESULT;
-#if HAVE_DPDK
+#if HAVE_DPDK && !CLICK_PACKET_USE_DPDK
     static WritablePacket *make_dpdk_packet(uint32_t headroom,
 	     uint32_t length, uint32_t tailroom, bool clear) CLICK_WARN_UNUSED_RESULT;
 #endif
