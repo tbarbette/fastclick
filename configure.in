@@ -374,7 +374,10 @@ fi
 
 AC_ARG_ENABLE([clone],
     [AS_HELP_STRING([  --disable-clone], [disable packet cloning])],
-    [AC_DEFINE(CLICK_NOINDIRECT)],[:])
+    [:],[:])
+if test "$enable_clone" = no; then
+    AC_DEFINE(CLICK_NOINDIRECT)
+fi
 
 AC_ARG_ENABLE([rsspp],
     [AS_HELP_STRING([  --disable-rsspp], [disable RSS++ (enabled if --enable-cpu-load by default)])],
