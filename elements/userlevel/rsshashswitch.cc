@@ -26,8 +26,10 @@
 #include <clicknet/ether.h>
 
 #include <click/dpdkdevice.hh>
-#include <click/ip6address.hh>
-#include <click/ip6flowid.hh>
+#if HAVE_IP6
+# include <click/ip6address.hh>
+# include <click/ip6flowid.hh>
+#endif
 #include <rte_thash.h>
 
 CLICK_DECLS
@@ -79,7 +81,9 @@ RSSHashSwitch::process(Packet *p)
         memcpy(&tuple.v4.dst_addr, &a, 4);
         len = 4 + 4 + 2 + 2;
 
-    } else if  (eth->ether_type == 0xDD86) {
+    }
+#if HAVE_IP6
+    else if  (eth->ether_type == 0xDD86) {
         IP6FlowID f(p);
         tuple.v6.sport = f.sport();
         tuple.v6.dport = f.dport();
@@ -88,7 +92,9 @@ RSSHashSwitch::process(Packet *p)
         a = f.daddr();
         memcpy(&tuple.v6.dst_addr, &a, 16);
         len = 16 + 16 + 2 + 2;
-    } else {
+    }
+#endif
+    else {
         return 0;
     }
 
