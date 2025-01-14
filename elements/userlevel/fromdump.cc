@@ -275,23 +275,24 @@ FromDump::initialize(ErrorHandler *errh)
 	return _ff.error(errh, "not a tcpdump file (too short)");
 
     if (fh->magic == FAKE_PCAP_MAGIC || fh->magic == FAKE_PCAP_MAGIC_NANO || fh->magic == FAKE_MODIFIED_PCAP_MAGIC)
-	_swapped = false;
+	    _swapped = false;
     else {
-	swap_file_header(fh, &swapped_fh);
-	_swapped = true;
-	fh = &swapped_fh;
+        swap_file_header(fh, &swapped_fh);
+        _swapped = true;
+        fh = &swapped_fh;
     }
     if (fh->magic != FAKE_PCAP_MAGIC && fh->magic != FAKE_PCAP_MAGIC_NANO && fh->magic != FAKE_MODIFIED_PCAP_MAGIC)
-	return _ff.error(errh, "not a tcpdump file (bad magic number)");
+	    return _ff.error(errh, "not a tcpdump file (bad magic number)");
     // compensate for extra crap appended to packet headers
     if (fh->magic == FAKE_PCAP_MAGIC || fh->magic == FAKE_PCAP_MAGIC_NANO)
-	_extra_pkthdr_crap = 0;
+	    _extra_pkthdr_crap = 0;
     else
-	_extra_pkthdr_crap = sizeof(fake_modified_pcap_pkthdr) - sizeof(fake_pcap_pkthdr);
+	    _extra_pkthdr_crap = sizeof(fake_modified_pcap_pkthdr) - sizeof(fake_pcap_pkthdr);
     _have_nanosecond_timestamps = fh->magic == FAKE_PCAP_MAGIC_NANO;
 
     if (fh->version_major != FAKE_PCAP_VERSION_MAJOR)
-	return _ff.error(errh, "unknown major version %d", fh->version_major);
+	    return _ff.error(errh, "unknown major version %d", fh->version_major);
+
     _minor_version = fh->version_minor;
     // map possible host link types to global link types
     _linktype = fake_pcap_canonical_dlt(fh->linktype, true);
@@ -429,19 +430,19 @@ FromDump::read_packet(ErrorHandler *errh)
 
     // read the packet header
     if (!(ph = reinterpret_cast<const fake_pcap_pkthdr *>(_ff.get_aligned(sizeof(*ph), &swapped_ph))))
-	return false;
+	    return false;
     if (_swapped) {
-	swap_packet_header(ph, &swapped_ph);
-	ph = &swapped_ph;
+        swap_packet_header(ph, &swapped_ph);
+        ph = &swapped_ph;
     }
 
     // may need to swap 'caplen' and 'len' fields at or before version 2.3
     if (_minor_version > 3 || (_minor_version == 3 && ph->caplen <= ph->len)) {
-	len = ph->len;
-	caplen = ph->caplen;
+        len = ph->len;
+        caplen = ph->caplen;
     } else {
-	len = ph->caplen;
-	caplen = ph->len;
+        len = ph->caplen;
+        caplen = ph->len;
     }
 
     // check for errors
@@ -450,11 +451,11 @@ FromDump::read_packet(ErrorHandler *errh)
     // should be fixed, but we hack around the problem here, as does
     // tcpdump itself.
     if (caplen > 65535) {
-	_ff.error(errh, "bad packet header; giving up");
-	return false;
+	    _ff.error(errh, "bad packet header; giving up");
+	    return false;
     } else if (caplen > len) {
-	skiplen = caplen - len;
-	caplen = len;
+        skiplen = caplen - len;
+        caplen = len;
     }
 
     // compensate for modified pcap versions
@@ -473,27 +474,27 @@ FromDump::read_packet(ErrorHandler *errh)
 	    _have_first_time = false;
     }
     if (_have_last_time && ts >= _last_time) {
-	_have_last_time = false;
-	(void) _end_h->call_write(errh);
-	if (!_active) {
-	    _ff.shift_pos(caplen + skiplen);
-	    return false;
-	}
-	// retry _last_time in case someone changed it
-	goto check_times;
+        _have_last_time = false;
+        (void) _end_h->call_write(errh);
+        if (!_active) {
+            _ff.shift_pos(caplen + skiplen);
+            return false;
+        }
+        // retry _last_time in case someone changed it
+        goto check_times;
     }
 
     // checking sampling probability
     if (_sampling_prob < (1 << SAMPLING_SHIFT)
-	&& (click_random() & ((1<<SAMPLING_SHIFT)-1)) >= _sampling_prob) {
-	_ff.shift_pos(caplen + skiplen);
-	return true;
+        && (click_random() & ((1<<SAMPLING_SHIFT)-1)) >= _sampling_prob) {
+        _ff.shift_pos(caplen + skiplen);
+        return true;
     }
 
     // create packet
     p = _ff.get_packet(caplen, ts.sec(), ts.subsec(), errh);
     if (!p)
-	return false;
+	    return false;
 
     // Adjust the packet length as requested by the user
     if (_force_len != DISABLED) {
@@ -659,13 +660,13 @@ FromDump::run_task(Task *)
 	return false;
 
     if (!_packet && !read_packet(0)) {
-	if (_end_h)
-	    _end_h->call_write(ErrorHandler::default_handler());
-	return false;
+        if (_end_h)
+            _end_h->call_write(ErrorHandler::default_handler());
+        return false;
     }
     if (_packet && _timing) {
         if (!check_timing(_packet, now_s, fresh)) {
-		return false;
+		    return false;
         }
     }
     if (_packet && _force_ip && !fake_pcap_force_ip(_packet, _linktype)) {

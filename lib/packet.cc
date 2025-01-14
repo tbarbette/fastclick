@@ -1103,7 +1103,7 @@ Packet::clone(bool fast)
 # endif
     if (!p)
 	    return 0;
-    if (unlikely(fast)) {
+    if (unlikely(fast)) { //Fast clone makes "illegal" unshared copy for click, copying also only pointers. However when using DPDK the underlying buffer is properly managed
 
         p->_use_count = 1;
         p->_head = _head;
@@ -1115,12 +1115,11 @@ Packet::clone(bool fast)
         p->_end = _end;
 # if HAVE_DPDK
         if (DPDKDevice::is_dpdk_packet(this)) {
+            click_chatter("Click clone");
           p->_destructor = DPDKDevice::free_pkt;
           p->_destructor_argument = destructor_argument();
           rte_mbuf_refcnt_update((rte_mbuf*)p->_destructor_argument, 1);
-        }
-
-        else if (
+        } else if (
                 data_packet() && DPDKDevice::is_dpdk_packet(data_packet())) {
            p->_destructor = DPDKDevice::free_pkt;
            p->_destructor_argument = data_packet()->destructor_argument();

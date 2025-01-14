@@ -34,6 +34,11 @@
 #ifdef ALLOW_MMAP
 # include <sys/mman.h>
 #endif
+#if HAVE_DPDK
+#include <rte_memory.h>
+#include <rte_memzone.h>
+#include <click/dpdkdevice.hh>
+#endif
 CLICK_DECLS
 
 FromFile::FromFile()
@@ -135,11 +140,11 @@ int
 FromFile::read_buffer_mmap(ErrorHandler *errh)
 {
     if (_mmap_unit == 0) {
-	size_t page_size = getpagesize();
-	_mmap_unit = (WANT_MMAP_UNIT / page_size) * page_size;
-	_mmap_off = 0;
-	// don't report most errors on the first time through
-	errh = ErrorHandler::silent_handler();
+        size_t page_size = getpagesize();
+        _mmap_unit = (WANT_MMAP_UNIT / page_size) * page_size;
+        _mmap_off = 0;
+        // don't report most errors on the first time through
+        errh = ErrorHandler::silent_handler();
     }
 
     // get length of file
@@ -182,7 +187,7 @@ FromFile::read_buffer(ErrorHandler *errh)
 {
 #if !CLICK_PACKET_USE_DPDK
     if (_data_packet) {
-	_data_packet->kill();
+	    _data_packet->kill();
     }
     _data_packet = 0;
 #endif
@@ -198,24 +203,23 @@ FromFile::read_buffer(ErrorHandler *errh)
 
 #ifdef ALLOW_MMAP
     if (_mmap) {
-	int result = read_buffer_mmap(errh);
-	if (result >= 0)
-	    return result;
-	// else, try a regular read
-	_mmap = false;
-	(void) lseek(_fd, _mmap_off, SEEK_SET);
-	_len = 0;
+        int result = read_buffer_mmap(errh);
+        if (result >= 0)
+            return result;
+        // else, try a regular read
+        _mmap = false;
+        (void) lseek(_fd, _mmap_off, SEEK_SET);
+        _len = 0;
     }
 #endif
 
 #if !CLICK_PACKET_USE_DPDK
     _data_packet = Packet::make(0, 0, BUFFER_SIZE, 0);
     if (!_data_packet)
-	return error(errh, strerror(ENOMEM));
+	    return error(errh, strerror(ENOMEM));
     _buffer = _data_packet->data();
     unsigned char *data = _data_packet->data();
 #else
-
     unsigned char *data = _buffer;
 #endif
 
@@ -358,11 +362,11 @@ FromFile::seek(off_t want, ErrorHandler* errh)
 
 #ifdef ALLOW_MMAP
     if (_mmap) {
-	_mmap_off = (want / _mmap_unit) * _mmap_unit;
-	_pos = _len + want - _mmap_off;
-	_file_offset = 0; // Is that correct?
-	// TODO: fix lineno
-	return 0;
+        _mmap_off = (want / _mmap_unit) * _mmap_unit;
+        _pos = _len + want - _mmap_off;
+        _file_offset = 0; // Is that correct?
+        // TODO: fix lineno
+        return 0;
     }
 #endif
 
@@ -378,9 +382,9 @@ FromFile::seek(off_t want, ErrorHandler* errh)
 
     // try to seek
     if (lseek(_fd, want, SEEK_SET) != (off_t) -1) {
-	_pos = _len;
-	_file_offset = want - _len;
-	return 0;
+        _pos = _len;
+        _file_offset = want - _len;
+        return 0;
     }
 
     // otherwise, read data
@@ -520,8 +524,8 @@ FromFile::get_aligned(size_t size, void *buffer, ErrorHandler *errh)
 {
     // we may need to read bits of the file
     if (_pos + size <= _len) {
-	const uint8_t *chunk = _buffer + _pos;
-	_pos += size;
+	    const uint8_t *chunk = _buffer + _pos;
+	    _pos += size;
 #if HAVE_INDIFFERENT_ALIGNMENT
 	return reinterpret_cast<const uint8_t *>(chunk);
 #else
@@ -534,9 +538,9 @@ FromFile::get_aligned(size_t size, void *buffer, ErrorHandler *errh)
 	}
 #endif
     } else if (read(buffer, size, errh) == (int)size)
-	return reinterpret_cast<uint8_t *>(buffer);
+	    return reinterpret_cast<uint8_t *>(buffer);
     else
-	return 0;
+	    return 0;
 }
 
 const uint8_t *
@@ -544,13 +548,13 @@ FromFile::get_unaligned(size_t size, void *buffer, ErrorHandler *errh)
 {
     // we may need to read bits of the file
     if (_pos + size <= _len) {
-	const uint8_t *chunk = _buffer + _pos;
-	_pos += size;
-	return reinterpret_cast<const uint8_t *>(chunk);
-    } else if (read(buffer, size, errh) == (int)size)
-	return reinterpret_cast<uint8_t *>(buffer);
-    else
-	return 0;
+        const uint8_t *chunk = _buffer + _pos;
+        _pos += size;
+	    return reinterpret_cast<const uint8_t *>(chunk);
+    } else if (read(buffer, size, errh) == (int)size) {
+	    return reinterpret_cast<uint8_t *>(buffer);
+    } else
+	    return 0;
 }
 
 String

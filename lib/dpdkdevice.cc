@@ -25,7 +25,9 @@
 #include <click/dpdkdevice.hh>
 #include <click/userutils.hh>
 #include <rte_errno.h>
+#include <rte_ethdev.h>
 #include <click/dpdk_glue.hh>
+#include <click/packet.hh>
 
 #if CLICK_PACKET_USE_DPDK
 #define DPDK_ANNO_SIZE sizeof(Packet::AllAnno)
@@ -1319,6 +1321,60 @@ void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 {
     rte_pktmbuf_free((struct rte_mbuf *) pktmbuf);
 }
+
+void destroy_extbuf(void *addr, void *opaque) {
+    Packet::buffer_destructor_type destructor = (Packet::buffer_destructor_type)opaque;
+    destructor((unsigned char*)addr, 0, 0);
+
+}
+
+WritablePacket* DPDKDevice::make_extbuf(unsigned char *data, uint32_t length,
+	     Packet::buffer_destructor_type destructor, void* argument, int headroom, int tailroom, bool clear) {
+    struct rte_mbuf *mb = DPDKDevice::get_pkt();
+    if (!mb) {
+        click_chatter("could not alloc pktmbuf");
+        return 0;
+    }
+    if (argument != 0)
+        click_chatter("make_extbuf cannot have destructor argument!");
+
+    struct rte_mbuf_ext_shared_info *shinfo;
+
+	shinfo = (struct rte_mbuf_ext_shared_info *)rte_malloc("rte_mbuf_ext_shared_info",sizeof(struct rte_mbuf_ext_shared_info),64);
+	shinfo->free_cb = &destroy_extbuf;
+	shinfo->fcb_opaque = (void*)destructor;
+	rte_mbuf_ext_refcnt_set(shinfo, 1);
+
+    rte_pktmbuf_attach_extbuf(mb, data, 0, length, shinfo);
+
+    for (HashTable<portid_t, DPDKDevice*>::const_iterator it = _devs.begin();
+         it != _devs.end(); ++it) {
+        struct rte_eth_dev_info dev_info;
+        //memset(&dev_info, 0, sizeof(rte_eth_dev_info));
+        rte_eth_dev_info_get(it.key(), &dev_info);
+        click_chatter("Map dev %d, mem %p %d", it.key(), data, length);
+        int err = rte_dev_dma_map(dev_info.device,
+            data, 0, length);
+        if (err != 0)
+            click_chatter("Could not map extbuf to device, errno %d %s!",rte_errno,rte_strerror(rte_errno));
+    }
+
+    WritablePacket* q;
+    #if CLICK_PACKET_USE_DPDK
+    mb->data_off = headroom;
+    mb->data_len = length;
+    mb->pkt_len = length;
+    q = reinterpret_cast<WritablePacket *>(mb);
+    #else
+    q = Packet::make(
+        data, length, DPDKDevice::free_pkt, mb,
+        headroom, tailroom, clear);
+    #endif
+
+
+    return q;
+}
+
 
 void DPDKDevice::cleanup(ErrorHandler *errh)
 {

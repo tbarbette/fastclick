@@ -22,6 +22,8 @@
 #include <rte_pci.h>
 #include <rte_version.h>
 
+
+
 #if HAVE_FLOW_API
     #include <click/flowruleparser.hh>
 #endif
@@ -283,6 +285,9 @@ public:
     inline static rte_mbuf* get_pkt(unsigned numa_node);
     inline static rte_mbuf* get_pkt();
     inline static struct rte_mbuf* get_mbuf(Packet* p, bool create, int node, bool reset = true);
+
+    static WritablePacket* make_extbuf(unsigned char *data, uint32_t length,
+	     Packet::buffer_destructor_type destructor, void* argument, int headroom, int tailroom, bool clear);
 
     static void free_pkt(unsigned char *, size_t, void *pktmbuf);
 

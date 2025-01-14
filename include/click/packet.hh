@@ -770,6 +770,10 @@ class Packet { public:
     inline Packet* data_packet() {
     	return _data_packet;
     }
+    inline void set_data_packet(Packet* p) {
+	_data_packet = p;
+        _data_packet->_use_count ++;
+    }
 #else
     inline Packet* data_packet() {
         return 0;
