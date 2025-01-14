@@ -150,23 +150,23 @@ FromFile::read_buffer_mmap(ErrorHandler *errh)
     // get length of file
     struct stat statbuf;
     if (fstat(_fd, &statbuf) < 0)
-	return error(errh, "stat: %s", strerror(errno));
+	    return error(errh, "stat: %s", strerror(errno));
 
     // check for end of file
     // But return -1 if we have not mmaped before: it might be a pipe, not
     // true EOF.
     if (_mmap_off >= statbuf.st_size)
-	return (_mmap_off == 0 ? -1 : 0);
+	    return (_mmap_off == 0 ? -1 : 0);
 
     // actually mmap
     _len = _mmap_unit;
     if ((off_t)(_mmap_off + _len) > statbuf.st_size)
-	_len = statbuf.st_size - _mmap_off;
+	    _len = statbuf.st_size - _mmap_off;
 
     void *mmap_data = mmap(0, _len, PROT_READ, MAP_SHARED, _fd, _mmap_off);
 
     if (mmap_data == MAP_FAILED)
-	return error(errh, "mmap: %s", strerror(errno));
+	    return error(errh, "mmap: %s", strerror(errno));
 
     _data_packet = Packet::make((unsigned char *)mmap_data, _len, munmap_destructor, 0);
     _buffer = _data_packet->data();
@@ -514,7 +514,7 @@ FromFile::cleanup()
 #if CLICK_PACKET_USE_DPDK
 #else
     if (_data_packet)
-	_data_packet->kill();
+	    _data_packet->kill();
     _data_packet = 0;
 #endif
 }
