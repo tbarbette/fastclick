@@ -838,7 +838,7 @@ void WritablePacket::pool_transfer(int from, int to) {
     (void)to;
 }
 
-
+#if HAVE_DPDK
 /**
  * @brief Make a Packet with a DPDK-backed buffer
  *
@@ -881,7 +881,7 @@ Packet::make_dpdk_packet(uint32_t headroom, uint32_t length, uint32_t tailroom, 
         p->clear_annotations();
     return p;
 }
-
+#endif
 
 
 /** @brief Create and return a new packet.

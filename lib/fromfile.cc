@@ -592,6 +592,7 @@ FromFile::get_string(size_t size, ErrorHandler *errh)
 Packet *
 FromFile::get_packet(size_t size, uint32_t sec, uint32_t subsec, ErrorHandler *errh)
 {
+#if HAVE_DPDK
     if (_dpdk) {
         WritablePacket *p = Packet::make_dpdk_packet(0, size, 0, 0);
         //click_chatter("P %p, %d %d %d %d", p, p->length(), p->buffer_length(), p->headroom(), p->tailroom());
@@ -604,6 +605,7 @@ FromFile::get_packet(size_t size, uint32_t sec, uint32_t subsec, ErrorHandler *e
             return p;
 	    }
     }
+#endif
 #if CLICK_PACKET_USE_DPDK
 #else
     if (_pos + size <= _len) {
