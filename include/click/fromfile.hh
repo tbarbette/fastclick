@@ -74,6 +74,9 @@ class FromFile { public:
 #ifdef ALLOW_MMAP
     bool _mmap;
 #endif
+#if HAVE_DPDK
+    bool _dpdk;
+#endif
 
 #ifdef ALLOW_MMAP
     enum { WANT_MMAP_UNIT = 4194304 }; // 4 MB

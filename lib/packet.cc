@@ -757,9 +757,9 @@ inline bool
 Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
 {
     uint32_t n = length + headroom + tailroom;
-    if (n < min_buffer_length) {
-	tailroom = min_buffer_length - length - headroom;
-	n = min_buffer_length;
+    if (unlikely(n < min_buffer_length)) {
+        tailroom = min_buffer_length - length - headroom;
+        n = min_buffer_length;
     }
 # if CLICK_USERLEVEL || CLICK_MINIOS
     unsigned char *d = 0;
@@ -838,6 +838,49 @@ void WritablePacket::pool_transfer(int from, int to) {
     (void)to;
 }
 
+
+/**
+ * @brief Make a Packet with a DPDK-backed buffer
+ *
+ * @param headroom
+ * @param data
+ * @param length
+ * @param tailroom
+ * @param clear
+ * @return WritablePacket*
+ */
+WritablePacket *
+Packet::make_dpdk_packet(uint32_t headroom, uint32_t length, uint32_t tailroom, bool clear) {
+    uint32_t n = length + headroom + tailroom;
+    if (unlikely(n < min_buffer_length)) {
+        tailroom = min_buffer_length - length - headroom;
+        n = min_buffer_length;
+    }
+
+    WritablePacket* p = WritablePacket::pool_allocate();
+
+    unsigned char *d = 0;
+
+    struct rte_mbuf *mb = DPDKDevice::get_pkt();
+    if (likely(mb)) {
+        d = (unsigned char*)mb->buf_addr;
+        p->_destructor = DPDKDevice::free_pkt;
+        p->_destructor_argument = mb;
+    } else {
+        p->kill();
+        return 0;
+    }
+
+    p->_head = d;
+    p->_data = d + headroom;
+    p->_tail = p->_data + length;
+    p->_end = p->_head + n;
+    p->_use_count = 1;
+    p->_data_packet = 0;
+    if (clear)
+        p->clear_annotations();
+    return p;
+}
 
 
 
@@ -938,8 +981,9 @@ Packet::make(uint32_t headroom, const void *data,
 #endif
             return p;
         #endif
-
 }
+
+
 
 #if CLICK_USERLEVEL || CLICK_MINIOS
 /** @brief Create and return a new packet (userlevel).

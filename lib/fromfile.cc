@@ -50,6 +50,9 @@ FromFile::FromFile()
 #ifdef ALLOW_MMAP
       _mmap(true),
 #endif
+#if HAVE_DPDK
+    _dpdk(true),
+#endif
       _filename(), _pipe(0), _landmark_pattern("%f"), _lineno(0)
 {
 }
@@ -57,6 +60,11 @@ FromFile::FromFile()
 int
 FromFile::configure_keywords(Vector<String> &conf, Element *e, ErrorHandler *errh)
 {
+#if HAVE_DPDK
+    bool dpdk = _dpdk;
+#else
+    bool dpdk = false;
+#endif
 #ifdef ALLOW_MMAP
     bool mmap = _mmap;
 #else
@@ -64,6 +72,7 @@ FromFile::configure_keywords(Vector<String> &conf, Element *e, ErrorHandler *err
 #endif
     if (Args(e, errh).bind(conf)
 	.read("MMAP", mmap)
+    .read("DPDK", dpdk)
 	.consume() < 0)
 	return -1;
 #ifdef ALLOW_MMAP
@@ -71,6 +80,12 @@ FromFile::configure_keywords(Vector<String> &conf, Element *e, ErrorHandler *err
 #else
     if (mmap)
 	errh->warning("%<MMAP true%> is not supported on this platform");
+#endif
+#if HAVE_DPDK
+    _dpdk = dpdk;
+#else
+    if (dpdk)
+	errh->warning("%<DPDK true%> is not supported on this platform");
 #endif
     return 0;
 }
@@ -245,16 +260,16 @@ FromFile::read(void *vdata, uint32_t dlen, ErrorHandler *errh)
     uint32_t dpos = 0;
 
     while (dpos < dlen) {
-	if (_pos < _len) {
-	    uint32_t howmuch = dlen - dpos;
-	    if (howmuch > _len - _pos)
-		howmuch = _len - _pos;
-	    memcpy(data + dpos, _buffer + _pos, howmuch);
-	    dpos += howmuch;
-	    _pos += howmuch;
-	}
-	if (dpos < dlen && read_buffer(errh) <= 0)
-	    return dpos;
+        if (_pos < _len) {
+            uint32_t howmuch = dlen - dpos;
+            if (howmuch > _len - _pos)
+            howmuch = _len - _pos;
+            memcpy(data + dpos, _buffer + _pos, howmuch);
+            dpos += howmuch;
+            _pos += howmuch;
+        }
+        if (dpos < dlen && read_buffer(errh) <= 0)
+            return dpos;
     }
 
     return dlen;
@@ -577,10 +592,21 @@ FromFile::get_string(size_t size, ErrorHandler *errh)
 Packet *
 FromFile::get_packet(size_t size, uint32_t sec, uint32_t subsec, ErrorHandler *errh)
 {
+    if (_dpdk) {
+        WritablePacket *p = Packet::make_dpdk_packet(0, size, 0, 0);
+        //click_chatter("P %p, %d %d %d %d", p, p->length(), p->buffer_length(), p->headroom(), p->tailroom());
+        assert(DPDKDevice::is_dpdk_packet(p));
+	    if (read(p->data(), size, errh) < (int)size) {
+		    p->kill();
+		    return 0;
+	    } else {
+            p->timestamp_anno().assign(sec, subsec);
+            return p;
+	    }
+    }
 #if CLICK_PACKET_USE_DPDK
 #else
     if (_pos + size <= _len) {
-
 #ifndef CLICK_NOINDIRECT
         if (Packet *p = _data_packet->clone()) {
             p->shrink_data(_buffer + _pos, size);
@@ -598,15 +624,15 @@ FromFile::get_packet(size_t size, uint32_t sec, uint32_t subsec, ErrorHandler *e
     } else
 #endif
     {
-	if (WritablePacket *p = Packet::make(0, 0, size, 0)) {
-	    if (read(p->data(), size, errh) < (int)size) {
-		    p->kill();
-		return 0;
-	    } else {
-		p->timestamp_anno().assign(sec, subsec);
-		return p;
-	    }
-    }
+        if (WritablePacket *p = Packet::make(0, 0, size, 0)) {
+            if (read(p->data(), size, errh) < (int)size) {
+                p->kill();
+                return 0;
+            } else {
+                p->timestamp_anno().assign(sec, subsec);
+                return p;
+            }
+        }
     }
     error(errh, strerror(ENOMEM));
     return 0;
