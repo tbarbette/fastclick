@@ -147,7 +147,8 @@ int LookupBierTable::classify(Packet *p_in) {
       click_ip6 *ip6 = reinterpret_cast<click_ip6*>(p2->data());
       ip6->ip6_dst = bfr_prefix;
       click_bier *bier = reinterpret_cast<click_bier*>(p2->data()+sizeof(click_ip6));
-      memcpy(bier->bitstring, (bs & fbm).data_words(), bsl/(sizeof(Bitvector::word_type)*8));
+      memcpy(bier_cpy->bitstring, (bs & fbm).data_words(), bsl/8);
+      bier->bier_ttl -= 1;
       bier->encode();
       
       // ifname is ensured to be in _ifaces because of the check upon route addition.
