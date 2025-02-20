@@ -292,7 +292,7 @@ IP6NDSolicitor::push(int port, Packet *p)
      Packet* out = handle_ip6(p);
      if (out)
       output_push(0, out);
-    }
+   }
   else {
     Packet* q = handle_response(p);
     if (q)
