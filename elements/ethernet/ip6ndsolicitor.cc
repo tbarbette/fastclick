@@ -181,7 +181,14 @@ IP6NDSolicitor::send_query_for(const u_char want_ip6[16])
   ea->checksum = htons(in6_fast_cksum(&ip6->ip6_src, &ip6->ip6_dst, ip6->ip6_plen, ip6->ip6_nxt, 0, (unsigned char *)(ip6+1), htons(sizeof(click_nd_sol))));
 
   _arp_queries++;
-  output(noutputs()-1).push(q);
+#if HAVE_BATCH
+  if (in_batch_mode) {
+    output_push_batch(noutputs()-1,PacketBatch::make_from_packet(q));
+  } else
+#endif
+  {
+    output(noutputs()-1).push(q);
+  }
 }
 
 /*
@@ -191,7 +198,7 @@ IP6NDSolicitor::send_query_for(const u_char want_ip6[16])
  * May save the packet in the NDEntry table for later sending.
  * May call p->kill().
  */
-void
+Packet*
 IP6NDSolicitor::handle_ip6(Packet *p)
 {
   IP6Address ipa = DST_IP6_ANNO(p);
@@ -212,11 +219,11 @@ IP6NDSolicitor::handle_ip6(Packet *p)
       memcpy(e->ether_shost, _my_en.data(), 6);
       memcpy(e->ether_dhost, ae->en.data(), 6);
       e->ether_type = htons(ETHERTYPE_IP6);
-      output(0).push(q);
+      return q;
     } else {
       if (ae->p) {
         ae->p->kill();
-	_pkts_killed++;
+        _pkts_killed++;
       }
       ae->p = p;
       send_query_for(DST_IP6_ANNO(p).data());
@@ -232,6 +239,7 @@ IP6NDSolicitor::handle_ip6(Packet *p)
 
     send_query_for(DST_IP6_ANNO(p).data());
   }
+  return 0;
 }
 
 /*
@@ -239,7 +247,7 @@ IP6NDSolicitor::handle_ip6(Packet *p)
  * Update our NDEntry table.
  * If there was a packet waiting to be sent, return it.
  */
-void
+Packet*
 IP6NDSolicitor::handle_response(Packet *p)
 {
   if (p->length() < sizeof(click_ether) + sizeof(click_ip6) + sizeof(click_nd_sol))
@@ -270,21 +278,47 @@ IP6NDSolicitor::handle_response(Packet *p)
       Packet *cached_packet = ae->p;
       ae->p = 0;
 
-      if (cached_packet){
-        handle_ip6(cached_packet);}
+      if (cached_packet) {
+        return handle_ip6(cached_packet);
+      }
     }
+    return 0;
 }
 
 void
 IP6NDSolicitor::push(int port, Packet *p)
 {
    if (port == 0){
-     handle_ip6(p); }
+     Packet* p = handle_ip6(p);
+     if (p)
+      output_push(0, p);
+    }
   else {
-    handle_response(p);
+    Packet* q = handle_response(p);
+    if (q)
+      output_push(0, q);
     p->kill();
   }
 }
+
+#if HAVE_BATCH
+void
+IP6NDSolicitor::push_batch(int port, PacketBatch *batch)
+{
+    auto fnt = [this,port](Packet* p) -> Packet* {
+      if (port == 0){
+          return handle_ip6(p);
+      } else {
+        Packet* q = handle_response(p);
+        p->kill();
+        return q;
+      }
+    };
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, batch);
+    if (batch)
+      output_push_batch(0, batch);
+}
+#endif
 
 String
 IP6NDSolicitor::read_table(Element *e, void *)

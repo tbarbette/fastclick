@@ -1,6 +1,6 @@
 #ifndef CLICK_IP6NDSOLICITOR_HH
 #define CLICK_IP6NDSOLICITOR_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/etheraddress.hh>
 #include <click/ip6address.hh>
 #include <click/timer.hh>
@@ -47,7 +47,7 @@ CLICK_DECLS
  * IP6NDAdvertiser
  */
 
-class IP6NDSolicitor : public Element {
+class IP6NDSolicitor : public BatchElement {
  public:
 
   IP6NDSolicitor();
@@ -66,6 +66,9 @@ class IP6NDSolicitor : public Element {
   void take_state(Element *, ErrorHandler *);
 
   void push(int port, Packet *);
+#if HAVE_BATCH
+  void push_batch(int port, PacketBatch *);
+#endif
 
   Packet *make_query(unsigned char tpa[16],
                      unsigned char sha[6], unsigned char spa[16]);
@@ -96,8 +99,8 @@ class IP6NDSolicitor : public Element {
 
   void send_query_for(const u_char want_ip6[16]);
 
-  void handle_ip6(Packet *);
-  void handle_response(Packet *);
+  Packet* handle_ip6(Packet *);
+  Packet* handle_response(Packet *);
 
   enum { EXPIRE_TIMEOUT_MS = 15 * 1000 };
   static void expire_hook(Timer *, void *);
