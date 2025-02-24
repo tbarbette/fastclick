@@ -812,8 +812,8 @@ Element::Port::push(Packet* p) const
 # else
     _e->push(_port, p);
 # endif
-    }
 #endif
+    }
 #if HAVE_FLOW_DYNAMIC
     if (_unstack) {
         fcb_stack = tmp_stack;
