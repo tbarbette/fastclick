@@ -8362,12 +8362,15 @@ fi
 # Check whether --enable-clone was given.
 if test ${enable_clone+y}
 then :
-  enableval=$enable_clone; printf "%s\n" "#define CLICK_NOINDIRECT 1" >>confdefs.h
-
+  enableval=$enable_clone; :
 else $as_nop
   :
 fi
 
+if test "$enable_clone" = no; then
+    printf "%s\n" "#define CLICK_NOINDIRECT 1" >>confdefs.h
+
+fi
 
 # Check whether --enable-rsspp was given.
 if test ${enable_rsspp+y}
