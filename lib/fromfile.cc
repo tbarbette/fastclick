@@ -51,7 +51,7 @@ FromFile::FromFile()
       _mmap(true),
 #endif
 #if HAVE_DPDK
-    _dpdk(true),
+    _dpdk(false),
 #endif
       _filename(), _pipe(0), _landmark_pattern("%f"), _lineno(0)
 {

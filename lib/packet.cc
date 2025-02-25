@@ -1162,7 +1162,6 @@ Packet::clone(bool fast)
         p->_end = _end;
 # if HAVE_DPDK
         if (DPDKDevice::is_dpdk_packet(this)) {
-            click_chatter("Click clone");
           p->_destructor = DPDKDevice::free_pkt;
           p->_destructor_argument = destructor_argument();
           rte_mbuf_refcnt_update((rte_mbuf*)p->_destructor_argument, 1);

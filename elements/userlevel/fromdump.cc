@@ -201,6 +201,9 @@ FromDump::configure(Vector<String> &conf, ErrorHandler *errh)
         _fnt_expr = TinyExpr::compile(timing_fnt, 1);
     }
 
+    if (_timing && _preload > 0) {
+        return errh->error("PRELOAD is not compatible with TIMING");
+    }
 
 #if CLICK_NS
     if (per_node) {

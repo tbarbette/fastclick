@@ -1,12 +1,6 @@
 /*
- * RSSHashSwitch.{cc,hh} -- element demultiplexes packets based on hash of
- * specified packet fields
- * Eddie Kohler
- *
- * Computational batching support by Georgios Katsikas
- *
- * Copyright (c) 1999-2000 Massachusetts Institute of Technology
- * Copyright (c) 2018 Georgios Katsikas, RISE SICS
+ * RSSHashSwitch.{cc,hh} -- element demultiplexes packets based on RSS hash
+ * Tom Barbette
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
