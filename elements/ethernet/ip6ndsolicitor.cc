@@ -251,7 +251,7 @@ Packet*
 IP6NDSolicitor::handle_response(Packet *p)
 {
   if (p->length() < sizeof(click_ether) + sizeof(click_ip6) + sizeof(click_nd_sol))
-    return;
+    return 0;
 
   click_ether *ethh = (click_ether *) p->data();
   click_ip6 *ip6h = (click_ip6 *)(ethh+1);
@@ -267,7 +267,7 @@ IP6NDSolicitor::handle_response(Packet *p)
       while (ae && ae->ip6 != ipa)
         ae = ae->next;
       if (!ae)
-        return;
+        return 0;
 
       if (ae->ok && ae->en != ena)
         click_chatter("IP6NDSolicitor overwriting an entry");
@@ -289,9 +289,9 @@ void
 IP6NDSolicitor::push(int port, Packet *p)
 {
    if (port == 0){
-     Packet* p = handle_ip6(p);
-     if (p)
-      output_push(0, p);
+     Packet* out = handle_ip6(p);
+     if (out)
+      output_push(0, out);
     }
   else {
     Packet* q = handle_response(p);
@@ -314,7 +314,7 @@ IP6NDSolicitor::push_batch(int port, PacketBatch *batch)
         return q;
       }
     };
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, batch);
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, batch, [](Packet*){});
     if (batch)
       output_push_batch(0, batch);
 }
