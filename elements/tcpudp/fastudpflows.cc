@@ -184,7 +184,7 @@ FastUDPFlows::initialize(ErrorHandler * errh)
     }
 
     if (output_is_push(0)) {
-        ScheduleInfo::initialize_task(this, &_task, true, errh);
+        ScheduleInfo::initialize_task(this, &_task, _active, errh);
         _timer.initialize(this);
     }
 
@@ -367,8 +367,8 @@ FastUDPFlows_rate_write_handler
     return 0;
 }
 
-static int
-FastUDPFlows_active_write_handler
+int
+FastUDPFlows::active_write_handler
 (const String &s, Element *e, void *, ErrorHandler *errh)
 {
     FastUDPFlows *c = (FastUDPFlows *)e;
@@ -376,6 +376,9 @@ FastUDPFlows_active_write_handler
     if (!BoolArg().parse(s, active))
         return errh->error("active parameter must be boolean");
     c->_active = active;
+    if (active) {
+        c->_task.reschedule();
+    }
     if (active) c->reset();
         return 0;
 }
@@ -425,7 +428,7 @@ FastUDPFlows::add_handlers()
     add_read_handler("rate", FastUDPFlows_read_rate_handler, 0);
     add_write_handler("rate", FastUDPFlows_rate_write_handler, 0);
     add_write_handler("reset", FastUDPFlows_reset_write_handler, 0, Handler::BUTTON);
-    add_write_handler("active", FastUDPFlows_active_write_handler, 0, Handler::CHECKBOX);
+    add_write_handler("active", FastUDPFlows::active_write_handler, 0, Handler::CHECKBOX);
     add_write_handler("limit", FastUDPFlows_limit_write_handler, 0);
     add_write_handler("srceth", FastUDPFlows::eth_write_handler, 0);
     add_write_handler("dsteth", FastUDPFlows::eth_write_handler, 1);

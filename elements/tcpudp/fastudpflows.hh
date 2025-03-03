@@ -131,6 +131,7 @@ class FastUDPFlows : public BatchElement {
         Packet *gen_packet();
         Packet *get_p();
 
+        static int active_write_handler(const String &s, Element *e, void *, ErrorHandler *errh);
         static int eth_write_handler(const String &, Element *, void *, ErrorHandler *);
 
         void set_length(unsigned len) {
