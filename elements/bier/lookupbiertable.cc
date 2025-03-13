@@ -151,8 +151,9 @@ int LookupBierTable::classify(Packet *p_in) {
 }
 
 int LookupBierTable::add_route(bfrid dst, IP6Address bfr_prefix, bitstring fbm, IP6Address nxt, int output, String ifname, ErrorHandler *errh) {
-  if (output < 0 || output >= noutputs())
-    return errh->error("port number <%u> out of range", output);
+  // FIXME: Output corresponds to kernel interface id and not to a FastClick output
+  // if (output < 0 || output >= noutputs())
+  //   return errh->error("port number <%u> out of range", output);
 
   if (!_ifaces.find(ifname))
     return errh->error("unknown interface <%s>", ifname.c_str());
