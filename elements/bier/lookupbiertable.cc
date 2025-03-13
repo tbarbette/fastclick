@@ -88,24 +88,6 @@ int LookupBierTable::classify(Packet *p_in) {
   bsl = click_bier_expand_bsl(bier);
   bitstring bs(bier->bitstring, bsl);
  
-  click_chatter(
-    "bift_id %05x\ntc %02x\ns %x\nttl %02x\nnibble %02x\nver %x\nbsl %x\nentropy %02x\noam %x\nrsv %x\ndscp %x\nproto %x\nbfrid %02x\nbs %s",
-    bier->bier_bift_id,
-    bier->bier_tc,
-    bier->bier_s,
-    bier->bier_ttl,
-    bier->bier_nibble,
-    bier->bier_version,
-    bier->bier_bsl,
-    bier->bier_entropy,
-    bier->bier_oam,
-    bier->bier_rsv,
-    bier->bier_dscp,
-    bier->bier_proto,
-    bier->bier_bfr_id,
-    bs.unparse().c_str()
-  );
-
   // Sanity check: the BIFT ID specified in the BIER packet corresponds to the current BIFT. 
   if (bier->bier_bift_id != _bift_id) {
     click_chatter("Unknown BIFT-ID %x. Ignoring.", bier->bier_bift_id);
@@ -114,12 +96,10 @@ int LookupBierTable::classify(Packet *p_in) {
 
   // RFC8279 Section 6.5 Step 2
   while (bs != 0) {
-    click_chatter("bs %s", bs.unparse().c_str());
 
     // RFC8279 Section 6.5 Step 3: Find first node in bitstring
     while (bs[k] == 0) k++;
     bfr_id = k+1;
-    click_chatter("found bdr_id %u", bfr_id);
 
     // RFC8279 Section 6.5 Step 4: Deliver packet to overlay
     if (bfr_id == _bfr_id){
@@ -147,7 +127,7 @@ int LookupBierTable::classify(Packet *p_in) {
       click_ip6 *ip6 = reinterpret_cast<click_ip6*>(p2->data());
       ip6->ip6_dst = bfr_prefix;
       click_bier *bier = reinterpret_cast<click_bier*>(p2->data()+sizeof(click_ip6));
-      memcpy(bier_cpy->bitstring, (bs & fbm).data_words(), bsl/8);
+      memcpy(bier->bitstring, (bs & fbm).data_words(), bsl/8);
       bier->bier_ttl -= 1;
       bier->encode();
       
