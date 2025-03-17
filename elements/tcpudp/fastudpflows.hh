@@ -14,7 +14,8 @@ CLICK_DECLS
  * FastUDPFlows(RATE, LIMIT, LEN,
  *              SRCETH, SRCIP,
  *              DSTETH, DSTIP,
- *              FLOWS, FLOWSIZE [, CHECKSUM, ACTIVE])
+ *              FLOWS, FLOWSIZE [, CHECKSUM, ACTIVE,
+ *              SEQUENTIAL, DUPLICATE, STOP])
  * =s udp
  * creates packets flows with static UDP/IP/Ethernet headers
  * =d
@@ -38,6 +39,19 @@ CLICK_DECLS
  * make that available in the rate handler.
  *
  * By default FastUDPFlows is ACTIVE.
+ *
+ * Keyword arguments are:
+ *
+ * =over 8
+ *
+ * =item SEQUENTIAL. instead of generating random port numbers, generate sequential
+ * one. Surprisingly this has a huge positive impact on performance.
+ *
+ * =item DUPLICATE. Duplicate packets instead of doing a shadow clone. If you know
+ * packets will be modified, you might as well avoid the extra steps.
+ *
+ * =back
+ *
  *
  * =h count read-only
  * Returns the total number of packets that have been generated.

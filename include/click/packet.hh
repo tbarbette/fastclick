@@ -900,7 +900,11 @@ class Packet { public:
     // User-space and BSD kernel module implementations.
 protected:
 #ifndef CLICK_NOINDIRECT
+# ifndef HAVE_FULLPUSH_NONATOMIC
+    nonatomic_uint32_t _use_count;
+# else
     atomic_uint32_t _use_count;
+#endif
     Packet *_data_packet;
 #endif
 private:

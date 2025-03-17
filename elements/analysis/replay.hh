@@ -303,7 +303,7 @@ inline void ReplayBase::check_end_loop(Task* t, bool force_time) {
                 _stop = 0;
             } else {
                 if (_verbose)
-                    click_chatter("Replay continue after %d/%d seconds",_stop_time, _stop_time);
+                    click_chatter("Replay continue after %d/%d seconds", diff, _stop_time);
             }
         }
         if (_stop == 0) {

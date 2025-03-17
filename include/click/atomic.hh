@@ -1086,5 +1086,47 @@ atomic_uint64_t::fetch_and_add(uint64_t delta)
 }
 
 
+
+class nonatomic_uint32_t { public:
+
+    // Fake atomic to drop-in for atomic uint32_t.  Not actually atomic.
+
+    inline uint32_t value() const { return _val; }
+    inline uint32_t nonatomic_value() const { return _val; }
+    inline operator uint32_t() const { return _val; }
+
+    inline nonatomic_uint32_t &operator=(uint32_t x) { _val = x; return *this; }
+
+    inline nonatomic_uint32_t &operator+=(int32_t delta) { _val += delta; return *this; }
+    inline nonatomic_uint32_t &operator-=(int32_t delta) { _val -= delta; return *this; }
+    inline nonatomic_uint32_t &operator|=(uint32_t mask) { _val |= mask; return *this; }
+    inline nonatomic_uint32_t &operator&=(uint32_t mask) { _val &= mask; return *this; }
+
+    inline void nonatomic_inc() { ++_val; }
+    inline void operator++() { ++_val; }
+    inline void operator++(int) { ++_val; }
+    inline void nonatomic_dec() { --_val; }
+    inline void operator--() { --_val; }
+    inline void operator--(int) { --_val; }
+
+    inline uint32_t swap(uint32_t desired) { uint32_t old = _val; _val = desired; return old; }
+    inline uint32_t fetch_and_add(uint32_t delta) { uint32_t old = _val; _val += delta; return old; }
+    inline bool dec_and_test() { return --_val == 0; }
+    inline bool nonatomic_dec_and_test() { return --_val == 0; }
+    inline uint32_t compare_swap(uint32_t expected, uint32_t desired) { uint32_t old = _val; if (_val == expected) _val = desired; return old; }
+    inline bool compare_and_swap(uint32_t expected, uint32_t desired) { if (_val == expected) { _val = desired; return true; } return false; }
+
+    inline static uint32_t swap(volatile uint32_t &x, uint32_t desired) { uint32_t old = x; x = desired; return old; }
+    inline static void inc(volatile uint32_t &x) { ++x; }
+    inline static bool dec_and_test(volatile uint32_t &x) { return --x == 0; }
+    inline static uint32_t compare_swap(volatile uint32_t &x, uint32_t expected, uint32_t desired) { uint32_t old = x; if (x == expected) x = desired; return old; }
+    inline static bool compare_and_swap(volatile uint32_t &x, uint32_t expected, uint32_t desired) { if (x == expected) { x = desired; return true; } return false; }
+
+    inline static bool use_builtins() { return false; }
+  private:
+
+    uint32_t _val;
+};
+
 CLICK_ENDDECLS
 #endif

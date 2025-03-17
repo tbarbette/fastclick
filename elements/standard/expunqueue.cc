@@ -96,9 +96,7 @@ EXPUnqueue::initialize(ErrorHandler *errh)
 
 
 void EXPUnqueue::refill(uint64_t now) {
-
     while (_last < now) {
-        
         _last += _inter_arrival_time;
         _bucket++;
         _inter_arrival_time = ran_expo(_lambda);
