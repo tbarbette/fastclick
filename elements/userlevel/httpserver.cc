@@ -84,7 +84,6 @@ int HTTPServer::initialize(ErrorHandler *errh) {
             NULL,
             &ahc_echo,
             (void*)this,
-            MHD_OPTION_LISTENING_ADDRESS_REUSE, 1,
             MHD_OPTION_END);
     if (_daemon == NULL)
         return 1;
@@ -309,6 +308,15 @@ MHD_Result HTTPServer::ahc_echo(
         click_chatter("Could not create response");
         return MHD_NO;
     }
+    
+    MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
+    MHD_add_response_header(response, "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+    MHD_add_response_header(response, "Access-Control-Allow-Headers", "Content-Type");
+    
+    if (path == "element_map" && e == server->router()->root_element()) {
+        MHD_add_response_header(response, "Content-Type", "text/plain");
+    }
+    
     ret = MHD_queue_response(connection,
             status,
             response);
