@@ -84,6 +84,7 @@ int HTTPServer::initialize(ErrorHandler *errh) {
             NULL,
             &ahc_echo,
             (void*)this,
+            MHD_OPTION_LISTENING_ADDRESS_REUSE, 1,
             MHD_OPTION_END);
     if (_daemon == NULL)
         return 1;
