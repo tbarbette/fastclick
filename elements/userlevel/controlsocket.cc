@@ -183,7 +183,7 @@ ControlSocket::initialize_socket(ErrorHandler *errh)
     if (_socket_fd < 0)
       return initialize_socket_error(errh, "socket");
     int sockopt = 1;
-    if (setsockopt(_socket_fd, SOL_SOCKET, SO_REUSEADDR, (void *)&sockopt, sizeof(sockopt)) < 0)
+    if (setsockopt(_socket_fd, SOL_SOCKET, SO_REUSEPORT, (void *)&sockopt, sizeof(sockopt)) < 0)
       errh->warning("setsockopt: %s", strerror(errno));
 
     // bind to port
