@@ -2547,7 +2547,7 @@ Router::configuration_string() const
 enum { GH_VERSION, GH_CONFIG, GH_FLATCONFIG, GH_LIST, GH_LOAD, GH_LOAD_CYCLES, GH_USEFUL_CYCLES, GH_REQUIREMENTS,
        GH_DRIVER, GH_ACTIVE_PORTS, GH_ACTIVE_PORT_STATS, GH_STRING_PROFILE,
        GH_STRING_PROFILE_LONG, GH_SCHEDULING_PROFILE, GH_STOP,
-       GH_ELEMENT_CYCLES, GH_CLASS_CYCLES, GH_RESET_CYCLES };
+       GH_ELEMENT_CYCLES, GH_CLASS_CYCLES, GH_RESET_CYCLES, GH_ELEMENTMAP_PATH };
 
 #if CLICK_STATS >= 2
 struct stats_info {
@@ -2631,6 +2631,28 @@ Router::router_read_handler(Element *e, void *thunk)
                 sa << r->_element_names[i] << "\n";
         }
         break;
+
+      case GH_ELEMENTMAP_PATH:
+      {
+#if CLICK_USERLEVEL || CLICK_NS || CLICK_MINIOS
+        String path = "/usr/local/share/click/elementmap.xml";
+        FILE *f = fopen(path.c_str(), "r");
+        if (!f)
+            return String("Could not open elementmap file: ") + path;
+        
+        StringAccum contents;
+        char buf[4096];
+        size_t nread;
+        while ((nread = fread(buf, 1, sizeof(buf), f)) > 0)
+            contents.append(buf, nread);
+        fclose(f);
+        
+        return contents.take_string();
+
+#else
+        return String("Elementmap reading not supported in this driver");
+#endif
+      }
 
       case GH_REQUIREMENTS:
         if (r)
@@ -2826,6 +2848,7 @@ Router::static_initialize()
         add_read_handler(0, "requirements", router_read_handler, (void *)GH_REQUIREMENTS);
         add_read_handler(0, "handlers", Element::read_handlers_handler, 0);
         add_read_handler(0, "list", router_read_handler, (void *)GH_LIST);
+        add_read_handler(0, "element_map", router_read_handler, (void *)GH_ELEMENTMAP_PATH);
 #if HAVE_CLICK_LOAD
         set_handler(0, "load", Handler::h_read | Handler::f_read_param, router_handler, (void *)GH_LOAD, (void *)0);
         set_handler(0, "load_cycles", Handler::h_read | Handler::f_read_param, router_handler, (void *)GH_LOAD_CYCLES, (void *)0);
