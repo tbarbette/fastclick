@@ -157,7 +157,7 @@ CheckIP6Header::simple_action(Packet *p)
 
     // shorten packet according to IP6 payload length field
     if(unlikely(ntohs(ip->ip6_plen) < (plen-ip6_totallen))) {
-        click_chatter("take!");
+        //click_chatter("take!");
         p->take(plen - ip6_totallen - ntohs(ip->ip6_plen));
     }
 
