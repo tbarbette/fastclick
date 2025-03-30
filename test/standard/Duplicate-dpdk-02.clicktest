@@ -1,0 +1,33 @@
+%info
+Simple Duplicate test, based on Tee
+
+%require
+click-buildtool provides dpdk
+
+%script
+click --dpdk --no-huge -m 512M --no-pci -- CONFIG2
+
+
+%file CONFIG2
+InfiniteSource(LIMIT 1,  DATA \<42>) ->
+EnsureDPDKBuffer ->
+Print(IN) ->
+q::Queue(CAPACITY 1) ->
+Unqueue() ->
+t::Duplicate();
+t[1] -> Print(A) -> Discard();
+t[0] -> Print(B) -> Discard();
+DriverManager(wait 0.5s, stop)
+
+%ignorex stderr
+EAL.*
+PMD.*
+
+
+%expect stdout
+
+%expect stderr
+Initializing DPDK
+IN:    1 | 42
+B:    1 | 42
+A:    1 | 42

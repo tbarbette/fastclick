@@ -1,0 +1,32 @@
+%info
+Simple Duplicate test, based on Tee
+
+%script
+click CONFIG
+click CONFIG2
+
+%file CONFIG
+InfiniteSource(LIMIT 1) ->
+q::Queue(CAPACITY 1) ->
+Unqueue() ->
+t::Duplicate();
+t[1] -> Discard();
+t[0] -> q;
+DriverManager(wait 0.1s, stop)
+
+%file CONFIG2
+InfiniteSource(LIMIT 1,  DATA \<42>) ->
+Print(IN) ->
+q::Queue(CAPACITY 1) ->
+Unqueue() ->
+t::Duplicate();
+t[1] -> Print(A) -> Discard();
+t[0] -> Print(B) -> Discard();
+DriverManager(wait 0.5s, stop)
+
+%expect stdout
+
+%expect stderr
+IN:    1 | 42
+B:    1 | 42
+A:    1 | 42

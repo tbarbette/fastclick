@@ -1219,12 +1219,11 @@ Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom, const bool dat
     rte_pktmbuf_pkt_len(nmb) = length();
     WritablePacket *npkt = reinterpret_cast<WritablePacket *>(nmb);
 #else
-    WritablePacket *npkt = WritablePacket::make_similar(this, length() + headroom() + extra_headroom+extra_tailroom);
+    WritablePacket *npkt = WritablePacket::make_similar(this, length()+extra_headroom+extra_tailroom);
 #endif
     memcpy(npkt->all_anno(), all_anno(), sizeof (AllAnno));
 
     if (data_only) {
-
         unsigned char *start_copy = (unsigned char*)data() + (extra_headroom >= 0 ? 0 : -extra_headroom);
         unsigned char *end_copy = (unsigned char*)end_data() + (extra_tailroom >= 0 ? 0 : extra_tailroom);
         memcpy(npkt->data() + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);

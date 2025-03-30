@@ -660,7 +660,7 @@ FromDump::run_task(Task *)
     int retry_count = 0;
   again:
     if (!_active)
-	return false;
+	    return false;
 
     if (!_packet && !read_packet(0)) {
         if (_end_h)
