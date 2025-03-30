@@ -123,7 +123,7 @@ class Packet { public:
     inline bool shared() const;
     inline bool shared_nonatomic() const;
     Packet *clone(bool fast = false) CLICK_WARN_UNUSED_RESULT;
-    WritablePacket *duplicate(int32_t extra_headroom = 0, int32_t extra_tailroom = 0) CLICK_WARN_UNUSED_RESULT;
+    WritablePacket *duplicate(int32_t extra_headroom = 0, int32_t extra_tailroom = 0, const bool data_only=true) CLICK_WARN_UNUSED_RESULT;
     inline WritablePacket *uniqueify() CLICK_WARN_UNUSED_RESULT;
 #ifndef CLICK_NOINDIRECT
 # if CLICK_LINUXMODULE
@@ -1013,6 +1013,7 @@ class WritablePacket : public Packet { public:
     inline void rewrite_seq(tcp_seq_t seq, const int shift);
 
 #if !CLICK_LINUXMODULE
+    inline void set_mbuf(rte_mbuf* mbuf, uint32_t length);
     inline void init_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
     inline void set_buffer(unsigned char *buffer, uint32_t buffer_length);
     inline void set_data(unsigned char *data);
@@ -2264,8 +2265,8 @@ Packet::change_headroom_and_length(uint32_t headroom, uint32_t length)
     rte_pktmbuf_data_len(mb()) = length;
 # else
     if (headroom + length <= buffer_length()) {
-	_data = _head + headroom;
-	_tail = _data + length;
+        _data = _head + headroom;
+        _tail = _data + length;
     }
 # endif
 }

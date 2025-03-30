@@ -593,7 +593,7 @@ FromFile::get_packet(size_t size, uint32_t sec, uint32_t subsec, ErrorHandler *e
 #if CLICK_PACKET_USE_DPDK
 #elif HAVE_DPDK
     if (_dpdk) {
-        WritablePacket *p = Packet::make_dpdk_packet(0, size, 0, 0);
+        WritablePacket *p = Packet::make_dpdk_packet(RTE_PKTMBUF_HEADROOM, size, 0, 0);
         assert(DPDKDevice::is_dpdk_packet(p));
 	    if (read(p->data(), size, errh) < (int)size) {
 		    p->kill();

@@ -873,6 +873,8 @@ Packet::make_dpdk_packet(uint32_t headroom, uint32_t length, uint32_t tailroom, 
         p->kill();
         return 0;
     }
+    if (headroom != RTE_PKTMBUF_HEADROOM)
+        mb->data_off = headroom;
 
     p->_head = d;
     p->_data = d + headroom;
@@ -1202,7 +1204,7 @@ Packet::clone(bool fast)
 }
 
 WritablePacket *
-Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom)
+Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom, const bool data_only)
 {
 #if CLICK_PACKET_USE_DPDK
     struct rte_mbuf *mb = this->mb();
@@ -1216,17 +1218,22 @@ Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom)
     rte_pktmbuf_data_len(nmb) = length();
     rte_pktmbuf_pkt_len(nmb) = length();
     WritablePacket *npkt = reinterpret_cast<WritablePacket *>(nmb);
-#elif HAVE_CLICK_PACKET_POOL
-    WritablePacket *npkt = WritablePacket::pool_allocate(headroom() + extra_headroom, length(), tailroom() + extra_tailroom, false);
 #else
-    WritablePacket *npkt = new WritablePacket;
-    npkt->alloc_data(headroom() + extra_headroom, length(), tailroom() + extra_tailroom);
+    WritablePacket *npkt = WritablePacket::make_similar(this, length() + headroom() + extra_headroom+extra_tailroom);
 #endif
     memcpy(npkt->all_anno(), all_anno(), sizeof (AllAnno));
 
-    unsigned char *start_copy = (unsigned char*)buffer() + (extra_headroom >= 0 ? 0 : -extra_headroom);
-    unsigned char *end_copy = (unsigned char*)end_buffer() + (extra_tailroom >= 0 ? 0 : extra_tailroom);
-    memcpy(npkt->buffer() + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
+    if (data_only) {
+
+        unsigned char *start_copy = (unsigned char*)data() + (extra_headroom >= 0 ? 0 : -extra_headroom);
+        unsigned char *end_copy = (unsigned char*)end_data() + (extra_tailroom >= 0 ? 0 : extra_tailroom);
+        memcpy(npkt->data() + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
+    } else {
+        unsigned char *start_copy = (unsigned char*)buffer() + (extra_headroom >= 0 ? 0 : -extra_headroom);
+        unsigned char *end_copy = (unsigned char*)end_buffer() + (extra_tailroom >= 0 ? 0 : extra_tailroom);
+        npkt->change_headroom_and_length(npkt->headroom() + extra_headroom, length());
+        memcpy(npkt->buffer() + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
+    }
 
     npkt->shift_header_annotations(buffer(), extra_headroom);
 
@@ -1612,14 +1619,24 @@ Packet::static_cleanup()
 #endif
 }
 
+inline void
+WritablePacket::set_mbuf(rte_mbuf* mbuf, uint32_t length) {
+    _head = (unsigned char*)mbuf->buf_addr;
+    _data = rte_pktmbuf_mtod(mbuf, unsigned char*);
+    _tail = _data + length;
+    _end = _head + DPDKDevice::MBUF_DATA_SIZE;
+    _destructor = DPDKDevice::free_pkt;
+    _destructor_argument = mbuf;
+}
+
 WritablePacket *
 Packet::make_similar(Packet* original, uint32_t length)
 {
 #if HAVE_DPDK && !HAVE_DPDK_PACKET_POOL && !CLICK_PACKET_USE_DPDK
     if (DPDKDevice::is_dpdk_buffer(original) && length <= DPDKDevice::MBUF_DATA_SIZE) {
-#if HAVE_CLICK_PACKET_POOL
+# if HAVE_CLICK_PACKET_POOL
         WritablePacket* p = WritablePacket::pool_allocate();
-#else
+# else
         WritablePacket *p = new WritablePacket;
         if (!p)
             return 0;
@@ -1629,27 +1646,24 @@ Packet::make_similar(Packet* original, uint32_t length)
             delete p;
             return 0;
         }
-#endif
+# endif
         if (!p)
             return 0;
+
 		p->initialize(false);
 
-#if HAVE_FLOW_DYNAMIC
+# if HAVE_FLOW_DYNAMIC
             if (fcb_stack)
                 fcb_stack->acquire(1);
-#endif
+# endif
         rte_mbuf* mbuf = DPDKDevice::get_pkt();
-	    p->_head = (unsigned char*)mbuf->buf_addr;
-        p->_data = rte_pktmbuf_mtod(mbuf, unsigned char*);
-	    p->_tail = p->_data + length;
-	    p->_end = p->_head + DPDKDevice::MBUF_DATA_SIZE;
-        p->_destructor = DPDKDevice::free_pkt;
-        p->_destructor_argument = mbuf;
+	    p->set_mbuf(mbuf, length);
         return p;
     }
 #else
-        (void)original;
+    (void)original;
 #endif
+    //Default path, we will have returned if it was a DPDK packet
     {
         return make(default_headroom, (const unsigned char *) 0, length, 0);
     }

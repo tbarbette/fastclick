@@ -102,7 +102,8 @@ CLICK_DECLS
  * another packet and which case the packet of the batch will be replaced by
  * that one, or null if the packet is to be dropped.
  *
- * If all packets are dropped, batch will become null. If the first packets are dropped, the address of batch will change.
+ * If all packets are dropped, batch will become null.
+ * If the first packets are dropped, the address of batch will change.
  *
  *
  * Example: EXECUTE_FOR_EACH_PACKET_DROPPABLE([this](Packet* p){return p->push(_nbytes);},batch,[](Packet* p){})
@@ -695,11 +696,15 @@ public :
     /**
      * Clone the batch
      */
-    inline PacketBatch* clone_batch() {
+    inline PacketBatch* clone_batch(const bool duplicate = false, const bool duplicate_data_only = false) {
         PacketBatch* head = 0;
         Packet* last = 0;
         FOR_EACH_PACKET(this, p) {
-            Packet* q = p->clone();
+            Packet* q;
+            if (duplicate)
+                q = p->duplicate(0, 0, duplicate_data_only);
+            else
+                q = p->clone();
             if (last == 0) {
                 head = start_head(q);
                 last = q;
