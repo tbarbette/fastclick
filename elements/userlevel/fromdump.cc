@@ -41,6 +41,10 @@
 #ifdef ALLOW_MMAP
 #include <sys/mman.h>
 #endif
+#if HAVE_BATCH
+#include <click/batchbuilder.hh>
+#endif
+
 CLICK_DECLS
 
 #define	SWAPLONG(y) \
@@ -606,7 +610,7 @@ again:
         if (elapsed_real < elapsed_virt) {
             _timer.schedule_at_steady(_last_real + Timestamp::make_usec(elapsed_virt));
             if (output_is_pull(0))
-            _notifier.sleep();
+                _notifier.sleep();
         } else {
             if (output_is_push(0))
                 _task.fast_reschedule();
@@ -658,18 +662,21 @@ FromDump::run_task(Task *)
     bool fresh = true;
     unsigned n = 0;
     int retry_count = 0;
+#if HAVE_BATCH
+    BatchBuilder batch;
+#endif
   again:
     if (!_active)
-	    return false;
+	    goto exit;
 
     if (!_packet && !read_packet(0)) {
         if (_end_h)
             _end_h->call_write(ErrorHandler::default_handler());
-        return false;
+        goto exit;
     }
     if (_packet && _timing) {
         if (!check_timing(_packet, now_s, fresh)) {
-		    return false;
+		    goto exit;
         }
     }
     if (_packet && _force_ip && !fake_pcap_force_ip(_packet, _linktype)) {
@@ -691,7 +698,8 @@ FromDump::run_task(Task *)
     if (_packet) {
         #if HAVE_BATCH
             if (in_batch_mode) {
-	            output(0).push_batch(PacketBatch::make_from_packet(_packet));
+                batch.append(_packet);
+
             } else
         #endif
 	            output(0).push(_packet);
@@ -699,9 +707,16 @@ FromDump::run_task(Task *)
         _packet = 0;
         if (n++ < _burst)
             goto again;
-        return true;
+        goto exit;
     } else
-        return false;
+        goto exit;
+
+exit:
+#if HAVE_BATCH
+    if (in_batch_mode && batch.count)
+        output(0).push_batch(batch.finish());
+#endif
+    return n > 0;
 }
 
 #if HAVE_BATCH
