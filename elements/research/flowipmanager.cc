@@ -66,6 +66,8 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
         click_chatter("Real capacity will be %d",_table_size);
     }
 
+    if (timeout < 0)
+        timeout = 0;
     _recycle_interval_ms = (int)(recycle_interval * 1000);
     _epochs_per_sec = max(1, (int)(1000 / _recycle_interval_ms));
     _timeout_ms = timeout * 1000;

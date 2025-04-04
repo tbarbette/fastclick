@@ -1618,6 +1618,7 @@ Packet::static_cleanup()
 #endif
 }
 
+#if HAVE_DPDK
 inline void
 WritablePacket::set_mbuf(rte_mbuf* mbuf, uint32_t length) {
     _head = (unsigned char*)mbuf->buf_addr;
@@ -1627,6 +1628,7 @@ WritablePacket::set_mbuf(rte_mbuf* mbuf, uint32_t length) {
     _destructor = DPDKDevice::free_pkt;
     _destructor_argument = mbuf;
 }
+#endif
 
 WritablePacket *
 Packet::make_similar(Packet* original, uint32_t length)
