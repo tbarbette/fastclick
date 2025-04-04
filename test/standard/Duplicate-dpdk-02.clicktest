@@ -23,6 +23,7 @@ DriverManager(wait 0.5s, stop)
 EAL.*
 PMD.*
 TELEMETRY.*
+EAL.*
 
 %expect stdout
 
