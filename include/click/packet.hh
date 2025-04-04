@@ -1013,7 +1013,7 @@ class WritablePacket : public Packet { public:
     inline void rewrite_seq(tcp_seq_t seq, const int shift);
 
 #if !CLICK_LINUXMODULE
-# if HAVE_DPDK
+# if HAVE_DPDK && !CLICK_PACKET_USE_DPDK
     inline void set_mbuf(rte_mbuf* mbuf, uint32_t length);
 # endif
     inline void init_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);

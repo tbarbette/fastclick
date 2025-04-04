@@ -1618,7 +1618,7 @@ Packet::static_cleanup()
 #endif
 }
 
-#if HAVE_DPDK
+#if HAVE_DPDK && !CLICK_PACKET_USE_DPDK
 inline void
 WritablePacket::set_mbuf(rte_mbuf* mbuf, uint32_t length) {
     _head = (unsigned char*)mbuf->buf_addr;
