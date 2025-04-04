@@ -22,7 +22,7 @@ DriverManager(wait 0.5s, stop)
 %ignorex stderr
 EAL.*
 PMD.*
-
+TELEMETRY.*
 
 %expect stdout
 
