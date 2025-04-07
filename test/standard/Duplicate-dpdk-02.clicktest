@@ -5,7 +5,7 @@ Simple Duplicate test, based on Tee
 click-buildtool provides dpdk
 
 %script
-click --dpdk --no-huge -m 512M --no-pci -- CONFIG2
+click --dpdk --log-level=error --no-huge -m 512M --no-pci -- CONFIG2
 
 
 %file CONFIG2
