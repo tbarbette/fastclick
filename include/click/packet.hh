@@ -14,6 +14,15 @@
 # include <rte_mbuf.h>
 # include <rte_malloc.h>
 # include <click/dpdk_glue.hh>
+
+#if CLICK_PACKET_USE_DPDK
+#define DPDK_ANNO_SIZE sizeof(Packet::AllAnno)
+#elif CLICK_PACKET_INSIDE_DPDK
+#define DPDK_ANNO_SIZE (((sizeof(Packet) - 1) / 4) +1) * 4 // round up to 4 bytes
+#else
+#define DPDK_ANNO_SIZE 0
+#endif
+
 #else
 # include <click/atomic.hh>
 #endif
@@ -343,6 +352,9 @@ class Packet { public:
      * Useful to align packet data.  For example, if the packet's embedded IP
      * header is located at pointer value 0x8CCA03, then shift_data(1) or
      * shift_data(-3) will both align the header on a 4-byte boundary.
+     *
+     * Due to the alignement, the data may be shifted by an error of 4 bytes.
+     *  Eg calling shift(-5) might shift only for -3.
      *
      * If the packet is shared() or there isn't enough headroom or tailroom
      * for the operation, the packet is passed to uniqueify() first.  This can
@@ -1233,7 +1245,7 @@ Packet::buffer() const
 #if CLICK_LINUXMODULE
     return skb()->head;
 #elif CLICK_PACKET_USE_DPDK
-    return data() - rte_pktmbuf_headroom(mb());
+    return (const unsigned char*)mb()->buf_addr;
 #else
     return _head;
 #endif
