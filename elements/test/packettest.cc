@@ -165,6 +165,18 @@ PacketTest::initialize(ErrorHandler *errh)
     p->kill();
 
     p = Packet::make(5, lowers, 60, 2);
+    p1 = p->duplicate(5,5,true);
+    CHECK(p1->headroom() == 10 && p1->length() == 60);
+    CHECK_DATA(p1->data(), lowers, 60);
+    p1->kill();
+    p1 = p->duplicate(5,5,false);
+    CHECK(p1->headroom() == 10 && p1->length() == 60);
+    CHECK_DATA(p1->data(), lowers, 60);
+    p1->kill();
+    p->kill();
+
+
+    p = Packet::make(5, lowers, 60, 2);
     p->set_mac_header(p->data(), 2);
     p->pull(2);
     p = p->shift_data(-3);
