@@ -1220,17 +1220,17 @@ Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom, const bool dat
     WritablePacket *npkt = reinterpret_cast<WritablePacket *>(nmb);
 #else
     WritablePacket *npkt = WritablePacket::make_similar(this, length()+extra_headroom+extra_tailroom);
+    npkt->change_headroom_and_length(headroom() + extra_headroom, length());
 #endif
     memcpy(npkt->all_anno(), all_anno(), sizeof (AllAnno));
 
     if (data_only) {
         unsigned char *start_copy = (unsigned char*)data() + (extra_headroom >= 0 ? 0 : -extra_headroom);
         unsigned char *end_copy = (unsigned char*)end_data() + (extra_tailroom >= 0 ? 0 : extra_tailroom);
-        memcpy(npkt->data() + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
+        memcpy(npkt->data(), start_copy, end_copy - start_copy);
     } else {
         unsigned char *start_copy = (unsigned char*)buffer() + (extra_headroom >= 0 ? 0 : -extra_headroom);
         unsigned char *end_copy = (unsigned char*)end_buffer() + (extra_tailroom >= 0 ? 0 : extra_tailroom);
-        //npkt->change_headroom_and_length(npkt->headroom() + extra_headroom, length());
         memcpy(npkt->buffer() + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
     }
 
