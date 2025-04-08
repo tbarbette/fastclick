@@ -1230,7 +1230,7 @@ Packet::duplicate(int32_t extra_headroom, int32_t extra_tailroom, const bool dat
     } else {
         unsigned char *start_copy = (unsigned char*)buffer() + (extra_headroom >= 0 ? 0 : -extra_headroom);
         unsigned char *end_copy = (unsigned char*)end_buffer() + (extra_tailroom >= 0 ? 0 : extra_tailroom);
-        npkt->change_headroom_and_length(npkt->headroom() + extra_headroom, length());
+        //npkt->change_headroom_and_length(npkt->headroom() + extra_headroom, length());
         memcpy(npkt->buffer() + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
     }
 
@@ -1270,7 +1270,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     return reinterpret_cast<WritablePacket *>(nskb);
 
 #elif CLICK_PACKET_USE_DPDK /* !CLICK_LINUXMODULE */
-    auto npkt = duplicate(extra_headroom, extra_tailroom);
+    auto npkt = duplicate(extra_headroom, extra_tailroom, false);
     if (unlikely(!npkt)) {
         if (free_on_failure)
             kill();
@@ -1523,30 +1523,30 @@ Packet::shift_data(int offset, bool free_on_failure)
     if (!shared()
 	    && (offset < 0 ? (dp - buffer()) >= (ptrdiff_t)(-offset)
 	    : tailroom() >= (uint32_t)offset)) {
-	WritablePacket *q = static_cast<WritablePacket *>(this);
-	memmove((unsigned char *) dp + offset, dp, q->end_data() - dp);
-#if CLICK_LINUXMODULE
-        struct sk_buff *mskb = q->skb();
-        mskb->data += offset;
-        mskb->tail += offset;
-#elif CLICK_PACKET_USE_DPDK
-        q->mb()->data_off += offset;
-#else				/* User-space and BSD kernel module */
-        q->_data += offset;
-        q->_tail += offset;
-# if CLICK_BSDMODULE
-        q->m()->m_data += offset;
-# endif
-#endif
-        shift_header_annotations(q->buffer(), offset);
-	return this;
+        WritablePacket *q = static_cast<WritablePacket *>(this);
+        memmove((unsigned char *) dp + offset, dp, q->end_data() - dp);
+    #if CLICK_LINUXMODULE
+            struct sk_buff *mskb = q->skb();
+            mskb->data += offset;
+            mskb->tail += offset;
+    #elif CLICK_PACKET_USE_DPDK
+            q->mb()->data_off += offset;
+    #else				/* User-space and BSD kernel module */
+            q->_data += offset;
+            q->_tail += offset;
+    # if CLICK_BSDMODULE
+            q->m()->m_data += offset;
+    # endif
+    #endif
+            shift_header_annotations(q->buffer(), offset);
+        return this;
     } else {
-	int tailroom_offset = (offset < 0 ? -offset : 0);
-	if (offset < 0 && headroom() < (uint32_t)(-offset))
-	    offset = -headroom() + ((uintptr_t)(data() + offset) & 7);
-	else
-	    offset += ((uintptr_t)buffer() & 7);
-	return expensive_uniqueify(offset, tailroom_offset, free_on_failure);
+        int tailroom_offset = (offset < 0 ? -offset : 0);
+        if (offset < 0 && headroom() < (uint32_t)(-offset))
+            offset = -headroom() + ((uintptr_t)(data() + offset) & 7);
+        else
+            offset += ((uintptr_t)buffer() & 7);
+        return expensive_uniqueify(offset, tailroom_offset, free_on_failure);
     }
 }
 
