@@ -4,13 +4,10 @@ PacketMill modified FastClick with some additional source-code optimization tech
 
 For more information, please refer to PacketMill's [paper][packetmill-paper] and [repo][packetmill-repo].
 
+## Building 
+PacketMill performs multiple source-code optimizations that exploit the available information in a given NF configuration file. We have implemented these optimizations on top of `click-devirtualize`.
 
-## Source-code Modifications
-
-PacketMill performs multiple source-code optimizations that exploit the availabe information in a given NF configuration file. We have implemented these optimizations on top of `click-devirtualize`.
-
-To use these optimization, you need to build and install FastClick as follows:
-
+To use these optimizations, you need to build and install FastClick as follows:
 
 ```bash
 git clone git@github.com:tbarbette/fastclick.git
@@ -23,7 +20,93 @@ sudo make install
 
 You need to define `RTE_SDK` and `RTE_TARGET` before configuring FastClick.
 
-**Note: PacketMill's [repo][packetmill-repo] offers a automated pipeline/workflow for building/installing PacketMill (FastClick + X-Change) and performing some experiments related to PacketMill's PacketMill's [paper][packetmill-paper].**
+**Note: PacketMill's [repo][packetmill-repo] offers an automated pipeline/workflow for building/installing PacketMill (FastClick + X-Change) and performing some experiments related to PacketMill's PacketMill's [paper][packetmill-paper].** This guide is only about the FastClick part, X-Change must be compiled separately.
+
+Here is an overview of the configuration summary (without X-Change). DPDK and LLVM should appear as yes:
+```
+Configuration Summary:
+    C     Compiler:              clang
+    C++   Compiler:              clang++
+    CFLAGS:                      -march=native -g -O2 -W -Wall -mavx2 -msse2 -msse4.2
+    CXXFLAGS:                    -march=native -std=gnu++14 -O3 -Wno-inconsistent-missing-override -faligned-new -mavx2 -msse2 -msse4.2
+
+          Batching:              yes
+    Flow Subsystem:              yes
+ Context Subsystem:              no
+       HW Flow API:              no
+
+    DPDK   support:              yes
+    DPDK    Target:
+    DPDK   Version:              22.11
+    DPDK      Path:              /etinfo/users2/tbarbette/workspace/dpdk-stable-22.11.1-nains
+    DPDK     build:              meson
+    DPDK  Location:              /etinfo/users2/tbarbette/workspace/dpdk-stable-22.11.1-nains/install/lib/x86_64-linux-gnu
+
+    RSS++  support:              yes
+
+    Netmap support:              no
+    PCAP   support:              yes
+
+    PAPI   support:              no
+    RE2    support:              yes
+    BPF    support:              yes
+    HTTPD  support:              yes
+    libpci support:              yes
+    LLVM   support:              yes
+
+Now type make to build FastClick...
+```
+
+Here's an example with the configure line to **enable LLVM**:
+```
+./configure --disable-linuxmodule --enable-userlevel --enable-user-multithread --enable-etherswitch --disable-dynamic-linking --enable-local --enable-dpdk=$XCHG_SDK --enable-research --disable-task-stats --enable-flow --enable-cpu-load --prefix $(pwd)/build/ --enable-intel-cpu --enable-dpdk-pool --enable-rand-align RTE_TARGET=x86_64-native-linux-clanglto CXX="clang++ -flto -fno-access-control" CC="clang -flto" CXXFLAGS="-std=gnu++14 -O3" LDFLAGS="-flto -fuse-ld=lld -Wl,-plugin-opt=save-temps" RANLIB="/bin/true" LD="ld.lld" READELF="llvm-readelf" AR="llvm-ar" --disable-bound-port-transfer --enable-dpdk --enable-dpdk-pool --disable-dpdk-packet --disable-dpdk-softqueue
+[...]
+Configuration Summary:
+    C     Compiler:              clang -flto
+    C++   Compiler:              clang++ -flto -fno-access-control
+    CFLAGS:                      -march=native -g -O2 -W -Wall -mavx2 -msse2 -msse4.2
+    CXXFLAGS:                    -march=native -std=gnu++14 -O3 -Wno-inconsistent-missing-override -faligned-new -mavx2 -msse2 -msse4.2
+
+          Batching:              yes
+    Flow Subsystem:              yes
+ Context Subsystem:              no
+       HW Flow API:              no
+
+    DPDK   support:              yes
+    DPDK    Target:
+    DPDK   Version:              22.11
+    DPDK      Path:              /etinfo/users2/tbarbette/workspace/dpdk-stable-22.11.1-nains
+    DPDK     build:              meson
+    DPDK  Location:              /etinfo/users2/tbarbette/workspace/dpdk-stable-22.11.1-nains/install/lib/x86_64-linux-gnu
+
+    RSS++  support:              yes
+
+    Netmap support:              no
+    PCAP   support:              yes
+
+    PAPI   support:              no
+    RE2    support:              yes
+    BPF    support:              yes
+    HTTPD  support:              yes
+    libpci support:              yes
+    LLVM   support:              yes
+
+Now type make to build FastClick...
+```
+
+To enable X-Change too, see the PacketMill's [repo][packetmill-repo].
+
+## Automatic PacketMill
+
+The "packetmill" binary will automatically execute all the instructions below, creating a new binary and then executing it. It is therefore drop-in replacement for the "click" command.
+
+```bash
+sudo bin/packetmill --dpdk -- CONFIG
+```
+
+## Manual pipeline
+
+The following explains how to execute the pipeline manually.
 
 ### Devirtualize Pass
 
