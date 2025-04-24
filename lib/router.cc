@@ -35,6 +35,7 @@
 #include <click/notifier.hh>
 #include <click/nameinfo.hh>
 #include <click/bighashmap_arena.hh>
+#include <click/pathvars.h>
 #if HAVE_DPDK_PACKET_POOL || CLICK_PACKET_USE_DPDK
 #include <click/dpdkdevice.hh>
 #endif
@@ -2635,8 +2636,27 @@ Router::router_read_handler(Element *e, void *thunk)
       case GH_ELEMENTMAP_PATH:
       {
 #if CLICK_USERLEVEL || CLICK_NS || CLICK_MINIOS
-        String path = "/usr/local/share/click/elementmap.xml";
-        FILE *f = fopen(path.c_str(), "r");
+        String datadir_path = String(CLICK_DATADIR) + "/elementmap.xml";
+
+        const char* possible_paths[] = {
+            datadir_path.c_str(),
+            "/usr/local/share/click/elementmap.xml",
+            "/usr/share/click/elementmap.xml",
+            "../share/click/elementmap.xml",
+            "./elementmap.xml",
+            NULL
+        };
+
+        String path;
+        FILE *f;
+
+        for(int i=0; possible_paths[i] != NULL; i++) {
+            path = possible_paths[i];
+            f = fopen(path.c_str(), "r");
+            if (f)
+                break;
+        }
+
         if (!f)
             return String("Could not open elementmap file: ") + path;
         
