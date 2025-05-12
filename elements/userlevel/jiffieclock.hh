@@ -34,7 +34,9 @@ private:
   Task _task;
   Timer _timer;
   Timestamp last_jiffies_update;
+  Timestamp first_jiffies_update;
   click_jiffies_t jiffies;
+  click_jiffies_t first_jiffies;
   bool _verbose;
   int _minprecision;
 };

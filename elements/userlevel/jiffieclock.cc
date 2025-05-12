@@ -61,13 +61,13 @@ JiffieClock::initialize(ErrorHandler*) {
 
 void JiffieClock::run_timer(Timer* t) {
     Timestamp current_time = Timestamp::now_steady();
-    int64_t delta = (current_time - last_jiffies_update).msec() / (1000 / CLICK_HZ);
+    int64_t delta = (current_time - last_jiffies_update).msecval() / (1000 / CLICK_HZ);
     if (delta > 0) {
         if (unlikely(delta > _minprecision)) {//Accept a little jump from time to time, but not double jump
             //We try all the click threads
             int nt = (t->home_thread_id() + 1) % master()->nthreads();
             if (nt == home_thread_id()) {
-                click_chatter("Click tasks are too heavy and the jiffie accumulator cannot run at least once every %dmsec, the user jiffie clock is deactivated.",_minprecision);
+                click_chatter("%p{element}: Click tasks are too heavy and the jiffie accumulator cannot run at least once every %dmsec, the user jiffie clock is deactivated.",this,_minprecision);
                 click_jiffies_fct = &click_timestamp_jiffies;
                 return;
             }
@@ -75,7 +75,7 @@ void JiffieClock::run_timer(Timer* t) {
                 click_chatter("%p{element}: Thread %d is doing too much work and prevent accumulating jiffies accurately (this tick accumulated %d jiffies), trying the next one",this,t->home_thread_id(),delta);
             t->move_thread(nt);
         }
-        jiffies += delta;
+        jiffies = first_jiffies + ((current_time - first_jiffies_update).msecval() / (1000 / CLICK_HZ));
         last_jiffies_update = current_time;
     }
     t->schedule_at_steady(last_jiffies_update + Timestamp::make_msec(1000 / CLICK_HZ));
@@ -90,7 +90,9 @@ bool JiffieClock::run_task(Task*) {
     if (_verbose)
         click_chatter("Switching to accumulated jiffies");
     jiffies = click_jiffies();
+    first_jiffies = jiffies;
     last_jiffies_update = Timestamp::now_steady();
+    first_jiffies_update = last_jiffies_update;
     //TODO : this should be rcu protected
     click_jiffies_fct_data = this;
     click_jiffies_fct = &read_jiffies;
