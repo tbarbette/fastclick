@@ -879,7 +879,9 @@ Packet::make_dpdk_packet(uint32_t headroom, uint32_t length, uint32_t tailroom, 
     p->_head = d;
     p->_data = d + headroom;
     p->_tail = p->_data + length;
-    p->_end = p->_head + n;
+    //Do not shorten the buffer length, as it is allocated by DPDK from the pool it's probably larger
+    //p->_end = p->_head + n;
+    p->_end = d + mb->buf_len;
     p->_use_count = 1;
     p->_data_packet = 0;
     if (clear)
@@ -1302,7 +1304,8 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     int length = this->length();
     uint8_t* new_head = p->_head;
     uint8_t* new_end = p->_end;
-# if HAVE_DPDK_PACKET_POOL
+//# if HAVE_DPDK_PACKET_POOL -> other cases too, like if we're expanding a mmapped packet with its own destructor, and replacing the buffer with a normal buffer, the mmap destructor needs to be zeroed
+# if CLICK_USERLEVEL || CLICK_MINIOS
     buffer_destructor_type desc = p->_destructor;
     void* arg = p->_destructor_argument;
 # endif
@@ -1364,7 +1367,8 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
 # endif
             );
     }
-# if HAVE_DPDK_PACKET_POOL
+//# if HAVE_DPDK_PACKET_POOL --> see comment above
+# if CLICK_USERLEVEL || CLICK_MINIOS
     p->_destructor = desc;
     p->_destructor_argument = arg;
 # endif
