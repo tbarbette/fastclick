@@ -705,7 +705,7 @@ FromDump::run_task(Task *)
 	            output(0).push(_packet);
         _count++;
         _packet = 0;
-        if (n++ < _burst)
+        if (++n < _burst)
             goto again;
         goto exit;
     } else
