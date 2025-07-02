@@ -1305,7 +1305,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     uint8_t* new_head = p->_head;
     uint8_t* new_end = p->_end;
 //# if HAVE_DPDK_PACKET_POOL -> other cases too, like if we're expanding a mmapped packet with its own destructor, and replacing the buffer with a normal buffer, the mmap destructor needs to be zeroed
-# if CLICK_USERLEVEL || CLICK_MINIOS
+# if (CLICK_USERLEVEL || CLICK_MINIOS ) && HAVE_CLICK_PACKET_POOL // If no packet pool, then desc is necessary garbage
     buffer_destructor_type desc = p->_destructor;
     void* arg = p->_destructor_argument;
 # endif
@@ -1368,7 +1368,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
             );
     }
 //# if HAVE_DPDK_PACKET_POOL --> see comment above
-# if CLICK_USERLEVEL || CLICK_MINIOS
+# if (CLICK_USERLEVEL || CLICK_MINIOS) && HAVE_CLICK_PACKET_POOL
     p->_destructor = desc;
     p->_destructor_argument = arg;
 # endif
