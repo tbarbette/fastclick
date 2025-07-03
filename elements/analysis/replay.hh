@@ -292,19 +292,26 @@ inline void ReplayBase::check_end_loop(Task* t, bool force_time) {
         reset_time();
         if (_stop_time == 0) {
             if (_verbose)
-                click_chatter("%p{element}: Replay loop", this);
+                click_chatter("%p{element}: Replay loop (%d loops left)", this, _stop);
             if (_stop > 0)
                 _stop--;
+            if (_stop == 0 && _verbose)
+                click_chatter("%p{element}: stopped because there is 0 loops left", this);
         } else {
             int diff = (Timestamp::now_steady() - _startsent).msecval() / 1000;
             if (diff >= _stop_time) {
                 if (_verbose)
-                    click_chatter("Replay stopped after %d seconds",diff);
+                    click_chatter("Replay stopped after %d seconds (%d loops left)",diff,_stop);
                 _stop = 0;
             } else {
                 if (_verbose)
-                    click_chatter("Replay continue after %d/%d seconds", diff, _stop_time);
+                    click_chatter("%p{element}: continue after %d/%d seconds (%d loops left)", this, diff, _stop_time, _stop);
+                if (_stop > 0)
+                    _stop--;
+                if (_stop == 0 && _verbose)
+                    click_chatter("%p{element}: stopped early after %d/%d seconds because there is 0 loops left", this, diff, _stop_time);
             }
+
         }
         if (_stop == 0) {
 stop:
