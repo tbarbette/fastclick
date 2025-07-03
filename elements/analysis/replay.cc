@@ -24,7 +24,7 @@
 CLICK_DECLS
 
 ReplayBase::ReplayBase() : _active(true), _loaded(false),
-    _burst(64), _stop(-1),_stop_time(0),  _quick_clone(false), _task(this), _limit(-1), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true), _timing_packet(), _timing_real(), _startsent(), _fnt_expr() {
+    _burst(64), _stop(-1), _stop_time(0),  _quick_clone(false), _task(this), _limit(-1), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true), _timing_packet(), _timing_real(), _startsent(), _fnt_expr() {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
 #endif
@@ -339,7 +339,7 @@ stop:
                         Timestamp diff_s = now - _startsent; //x is the seconds since the beginning of the sending
                         float nt = _fnt_expr.eval((float)diff_s.msecval() / 1000);
                         if (_stop_time > 0 && diff_s.sec() > _stop_time) {
-                            click_chatter("Forced stop because time is achieved!");
+                            click_chatter("Forced stop because time is out!");
                             _stop = 0;
                             goto stop;
                         }
