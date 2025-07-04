@@ -175,7 +175,7 @@ RatedUnqueue::read_handler(Element *e, void *thunk)
     return String();
 }
 
-enum {h_active};
+enum {h_active,h_reset};
 int
 RatedUnqueue::write_param(const String &conf, Element *e, void *user_data,
 		     ErrorHandler *errh)
@@ -189,6 +189,9 @@ RatedUnqueue::write_param(const String &conf, Element *e, void *user_data,
             u->_task.reschedule();
         }
         break;
+    case h_reset:
+        u->_tb.clear();
+        break;
     }
     return 0;
 }
@@ -201,6 +204,7 @@ RatedUnqueue::add_handlers()
     add_write_handler("rate", reconfigure_keyword_handler, "0 RATE");
     add_data_handlers("active", Handler::OP_READ | Handler::CHECKBOX, &_active);
     add_write_handler("active", write_param, h_active);
+    add_write_handler("reset", write_param, h_reset, Handler::BUTTON);
     add_task_handlers(&_task);
     add_read_handler("config", read_handler, h_rate);
     set_handler_flags("config", 0, Handler::CALM);
