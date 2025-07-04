@@ -355,12 +355,12 @@ class CounterMP : public CounterMPBase<nolock> { public:
 
 inline void
 CounterBase::check_handlers(counter_int_type count, counter_int_type byte_count) {
-    if (count == _count_trigger && !_count_triggered) {
+    if (count >= _count_trigger && !_count_triggered) {
         _count_triggered = true;
         if (_count_trigger_h)
             (void) _count_trigger_h->call_write();
     }
-    if (byte_count == _byte_trigger && !_byte_triggered) {
+    if (byte_count >= _byte_trigger && !_byte_triggered) {
         _byte_triggered = true;
         if (_byte_trigger_h)
             (void) _byte_trigger_h->call_write();
