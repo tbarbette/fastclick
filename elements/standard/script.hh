@@ -490,7 +490,7 @@ class Script : public Element { public:
         insn_save, insn_append,
 #endif
         INSN_LABEL, INSN_GOTO, INSN_GOTOA, INSN_RETURN, insn_returnq,
-        INSN_WAIT_PSEUDO, INSN_LOOP_PSEUDO,
+        INSN_WAIT_PSEUDO, INSN_LOOP_PSEUDO, INSN_PLEASE_STOP,
         // negative instructions are also valid label constants
         insn_exit = -1, insn_end = -2, insn_stop = -3, insn_error = -4,
         insn_errorq = -5

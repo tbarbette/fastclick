@@ -54,6 +54,7 @@ static const StaticNameDB::Entry instruction_entries[] = {
     { "label", Script::INSN_LABEL },
     { "loop", Script::INSN_LOOP_PSEUDO },
     { "pause", Script::INSN_WAIT_STEP },
+    { "please_stop", Script::INSN_PLEASE_STOP },
     { "print", Script::INSN_PRINT },
     { "printn", Script::INSN_PRINTN },
     { "printnq", Script::INSN_PRINTNQ },
@@ -296,6 +297,7 @@ Script::configure(Vector<String> &conf, ErrorHandler *errh)
         case insn_end:
         case insn_exit:
         case insn_stop:
+        case INSN_PLEASE_STOP:
         case insn_error:
         case insn_errorq:
             if (conf[i] && insn != insn_error && insn != insn_errorq)
@@ -390,6 +392,9 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
 
         switch (insn) {
 
+        case INSN_PLEASE_STOP:
+            router()->adjust_runcount(-1);
+            break;
         case insn_stop:
             _step_count++;
             _insn_pos--;
