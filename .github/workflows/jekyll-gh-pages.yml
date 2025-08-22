@@ -1,8 +1,8 @@
-# Sample workflow for building and deploying a Jekyll site to GitHub Pages
-name: Deploy Jekyll with GitHub Pages dependencies preinstalled
+# Sample workflow for building and deploying a documentation site to GitHub Pages
+name: Deploy Doxygen documentation with GitHub Pages
 
 on:
-  # Runs on pushes targeting the default branch
+  # Runs on pushes targeting the default branch and the test branch
   push:
     branches: ["main", "generate-doc"]
 
@@ -30,13 +30,18 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./
-          destination: ./_site
+      - name: Install Doxygen
+        run: sudo apt update && sudo apt install -y doxygen
+      - name: Configure
+        run: ./configure
+      - name: Build Doxygen documentation
+        run: |
+            cd doc
+            make doxygen O=/tmp/doxygen-output
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
+        with:
+          path: /tmp/doxygen-output
 
   # Deployment job
   deploy:
