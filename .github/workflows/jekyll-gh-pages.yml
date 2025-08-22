@@ -35,13 +35,11 @@ jobs:
       - name: Configure
         run: ./configure
       - name: Build Doxygen documentation
-        run: |
-            cd doc
-            make doxygen O=/tmp/doxygen-output
+        run: make -C doc doxygen O=site/docs
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: /tmp/doxygen-output
+          path: ./site
 
   # Deployment job
   deploy:
