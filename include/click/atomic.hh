@@ -819,7 +819,29 @@ atomic_uint64_t::value() const
 #if CLICK_LINUXMODULE
     return atomic64_read(&_val);
 #else
-    return CLICK_ATOMIC_VAL;
+    #if defined(__x86_64__)
+        return CLICK_ATOMIC_VAL;
+    #else
+        uint32_t low, high;
+
+        asm volatile(
+        "movl %%ebx, %%esi\n\t"           // Save EBX (since it's used by PIC code)
+        "1:\n\t"
+        "movl (%2), %%eax\n\t"            // EAX = low part
+        "movl 4(%2), %%edx\n\t"           // EDX = high part
+        "movl %%eax, %%ebx\n\t"           // EBX = EAX (expected low)
+        "movl %%edx, %%ecx\n\t"           // ECX = EDX (expected high)
+        CLICK_ATOMIC_LOCK "cmpxchg8b (%2)\n\t"         // Try to swap with same value (no change)
+        "jnz 1b\n\t"                      // If failed, retry
+        "movl %%eax, %0\n\t"              // low = EAX
+        "movl %%edx, %1\n\t"              // high = EDX
+        "movl %%esi, %%ebx\n\t"           // Restore EBX
+        : "=r"(low), "=r"(high)
+        : "r"(&_val)
+        : "eax", "edx", "ecx", "esi", "memory"
+        );
+       return ((uint64_t)high << 32) | low;
+    #endif
 #endif
 }
 
@@ -844,7 +866,28 @@ atomic_uint64_t::operator=(uint64_t x)
 #if CLICK_LINUXMODULE
     atomic64_set(&_val, x);
 #else
-    CLICK_ATOMIC_VAL = x;
+   #if defined(__x86_64__)
+       CLICK_ATOMIC_VAL = x;
+   #else
+       uint32_t nlow = static_cast<uint32_t>(x & 0xFFFFFFFF);
+       uint32_t nhigh = static_cast<uint32_t>(x >> 32);
+       asm volatile (
+       "movl %%ebx, %%esi\n\t"              // Save EBX (needed for PIC code)
+       "movl %[low], %%ebx\n\t"             // EBX = new low
+       "movl %[high], %%ecx\n\t"            // ECX = new high
+       "1:\n\t"
+       "movl (%[addr]), %%eax\n\t"          // EAX = old low
+       "movl 4(%[addr]), %%edx\n\t"         // EDX = old high
+       CLICK_ATOMIC_LOCK "cmpxchg8b (%[addr])\n\t"       // Atomically write ECX:EBX if EDX:EAX match
+       "jnz 1b\n\t"                         // Retry if compare failed
+       "movl %%esi, %%ebx\n\t"              // Restore EBX
+       :
+       : [addr] "r" (&_val),
+         [low] "r" (nlow),
+         [high] "r" (nhigh)
+       : "eax", "edx", "ecx", "esi", "memory"
+       );
+  #endif
 #endif
     return *this;
 }
