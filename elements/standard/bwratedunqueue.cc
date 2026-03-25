@@ -20,6 +20,7 @@
 
 #include <click/config.h>
 #include <click/args.hh>
+#include <click/error.hh>
 #include "bwratedunqueue.hh"
 CLICK_DECLS
 
@@ -35,6 +36,18 @@ BandwidthRatedUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_or_set("LINK_RATE", _link_rate, false)
         .consume() < 0)
         return -1;
+
+    _thresh = tb_bandwidth_thresh;
+
+    if (_link_rate)
+        _thresh = tb_bandwidth_thresh * 8;
+
+    int max_mtu=1500;
+    int max_burst = _thresh / ((_link_rate ? 8 : 1)*max_mtu + (_link_rate ? 8 * 24 : 0));
+    if (max_burst > _burst)
+        errh->warning("The BURST value is too large, the token bucket might leak packets. Consider setting BURST to %d",max_burst);
+
+
     return RatedUnqueue::configure(conf, errh);
 }
 
@@ -52,12 +65,12 @@ BandwidthRatedUnqueue::run_task(Task *)
 
     _tb.refill();
 
-    if (_tb.contains(tb_bandwidth_thresh)) {
+    if (_tb.contains(_thresh)) {
 #if HAVE_BATCH
         if (in_batch_mode) {
             PacketBatch* batch = input(0).pull_batch(_burst);
             if (batch) {
-                int c = 0;
+                TokenBucket::token_type c = 0;
                 FOR_EACH_PACKET(batch, p) c += LENGTHOF(p);
                 _tb.remove(c);
                 _packets += batch->count();
@@ -73,7 +86,8 @@ BandwidthRatedUnqueue::run_task(Task *)
 #endif
         {
             if (Packet *p = input(0).pull()) {
-                _tb.remove(LENGTHOF(p));
+                TokenBucket::token_type c = LENGTHOF(p);
+                _tb.remove(c);
                 _packets++;
                 _pushes++;
                 worked = true;
@@ -85,7 +99,7 @@ BandwidthRatedUnqueue::run_task(Task *)
             }
         }
     } else {
-	    _timer.schedule_after(Timestamp::make_usec(_tb.time_until_contains(tb_bandwidth_thresh)));
+	    _timer.schedule_after(Timestamp::make_usec(_tb.time_until_contains(_thresh)));
 	    _empty_runs++;
 	    return false;
     }

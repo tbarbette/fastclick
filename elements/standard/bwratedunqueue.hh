@@ -62,6 +62,7 @@ class BandwidthRatedUnqueue : public RatedUnqueue { public:
   private:
     bool _use_extra_length;
     bool _link_rate;
+    TokenBucket::token_type _thresh;
 };
 
 CLICK_ENDDECLS
