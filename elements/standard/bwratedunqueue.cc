@@ -44,7 +44,7 @@ BandwidthRatedUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 
     int max_mtu=1500;
     int max_burst = _thresh / ((_link_rate ? 8 : 1)*max_mtu + (_link_rate ? 8 * 24 : 0));
-    if (max_burst > _burst)
+    if (max_burst < _burst)
         errh->warning("The BURST value is too large, the token bucket might leak packets. Consider setting BURST to %d",max_burst);
 
 
