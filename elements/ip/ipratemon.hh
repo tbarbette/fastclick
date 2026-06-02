@@ -2,7 +2,7 @@
 #define CLICK_IPRATEMON_HH
 #include <click/glue.hh>
 #include <clicknet/ip.h>
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/ewma.hh>
 #include <click/vector.hh>
 #include <click/packet_anno.hh>
@@ -67,7 +67,7 @@ CLICK_DECLS
 
 class Spinlock;
 
-class IPRateMonitor : public Element {
+class IPRateMonitor : public BatchElement {
 public:
 
     enum {
@@ -107,6 +107,10 @@ public:
 
   void push(int port, Packet *p);
   Packet *pull(int port);
+#if HAVE_BATCH
+  void push_batch(int port, PacketBatch *batch);
+  PacketBatch *pull_batch(int port, unsigned max);
+#endif
 
   int llrpc(unsigned, void *);
 
