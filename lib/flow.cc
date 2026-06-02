@@ -21,7 +21,7 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <stdlib.h>
-#if defined(__aarch64__) && defined(__mach__)
+#if defined(__aarch64__) && defined(__MACH__)
 static __inline uint32_t __bswap_32(uint32_t __x)
 {
 	return __x>>24 | __x>>8&0xff00 | __x<<8&0xff0000 | __x<<24;
