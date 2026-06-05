@@ -45,6 +45,10 @@
 #define ETH_LINK_FULL_DUPLEX RTE_ETH_LINK_FULL_DUPLEX
 #endif
 
+#if RTE_VERSION >= RTE_VERSION_NUM(21,02,0,0)
+#include <rte_power_pmd_mgmt.h>
+#endif
+
 CLICK_DECLS
 
 #define LOAD_UNIT 10
@@ -127,6 +131,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("TCO", _tco)
         .read("UCO", _uco)
 #endif
+        .read("POWER_MGMT", _power_mgmt)
         .complete() < 0)
         return -1;
 
@@ -282,6 +287,30 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
             "Raise the number using N_QUEUES of queues or "
             "limit the number of threads using MAXTHREADS"
         );
+
+    if (_power_mgmt != "") {
+#if RTE_VERSION >= RTE_VERSION_NUM(21,02,0,0)
+        for (unsigned q = (unsigned)firstqueue; q <= (unsigned)lastqueue; q++) {
+            int tid = thread_for_queue_offset(q - firstqueue);
+            unsigned lcore_id = tid;
+
+            enum rte_power_pmd_mgmt_type mode = RTE_POWER_MGMT_TYPE_MONITOR;
+            String pm_upper = _power_mgmt.upper();
+            if (pm_upper == "PAUSE") mode = RTE_POWER_MGMT_TYPE_PAUSE;
+            else if (pm_upper == "SCALE") mode = RTE_POWER_MGMT_TYPE_SCALE;
+            else if (pm_upper != "MONITOR") {
+                return errh->error("Invalid POWER_MGMT mode '%s'. Must be MONITOR, PAUSE, or SCALE", _power_mgmt.c_str());
+            }
+
+            int ret_pm = rte_power_ethdev_pmgmt_queue_enable(lcore_id, _dev->port_id, q, mode);
+            if (ret_pm < 0) {
+                return errh->error("Failed to enable PMD power management on queue %d: error %d", q, ret_pm);
+            }
+        }
+#else
+        return errh->error("POWER_MGMT is only supported with DPDK >= 21.02");
+#endif
+    }
 
     if (all_initialized()) {
         ret = DPDKDevice::initialize(errh);
