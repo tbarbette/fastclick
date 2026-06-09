@@ -1203,8 +1203,7 @@ int DPDKDevice::static_initialize(ErrorHandler* errh) {
             rte_exit(EXIT_FAILURE, "Cannot register mbuf field\n");
         }
         if (timestamp_dynflag < 0) {
-            RTE_ETHDEV_LOG(ERR,
-                    "Failed to register mbuf flag for Rx timestamp\n");
+            errh->error("Failed to register mbuf flag for Rx timestamp");
             return -rte_errno;
         }
         //timestamp_dynflag = RTE_BIT64(offset);
