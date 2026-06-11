@@ -158,27 +158,16 @@ ifeq ($(USE_DPDK),yes)
 	include rte_parse.mk
 	CFLAGS := $(CFLAGS) @DPDK_CFLAGS@
 	CXXFLAGS := $(CXXFLAGS) @DPDK_CFLAGS@
+ifeq (@HAVE_SSE42@,yes)
 	EXTRA_DRIVER_OBJS := dpdkdevice.o rte_cuckoo_hash_bloom.o rte_cuckoo_hash_lazy_bloom.o $(EXTRA_DRIVER_OBJS)
+else
+	EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
+endif
 	ifeq ($(shell [ ${HAVE_FLOW_API} -eq 1 ] && echo true),true)
 		EXTRA_DRIVER_OBJS := flowrulemanager.o flowrulecache.o flowruleparser.o $(EXTRA_DRIVER_OBJS)
 	endif
 endif
 
-
-
-USE_DPDK = @USE_DPDK@
-ifeq ($(USE_DPDK),yes)
-	RTE_SDK = @RTE_SDK@
-	RTE_TARGET = @RTE_TARGET@
-	RTE_VER_MAJOR = @RTE_VER_MAJOR@
-	RTE_VER_MINOR = @RTE_VER_MINOR@
-	RTE_VER_YEAR = @RTE_VER_YEAR@
-	RTE_VER_MONTH = @RTE_VER_MONTH@
-	RTE_USE_PKGCONFIG = @RTE_USE_PKGCONFIG@
-	CFLAGS := $(CFLAGS) @DPDK_CFLAGS@
-	CXXFLAGS := $(CXXFLAGS) @DPDK_CFLAGS@
-	EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
-endif
 
 
 
