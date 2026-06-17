@@ -811,7 +811,6 @@ operator<=(const atomic_uint32_t &a, const atomic_uint32_t &b)
 typedef atomic_uint32_t uatomic32_t;
 
 //Atomic 64
-
 /** @brief  Return the value. */
 inline uint64_t
 atomic_uint64_t::value() const
@@ -819,7 +818,25 @@ atomic_uint64_t::value() const
 #if CLICK_LINUXMODULE
     return atomic64_read(&_val);
 #else
-    return CLICK_ATOMIC_VAL;
+    #if defined(__x86_64__)
+        return CLICK_ATOMIC_VAL;
+    #else
+        uint32_t low, high;
+
+        asm volatile(
+	"1:\n\t"
+        "movl (%[addr]), %%eax\n\t"          // EAX = low
+        "movl 4(%[addr]), %%edx\n\t"         // EDX = high
+        "movl %%eax, %%ebx\n\t"         // EDX = high
+        "movl %%edx, %%ecx\n\t"         // EDX = high
+        CLICK_ATOMIC_LOCK "cmpxchg8b (%[addr])\n\t"       // Compare with same value to validate consistency
+        "jnz 1b\n\t"                         // Retry if value changed during read
+        : "=a" (low), "=d" (high)
+        : [addr] "r" (&_val)
+        : "ebx", "ecx", "memory"
+        );
+ 	return ((uint64_t)high << 32) | low;
+    #endif
 #endif
 }
 
@@ -844,7 +861,23 @@ atomic_uint64_t::operator=(uint64_t x)
 #if CLICK_LINUXMODULE
     atomic64_set(&_val, x);
 #else
-    CLICK_ATOMIC_VAL = x;
+   #if defined(__x86_64__)
+       CLICK_ATOMIC_VAL = x;
+   #else
+        uint32_t nlow = static_cast<uint32_t>(x & 0xFFFFFFFF);
+        uint32_t nhigh = static_cast<uint32_t>(x >> 32);
+        asm volatile (
+        "1:\n\t"
+        "movl (%[addr]), %%eax\n\t"          // EAX = old low
+        "movl 4(%[addr]), %%edx\n\t"         // EDX = old high
+        CLICK_ATOMIC_LOCK "cmpxchg8b (%[addr])\n\t"       // Atomically write ECX:EBX if EDX:EAX match
+        "jnz 1b\n\t"                         // Retry if compare failed
+        :
+        : [addr] "r" (&_val),
+          "b" (nlow),"c"(nhigh)
+        : "eax", "edx", "memory"
+        );
+  #endif
 #endif
     return *this;
 }
