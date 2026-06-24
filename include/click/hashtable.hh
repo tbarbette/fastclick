@@ -951,7 +951,9 @@ template <typename T>
 typename HashTable<T>::value_type &
 HashTable<T>::operator[](key_const_reference key)
 {
-    return *find_insert(key);
+    HashTable_iterator<T> i = find_insert(key);
+    assert(i.get());
+    return *i;
 }
 
 template <typename T>
