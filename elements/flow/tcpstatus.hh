@@ -6,9 +6,10 @@
 #include <click/flow/flow.hh>
 #include <click/flow/flowelement.hh>
 
+
 CLICK_DECLS
 
-enum TcpStatus {TCP_FIRSTSEEN = 0,TCP_DROP};
+enum TcpStatus {TCP_FIRSTSEEN = 0,TCP_DROP,TCP_ESTABLISHED};
 class TCPStatusFlowData {
 	public:
 		enum TcpStatus status;
@@ -25,7 +26,7 @@ public:
 	~TCPStatus() {};
 
     const char *class_name() const		{ return "TCPStatus"; }
-    const char *port_count() const		{ return "1/1"; }
+    const char *port_count() const		{ return "1/1-2"; }
     const char *processing() const		{ return PUSH; }
 
 
@@ -35,7 +36,7 @@ public:
 
 
  private:
-
+    bool _accept_synack;
 };
 CLICK_ENDDECLS
 #endif
