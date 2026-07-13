@@ -62,7 +62,8 @@ EtherSwitch::broadcast(int source, Packet *p)
   for (int i = 0; i < n && w > 0; i++) {
     if (pfr.bv[i]) {
       Packet *pp = (w > 1 ? p->clone() : p);
-      output(i).push(pp);
+      if (pp)
+        output(i).push(pp);
       w--;
     }
   }

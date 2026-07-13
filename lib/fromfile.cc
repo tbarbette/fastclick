@@ -184,6 +184,11 @@ FromFile::read_buffer_mmap(ErrorHandler *errh)
 	    return error(errh, "mmap: %s", strerror(errno));
 
     _data_packet = Packet::make((unsigned char *)mmap_data, _len, munmap_destructor, 0);
+    if (!_data_packet) {
+        munmap_destructor((unsigned char *)mmap_data, _len, NULL);
+        return error(errh, "Packet::make failed");
+    }
+
     _buffer = _data_packet->data();
     _file_offset = _mmap_off;
     _mmap_off += _len;
