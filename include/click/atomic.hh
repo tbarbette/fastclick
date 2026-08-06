@@ -1015,10 +1015,18 @@ atomic_uint64_t::compare_swap(volatile uint64_t &x, uint64_t expected, uint64_t 
     return __atomic_compare_exchange(&x,&expected,&desired,0,CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER)
 	? expected : x;
 #elif CLICK_ATOMIC_X86
-    asm volatile (CLICK_ATOMIC_LOCK "cmpxchgq %2,%1"
-		  : "=a" (expected), "=m" (x)
-		  : "r" (desired), "0" (expected), "m" (x)
-		  : "cc", "memory");
+    #if defined(__x86_64__)
+        asm volatile (CLICK_ATOMIC_LOCK "cmpxchgq %2,%1"
+            : "=a" (expected), "=m" (x)
+            : "r" (desired), "0" (expected), "m" (x)
+            : "cc", "memory");
+    #else
+	asm volatile (CLICK_ATOMIC_LOCK "cmpxchg8b %1\n\t"   // Compare EDX:EAX with [mem], replace with ECX:EBX if equal
+            : "+A" (expected)          //load expected into EAX:EDX
+            : "m" (x),            // preload memory value to compare.
+              "b" ((uint32_t)desired), "c"((uint32_t) (desired>>32))
+            : "memory");
+    #endif
     return expected;
 #elif CLICK_LINUXMODULE && defined(cmpxchg)
     return cmpxchg(&x, expected, desired);
@@ -1063,11 +1071,31 @@ atomic_uint64_t::fetch_and_add(uint64_t delta)
 #if CLICK_ATOMIC_BUILTINS
     return __atomic_fetch_add(&_val, delta, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
-    asm volatile (CLICK_ATOMIC_LOCK "xaddq %0,%1"
-          : "=r" (delta), "=m" (CLICK_ATOMIC_VAL)
-          : "0" (delta), "m" (CLICK_ATOMIC_VAL)
-          : "cc");
-    return delta;
+    #if defined(__x86_64__)
+        asm volatile (CLICK_ATOMIC_LOCK "xaddq %0,%1"
+	    : "=r" (delta), "=m" (CLICK_ATOMIC_VAL)
+	    : "0" (delta), "m" (CLICK_ATOMIC_VAL)
+	    : "cc");
+	return delta;
+    #else
+	uint32_t old_lo, old_hi;
+	asm volatile (
+            "1:\n\t"
+	    "movl (%2), %%eax\n\t"           // Load old low 32 bits
+	    "movl 4(%2), %%edx\n\t"          // Load old high 32 bits
+	    "movl %%eax, %%ebx\n\t"          // Copy low to ebx (new low)
+	    "movl %%edx, %%ecx\n\t"          // Copy high to ecx (new high)
+	    "addl %3, %%ebx\n\t"             // new low += delta low
+	    "adcl %4, %%ecx\n\t"             // new high += delta high + carry
+	    CLICK_ATOMIC_LOCK "cmpxchg8b (%2)\n\t"        // atomic cmpxchg8b
+	    "jnz 1b\n\t"                     // if fail, retry
+	    "movl %%eax, %0\n\t"             // store old low
+	    "movl %%edx, %1\n\t"             // store old high
+	    : "+a" (old_lo), "+d" (old_hi)
+	    : "r" (&_val), "r" ((uint32_t)delta), "r" ((uint32_t)(delta >> 3))
+	    : "ebx", "memory");
+	return (static_cast<uint64_t>(old_hi) << 32) | old_lo;
+    #endif
 #elif CLICK_LINUXMODULE && HAVE_LINUX_ATOMIC_ADD_RETURN
     return atomic64_add_return(&_val, delta) - delta;
 #elif CLICK_LINUXMODULE
