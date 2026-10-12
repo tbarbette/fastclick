@@ -1146,8 +1146,15 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir, unsigned &queue_id,
                             bool lro, bool jumbo, unsigned n_desc, ErrorHandler *errh)
 {
     if (_is_initialized) {
+        // Hot-swapping (click -R): the new router's elements take over queues
+        // that the running device already has. Queue settings (promiscuity,
+        // VLAN, descriptors...) cannot change any more; new queues cannot be added.
+        Vector<bool> &slots = dir == RX ? info.rx_queues : info.tx_queues;
+        if (queue_id < (unsigned)slots.size() && slots[queue_id])
+            return 0;
         return errh->error(
-            "Trying to configure DPDK device after initialization");
+            "Trying to configure DPDK device after initialization (when hot-swapping, "
+            "only the %s queues configured at startup can be reused)", dir == RX ? "RX" : "TX");
     }
 
     if (dir == RX) {
