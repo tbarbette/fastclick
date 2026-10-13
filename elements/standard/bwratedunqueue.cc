@@ -42,13 +42,15 @@ BandwidthRatedUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
     if (_link_rate)
         _thresh = tb_bandwidth_thresh * 8;
 
+    if (RatedUnqueue::configure(conf, errh) < 0)
+        return -1;
+
+    // after RatedUnqueue::configure(), which parses BURST
     int max_mtu=1500;
     int max_burst = _thresh / ((_link_rate ? 8 : 1)*max_mtu + (_link_rate ? 8 * 24 : 0));
-    if (max_burst < _burst)
+    if ((uint32_t) max_burst < _burst)
         errh->warning("The BURST value is too large, the token bucket might leak packets. Consider setting BURST to %d",max_burst);
-
-
-    return RatedUnqueue::configure(conf, errh);
+    return 0;
 }
 
 #define LENGTHOF(p) \
