@@ -866,6 +866,41 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
     }
 #endif
 
+#if RTE_VERSION >= RTE_VERSION_NUM(21, 02, 0, 0)
+    if (info.power_mgmt_mode >= 0) {
+        unsigned lcore_id = rte_get_main_lcore();
+        int current_worker = 0;
+        unsigned int lcore;
+        // Build a list of worker lcores
+        Vector<unsigned> worker_lcores;
+        RTE_LCORE_FOREACH_WORKER(lcore) {
+            worker_lcores.push_back(lcore);
+        }
+        for (unsigned i = 0; i < (unsigned)info.rx_queues.size(); i++) {
+            if (i == 0) {
+                lcore_id = rte_get_main_lcore();
+            } else if ((int)(i - 1) < worker_lcores.size()) {
+                lcore_id = worker_lcores[i - 1];
+            } else {
+                lcore_id = i; // fallback
+            }
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            int ret_pm = rte_power_ethdev_pmgmt_queue_enable(
+                lcore_id, port_id, i, (enum rte_power_pmd_mgmt_type)info.power_mgmt_mode);
+#pragma GCC diagnostic pop
+            if (ret_pm < 0) {
+                return errh->error("Failed to enable PMD power management on core %d / "
+                                   "queue %d: error %d (%s)",
+                                   lcore_id, i, ret_pm, rte_strerror(-ret_pm));
+            } else {
+                click_chatter("Port %d :: queue %d pwr mgmt enabled on core %d",
+                              port_id, i, lcore_id);
+            }
+        }
+    }
+#endif
+
     int err = rte_eth_dev_start(port_id);
     if (err < 0) {
         return errh->error("Cannot start DPDK port %u: error %d", port_id, err);
@@ -1062,6 +1097,12 @@ void DPDKDevice::set_tx_offload(uint64_t offload) {
     info.tx_offload |= offload;
 }
 
+#if RTE_VERSION >= RTE_VERSION_NUM(21, 02, 0, 0)
+void DPDKDevice::set_power_mgmt(enum rte_power_pmd_mgmt_type mode) {
+    info.power_mgmt_mode = (int)mode;
+}
+#endif
+
 #if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
 void DPDKDevice::set_init_flow_isolate(const bool &flow_isolate) {
     info.flow_isolate = flow_isolate;
@@ -1105,8 +1146,15 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir, unsigned &queue_id,
                             bool lro, bool jumbo, unsigned n_desc, ErrorHandler *errh)
 {
     if (_is_initialized) {
+        // Hot-swapping (click -R): the new router's elements take over queues
+        // that the running device already has. Queue settings (promiscuity,
+        // VLAN, descriptors...) cannot change any more; new queues cannot be added.
+        Vector<bool> &slots = dir == RX ? info.rx_queues : info.tx_queues;
+        if (queue_id < (unsigned)slots.size() && slots[queue_id])
+            return 0;
         return errh->error(
-            "Trying to configure DPDK device after initialization");
+            "Trying to configure DPDK device after initialization (when hot-swapping, "
+            "only the %s queues configured at startup can be reused)", dir == RX ? "RX" : "TX");
     }
 
     if (dir == RX) {
@@ -1203,8 +1251,7 @@ int DPDKDevice::static_initialize(ErrorHandler* errh) {
             rte_exit(EXIT_FAILURE, "Cannot register mbuf field\n");
         }
         if (timestamp_dynflag < 0) {
-            RTE_ETHDEV_LOG(ERR,
-                    "Failed to register mbuf flag for Rx timestamp\n");
+            errh->error("Failed to register mbuf flag for Rx timestamp");
             return -rte_errno;
         }
         //timestamp_dynflag = RTE_BIT64(offset);

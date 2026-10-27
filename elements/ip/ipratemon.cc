@@ -128,6 +128,35 @@ IPRateMonitor::pull(int port)
   return p;
 }
 
+#if HAVE_BATCH
+void
+IPRateMonitor::push_batch(int port, PacketBatch *batch)
+{
+  _lock->acquire();
+  FOR_EACH_PACKET(batch, p) {
+    bool ewma = ((unsigned) ((click_random() >> 5) & 0xffff) <= _ratio);
+    update_rates(p, port == 0, ewma);
+  }
+  _lock->release();
+  output_push_batch(port, batch);
+}
+
+PacketBatch *
+IPRateMonitor::pull_batch(int port, unsigned max)
+{
+  PacketBatch *batch = input_pull_batch(port, max);
+  if (batch) {
+    _lock->acquire();
+    FOR_EACH_PACKET(batch, p) {
+      bool ewma = ((unsigned) ((click_random() >> 5) & 0xffff) <= _ratio);
+      update_rates(p, port == 0, ewma);
+    }
+    _lock->release();
+  }
+  return batch;
+}
+#endif
+
 
 IPRateMonitor::Counter*
 IPRateMonitor::make_counter(Stats *s, unsigned char index, MyEWMA *rate)

@@ -39,9 +39,22 @@ RatedUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(this, errh).bind(conf)
 	    .read_or_set("BURST", _burst, -1)
-        .read_or_set("ACTIVE", _active, true)
+        // absent: keep the current state, a live reconfiguration must not resume a paused element
+        .read("ACTIVE", _active)
         .consume() < 0)
         return -1;
+    // Default BURST here rather than in initialize(): a live reconfiguration (e.g. writing
+    // the "rate" handler) does not run initialize(), and an unset (-1) BURST would make
+    // run_task() pull unbounded batches, emptying the queue far above the rate.
+    if (_burst == (uint32_t) -1) {
+        if (is_bandwidth()) {
+            _burst = 1;
+#if HAVE_VERBOSE_BATCH
+            errh->warning("BURST parameter is not set. To avoid unexpected behavior, it will pull batches of one packet at maximum to avoid imprecision (e.g. pulling 32 packets which might be way over the amount of available tokens). Set BURST to a value to silence this message.", this);
+#endif
+        } else
+            _burst = 32;
+    }
     return configure_helper(&_tb, is_bandwidth(), this, conf, errh);
 }
 
@@ -74,8 +87,8 @@ RatedUnqueue::configure_helper(TokenBucket *tb, bool is_bandwidth, Element *elt,
     }
 
     if (is_bandwidth) {
-	uint64_t new_tokens = tokens + tb_bandwidth_thresh;
-	tokens = (tokens < new_tokens ? new_tokens : UINT64_MAX);
+        uint64_t new_tokens = tokens + tb_bandwidth_thresh;
+        tokens = (tokens < new_tokens ? new_tokens : UINT64_MAX);
     }
 
     tb->assign(r, tokens ? tokens : 1);
@@ -86,16 +99,6 @@ int
 RatedUnqueue::initialize(ErrorHandler *errh)
 {
     ScheduleInfo::initialize_task(this, &_task, errh);
-
-    if (_burst == -1) {
-        if (is_bandwidth()) {
-            _burst = 1;
-#if HAVE_VERBOSE_BATCH
-            errh->warning("BURST parameter is not set. To avoid unexpected behavior, it will pull batches of one packet at maximum to avoid imprecision (e.g. pulling 32 packets which might be way over the amount of available tokens). Set BURST to a value to silence this message.", this);
-#endif
-        } else
-            _burst = 32;
-    }
 
     _signal = Notifier::upstream_empty_signal(this, 0, &_task);
     _timer.initialize(this);
@@ -206,7 +209,6 @@ RatedUnqueue::add_handlers()
     add_write_handler("active", write_param, h_active);
     add_write_handler("reset", write_param, h_reset, Handler::BUTTON);
     add_task_handlers(&_task);
-    add_read_handler("config", read_handler, h_rate);
     set_handler_flags("config", 0, Handler::CALM);
 }
 

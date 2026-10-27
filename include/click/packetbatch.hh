@@ -105,6 +105,8 @@ CLICK_DECLS
  * If all packets are dropped, batch will become null.
  * If the first packets are dropped, the address of batch will change.
  *
+ * This function does *not* kill the packets. It is up to the caller to do it.
+ *
  *
  * Example: EXECUTE_FOR_EACH_PACKET_DROPPABLE([this](Packet* p){return p->push(_nbytes);},batch,[](Packet* p){})
  */

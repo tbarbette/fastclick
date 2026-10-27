@@ -471,6 +471,7 @@ protected:
     bool _uco;
     bool _ipco;
     bool _clear;
+    String _power_mgmt;
 };
 
 CLICK_ENDDECLS

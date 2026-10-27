@@ -22,6 +22,10 @@
 #include <rte_pci.h>
 #include <rte_version.h>
 
+#if RTE_VERSION >= RTE_VERSION_NUM(21, 02, 0, 0)
+#include <rte_power_pmd_mgmt.h>
+#endif
+
 
 
 #if HAVE_FLOW_API
@@ -101,6 +105,9 @@ public:
 	        flow_isolate(false),
             vlan_filter(false), vlan_strip(false), vlan_extend(false), vf_vlan(),
             lro(false), jumbo(false)
+#if RTE_VERSION >= RTE_VERSION_NUM(21, 02, 0, 0)
+            , power_mgmt_mode(-1)
+#endif
         {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
@@ -163,6 +170,10 @@ public:
         Vector<int> vf_vlan;
         bool lro;
         bool jumbo;
+
+#if RTE_VERSION >= RTE_VERSION_NUM(21, 02, 0, 0)
+        int power_mgmt_mode;
+#endif
     };
 
 #if HAVE_FLOW_API
@@ -192,6 +203,10 @@ public:
     void set_init_fc_mode(FlowControlMode fc);
     void set_rx_offload(uint64_t offload);
     void set_tx_offload(uint64_t offload);
+
+#if RTE_VERSION >= RTE_VERSION_NUM(21, 02, 0, 0)
+    void set_power_mgmt(enum rte_power_pmd_mgmt_type mode);
+#endif
 
 #if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
     void set_init_flow_isolate(const bool &flow_isolate);
