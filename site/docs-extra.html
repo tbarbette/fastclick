@@ -1,0 +1,25 @@
+<h2 id="differences">Differences with Click</h2>
+<div class="tablewrap"><table>
+  <thead><tr><th></th><th>Click (mainline)</th><th>FastClick</th></tr></thead>
+  <tbody>
+    <tr><td>Packet transfer</td><td>One packet per call</td><td>Batches of packets</td></tr>
+    <tr><td>DPDK</td><td>Basic, one device queue per element copy</td><td>Native multi-queue and RSS</td></tr>
+    <tr><td>Threads</td><td>Manual task assignment</td><td>Thread vectors, multi-threaded by default at userlevel</td></tr>
+    <tr><td>Per-flow state</td><td>Per-element tables</td><td>Flow subsystem (MiddleClick)</td></tr>
+    <tr><td>Scaling</td><td>Static</td><td>Dynamic with RSS++</td></tr>
+  </tbody>
+</table></div>
+<p>The full list is in <a href="{{R}}docs/Differences-between-FastClick-and-Click.html">Differences between FastClick and Click</a>.</p>
+
+<h2 id="research">Research built on FastClick</h2>
+<ul>
+  <li><strong>FastClick.</strong> T. Barbette, C. Soldani, L. Mathy. <em>Fast userspace packet processing.</em> ANCS 2015.
+    <a href="http://hdl.handle.net/2268/181954">PDF</a> · <a href="https://doi.org/10.1109/ANCS.2015.7110116">DOI</a></li>
+  <li><strong>RSS++.</strong> Load and state-aware receive side scaling, a NIC-driven scheduler.
+    <a href="http://www.diva-portal.org/smash/get/diva2:1371780/FULLTEXT01.pdf">PDF</a></li>
+  <li><strong>PacketMill.</strong> Toward per-core 100-Gbps networking, by specialising the binary.
+    <a href="https://packetmill.io">packetmill.io</a></li>
+  <li><strong>MiddleClick.</strong> Flows and sessions on top of packets.
+    <a href="https://www.diva-portal.org/smash/record.jsf?pid=diva2%3A1582880">Thesis record</a></li>
+</ul>
+<p>If you build on one of these, cite its paper too: RSS++ if you use or improve <code>DeviceBalancer</code>, PacketMill if you use the <code>packetmill</code> command.</p>

@@ -1,0 +1,43 @@
+<section class="hero">
+  <p class="pill">Built on Click · DPDK · Netmap</p>
+  <h1>Packet processing,<br><span class="grad">at line rate.</span></h1>
+  <p class="subtitle">FastClick extends the Click Modular Router with batching, native multi-queue DPDK I/O and a flow subsystem. Build data planes by wiring small elements together.</p>
+  <p class="cta">
+    <a class="btn primary" href="docs/Installation.html">Get started</a>
+    <a class="btn" href="elements/index.html">Browse {{ELEMENT_COUNT}} elements</a>
+    <a class="btn ghost" href="https://github.com/tbarbette/fastclick">GitHub ↗</a>
+  </p>
+</section>
+
+<section class="features">
+  <div class="card"><h3>Batching</h3><p>Elements exchange lists of packets instead of single packets, amortising per-packet costs across the whole graph.</p><a href="docs/Batching.html">Learn more →</a></div>
+  <div class="card"><h3>High-speed I/O</h3><p>Native multi-queue DPDK and Netmap, with RSS and thread vectors. No need to duplicate elements per core.</p><a href="docs/High-speed-I-O.html">Learn more →</a></div>
+  <div class="card"><h3>Flows</h3><p>MiddleClick adds per-flow state on top of packets for NAT, load balancing, DPI and TCP reordering.</p><a href="docs/MiddleClick.html">Learn more →</a></div>
+</section>
+
+<section class="start">
+  <h2>Quick start</h2>
+  <p>Install DPDK and dependencies with <code>./deps.sh</code>, then build with DPDK support:</p>
+<pre><code>./configure CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3" \
+  --enable-dpdk --enable-intel-cpu --disable-dynamic-linking \
+  --enable-bound-port-transfer --enable-flow \
+  --disable-task-stats --disable-cpu-load
+make</code></pre>
+  <p>Then describe a pipeline in the Click language and run it:</p>
+<pre><code>FromDPDKDevice(0) -&gt; Counter -&gt; ToDPDKDevice(1);</code></pre>
+  <p class="more">Next: the <a href="docs/Tutorial.html">tutorial</a>, <a href="docs/High-speed-I-O.html">high-speed I/O setup</a>, <a href="docs/Docker.html">Docker</a>, and how FastClick <a href="docs/index.html#differences">differs from Click</a>.</p>
+</section>
+
+<section id="citing" class="cite">
+  <h2>Citing</h2>
+  <p>If you use FastClick in academic work, please cite our ANCS 2015 paper. Cite RSS++, PacketMill or MiddleClick too when you build on them (<a href="docs/index.html#research">details</a>).</p>
+<pre class="bibtex"><code>@inproceedings{barbette2015fast,
+  title     = {Fast userspace packet processing},
+  author    = {Barbette, Tom and Soldani, Cyril and Mathy, Laurent},
+  booktitle = {ANCS},
+  pages     = {5--16},
+  year      = {2015},
+  doi       = {10.1109/ANCS.2015.7110116}
+}</code></pre>
+  <p class="more">Questions? Use the <a href="https://github.com/tbarbette/fastclick/issues">issue tracker</a> or <a href="https://github.com/tbarbette/fastclick/discussions">Discussions</a>.</p>
+</section>

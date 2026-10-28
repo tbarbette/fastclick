@@ -1,28 +1,25 @@
-# Sample workflow for building and deploying a documentation site to GitHub Pages
-name: Deploy Doxygen documentation with GitHub Pages
+# Builds www.fastclick.dev: landing page, wiki, per-element reference and Doxygen API.
+name: Deploy documentation site
 
 on:
-  # Runs on pushes targeting the default branch and the test branch
   push:
     branches: ["main", "generate-doc"]
-
-  # Allows you to run this workflow manually from the Actions tab
+  # Rebuild when the wiki is edited
+  gollum:
+  schedule:
+    - cron: "0 4 * * 1"
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  # Build job
   build:
     runs-on: ubuntu-latest
     steps:
@@ -30,18 +27,28 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
-      - name: Install Doxygen
-        run: sudo apt update && sudo apt install -y doxygen
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen mawk
+          python3 -m pip install markdown pygments
       - name: Configure
         run: ./configure
-      - name: Build Doxygen documentation
-        run: make -C doc doxygen O=site/docs
+      - name: Fetch the wiki
+        run: git clone --depth 1 "https://github.com/${{ github.repository }}.wiki.git" _wiki
+      - name: Generate element and tool documentation
+        run: |
+          mkdir -p _elements
+          make -C doc install-man-markdown O="$PWD/_elements"
+      - name: Build Doxygen API documentation
+        run: make -C doc doxygen O="$PWD/_api"
+      - name: Build the site
+        run: python3 site/build.py --wiki _wiki --elements _elements --api _api --out _site
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./site
+          path: ./_site
 
-  # Deployment job
   deploy:
     environment:
       name: github-pages

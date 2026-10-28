@@ -38,3 +38,7 @@ compile_commands.json
 *.lto.o
 build/*
 userlevel/packetmill
+_site/
+_wiki/
+_elements/
+_api/
