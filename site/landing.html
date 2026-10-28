@@ -1,5 +1,6 @@
 <section class="hero">
-  <p class="pill">Built on Click · DPDK · Netmap</p>
+  <div id="graph" class="hero-bg" aria-hidden="true"></div>
+  <div class="hero-copy">
   <h1>Packet processing,<br><span class="grad">at line rate.</span></h1>
   <p class="subtitle">FastClick extends the Click Modular Router with batching, native multi-queue DPDK I/O and a flow subsystem. Build data planes by wiring small elements together.</p>
   <p class="cta">
@@ -7,7 +8,9 @@
     <a class="btn" href="elements/index.html">Browse {{ELEMENT_COUNT}} elements</a>
     <a class="btn ghost" href="https://github.com/tbarbette/fastclick">GitHub ↗</a>
   </p>
+  </div>
 </section>
+<script defer src="static/graph.js"></script>
 
 <section class="features">
   <div class="card"><h3>Batching</h3><p>Elements exchange lists of packets instead of single packets, amortising per-packet costs across the whole graph.</p><a href="docs/Batching.html">Learn more →</a></div>

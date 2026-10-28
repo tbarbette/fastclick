@@ -106,7 +106,7 @@ ul.cols3 { columns: 3 10rem; }
 .doc h2 small { color: var(--muted); font-size: .75rem; font-weight: 400; }
 
 /* landing */
-.hero { text-align: center; padding: 4.5rem 0 2.5rem; position: relative; }
+.hero { text-align: center; display: flex; align-items: center; justify-content: center; padding: 4rem 0 17rem; position: relative; }
 .hero::before { content: ""; position: absolute; inset: -4rem -20% auto; height: 28rem; z-index: -1;
   background: radial-gradient(ellipse at 50% 0, color-mix(in srgb, var(--accent) 22%, transparent), transparent 65%); }
 .pill { display: inline-block; margin: 0 0 1.4rem; padding: .3rem .9rem; font-size: .82rem; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; background: var(--bg-soft); }
@@ -131,6 +131,24 @@ main > section h2 { font-size: 1.6rem; margin: 0 0 .8rem; }
 
 footer { border-top: 1px solid var(--line); padding: 1.8rem 1.5rem; text-align: center; font-size: .82rem; color: var(--muted); }
 footer p { max-width: 46rem; margin: 0 auto; }
+
+/* animated graph, used as hero background */
+.hero-copy { position: relative; z-index: 1; }
+.hero-bg { position: absolute; z-index: 0; bottom: 1rem; left: 50%; width: min(100vw, 1300px); height: 15.5rem; transform: translateX(-50%); pointer-events: none; opacity: .75;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent); mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent); }
+.graph-svg { display: block; width: 100%; height: 100%; font-family: var(--sans); }
+.g-node { fill: var(--bg); stroke: var(--muted); stroke-width: 1.2; }
+.g-edge { stroke: var(--muted); stroke-width: 1.4; fill: none; opacity: .7; }
+.g-name { fill: var(--fg); font-size: 14px; font-weight: 600; }
+.g-sub { fill: var(--muted); font-size: 12px; font-family: var(--mono); }
+.g-tag { fill: var(--muted); font-size: 11px; letter-spacing: .1em; }
+.g-node.g-dim { stroke-dasharray: 4 3; stroke: var(--line); }
+.g-dash { stroke-dasharray: 4 3; }
+.g-pkt { stroke: var(--bg); stroke-width: 1; }
+.g-chip { fill: var(--bg); stroke: var(--muted); stroke-width: 1.2; }
+.g-link { stroke-dasharray: 2 3; }
+.g-pin { stroke: var(--muted); stroke-width: 1.4; opacity: .7; }
+@media (max-width: 62rem) { .hero-bg { opacity: .3; } }
 
 /* syntax highlighting (codehilite on dark blocks) */
 .codehilite { margin: 1rem 0; }
