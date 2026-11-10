@@ -220,8 +220,9 @@ class FromDevice : public BatchElement, public EthernetDevice { public:
     int dev_set_rss_reta(unsigned *reta, unsigned reta_sz);
     int dev_get_rss_reta_size();
 #endif
+#if FROMDEVICE_ALLOW_LINUX
     struct ether_addr dev_get_mac();
-
+#endif
 
   private:
 

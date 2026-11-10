@@ -30,8 +30,10 @@
 #include <click/glue.hh>
 #include <click/straccum.hh>
 #include <click/packet_anno.hh>
-#include <nicscheduler/ethernetdevice.hh>
-#include <net/ethernet.h>
+#if CLICK_USERLEVEL
+# include <nicscheduler/ethernetdevice.hh>
+# include <net/ethernet.h>
+#endif
 
 CLICK_DECLS
 
@@ -53,8 +55,9 @@ ARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) const
     Vector<Entry> entries;
     EtherAddress ena;
     bool have_ena = false;
-    EthernetDevice* macdev;
-
+#if CLICK_USERLEVEL
+    EthernetDevice* macdev = 0;
+#endif
 
     for (int i = 0; i < words.size(); ++i) {
 	IPAddress addr, mask;
@@ -68,18 +71,24 @@ ARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) const
 		return errh->error("more than one ETH");
 	    }
 	    have_ena = true;
-    } else if (ElementCastArg("EthernetDevice").parse(words[i], macdev, this)) {
+#if CLICK_USERLEVEL
+	} else if (ElementCastArg("EthernetDevice").parse(words[i], macdev, this)) {
 	    if (have_ena) {
-            v.resize(old_vsize);
-            return errh->error("more than one ETH");
+		v.resize(old_vsize);
+		return errh->error("more than one ETH");
 	    }
-        if (macdev->get_mac == 0) {
-            v.resize(old_vsize);
-            return errh->error("MACDEV does not support getting the MAC address");
-        }
-        struct ether_addr addr = macdev->get_mac(macdev);
-        ena = EtherAddress((unsigned char*) &addr);
+	    if (macdev->get_mac == 0) {
+		v.resize(old_vsize);
+		return errh->error("%s does not support getting the MAC address", words[i].c_str());
+	    }
+	    struct ether_addr addr = macdev->get_mac(macdev);
+	    ena = EtherAddress((unsigned char*) &addr);
+	    if (!ena) {
+		v.resize(old_vsize);
+		return errh->error("could not get the MAC address of %s", words[i].c_str());
+	    }
 	    have_ena = true;
+#endif
 	} else {
 	    v.resize(old_vsize);
 	    return errh->error("expected IP/MASK ETH");

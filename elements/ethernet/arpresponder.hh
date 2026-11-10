@@ -29,6 +29,10 @@ CLICK_DECLS
  * The netmask can be specified in CIDR form (`C<18.26.7.0/24>') or dotted
  * decimal form (`C<18.26.7.0/255.255.255.0>').
  *
+ * At user level, ETH may also be the name of a device element (FromDevice or
+ * FromDPDKDevice), in which case the Ethernet address is read from that
+ * device at configuration time.
+ *
  * ARPResponder sets the device and VLAN TCI annotations on generated ARP
  * responses to the corresponding annotations from the queries.
  *
