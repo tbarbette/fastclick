@@ -6,15 +6,31 @@ CLICK_DECLS
 
 /*
  * =c
- * ResetIPChecksum()
+ * ResetIPChecksum([L4])
  * =s ip
  * sets IP packets' checksums
  * =d
  * Expects an IP packet as input.
- * 
- * Resets the IP checksum and asks hardware to fix it
- * 
- * =a CheckIPHeader, DecIPTTL, ResetIPDSCP, IPRewriter */
+ *
+ * Resets the IP checksum and asks hardware to fix it. If the packet is not a
+ * DPDK buffer, or if Click is compiled without DPDK, the checksum is computed
+ * in software instead.
+ *
+ * Keyword arguments are:
+ *
+ * =over 8
+ *
+ * =item L4
+ *
+ * Boolean. Also reset the TCP or UDP checksum. Defaults to false.
+ *
+ * =back
+ *
+ * =h drops read-only
+ * Returns the number of dropped malformed packets.
+ *
+ * =a SetIPChecksum, SetTCPChecksum, SetUDPChecksum, CheckIPHeader, DecIPTTL,
+ * ResetIPDSCP, IPRewriter */
 
 class ResetIPChecksum : public BatchElement { public:
 

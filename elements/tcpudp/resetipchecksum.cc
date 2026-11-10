@@ -69,9 +69,11 @@ ResetIPChecksum::simple_action(Packet *p_in)
 #if HAVE_DPDK
         if (!DPDKDevice::is_dpdk_buffer(p))
         {
+            if (_warned < 10) {
+                _warned++;
+                click_chatter("%p{element}: Not a DPDK buffer, computing checksums in software. For max performance, arrange to always work on DPDK buffers", this);
+            }
 #endif
-            if (_warned++ < 10) 
-		    click_chatter("Not a DPDK buffer. For max performance, arrange TCP element to always work on DPDK buffers");
             unsigned char *nh_data = (p->has_network_header() ? p->network_header() : p->data());
             unsigned plen = p->end_data() - nh_data, hlen;
 
@@ -87,7 +89,7 @@ ResetIPChecksum::simple_action(Packet *p_in)
                 return 0;
             }
             if (_l4) {
-                if (iph->ip_p == IP_PROTO_TCP) { 
+                if (iph->ip_p == IP_PROTO_TCP) {
                     click_tcp *tcph = p->tcp_header();
                     unsigned plen = ntohs(iph->ip_len) - (iph->ip_hl << 2);
                     unsigned csum;
@@ -100,14 +102,6 @@ ResetIPChecksum::simple_action(Packet *p_in)
                         return 0;
                     }
 
-                    /*if (_fixoff) {
-                        unsigned off = tcph->th_off << 2;
-                        if (off < sizeof(click_tcp))
-                        tcph->th_off = sizeof(click_tcp) >> 2;
-                        else if (off > plen && !IP_ISFRAG(iph))
-                        tcph->th_off = plen >> 2;
-                    }*/
-
                     tcph->th_sum = 0;
                     csum = click_in_cksum((unsigned char *)tcph, plen);
                     tcph->th_sum = click_in_cksum_pseudohdr(csum, iph, plen);
@@ -118,8 +112,7 @@ ResetIPChecksum::simple_action(Packet *p_in)
                     || p->transport_length() < (int) sizeof(click_udp)
                     || (len = ntohs(udph->uh_ulen),
                         p->transport_length() < len)) {
-                    
-                        click_chatter("%p{element}: fragment or short packet. Setting UDP checksum to 0", this);
+                        // Cannot compute the checksum, disable it
                         udph->uh_sum = 0;
                         return p;
                     }
@@ -127,10 +120,8 @@ ResetIPChecksum::simple_action(Packet *p_in)
                     udph->uh_sum = 0;
                     unsigned csum = click_in_cksum((unsigned char *)udph, len);
                     udph->uh_sum = click_in_cksum_pseudohdr(csum, iph, len);
-                } else {
-                    click_chatter("%p{element}: Unknown protocol %d?", this, iph->ip_p);
                 }
-                
+                // Other protocols: only the IP checksum, as with offload
             }
             return p;
 #if HAVE_DPDK
