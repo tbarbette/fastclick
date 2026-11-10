@@ -102,10 +102,12 @@ static int dev_eth_get_rss_reta_size(EthernetDevice* eth) {
 }
 #endif
 
+#if FROMDEVICE_ALLOW_LINUX
 static struct ether_addr dev_eth_get_mac(EthernetDevice* eth) {
-    FromDevice* fd = (FromDevice*)((unsigned char*)eth - offset_of_base(FromDevice,EthernetDevice,get_rss_reta_size));
+	FromDevice* fd = (FromDevice*)((unsigned char*)eth - offset_of_base(FromDevice,EthernetDevice,get_rss_reta_size));
 	return fd->dev_get_mac();
 }
+#endif
 
 FromDevice::FromDevice()
     :
@@ -127,7 +129,9 @@ FromDevice::FromDevice()
 	set_rss_reta = &dev_eth_set_rss_reta;
 	get_rss_reta_size = &dev_eth_get_rss_reta_size;
 #endif
-    get_mac = &dev_eth_get_mac;
+#if FROMDEVICE_ALLOW_LINUX
+	get_mac = &dev_eth_get_mac;
+#endif
 }
 
 FromDevice::~FromDevice()
@@ -222,7 +226,7 @@ FromDevice::cast(const char *n)
     if (strcmp(n, "EthernetDevice") == 0)
         return static_cast<EthernetDevice*>(this);
     else
-	    return Element::cast(n);
+	return Element::cast(n);
 }
 
 #if FROMDEVICE_ALLOW_LINUX
@@ -869,32 +873,32 @@ free:
 }
 
 #endif
+
+#if FROMDEVICE_ALLOW_LINUX
+/**
+ * Return the MAC address of the device, or an all-zero address on failure.
+ */
 struct ether_addr
 FromDevice::dev_get_mac() {
-    int fd;
     struct ifreq ifr;
-    const char *iface = _ifname.c_str();
-    unsigned char *mac = NULL;
-    struct ether_addr mymac = {0};
-
+    struct ether_addr mac;
+    memset(&mac, 0, sizeof(mac));
     memset(&ifr, 0, sizeof(ifr));
 
-    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0)
+        return mac;
 
     ifr.ifr_addr.sa_family = AF_INET;
-    strncpy(ifr.ifr_name , iface , IFNAMSIZ-1);
+    strncpy(ifr.ifr_name, _ifname.c_str(), IFNAMSIZ - 1);
 
-    if (0 == ioctl(fd, SIOCGIFHWADDR, &ifr)) {
-        mac = (unsigned char *)ifr.ifr_hwaddr.sa_data;
+    if (ioctl(fd, SIOCGIFHWADDR, &ifr) == 0)
+        memcpy(&mac, ifr.ifr_hwaddr.sa_data, sizeof(mac));
 
-        //display mac address
-        printf("Mac : %.2X:%.2X:%.2X:%.2X:%.2X:%.2X\n" , mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-        memcpy(&mymac, mac, sizeof(struct ether_addr));
-    }
-    return mymac;
+    close(fd);
+    return mac;
 }
-
+#endif
 
 void
 FromDevice::add_handlers()

@@ -28,7 +28,6 @@
 #include <rte_ethdev.h>
 #include <click/dpdk_glue.hh>
 #include <click/packet.hh>
-
 #include <net/ethernet.h>
 
 #if HAVE_FLOW_API
@@ -112,12 +111,13 @@ static std::vector<unsigned> dpdk_eth_get_rss_reta(EthernetDevice* eth) {
 }
 
 static struct ether_addr dpdk_eth_get_mac(EthernetDevice* eth) {
+    struct rte_ether_addr rte_addr;
     struct ether_addr addr;
-    rte_eth_macaddr_get(((DPDKDevice*)eth)->port_id, (struct rte_ether_addr*)&addr);
+    memset(&rte_addr, 0, sizeof(rte_addr));
+    rte_eth_macaddr_get(((DPDKDevice*)eth)->port_id, &rte_addr);
+    memcpy(&addr, &rte_addr, sizeof(addr));
     return addr;
 }
-
-
 
 DPDKDevice::DPDKDevice(portid_t id) : info(), DPDKEthernetDevice() {
 	set_rss_reta = &dpdk_eth_set_rss_reta;

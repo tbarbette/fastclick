@@ -14,6 +14,7 @@ CLICK_DECLS
 
 ARPQuerier(IP, ETH, I<keywords>)
 ARPQuerier(NAME, I<keywords>)
+ARPQuerier(IP, MACDEV DEVICE, I<keywords>)
 
 =s arp
 
@@ -26,6 +27,8 @@ this host's IP address, and ETH should be this host's
 Ethernet address. (In
 the one-argument form, NAME should be shorthand for
 both an IP and an Ethernet address; see AddressInfo(n).)
+Instead of ETH, the MACDEV keyword may name a device element, in which case
+the Ethernet address is read from that device.
 
 Packets arriving on input 0 should be IP packets, and must have their
 destination address annotations set.
@@ -95,6 +98,12 @@ prefix, if any.
 Boolean.  If true, then send broadcast ARP polls (where an entry is about to
 expire, but hasn't expired yet).  The default is to send such polls unicast to
 the known Ethernet address.  Defaults to false.
+
+=item MACDEV
+
+Element.  A device element (FromDevice or FromDPDKDevice) from which to read
+this host's Ethernet address, in place of the ETH argument. The address is
+read once, at configuration time. User-level only.
 
 =back
 

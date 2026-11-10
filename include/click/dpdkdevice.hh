@@ -45,8 +45,6 @@
 #include <click/timer.hh>
 #include <click/router.hh>
 
-struct ether_address;
-
 #if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
 #define rte_ipv4_hdr ipv4_hdr
 #define rte_ether_addr ether_addr
