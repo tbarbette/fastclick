@@ -28,6 +28,7 @@ template <typename Stats>
 AverageCounterBase<Stats>::AverageCounterBase()
 {
     _link_fcs = true;
+    _offset = 0;
 }
 
 

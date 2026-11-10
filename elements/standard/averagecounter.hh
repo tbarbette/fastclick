@@ -8,7 +8,7 @@ CLICK_DECLS
 
 /*
  * =c
- * AverageCounter([IGNORE])
+ * AverageCounter([IGNORE, LINK_FCS, I<keywords> OFFSET])
  * =s counters
  * measures historical packet count and rate
  * =d
@@ -24,6 +24,14 @@ CLICK_DECLS
  * the first IGNORE number of seconds are ignored in
  * the count.
  *
+ * LINK_FCS is a boolean, true by default. If true, the link_count and
+ * link_rate handlers account 4 bytes of FCS per packet, in addition to the
+ * 20 bytes of preamble and inter-frame gap.
+ *
+ * OFFSET is a number of bytes added to each packet in the byte, bit and link
+ * counts and rates, e.g. to account for headers stripped before the counter.
+ * Defaults to 0.
+ *
  * =h count read-only
  * Returns the number of packets that have passed through since the last reset.
  *
@@ -38,6 +46,10 @@ CLICK_DECLS
  *
  * =h reset write-only
  * Resets the count and rate to zero.
+ *
+ * =h reset_now write-only
+ * Resets the count and rate to zero, and sets the start time to now, so the
+ * rate is the average between now and the next read.
  *
  * =a
  * AverageCounterMP, AverageCounterIMP
