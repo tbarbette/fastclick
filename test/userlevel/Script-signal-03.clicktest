@@ -1,18 +1,22 @@
 %info
 Test that signal redelivery works correctly in multithread userlevel Click.
 
+Each thread has its own packet Script: Script is not thread-safe, and a
+Script shared by two threads randomly corrupts its state and aborts.
+
 %require
 click-buildtool provides umultithread
 
 %script
-click --threads 2 CONFIG || echo "Died 1"
+click --threads 2 CONFIG || echo "Died $?"
 
 %file CONFIG
 i :: InfiniteSource(LIMIT 10)
-    -> s :: Script(TYPE PACKET, set y $(kill USR1 $$), end)
+    -> s0 :: Script(TYPE PACKET, set y $(kill USR1 $$), end)
     -> d :: Discard;
 j :: InfiniteSource(LIMIT 30)
-    -> s;
+    -> s1 :: Script(TYPE PACKET, set y $(kill USR1 $$), end)
+    -> d;
 Script(TYPE SIGNAL USR1,
 	    init x 0,
 	    set x $(add $x 1),
