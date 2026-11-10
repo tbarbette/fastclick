@@ -721,6 +721,7 @@ HAVE_LINUXMODULE_DRIVER
 HAVE_USERLEVEL_DRIVER
 DRIVERS
 POSSIBLE_DRIVERS
+HAVE_SSE42
 HAVE_FLOW_API
 LINUXMODULE_2_6
 EXTRA_TOOL_OBJS
@@ -15655,10 +15656,13 @@ printf "%s\n" "yes" >&6; }
     CFLAGS="$save_cflags -msse4.2"
     save_cxxflags="$CXXFLAGS"
     CXXFLAGS="$save_cxxflags -msse4.2"
+    HAVE_SSE42=yes
 else
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
+    HAVE_SSE42=no
 fi
+
 
 
 
