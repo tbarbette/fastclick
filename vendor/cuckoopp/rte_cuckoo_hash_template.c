@@ -42,6 +42,11 @@
 
 #include "rte_hash64.h"
 
+/* Recent DPDK (e.g. 24.11) no longer defines the static HASH log type */
+#ifndef RTE_LOGTYPE_HASH
+#define RTE_LOGTYPE_HASH RTE_LOGTYPE_USER1
+#endif
+
 
 /* Macro to enable/disable run-time checking of function parameters */
 #if defined(RTE_LIBRTE_HASH_LAZY_DEBUG)
