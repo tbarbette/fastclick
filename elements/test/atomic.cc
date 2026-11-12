@@ -86,29 +86,34 @@ static void test_64(ErrorHandler *)
 
     atomic_uint64_t a;
     a = 0;
-    click_chatter("[01] a=%i -> %s", a, a==0 ? "PASS" : "FAIL");
+    uint64_t u;
+    u = a;
+    click_chatter("[01] u=%llu -> %s", u, u==0 ? "PASS" : "FAIL");
     a++;
-    click_chatter("[02] a=%i -> %s", a, a==1 ? "PASS" : "FAIL");
+    u=a;
+    click_chatter("[02] u=%llu -> %s", u, u==1 ? "PASS" : "FAIL");
     a+=1;
-    click_chatter("[03] a=%i -> %s", a, a==2 ? "PASS" : "FAIL");
-    a-=1;
-    click_chatter("[04] a=%i -> %s", a, a==1 ? "PASS" : "FAIL");
-    uint32_t u = a.fetch_and_add(10);
-    click_chatter("[05] a=%i, u=%i -> %s", a, u,  a==11 && u==1 ? "PASS" : "FAIL");
+    u=a;
+    click_chatter("[03] u=%llu -> %s", u, u==2 ? "PASS" : "FAIL");
+    a-=1; u=a;
+    click_chatter("[04] u=%llu -> %s", u, u==1 ? "PASS" : "FAIL");
+
+    u = a.fetch_and_add(10);
+    click_chatter("[05] a=%llu, u=%llu -> %s", (uint64_t)a, u,  (uint64_t)a==11 && u==1 ? "PASS" : "FAIL");
 
 #if CLICK_ATOMIC_BUILTINS
     click_chatter("[--] Not testing compare_swap!");
 #else
     u = a.compare_swap(0,2);
-    click_chatter("[06] a=%i, u=%i -> %s", a, u,  a==11 && u==11 ? "PASS" : "FAIL");
+    click_chatter("[06] a=%llu, u=%llu -> %s", (uint64_t)a, u,  (uint64_t)a==11 && u==11 ? "PASS" : "FAIL");
     u = a.compare_swap(11,5);
-    click_chatter("[07] a=%i, u=%i -> %s", a, u,  a==5 && u==11 ? "PASS" : "FAIL");
+    click_chatter("[07] a=%llu, u=%llu -> %s", (uint64_t)a, u,  (uint64_t)a==5 && u==11 ? "PASS" : "FAIL");
     uint64_t b =5;
 
     u = atomic_uint64_t::compare_swap(b,0,2);
-    click_chatter("[08] b=%i, u=%i -> %s", b, u,  b==5 && u==5 ? "PASS" : "FAIL");
+    click_chatter("[08] b=%llu, u=%llu -> %s", b, u,  b==5 && u==5 ? "PASS" : "FAIL");
     u = atomic_uint64_t::compare_swap(b,5,2);
-    click_chatter("[09] b=%i, u=%i -> %s", b, u,  b==2 && u==5 ? "PASS" : "FAIL");
+    click_chatter("[09] b=%llu, u=%llu -> %s", b, u,  b==2 && u==5 ? "PASS" : "FAIL");
 #endif
 }
 

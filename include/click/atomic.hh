@@ -811,7 +811,6 @@ operator<=(const atomic_uint32_t &a, const atomic_uint32_t &b)
 typedef atomic_uint32_t uatomic32_t;
 
 //Atomic 64
-
 /** @brief  Return the value. */
 inline uint64_t
 atomic_uint64_t::value() const
@@ -819,7 +818,25 @@ atomic_uint64_t::value() const
 #if CLICK_LINUXMODULE
     return atomic64_read(&_val);
 #else
-    return CLICK_ATOMIC_VAL;
+    #if defined(__x86_64__)
+        return CLICK_ATOMIC_VAL;
+    #else
+        uint32_t low, high;
+
+        asm volatile(
+	"1:\n\t"
+        "movl (%[addr]), %%eax\n\t"          // EAX = low
+        "movl 4(%[addr]), %%edx\n\t"         // EDX = high
+        "movl %%eax, %%ebx\n\t"         // EDX = high
+        "movl %%edx, %%ecx\n\t"         // EDX = high
+        CLICK_ATOMIC_LOCK "cmpxchg8b (%[addr])\n\t"       // Compare with same value to validate consistency
+        "jnz 1b\n\t"                         // Retry if value changed during read
+        : "=&a" (low), "=&d" (high)
+        : [addr] "r" (&_val)
+        : "ebx", "ecx", "memory"
+        );
+ 	return ((uint64_t)high << 32) | low;
+    #endif
 #endif
 }
 
@@ -844,7 +861,23 @@ atomic_uint64_t::operator=(uint64_t x)
 #if CLICK_LINUXMODULE
     atomic64_set(&_val, x);
 #else
-    CLICK_ATOMIC_VAL = x;
+   #if defined(__x86_64__)
+       CLICK_ATOMIC_VAL = x;
+   #else
+        uint32_t nlow = static_cast<uint32_t>(x & 0xFFFFFFFF);
+        uint32_t nhigh = static_cast<uint32_t>(x >> 32);
+        asm volatile (
+        "1:\n\t"
+        "movl (%[addr]), %%eax\n\t"          // EAX = old low
+        "movl 4(%[addr]), %%edx\n\t"         // EDX = old high
+        CLICK_ATOMIC_LOCK "cmpxchg8b (%[addr])\n\t"       // Atomically write ECX:EBX if EDX:EAX match
+        "jnz 1b\n\t"                         // Retry if compare failed
+        :
+        : [addr] "r" (&_val),
+          "b" (nlow),"c"(nhigh)
+        : "eax", "edx", "memory"
+        );
+  #endif
 #endif
     return *this;
 }
@@ -858,10 +891,34 @@ atomic_uint64_t::operator+=(int64_t delta)
 #elif CLICK_ATOMIC_BUILTINS
     __atomic_add_fetch(&_val, delta, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
-    asm volatile (CLICK_ATOMIC_LOCK "addq %1,%0"
+    #if defined(__x86_64__)
+        asm volatile (CLICK_ATOMIC_LOCK "addq %1,%0"
           : "=m" (CLICK_ATOMIC_VAL)
           : "r" (delta), "m" (CLICK_ATOMIC_VAL)
           : "cc");
+    #else
+        uint32_t dlow = static_cast<uint32_t>(delta & 0xFFFFFFFF);
+        int32_t  dhigh = static_cast<int32_t>(delta >> 32);
+
+        asm volatile (
+            "movl %%ebx, %%esi\n\t"              // Save EBX (needed for PIC)
+            "1:\n\t"
+            "movl (%[addr]), %%eax\n\t"          // EAX = old low
+            "movl 4(%[addr]), %%edx\n\t"         // EDX = old high
+            "movl %%eax, %%ebx\n\t"              // EBX = expected low
+            "movl %%edx, %%ecx\n\t"              // ECX = expected high
+            "addl %[delta_low], %%ebx\n\t"       // EBX = new low
+            "adcl %[delta_high], %%ecx\n\t"      // ECX = new high (+ carry)
+            CLICK_ATOMIC_LOCK "cmpxchg8b (%[addr])\n\t"       // Atomically compare and exchange
+            "jnz 1b\n\t"                         // Retry if comparison failed
+            "movl %%esi, %%ebx\n\t"              // Restore EBX
+            :
+	    : [addr]        "r" (&_val),
+              [delta_low]   "m" (dlow),
+              [delta_high]  "m" (dhigh) // sign-extend high part
+           : "eax", "edx", "ecx", "esi", "memory"
+    );
+    #endif
 #else
     CLICK_ATOMIC_VAL += delta;
 #endif
@@ -877,10 +934,32 @@ atomic_uint64_t::add(volatile uint64_t &x, uint64_t delta)
 #elif CLICK_ATOMIC_BUILTINS
     __atomic_add_fetch(&x, delta, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
-    asm volatile (CLICK_ATOMIC_LOCK "addq %1,%0"
-          : "=m" (x)
-          : "r" (delta), "m" (x)
-          : "cc");
+    #if defined(__x86_64__)
+        asm volatile (CLICK_ATOMIC_LOCK "addq %1,%0"
+            : "=m" (x)
+            : "r" (delta), "m" (x)
+            : "cc");
+    #else
+        uint32_t dlow = static_cast<uint32_t>(delta & 0xFFFFFFFF);
+        uint32_t  dhigh = static_cast<uint32_t>(delta >> 32);
+        asm volatile (
+            "movl %%ebx, %%esi\n\t"              // Save EBX
+            "1:\n\t"
+            "movl (%[addr]), %%eax\n\t"          // EAX = old low
+            "movl 4(%[addr]), %%edx\n\t"         // EDX = old high
+            "movl %%eax, %%ebx\n\t"              // EBX = expected low
+            "movl %%edx, %%ecx\n\t"              // ECX = expected high
+            "addl %[delta_low], %%ebx\n\t"       // EBX = new low
+            "adcl %[delta_high], %%ecx\n\t"      // ECX = new high (+ carry)
+            CLICK_ATOMIC_LOCK "cmpxchg8b (%[addr])\n\t"       // Try to atomically swap
+            "jnz 1b\n\t"                         // Retry if failed
+            "movl %%esi, %%ebx\n\t"              // Restore EBX
+            :
+            : [addr]       "r" (&x),
+              [delta_low]  "m" (dlow),
+              [delta_high] "m" (dhigh)
+            : "eax", "edx", "ecx", "esi", "memory");
+    #endif
 #else
     x += delta;
 #endif
@@ -895,10 +974,29 @@ atomic_uint64_t::operator-=(int64_t delta)
 #elif CLICK_ATOMIC_BUILTINS
     __atomic_sub_fetch(&CLICK_ATOMIC_VAL, delta, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
-    asm volatile (CLICK_ATOMIC_LOCK "subq %1,%0"
-          : "=m" (CLICK_ATOMIC_VAL)
-          : "r" (delta), "m" (CLICK_ATOMIC_VAL)
-          : "cc");
+    #if defined(__x86_64__)
+        asm volatile (CLICK_ATOMIC_LOCK "subq %1,%0"
+            : "=m" (CLICK_ATOMIC_VAL)
+            : "r" (delta), "m" (CLICK_ATOMIC_VAL)
+            : "cc");
+    #else
+        uint32_t dlow = static_cast<uint32_t>(delta & 0xFFFFFFFF);
+        int32_t  dhigh = static_cast<int32_t>(delta >> 32);
+        asm volatile("1:\n\t"
+            "movl     (%[addr]), %%eax\n\t"        // EAX = old low
+            "movl     4(%[addr]), %%edx\n\t"       // EDX = old high
+            "movl     %%eax, %%ebx\n\t"            // EBX = old low
+            "movl     %%edx, %%ecx\n\t"            // ECX = old high
+            "subl     %[vlo], %%ebx\n\t"           // EBX -= value low
+            "sbbl     %[vhi], %%ecx\n\t"           // ECX -= value high + borrow
+            CLICK_ATOMIC_LOCK "cmpxchg8b (%[addr])\n\t"         // Attempt atomic CAS
+            "jnz      1b\n\t"                      // Retry if it failed
+            :
+            : [addr] "r" (&_val),
+              [vlo]  "m" (dlow),
+              [vhi]  "m" (dhigh)
+            : "eax", "ebx", "ecx", "edx", "memory");
+    #endif
 #else
     CLICK_ATOMIC_VAL -= delta;
 #endif
@@ -920,10 +1018,26 @@ atomic_uint64_t::operator++()
 #if CLICK_LINUXMODULE
     atomic64_inc(&_val);
 #elif CLICK_ATOMIC_X86
-    asm volatile (CLICK_ATOMIC_LOCK "incq %0"
-          : "=m" (CLICK_ATOMIC_VAL)
-          : "m" (CLICK_ATOMIC_VAL)
-          : "cc");
+    #if defined(__x86_64__)
+        asm volatile (CLICK_ATOMIC_LOCK "incq %0"
+            : "=m" (CLICK_ATOMIC_VAL)
+            : "m" (CLICK_ATOMIC_VAL)
+            : "cc");
+    #else
+        asm volatile(
+            "1:\n\t"
+            "movl     (%[addr]), %%eax\n\t"        // Load old low 32 bits
+            "movl     4(%[addr]), %%edx\n\t"       // Load old high 32 bits
+            "movl     %%eax, %%ebx\n\t"            // EBX = copy of low
+            "movl     %%edx, %%ecx\n\t"            // ECX = copy of high
+            "addl     $1, %%ebx\n\t"               // Increment low
+            "adcl     $0, %%ecx\n\t"               // Add carry to high
+            CLICK_ATOMIC_LOCK "cmpxchg8b (%[addr])\n\t"         // Attempt atomic swap
+            "jnz      1b\n\t"                      // Retry if failed
+            :
+            : [addr] "r" (&_val)
+            : "eax", "ebx", "ecx", "edx", "memory");
+    #endif
 #else
     CLICK_ATOMIC_VAL++;
 #endif
@@ -938,10 +1052,26 @@ atomic_uint64_t::operator++(int)
 #elif CLICK_ATOMIC_BUILTINS
     __atomic_add_fetch(&CLICK_ATOMIC_VAL, 1, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
-    asm volatile (CLICK_ATOMIC_LOCK "incq %0"
-          : "=m" (CLICK_ATOMIC_VAL)
-          : "m" (CLICK_ATOMIC_VAL)
-          : "cc");
+    #if defined(__x86_64)
+        asm volatile (CLICK_ATOMIC_LOCK "incq %0"
+            : "=m" (CLICK_ATOMIC_VAL)
+            : "m" (CLICK_ATOMIC_VAL)
+            : "cc");
+    #else
+        asm volatile(
+            "1:\n\t"
+            "movl    (%[addr]), %%eax\n\t"
+            "movl    4(%[addr]), %%edx\n\t"
+            "movl    %%eax, %%ebx\n\t"
+            "movl    %%edx, %%ecx\n\t"
+            "addl    $1, %%ebx\n\t"
+            "adcl    $0, %%ecx\n\t"
+            CLICK_ATOMIC_LOCK "cmpxchg8b (%[addr])\n\t"
+            "jnz     1b\n\t"
+            :
+            : [addr] "r" (&_val)
+            : "eax", "ebx", "ecx", "edx", "memory");
+    #endif
 #else
     CLICK_ATOMIC_VAL++;
 #endif
@@ -956,10 +1086,26 @@ atomic_uint64_t::operator--()
 #elif CLICK_ATOMIC_BUILTINS
     __atomic_sub_fetch(&CLICK_ATOMIC_VAL, 1, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
-    asm volatile (CLICK_ATOMIC_LOCK "decq %0"
-          : "=m" (CLICK_ATOMIC_VAL)
-          : "m" (CLICK_ATOMIC_VAL)
-          : "cc");
+    #if defined(__x86_64__)
+        asm volatile (CLICK_ATOMIC_LOCK "decq %0"
+            : "=m" (CLICK_ATOMIC_VAL)
+            : "m" (CLICK_ATOMIC_VAL)
+            : "cc");
+    #else
+        asm volatile(
+            "1:\n\t"
+            "movl     (%[addr]), %%eax\n\t"        // Load old low
+	    "movl     4(%[addr]), %%edx\n\t"       // Load old high
+	    "movl     %%eax, %%ebx\n\t"            // Copy low to EBX
+	    "movl     %%edx, %%ecx\n\t"            // Copy high to ECX
+	    "subl     $1, %%ebx\n\t"               // EBX -= 1 (low part)
+	    "sbbl     $0, %%ecx\n\t"               // ECX -= borrow (high part)
+	    "lock cmpxchg8b (%[addr])\n\t"         // Atomic compare & swap
+	    "jnz      1b\n\t"                      // Retry on failure
+	    :
+	    : [addr] "r" (&_val)
+	    : "eax", "ebx", "ecx", "edx", "memory");
+    #endif
 #else
     CLICK_ATOMIC_VAL--;
 #endif
@@ -981,10 +1127,26 @@ atomic_uint64_t::operator--(int)
 #elif CLICK_ATOMIC_BUILTINS
     __atomic_sub_fetch(&CLICK_ATOMIC_VAL, 1, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
-    asm volatile (CLICK_ATOMIC_LOCK "decq %0"
-          : "=m" (CLICK_ATOMIC_VAL)
-          : "m" (CLICK_ATOMIC_VAL)
-          : "cc");
+    #if defined(__x86_64__)
+        asm volatile (CLICK_ATOMIC_LOCK "decq %0"
+            : "=m" (CLICK_ATOMIC_VAL)
+            : "m" (CLICK_ATOMIC_VAL)
+            : "cc");
+    #else
+        asm volatile(
+            "1:\n\t"
+            "movl     (%[addr]), %%eax\n\t"        // Load old low
+            "movl     4(%[addr]), %%edx\n\t"       // Load old high
+            "movl     %%eax, %%ebx\n\t"            // Copy low to EBX
+            "movl     %%edx, %%ecx\n\t"            // Copy high to ECX
+            "subl     $1, %%ebx\n\t"               // EBX -= 1 (low part)
+            "sbbl     $0, %%ecx\n\t"               // ECX -= borrow (high part)
+            CLICK_ATOMIC_LOCK "cmpxchg8b (%[addr])\n\t"         // Atomic compare & swap
+            "jnz      1b\n\t"                      // Retry on failure
+            :
+            : [addr] "r" (&_val)
+            : "eax", "ebx", "ecx", "edx", "memory");
+    #endif
 #else
     CLICK_ATOMIC_VAL--;
 #endif
@@ -1015,10 +1177,18 @@ atomic_uint64_t::compare_swap(volatile uint64_t &x, uint64_t expected, uint64_t 
     return __atomic_compare_exchange(&x,&expected,&desired,0,CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER)
 	? expected : x;
 #elif CLICK_ATOMIC_X86
-    asm volatile (CLICK_ATOMIC_LOCK "cmpxchgq %2,%1"
-		  : "=a" (expected), "=m" (x)
-		  : "r" (desired), "0" (expected), "m" (x)
-		  : "cc", "memory");
+    #if defined(__x86_64__)
+        asm volatile (CLICK_ATOMIC_LOCK "cmpxchgq %2,%1"
+            : "=a" (expected), "=m" (x)
+            : "r" (desired), "0" (expected), "m" (x)
+            : "cc", "memory");
+    #else
+	asm volatile (CLICK_ATOMIC_LOCK "cmpxchg8b %1\n\t"   // Compare EDX:EAX with [mem], replace with ECX:EBX if equal
+            : "+A" (expected)          //load expected into EAX:EDX
+            : "m" (x),            // preload memory value to compare.
+              "b" ((uint32_t)desired), "c"((uint32_t) (desired>>32))
+            : "memory");
+    #endif
     return expected;
 #elif CLICK_LINUXMODULE && defined(cmpxchg)
     return cmpxchg(&x, expected, desired);
@@ -1063,11 +1233,31 @@ atomic_uint64_t::fetch_and_add(uint64_t delta)
 #if CLICK_ATOMIC_BUILTINS
     return __atomic_fetch_add(&_val, delta, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
-    asm volatile (CLICK_ATOMIC_LOCK "xaddq %0,%1"
-          : "=r" (delta), "=m" (CLICK_ATOMIC_VAL)
-          : "0" (delta), "m" (CLICK_ATOMIC_VAL)
-          : "cc");
-    return delta;
+    #if defined(__x86_64__)
+        asm volatile (CLICK_ATOMIC_LOCK "xaddq %0,%1"
+	    : "=r" (delta), "=m" (CLICK_ATOMIC_VAL)
+	    : "0" (delta), "m" (CLICK_ATOMIC_VAL)
+	    : "cc");
+	return delta;
+    #else
+	uint32_t old_lo=0, old_hi=0;
+	asm volatile (
+            "1:\n\t"
+	    "movl (%2), %%eax\n\t"           // Load old low 32 bits
+	    "movl 4(%2), %%edx\n\t"          // Load old high 32 bits
+	    "movl %%eax, %%ebx\n\t"          // Copy low to ebx (new low)
+	    "movl %%edx, %%ecx\n\t"          // Copy high to ecx (new high)
+	    "addl %3, %%ebx\n\t"             // new low += delta low
+	    "adcl %4, %%ecx\n\t"             // new high += delta high + carry
+	    CLICK_ATOMIC_LOCK "cmpxchg8b (%2)\n\t"        // atomic cmpxchg8b
+	    "jnz 1b\n\t"                     // if fail, retry
+	    "movl %%eax, %0\n\t"             // store old low
+	    "movl %%edx, %1\n\t"             // store old high
+	    : "=&a" (old_lo), "=&d" (old_hi)
+	    : "r" (&_val), "r" ((uint32_t)delta), "r" ((uint32_t)(delta >> 32))
+	    : "ebx", "ecx", "cc","memory");
+	return (static_cast<uint64_t>(old_hi) << 32) | old_lo;
+    #endif
 #elif CLICK_LINUXMODULE && HAVE_LINUX_ATOMIC_ADD_RETURN
     return atomic64_add_return(&_val, delta) - delta;
 #elif CLICK_LINUXMODULE
