@@ -206,7 +206,8 @@ AC_ARG_ENABLE([bpf],
     [:], [enable_bpf=yes])
 
 
-AC_SEARCH_LIBS([bpf_prog_load_xattr], [bpf], [ac_have_libbpf=yes], [ac_have_libbpf=no])
+dnl bpf_xdp_attach is in libbpf >= 0.8, whose API is the only one left since libbpf 1.0
+AC_SEARCH_LIBS([bpf_xdp_attach], [bpf], [ac_have_libbpf=yes], [ac_have_libbpf=no])
 AC_CHECK_HEADERS([bpf/bpf.h], [ac_have_libbpf_h=yes], [ac_have_libbpf_h=no])
 if test "x$ac_have_libbpf$ac_have_libbpf_h$enable_bpf" = "xyesyesyes"; then
     AC_DEFINE([HAVE_BPF])

@@ -61,12 +61,22 @@ int
 XDPLoader::initialize(ErrorHandler *errh) {
     int prog_fd;
 
-    struct bpf_prog_load_attr prog_load_attr= {0};
-    prog_load_attr.prog_type = BPF_PROG_TYPE_XDP;
-    prog_load_attr.file = _path.c_str();
+    _obj = bpf_object__open_file(_path.c_str(), NULL);
+    if (libbpf_get_error(_obj))
+        error(1, errno, "can't open %s", _path.c_str());
 
-    if (bpf_prog_load_xattr(&prog_load_attr, &_obj, &prog_fd))
-        error(1, errno, "can't load %s", prog_load_attr.file);
+    // Load all the programs as XDP programs and use the first one
+    struct bpf_program *prog;
+    bpf_object__for_each_program(prog, _obj)
+        bpf_program__set_type(prog, BPF_PROG_TYPE_XDP);
+
+    if (bpf_object__load(_obj))
+        error(1, errno, "can't load %s", _path.c_str());
+
+    prog = bpf_object__next_program(_obj, NULL);
+    if (!prog)
+        error(1, 0, "no program in %s", _path.c_str());
+    prog_fd = bpf_program__fd(prog);
 
     click_chatter("Loaded!");
 
@@ -74,7 +84,7 @@ XDPLoader::initialize(ErrorHandler *errh) {
     if (!_ifindex)
         error(1, errno, "unknown interface %s\n", _dev.c_str());
 
-    if (bpf_set_link_xdp_fd(_ifindex, prog_fd, 0) < 0)
+    if (bpf_xdp_attach(_ifindex, prog_fd, 0, NULL) < 0)
         printf("can't attach to interface %s:%d: %d:%s\n", _dev.c_str(), _ifindex, errno,
               strerror(errno));
 
@@ -85,7 +95,7 @@ void
 XDPLoader::cleanup(CleanupStage stage) {
     // cleaning-up
     if (_do_clean)
-        bpf_set_link_xdp_fd(_ifindex, -1, 0);
+        bpf_xdp_detach(_ifindex, 0, NULL);
 }
 
 ELEMENT_REQUIRES(bpf)
