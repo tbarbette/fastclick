@@ -7595,9 +7595,9 @@ fi
 
 
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing bpf_prog_load_xattr" >&5
-printf %s "checking for library containing bpf_prog_load_xattr... " >&6; }
-if test ${ac_cv_search_bpf_prog_load_xattr+y}
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing bpf_xdp_attach" >&5
+printf %s "checking for library containing bpf_xdp_attach... " >&6; }
+if test ${ac_cv_search_bpf_xdp_attach+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
@@ -7606,12 +7606,12 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
 namespace conftest {
-  extern "C" int bpf_prog_load_xattr ();
+  extern "C" int bpf_xdp_attach ();
 }
 int
 main (void)
 {
-return conftest::bpf_prog_load_xattr ();
+return conftest::bpf_xdp_attach ();
   ;
   return 0;
 }
@@ -7626,27 +7626,27 @@ do
   fi
   if ac_fn_cxx_try_link "$LINENO"
 then :
-  ac_cv_search_bpf_prog_load_xattr=$ac_res
+  ac_cv_search_bpf_xdp_attach=$ac_res
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam \
     conftest$ac_exeext
-  if test ${ac_cv_search_bpf_prog_load_xattr+y}
+  if test ${ac_cv_search_bpf_xdp_attach+y}
 then :
   break
 fi
 done
-if test ${ac_cv_search_bpf_prog_load_xattr+y}
+if test ${ac_cv_search_bpf_xdp_attach+y}
 then :
 
 else $as_nop
-  ac_cv_search_bpf_prog_load_xattr=no
+  ac_cv_search_bpf_xdp_attach=no
 fi
 rm conftest.$ac_ext
 LIBS=$ac_func_search_save_LIBS
 fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_bpf_prog_load_xattr" >&5
-printf "%s\n" "$ac_cv_search_bpf_prog_load_xattr" >&6; }
-ac_res=$ac_cv_search_bpf_prog_load_xattr
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_bpf_xdp_attach" >&5
+printf "%s\n" "$ac_cv_search_bpf_xdp_attach" >&6; }
+ac_res=$ac_cv_search_bpf_xdp_attach
 if test "$ac_res" != no
 then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
