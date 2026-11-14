@@ -15909,7 +15909,10 @@ printf "%s\n" "no" >&6; }
 
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether DPDK has rte_flow_update" >&5
 printf %s "checking whether DPDK has rte_flow_update... " >&6; }
-    if ${READELF} -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_flow_update &> /dev/null; then
+    # FlowRuleInstaller calls rte_flow_update(port, flow, pattern, actions, error). Some DPDK, such as the one of
+    # NVIDIA DOCA, have a rte_flow_update(port, flow, actions, error) instead.
+    if ${READELF} -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_flow_update &> /dev/null && \
+       cat "$RTE_INCLUDE/rte_flow.h" "$RTE_INCLUDE/dpdk/rte_flow.h" 2>/dev/null | grep -A4 "^rte_flow_update" | grep -q rte_flow_item; then
       { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
       printf "%s\n" "#define HAVE_RTE_FLOW_UPDATE 1" >>confdefs.h
