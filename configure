@@ -15809,9 +15809,17 @@ printf %s "checking for DPDK library... " >&6; }
 
       RTE_LIB=$(pkg-config --variable=libdir libdpdk)
       RTE_INCLUDE=$(pkg-config --variable=includedir libdpdk)
-      rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
-      rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
-      rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_INCLUDE/rte_build_config.h" | head -n 1 | awk '{print $3}'`
+      # Multiarch installs (Debian packages, NVIDIA DOCA) have rte_build_config.h in another folder of the cflags
+      rte_build_config="$RTE_INCLUDE/rte_build_config.h"
+      for rte_dir in $RTE_INCLUDE $(pkg-config --cflags-only-I libdpdk | sed -e 's/-I//g'); do
+        if test -f "$rte_dir/rte_build_config.h"; then
+          rte_build_config="$rte_dir/rte_build_config.h"
+          break
+        fi
+      done
+      rte_ver_year=`grep "#define RTE_VER_YEAR" "$rte_build_config" | head -n 1 | awk '{print $3}'`
+      rte_ver_month=`grep "#define RTE_VER_MONTH" "$rte_build_config" | head -n 1 | awk '{print $3}'`
+      rte_ver_minor=`grep "#define RTE_VER_MINOR" "$rte_build_config" | head -n 1 | awk '{print $3}'`
       rte_ver_major=$rte_ver_year
 
       if test "x$enable_dynamic_linking" = xyes; then
