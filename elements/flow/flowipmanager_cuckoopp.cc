@@ -116,7 +116,7 @@ void FlowIPManager_CuckooPP::cleanup(CleanupStage stage)
 
 CLICK_ENDDECLS
 
-ELEMENT_REQUIRES(flow dpdk cxx17)
+ELEMENT_REQUIRES(flow dpdk cxx17 x86_64)
 EXPORT_ELEMENT(FlowIPManager_CuckooPP)
 EXPORT_ELEMENT(FlowIPManager_CuckooPP-FlowIPManagerIMP)
 ELEMENT_MT_SAFE(FlowIPManager_CuckooPP)
