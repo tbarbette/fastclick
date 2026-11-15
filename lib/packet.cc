@@ -363,7 +363,9 @@ void WritablePacket::initialize_local_packet_pool() {
         pp->thread_pool_next = global_packet_pool.thread_pools;
         global_packet_pool.thread_pools = pp;
         thread_packet_pool = pp;
-        click_compiler_fence();
+        // The list must be seen updated before the lock is free: a compiler
+        // barrier is not enough on a weakly ordered CPU such as Arm
+        click_write_fence();
         global_packet_pool.lock = 0;
     }
 #  endif
