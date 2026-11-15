@@ -453,7 +453,8 @@ public:
     inline T extract() {
         acquire_tail();
         if (!SPSCRing<T,RING_SIZE>::is_empty()) {
-            T &v = SPSCRing<T,RING_SIZE>::ring[SPSCRing<T,RING_SIZE>::tail % RING_SIZE];
+            // A copy: once the lock is released, an insert can reuse the slot
+            T v = SPSCRing<T,RING_SIZE>::ring[SPSCRing<T,RING_SIZE>::tail % RING_SIZE];
             SPSCRing<T,RING_SIZE>::tail++;
             release_tail();
             return v;
@@ -502,7 +503,8 @@ public:
     inline T extract() {
         acquire_tail();
         if (!SPSCRing<T,RING_SIZE>::is_empty()) {
-            T &v = SPSCRing<T,RING_SIZE>::ring[SPSCRing<T,RING_SIZE>::tail % RING_SIZE];
+            // A copy: once the lock is released, an insert can reuse the slot
+            T v = SPSCRing<T,RING_SIZE>::ring[SPSCRing<T,RING_SIZE>::tail % RING_SIZE];
             SPSCRing<T,RING_SIZE>::tail++;
             release_tail();
             click_compiler_fence();
