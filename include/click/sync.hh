@@ -539,6 +539,10 @@ Spinlock::release()
     if (likely(_depth > 0)) {
 	if (--_depth == 0) {
 	    _owner = click_invalid_processor();
+	    // The writes made under the lock, and to _owner and _depth, must be
+	    // seen before the lock is free. x86 keeps the order of stores, a
+	    // weakly ordered CPU such as Arm needs a barrier.
+	    click_write_fence();
 	    _lock = 0;
 	}
     } else
@@ -667,6 +671,8 @@ SimpleSpinlock::release()
 #if CLICK_LINUXMODULE
     spin_unlock(&_lock);
 #elif CLICK_MULTITHREAD_SPINLOCK
+    // See Spinlock::release()
+    click_write_fence();
     _lock = 0;
 #endif
 }
