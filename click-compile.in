@@ -177,6 +177,12 @@ while true; do
     esac
     if test -z "$path" -o -n "$include_source"; then break; fi
 done
+# The headers of the sources include those of vendor/ (nicscheduler,
+# tinyexpr), which the build finds in the sources. Look there first too:
+# headers installed by another, older Click would not match the sources.
+if test -n "$include_source" -a -d "${include_source#-I}/vendor"; then
+    include_source="$include_source -I${include_source#-I}/vendor"
+fi
 
 if test ! -d "$includedir"; then
     echo "click-compile: Cannot find Click include directory!" 1>&2
