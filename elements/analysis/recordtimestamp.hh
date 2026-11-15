@@ -7,6 +7,9 @@
 #include <click/tsctimestamp.hh>
 #include <click/hashtable.hh>
 #include "numberpacket.hh"
+#if HAVE_DPDK
+# include <rte_mbuf.h>
+#endif
 
 CLICK_DECLS
 
@@ -99,8 +102,23 @@ public:
     }
 
 #if HAVE_DPDK
+    // Defined in the class: click-devirtualize keeps "static" only for the functions it reads here
     inline static uint16_t calc_latency(uint16_t port, uint16_t qidx,
-                struct rte_mbuf **pkts, uint16_t nb_pkts, void *ptr);
+                struct rte_mbuf **pkts, uint16_t nb_pkts, void *ptr) {
+        RecordTimestamp* rt = ((RecordTimestamp*)ptr);
+        for (unsigned i = 0; i < nb_pkts; i++) {
+            unsigned char *data = rte_pktmbuf_mtod(pkts[i], unsigned char *);
+            uint64_t n = (*(reinterpret_cast<const uint64_t *>(data + rt->_offset)));
+            if (rt->_sample > 1) {
+                if (n % rt->_sample == 0)
+                    n = n / rt->_sample;
+                else
+                    continue;
+            }
+            rt->_timestamps[n] = TimestampT::now_steady();
+        }
+        return nb_pkts;
+    }
 #endif
 private:
     int _offset;
