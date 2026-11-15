@@ -36,7 +36,10 @@ CLICK_DECLS
 
         inline T extract() {
             if (!is_empty()) {
-                T &v = ring[tail % RING_SIZE];
+                // See SPSCDynamicRing::extract()
+                click_read_fence();
+                T v = ring[tail % RING_SIZE];
+                click_read_fence();
                 tail++;
                 return v;
             } else
@@ -46,6 +49,8 @@ CLICK_DECLS
         inline bool insert(T batch) {
             if (has_space()) {
                 ring[head % RING_SIZE] = batch;
+                // See SPSCDynamicRing::insert()
+                click_write_fence();
                 head++;
                 return true;
             } else
@@ -115,7 +120,13 @@ public:
 
     inline T extract() {
         if (!is_empty()) {
-            T &v = ring[tail];
+            // The producer runs on another core: on a weakly ordered CPU such
+            // as Arm, read the element (and what it points to, e.g. the count
+            // of a PacketBatch) only after head, and give its slot back only
+            // after reading it. On x86 these are compiler barriers only.
+            click_read_fence();
+            T v = ring[tail];
+            click_read_fence();
             inc_i(tail);
             return v;
         } else
@@ -125,6 +136,8 @@ public:
     inline bool insert(T batch) {
         if (!is_full()) {
             ring[head] = batch;
+            // The element, and what it points to, must be seen before head
+            click_write_fence();
             inc_i(head);
             return true;
         } else
