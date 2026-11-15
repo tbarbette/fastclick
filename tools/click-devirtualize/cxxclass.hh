@@ -46,7 +46,8 @@ class CxxFunction {
 
   bool find_expr(const String &) const;
   bool replace_expr(const String &, const String &, bool full_symbol = false, bool all = false, int start_at = 0);
-  int replace_call(const String &, const String &, Vector<String>& args);
+  int find_call(const String &, Vector<String>& args, int start_at = 0) const;
+  int replace_call(const String &, const String &, Vector<String>& args, int start_at = 0);
 
   void set_inline();
 

@@ -402,11 +402,29 @@ again:
   return true;
 }
 
-int CxxFunction::replace_call(const String &pattern, const String &replacement, Vector<String> &args)
+/**
+ * Find the first call matching pattern after start_at, and add its arguments
+ * to args
+ * @return the position of the end of the call, or -1 if there is none
+ */
+int CxxFunction::find_call(const String &pattern, Vector<String> &args, int start_at) const
+{
+  int pos1, pos2, match_pos[10], match_len[10];
+  for (int i = 0; i < 10; i++)
+    match_len[i] = -1;
+  if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, true, true, start_at))
+    return -1;
+
+  for (int i = 0; i < 10 && match_len[i] > -1; i++)
+    args.push_back(_body.substring(match_pos[i], match_len[i]));
+  return pos2;
+}
+
+int CxxFunction::replace_call(const String &pattern, const String &replacement, Vector<String> &args, int start_at)
 {
 
   int pos1, pos2, match_pos[10], match_len[10] = {-1};
-  if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, true, true))
+  if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, true, true, start_at))
     return -1;
 
   int i = 0;
