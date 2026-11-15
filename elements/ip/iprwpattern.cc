@@ -265,7 +265,11 @@ IPRewriterPattern::rewrite_flowid(const IPFlowID &flowid,
 	return IPRewriterBase::rw_drop;
 
 found_variation:
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+	if (!_next_variation.compare_and_swap(next, val + 1))
+#else
 	if ((_next_variation.compare_swap(next, val + 1) != next))
+#endif
         goto retry_variation;
 	if (_is_napt)
 	    rewritten_flowid.set_sport(lookup.dport());
