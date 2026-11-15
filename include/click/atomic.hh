@@ -79,6 +79,7 @@ class atomic_uint32_t { public:
     inline atomic_uint32_t &operator=(uint32_t x);
 
     inline atomic_uint32_t &operator+=(int32_t delta);
+    inline void add_relaxed(int32_t delta);
     inline atomic_uint32_t &operator-=(int32_t delta);
     inline atomic_uint32_t &operator|=(uint32_t mask);
     inline atomic_uint32_t &operator&=(uint32_t mask);
@@ -145,6 +146,7 @@ class atomic_uint64_t { public:
     inline atomic_uint64_t &operator=(uint64_t x);
 
     inline atomic_uint64_t &operator+=(int64_t delta);
+    inline void add_relaxed(int64_t delta);
     inline atomic_uint64_t &operator-=(int64_t delta);
 
     inline void nonatomic_inc();
@@ -227,6 +229,22 @@ atomic_uint32_t::operator+=(int32_t delta)
     CLICK_ATOMIC_VAL += delta;
 #endif
     return *this;
+}
+
+/** @brief  Atomically add @a delta to the value, with no ordering of the
+ * other memory accesses.
+ *
+ * For values no other memory access depends on, such as statistics. With the
+ * atomic builtins, on weakly ordered CPUs such as Arm, it is cheaper than
+ * operator+=(). */
+inline void
+atomic_uint32_t::add_relaxed(int32_t delta)
+{
+#if CLICK_ATOMIC_BUILTINS && !CLICK_LINUXMODULE
+    __atomic_add_fetch(&CLICK_ATOMIC_VAL, delta, __ATOMIC_RELAXED);
+#else
+    *this += delta;
+#endif
 }
 
 /** @brief  Atomically subtract @a delta from the value. */
@@ -863,6 +881,22 @@ atomic_uint64_t::operator+=(int64_t delta)
     CLICK_ATOMIC_VAL += delta;
 #endif
     return *this;
+}
+
+/** @brief  Atomically add @a delta to the value, with no ordering of the
+ * other memory accesses.
+ *
+ * For values no other memory access depends on, such as statistics. With the
+ * atomic builtins, on weakly ordered CPUs such as Arm, it is cheaper than
+ * operator+=(). */
+inline void
+atomic_uint64_t::add_relaxed(int64_t delta)
+{
+#if CLICK_ATOMIC_BUILTINS && !CLICK_LINUXMODULE
+    __atomic_add_fetch(&CLICK_ATOMIC_VAL, delta, __ATOMIC_RELAXED);
+#else
+    *this += delta;
+#endif
 }
 
 /** @brief  Atomically increment value @a x. */

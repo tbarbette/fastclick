@@ -20,6 +20,9 @@ static void test_32(ErrorHandler *)
     click_chatter("[03] a=%u -> %s",  (uint32_t)a, a==2 ? "PASS" : "FAIL");
     a-=1;
     click_chatter("[04] a=%u -> %s",  (uint32_t)a, a==1 ? "PASS" : "FAIL");
+    a.add_relaxed(2);
+    click_chatter("[04r] a=%u -> %s",  (uint32_t)a, a==3 ? "PASS" : "FAIL");
+    a-=2;
     uint32_t u = a.swap(5);
     click_chatter("[05] a=%u, u=%i -> %s", (uint32_t)a, u,  a==5 && u==1 ? "PASS" : "FAIL");
     u = a.fetch_and_add(10);
@@ -93,6 +96,9 @@ static void test_64(ErrorHandler *)
     click_chatter("[03] a=%i -> %s", a, a==2 ? "PASS" : "FAIL");
     a-=1;
     click_chatter("[04] a=%i -> %s", a, a==1 ? "PASS" : "FAIL");
+    a.add_relaxed(2);
+    click_chatter("[04r] a=%u -> %s", (uint32_t)(uint64_t)a, a==3 ? "PASS" : "FAIL");
+    a-=2;
     uint32_t u = a.fetch_and_add(10);
     click_chatter("[05] a=%i, u=%i -> %s", a, u,  a==11 && u==1 ? "PASS" : "FAIL");
 

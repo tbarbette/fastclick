@@ -90,6 +90,10 @@ class AverageCounterBase : public BatchElement { public:
 };
 
 
+// A count needs atomic additions, but no ordering of the other memory accesses
+inline void average_counter_add(uint64_t &x, uint64_t delta) { x += delta; }
+inline void average_counter_add(atomic_uint64_t &x, uint64_t delta) { x.add_relaxed(delta); }
+
 template <typename T>
 struct AverageCounterStats {
     AverageCounterStats() {
@@ -102,8 +106,8 @@ struct AverageCounterStats {
     T _last;
 
     inline void add_count(uint64_t c,uint64_t b) {
-        _count += c;
-        _byte_count += b;
+        average_counter_add(_count, c);
+        average_counter_add(_byte_count, b);
     }
 
     inline void reset()
