@@ -33,10 +33,9 @@ CLICK_CXX_UNPROTECT
 //    #pragma message "atomic.hh: using builtins implementation"
     # define CLICK_ATOMIC_BUILTINS 1
     # define CLICK_ATOMIC_MEMORDER __ATOMIC_SEQ_CST
-    //	compare_swap methods are not atomic if using builtins. Disable them
-    # define CLICK_BUILTINS_DEPRECATED = delete
+    # define CLICK_BUILTINS_DEPRECATED
     # define CLICK_BUILTINS_NONDEPRECATED
-    # define CLICK_ATOMIC_COMPARE_SWAP 0
+    # define CLICK_ATOMIC_COMPARE_SWAP 1
 #else
     # define CLICK_ATOMIC_BUILTINS 0
 //    #pragma message "atomic.hh: Using click own implementation"
@@ -418,9 +417,7 @@ inline uint32_t
 atomic_uint32_t::swap(volatile uint32_t &x, uint32_t desired)
 {
 #if CLICK_ATOMIC_BUILTINS
-    uint32_t actual = x;
-    __atomic_exchange(&x, &desired, &actual, CLICK_ATOMIC_MEMORDER);
-    return actual;
+    return __atomic_exchange_n(&x, desired, CLICK_ATOMIC_MEMORDER);
 
 #elif CLICK_ATOMIC_X86
     asm volatile ("xchgl %0,%1"
@@ -546,9 +543,9 @@ inline uint32_t
 atomic_uint32_t::compare_swap(volatile uint32_t &x, uint32_t expected, uint32_t desired)
 {
 #if CLICK_ATOMIC_BUILTINS
-# warning "compare_swap is not truly atomic with system builtins"
-    return __atomic_compare_exchange(&x,&expected,&desired,0,CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER)
-	? expected : x;
+    // On failure, the builtin writes the value it saw in expected
+    __atomic_compare_exchange_n(&x, &expected, desired, false, CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER);
+    return expected;
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "cmpxchgl %2,%1"
 		  : "=a" (expected), "=m" (x)
@@ -685,9 +682,9 @@ inline uint32_t
 atomic_uint32_t::compare_swap(uint32_t expected, uint32_t desired)
 {
 #if CLICK_ATOMIC_BUILTINS
-# warning "compare_swap is not truly atomic with system builtins"
-    return __atomic_compare_exchange(&_val, &expected, &desired, 0, CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER)
-	? expected: _val;
+    // On failure, the builtin writes the value it saw in expected
+    __atomic_compare_exchange_n(&_val, &expected, desired, false, CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER);
+    return expected;
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "cmpxchgl %2,%1"
 		  : "=a" (expected), "=m" (CLICK_ATOMIC_VAL)
@@ -1011,9 +1008,9 @@ inline uint64_t
 atomic_uint64_t::compare_swap(volatile uint64_t &x, uint64_t expected, uint64_t desired)
 {
 #if CLICK_ATOMIC_BUILTINS
-# warning "compare_swap is not truly atomic with system builtins"
-    return __atomic_compare_exchange(&x,&expected,&desired,0,CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER)
-	? expected : x;
+    // On failure, the builtin writes the value it saw in expected
+    __atomic_compare_exchange_n(&x, &expected, desired, false, CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER);
+    return expected;
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "cmpxchgq %2,%1"
 		  : "=a" (expected), "=m" (x)

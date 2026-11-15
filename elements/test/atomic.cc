@@ -63,7 +63,7 @@ static void test_32(ErrorHandler *)
     click_chatter("[18] b=%i, u=%u -> %s", b,  (uint32_t)u,  b==2 && u==1 ? "PASS" : "FAIL");
 #pragma GCC diagnostic pop
 
-#if CLICK_ATOMIC_BUILTINS
+#if !CLICK_ATOMIC_COMPARE_SWAP
     click_chatter("[--] Not testing compare_swap!");
 #else
     a=11;
@@ -96,7 +96,7 @@ static void test_64(ErrorHandler *)
     uint32_t u = a.fetch_and_add(10);
     click_chatter("[05] a=%i, u=%i -> %s", a, u,  a==11 && u==1 ? "PASS" : "FAIL");
 
-#if CLICK_ATOMIC_BUILTINS
+#if !CLICK_ATOMIC_COMPARE_SWAP
     click_chatter("[--] Not testing compare_swap!");
 #else
     u = a.compare_swap(0,2);
