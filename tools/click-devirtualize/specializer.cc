@@ -791,6 +791,60 @@ is_primitive_val(String str) {
     return true;
 }
 
+static bool
+is_symbol_char(char c)
+{
+    return isalnum((unsigned char) c) || c == '_';
+}
+
+/**
+ * Whether a function of cxxc other than configure() can change symbol, so
+ * that its configured value is not a constant: an assignment, an increment, an
+ * access through another object (c->symbol, as the static handlers do) or its
+ * address (add_data_handlers(..., &symbol)).
+ */
+static bool
+changed_at_runtime(CxxClass *cxxc, const CxxFunction *configure, const String &symbol)
+{
+    for (int f = 0; f < cxxc->nfunctions(); f++) {
+        const CxxFunction &fnt = cxxc->function(f);
+        if (&fnt == configure || fnt.name() == "configure")
+            continue;
+        const String &b = fnt.clean_body() ? fnt.clean_body() : fnt.body();
+        int len = b.length();
+        for (int pos = b.find_left(symbol); pos >= 0; pos = b.find_left(symbol, pos + 1)) {
+            int end = pos + symbol.length();
+            if ((pos > 0 && is_symbol_char(b[pos - 1])) || (end < len && is_symbol_char(b[end])))
+                continue;
+            int p = pos - 1;
+            while (p >= 0 && isspace((unsigned char) b[p]))
+                p--;
+            if (p >= 1 && b[p] == '>' && b[p - 1] == '-') {
+                int q = p - 2;
+                while (q >= 0 && isspace((unsigned char) b[q]))
+                    q--;
+                if (!(q >= 3 && b.substring(q - 3, 4) == "this" && (q == 3 || !is_symbol_char(b[q - 4]))))
+                    return true;
+            } else if (p >= 0 && b[p] == '.')
+                return true;
+            else if (p >= 0 && b[p] == '&' && (p == 0 || b[p - 1] != '&'))
+                return true;
+            else if (p >= 1 && ((b[p] == '+' && b[p - 1] == '+') || (b[p] == '-' && b[p - 1] == '-')))
+                return true;
+            int n = end;
+            while (n < len && isspace((unsigned char) b[n]))
+                n++;
+            if (n < len && b[n] == '=' && (n + 1 == len || b[n + 1] != '='))
+                return true;
+            if (n + 1 < len && b[n + 1] == '=' && strchr("+-*/%&|^", b[n]))
+                return true;
+            if (n + 1 < len && ((b[n] == '+' && b[n + 1] == '+') || (b[n] == '-' && b[n + 1] == '-')))
+                return true;
+        }
+    }
+    return false;
+}
+
 void
 Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 {
@@ -940,6 +994,16 @@ Specializer::do_config_replacement() {
                       }
 
                       if (!has_value || !is_primitive_val(value)) {
+                          args.clear();
+                          continue;
+                      }
+
+                      // A handler can change it at run time (e.g. ACTIVE false,
+                      // then "write e.active true"): the configured value is
+                      // only its first one
+                      if (changed_at_runtime(original, configure, symbol)) {
+                          if (_verbose)
+                              click_chatter("Not replacing %s, which can change at run time", symbol.c_str());
                           args.clear();
                           continue;
                       }
