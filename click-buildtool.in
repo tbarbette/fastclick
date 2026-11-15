@@ -1853,7 +1853,17 @@ EOF
   --cf|--cfl|--cfla|--cflag|--cflags|--d|--de|--def|--defs)
      echo @PROPER_INCLUDES@ @PCAP_INCLUDES@ @DPDK_INCLUDES@ @DPDK_CFLAGS@ @NETMAP_INCLUDES@ -I@includedir@; exit 0;;
   --ir|--irl|--irli|--irlib|--irlibs)
-     echo @PROPER_LIBS@ @PCAP_LIBS@ @DL_LIBS@ @SOCKET_LIBS@ @DPDK_LIBS@ @PTHREAD_LIBS@ @POSIX_CLOCK_LIBS@ | sed -e "s/--whole-archive/--no-whole-archive/";
+     libs="@PROPER_LIBS@ @PCAP_LIBS@ @DL_LIBS@ @SOCKET_LIBS@ @DPDK_LIBS@ @PTHREAD_LIBS@ @POSIX_CLOCK_LIBS@"
+     # The DPDK drivers register in constructors that nothing calls, so they
+     # are linked whole. Only a DPDK built with LTO (LLVM bitcode, not ELF) is
+     # already in the IR, and linking it whole again would define it twice.
+     for d in `echo "$libs" | tr ' ' '\n' | sed -n -e 's/^-L//p'`; do
+         if test -f "$d/librte_eal.a" && ! ar p "$d/librte_eal.a" 2>/dev/null | head -c 4 | grep -q -a ELF; then
+             libs=`echo "$libs" | sed -e "s/--whole-archive/--no-whole-archive/"`
+             break
+         fi
+     done
+     echo $libs
      exit 0;;
   --o|--ot|--oth|--othe|--other|--otherl|--otherli|--otherlib|--otherlibs)
      echo @PROPER_LIBS@ @PCAP_LIBS@ @DL_LIBS@ @SOCKET_LIBS@ @DPDK_LIBS@ @PTHREAD_LIBS@ @POSIX_CLOCK_LIBS@;
