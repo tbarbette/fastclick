@@ -902,6 +902,26 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 
 
 /**
+ * If param is written "PARAM !VALUE" in config, remove the "!" and return true.
+ * The "!" means that the value of PARAM can change at run time (e.g.
+ * "ACTIVE !false", then a handler writes true): it must not be replaced.
+ */
+static bool
+remove_keep_mark(String &config, const String &param)
+{
+    int pos = config.find_left(param);
+    if (pos < 0)
+        return false;
+    pos += param.length();
+    while (pos < config.length() && isspace((unsigned char) config[pos]))
+        pos++;
+    if (pos >= config.length() || config[pos] != '!')
+        return false;
+    config = config.substring(0, pos) + config.substring(pos + 1);
+    return true;
+}
+
+/**
  * Replace argument parsing by constant value validation, and replace occurences
  * of the symbols by their constants
  */
@@ -925,9 +945,27 @@ Specializer::do_config_replacement() {
         //For all patterns like read, read_mp, ...
         for (int p =0; p < patterns.size(); p++) {
                 int res;
-                while ((res = configure->replace_call(patterns[p].first, patterns[p].second, args)) != -1) {
-                      String value;
+                int start_at = 0; // After the calls that are kept
+                while ((res = configure->find_call(patterns[p].first, args, start_at)) != -1) {
                       String param =  trim_quotes(args[0].trim());
+                      args.clear();
+                      if (remove_keep_mark(configline, param)) {
+                          // Keep the call that reads it, and give the
+                          // elements their configuration without the "!"
+                          if (_verbose)
+                              click_chatter("Not replacing %s, marked with !", param.c_str());
+                          for (int i = 0; i < _nelements; i++) {
+                              if (_specialize[i] != s)
+                                  continue;
+                              String config = _router->element(i)->config();
+                              remove_keep_mark(config, param);
+                              _router->element(i)->set_configuration(config);
+                          }
+                          start_at = res;
+                          continue;
+                      }
+                      res = configure->replace_call(patterns[p].first, patterns[p].second, args, start_at);
+                      String value;
                       bool has_value;
                       any_replacement = true;
                       int pos = configline.find_left(param);
@@ -947,13 +985,6 @@ Specializer::do_config_replacement() {
                           end -= 1;
                           while (configline[end] == ' ') end--;
                           value = configline.substring(pos,end+1 - pos).trim();
-                          if (value.starts_with("!")) {
-                            dynamic = true;
-                            pos = value.data() - configline.data();
-                            configline = configline.substring(0,pos) + configline.substring(pos + 1);
-                            continue;
-                          }
-
                           click_chatter("Config value is %s",value.c_str());
                           if (value.starts_with("$")) {
                               click_chatter("Variables not yet supported");

@@ -228,7 +228,8 @@ Options:\n\
   -r, --reverse                Reverse devirtualization.\n\
   -n, --no-devirtualize CLASS  Don't devirtualize element class CLASS.\n\
   -I, --inline                 Set all functions inline.\n\
-  -R, --replace                Replace configuration values into code.\n\
+  -R, --replace                Replace configuration values into code, except\n\
+                               those written \"!VALUE\" in the configuration.\n\
   -i, --instructions FILE      Read devirtualization instructions from FILE.\n\
   -C, --clickpath PATH         Use PATH for CLICKPATH.\n\
       --help                   Print this message and exit.\n\
