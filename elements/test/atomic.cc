@@ -89,32 +89,32 @@ static void test_64(ErrorHandler *)
 
     atomic_uint64_t a;
     a = 0;
-    click_chatter("[01] a=%i -> %s", a, a==0 ? "PASS" : "FAIL");
+    click_chatter("[01] a=%u -> %s", (uint32_t)(uint64_t)a, a==0 ? "PASS" : "FAIL");
     a++;
-    click_chatter("[02] a=%i -> %s", a, a==1 ? "PASS" : "FAIL");
+    click_chatter("[02] a=%u -> %s", (uint32_t)(uint64_t)a, a==1 ? "PASS" : "FAIL");
     a+=1;
-    click_chatter("[03] a=%i -> %s", a, a==2 ? "PASS" : "FAIL");
+    click_chatter("[03] a=%u -> %s", (uint32_t)(uint64_t)a, a==2 ? "PASS" : "FAIL");
     a-=1;
-    click_chatter("[04] a=%i -> %s", a, a==1 ? "PASS" : "FAIL");
+    click_chatter("[04] a=%u -> %s", (uint32_t)(uint64_t)a, a==1 ? "PASS" : "FAIL");
     a.add_relaxed(2);
     click_chatter("[04r] a=%u -> %s", (uint32_t)(uint64_t)a, a==3 ? "PASS" : "FAIL");
     a-=2;
     uint32_t u = a.fetch_and_add(10);
-    click_chatter("[05] a=%i, u=%i -> %s", a, u,  a==11 && u==1 ? "PASS" : "FAIL");
+    click_chatter("[05] a=%u, u=%u -> %s", (uint32_t)(uint64_t)a, u,  a==11 && u==1 ? "PASS" : "FAIL");
 
 #if !CLICK_ATOMIC_COMPARE_SWAP
     click_chatter("[--] Not testing compare_swap!");
 #else
     u = a.compare_swap(0,2);
-    click_chatter("[06] a=%i, u=%i -> %s", a, u,  a==11 && u==11 ? "PASS" : "FAIL");
+    click_chatter("[06] a=%u, u=%u -> %s", (uint32_t)(uint64_t)a, u,  a==11 && u==11 ? "PASS" : "FAIL");
     u = a.compare_swap(11,5);
-    click_chatter("[07] a=%i, u=%i -> %s", a, u,  a==5 && u==11 ? "PASS" : "FAIL");
+    click_chatter("[07] a=%u, u=%u -> %s", (uint32_t)(uint64_t)a, u,  a==5 && u==11 ? "PASS" : "FAIL");
     uint64_t b =5;
 
     u = atomic_uint64_t::compare_swap(b,0,2);
-    click_chatter("[08] b=%i, u=%i -> %s", b, u,  b==5 && u==5 ? "PASS" : "FAIL");
+    click_chatter("[08] b=%u, u=%u -> %s", (uint32_t)b, u,  b==5 && u==5 ? "PASS" : "FAIL");
     u = atomic_uint64_t::compare_swap(b,5,2);
-    click_chatter("[09] b=%i, u=%i -> %s", b, u,  b==2 && u==5 ? "PASS" : "FAIL");
+    click_chatter("[09] b=%u, u=%u -> %s", (uint32_t)b, u,  b==2 && u==5 ? "PASS" : "FAIL");
 #endif
 }
 
