@@ -61,6 +61,7 @@
 #define JMPS_OPT        319
 #define ALIGN_OPT       320
 #define VERBOSE_OPT     321
+#define KEEP_DYNAMIC_OPT 322
 
 static const Clp_Option options[] = {
   { "clickpath", 'C', CLICKPATH_OPT, Clp_ValString, 0 },
@@ -69,6 +70,7 @@ static const Clp_Option options[] = {
   { "inline", 'I', INLINE_OPT, 0},
   { "static", 'S', STATIC_OPT, 0},
   { "replace", 'R', REPLACE_OPT, 0},
+  { "keep-dynamic", 0, KEEP_DYNAMIC_OPT, 0, Clp_Negate },
   { "unroll", 'U', UNROLL_OPT, Clp_ValInt, Clp_Mandatory },
   { "switch", 'W', SWTICH_OPT, Clp_ValInt, Clp_Mandatory },
   { "jmps", 'J', JMPS_OPT, Clp_ValInt, Clp_Mandatory },
@@ -230,6 +232,9 @@ Options:\n\
   -I, --inline                 Set all functions inline.\n\
   -R, --replace                Replace configuration values into code, except\n\
                                those written \"!VALUE\" in the configuration.\n\
+      --keep-dynamic           With --replace, also keep the values that the\n\
+                               element can change after configure(), such as\n\
+                               with handlers.\n\
   -i, --instructions FILE      Read devirtualization instructions from FILE.\n\
   -C, --clickpath PATH         Use PATH for CLICKPATH.\n\
       --help                   Print this message and exit.\n\
@@ -263,6 +268,7 @@ main(int argc, char **argv)
   int reverse = 0;
   bool verbose = false;
   int do_replace = 0;
+  bool keep_dynamic = false;
   int do_inline = 0;
   int do_static = 0;
   int do_unroll = 0;
@@ -359,6 +365,10 @@ particular purpose.\n");
 
      case REPLACE_OPT:
       do_replace = !clp->negated;
+      break;
+
+     case KEEP_DYNAMIC_OPT:
+      keep_dynamic = !clp->negated;
       break;
 
      case INLINE_OPT:
@@ -487,6 +497,7 @@ particular purpose.\n");
 
   specializer.verbose(verbose);
   specializer.should_replace(do_replace);
+  specializer.keep_dynamic(keep_dynamic);
   specializer.should_inline(do_inline);
   specializer.make_static(do_static);
   specializer.should_unroll(do_unroll, unroll_val);

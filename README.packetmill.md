@@ -157,7 +157,7 @@ unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, 32);
 
 To use this pass, you have to add `--replace` when using `click-devirtualize`.
 
-A value that changes at run time must not be replaced, such as `ACTIVE false` when a handler later writes `true`. Mark it with a `!`, as in `FastUDPFlows(..., ACTIVE !false)`: `configure()` then keeps reading it, and the element gets its configuration without the `!`. Only mark the parameters that the element's own `configure()` reads, as `--replace` only replaces those: the `!` of the others stays in the configuration.
+A value that changes at run time must not be replaced, such as `ACTIVE false` when a handler later writes `true`. Mark it with a `!`, as in `FastUDPFlows(..., ACTIVE !false)`: `configure()` then keeps reading it, and the element gets its configuration without the `!`. Only mark the parameters that the element's own `configure()` reads, as `--replace` only replaces those: the `!` of the others stays in the configuration. With `--keep-dynamic`, `click-devirtualize` also keeps every value that another function of the element can change, such as a handler.
 
 
 ### Static Pass
