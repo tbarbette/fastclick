@@ -33,7 +33,7 @@ Vector<Pair<String,String>> patterns;
 Specializer::Specializer(RouterT *router, const ElementMap &em)
   : _router(router), _nelements(router->nelements()),
     _ninputs(router->nelements(), 0), _noutputs(router->nelements(), 0),
-    _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1), _do_inline(false),
+    _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1), _keep_dynamic(false), _do_inline(false),
     _do_static(false), _do_switch(false), _do_unroll(false), _unroll_val(0), _switch_burst(0),
     _do_jmps(false), _jmp_burst(0), _do_align(0), _verbose(false)
 {
@@ -1029,10 +1029,10 @@ Specializer::do_config_replacement() {
                           continue;
                       }
 
-                      // A handler can change it at run time (e.g. ACTIVE false,
-                      // then "write e.active true"): the configured value is
-                      // only its first one
-                      if (changed_at_runtime(original, configure, symbol)) {
+                      // With --keep-dynamic, as if marked with "!" when a handler,
+                      // or another function, can change it at run time (e.g.
+                      // ACTIVE false, then "write e.active true")
+                      if (_keep_dynamic && changed_at_runtime(original, configure, symbol)) {
                           if (_verbose)
                               click_chatter("Not replacing %s, which can change at run time", symbol.c_str());
                           args.clear();
