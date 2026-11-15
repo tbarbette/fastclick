@@ -446,12 +446,16 @@ class Args : public ArgContext {
             postparse(s && (str ? Args_parse_helper<DefaultArg<T> >::parse(DefaultArg<T>(), str, *s, *this) : (*s = static_value, true)), slot_status);
             if (*s != static_value) {
                 click_chatter("%s is not the expected value", keyword);
-                if (std::is_convertible<T,char *>::value) {
+#if __cplusplus >= 201703L
+                // Not compiled for types that cannot go through "%s" (clang
+                // refuses to pass a String through a variadic function)
+                if constexpr (std::is_convertible<T,char *>::value) {
                     click_chatter("Given %s", x);
                 }
-                if (std::is_convertible<V,char *>::value) {
+                if constexpr (std::is_convertible<V,char *>::value) {
                     click_chatter("Given %s", static_value);
                 }
+#endif
                 assert(*s == static_value);
             }
         }
