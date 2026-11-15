@@ -287,7 +287,8 @@ int parse(int argc, char** argv, click_args_t &click_args) {
 
      case HELP_OPT:
       usage();
-      return cleanup(clp, 0);
+      // Exit here: main() would go on with the parser deleted, and delete it again
+      exit(cleanup(clp, 0));
 
      case VERSION_OPT:
       printf("click (FastClick) %s\n", CLICK_VERSION);
@@ -300,7 +301,8 @@ Copyright (C) 2015-2021 Tom Barbette\n\
 This is free software; see the source for copying conditions.\n\
 There is NO warranty, not even for merchantability or fitness for a\n\
 particular purpose.\n");
-      return cleanup(clp, 0);
+      // Exit here: main() would go on with the parser deleted, and delete it again
+      exit(cleanup(clp, 0));
 
      bad_option:
      case Clp_BadOption:
