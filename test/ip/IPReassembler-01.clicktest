@@ -16,6 +16,7 @@ InfiniteSource(LIMIT 1, STOP true, BURST 1)
 	-> Discard;
 
 %ignore stderr
+warning: {{.*}} writes into packets shared with clones{{.*}}
 expensive{{.*}}
 
 %expect stderr

@@ -24,6 +24,9 @@ InfiniteSource(LENGTH 64, LIMIT 1000)
 
 DriverManager(wait,read diff.average, read counter.count)
 
+%ignore stderr
+warning: {{.*}} writes into packets shared with clones{{.*}}
+
 %expect stderr
 Loading replay with 1 inputs.
 replay : Successfully loaded 1000 packets. Input 0 dried out.

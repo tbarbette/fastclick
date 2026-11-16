@@ -18,6 +18,9 @@ $VALGRIND click --simtime CONFIG
 
 Script(wait 1, read arpq.stats, read arpq2.stats, write stop);
 
+%ignore stderr
+warning: {{.*}} writes into packets shared with clones{{.*}}
+
 %expect -w stderr
 arpq.stats:
 80 packets killed
