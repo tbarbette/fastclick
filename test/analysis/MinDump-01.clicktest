@@ -1,3 +1,6 @@
+%require
+click-buildtool provides FromIPSummaryDump ToMinDump FromMinDump
+
 %info
 ToMinDump then FromMinDump gives back every packet, once per TIMES, in bursts of any size
 
