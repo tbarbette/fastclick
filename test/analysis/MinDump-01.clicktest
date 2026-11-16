@@ -1,0 +1,28 @@
+%info
+ToMinDump then FromMinDump gives back every packet, once per TIMES, in bursts of any size
+
+%script
+click WRITE
+click READ
+
+%file WRITE
+FromIPSummaryDump(IN, STOP true, ZERO true) -> ToMinDump(OUT)
+
+%file IN
+!data ip_src ip_dst ip_len ip_proto sport dport
+10.0.0.1 10.0.0.2 60 T 1000 80
+10.0.0.1 10.0.0.2 60 T 1001 80
+10.0.0.1 10.0.0.2 60 U 1002 53
+10.0.0.1 10.0.0.2 60 U 1003 53
+10.0.0.1 10.0.0.2 60 T 1004 80
+
+%file READ
+FromMinDump(OUT, STOP true, BURST 32) -> c32 :: Counter -> Discard;
+FromMinDump(OUT, STOP true, BURST 2) -> c2 :: Counter -> Discard;
+FromMinDump(OUT, STOP true, BURST 32, TIMES 2) -> ctimes :: Counter -> Discard;
+DriverManager(wait, wait, wait, print $(c32.count), print $(c2.count), print $(ctimes.count))
+
+%expect stdout
+5
+5
+10

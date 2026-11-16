@@ -223,15 +223,16 @@ Packet *FromMinDump::read_packet(ErrorHandler *errh, uint8_t *data) {
 }
 
 inline int FromMinDump::read_binary_line(uint8_t *buffer) {
-  if (likely(_file_pos + LINE_LEN < _file_size)) {
+  if (likely(_file_pos + LINE_LEN <= _file_size)) {
     // TODO avoid memcpy, read directly from the buffer
     memcpy(buffer, _file_data + _file_pos, LINE_LEN);
     _file_pos += LINE_LEN;
     return LINE_LEN;
   } else {
-    memcpy(buffer, _file_data + _file_pos, _file_size - _file_pos);
+    int len = _file_size - _file_pos;
+    memcpy(buffer, _file_data + _file_pos, len);
     _file_pos = _file_size;
-    return _file_size - _file_pos;
+    return len;
   }
 }
 
@@ -329,6 +330,7 @@ bool FromMinDump::run_task(Task *) {
   PacketBatch *head = NULL;
   Packet *last = NULL;
   Packet *p = NULL;
+  int count = 0;
   for (int i = 0; i < _burst; i++) {
     p = get_packet(1);
     if (likely(p)) {
@@ -339,11 +341,12 @@ bool FromMinDump::run_task(Task *) {
         last->set_next(p);
         last = last->next();
       }
+      count++;
     } else
       break;
   }
   if (likely(head))
-    output_push_batch(0, head->make_tail(last, _burst));
+    output_push_batch(0, head->make_tail(last, count));
 #else
   Packet *p = 0;
   for (int i = 0; i < _burst; i++) {
