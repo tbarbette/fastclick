@@ -219,6 +219,7 @@ class FromDump : public BatchElement { public:
 
     const char *class_name() const override		{ return "FromDump"; }
     const char *port_count() const override		{ return "0/1-2"; }
+    const char *packet_code() const override { return "/n"; }
     const char *processing() const override		{ return PROCESSING_A_AH; }
     void *cast(const char *);
     String declaration() const;

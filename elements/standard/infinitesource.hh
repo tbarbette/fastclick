@@ -111,6 +111,7 @@ class InfiniteSource : public BatchElement, public ActiveNotifier { public:
   const char *class_name() const override		{ return "InfiniteSource"; }
   void *cast(const char *);
   const char *port_count() const override		{ return PORTS_0_1; }
+  const char *packet_code() const override { return "/c"; }
   const char *flags() const			{ return "S1"; }
   void add_handlers() CLICK_COLD;
 

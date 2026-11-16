@@ -29,6 +29,7 @@ class Hub : public Element { public:
 
     const char *class_name() const override		{ return "Hub"; }
     const char *port_count() const override		{ return "-/="; }
+    const char *packet_code() const override { return "/c"; }
     const char *processing() const override		{ return PUSH; }
     const char *flow_code() const override		{ return "#/[^#]"; }
 

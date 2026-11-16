@@ -39,6 +39,7 @@ class ResetIPChecksum : public BatchElement { public:
 
     const char *class_name() const override		{ return "ResetIPChecksum"; }
     const char *port_count() const override		{ return PORTS_1_1; }
+    const char *packet_code() const override { return "w"; }
     void add_handlers() override CLICK_COLD;
 
     int configure(Vector<String> &conf, ErrorHandler *errh) override CLICK_COLD;

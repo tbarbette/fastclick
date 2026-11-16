@@ -30,6 +30,7 @@ class Tee : public BatchElement {
 
   const char *class_name() const override		{ return "Tee"; }
   const char *port_count() const override		{ return "1/1-"; }
+  const char *packet_code() const override { return "/c"; }
   const char *processing() const override		{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -49,6 +50,7 @@ class PullTee : public BatchElement {
 
   const char *class_name() const override		{ return "PullTee"; }
   const char *port_count() const override		{ return "1/1-"; }
+  const char *packet_code() const override { return "/c"; }
   const char *processing() const override		{ return "l/lh"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

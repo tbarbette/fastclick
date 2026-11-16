@@ -34,6 +34,7 @@ class PaintTee : public BatchElement { public:
 
     const char *class_name() const override	{ return "PaintTee"; }
     const char *port_count() const override	{ return "1/2"; }
+    const char *packet_code() const override { return "/c"; }
     const char *processing() const override	{ return PROCESSING_A_AH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

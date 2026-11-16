@@ -28,6 +28,7 @@ class Unstrip : public BatchElement {
 
   const char *class_name() const override	{ return "Unstrip"; }
   const char *port_count() const override	{ return PORTS_1_1; }
+  const char *packet_code() const override { return "w"; }
 
   int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
 

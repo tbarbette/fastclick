@@ -90,6 +90,7 @@ class FastUDPSource : public Element {
 
   const char *class_name() const override	{ return "FastUDPSource"; }
   const char *port_count() const override	{ return PORTS_0_1; }
+  const char *packet_code() const override { return "/c"; }
   const char *processing() const override	{ return PULL; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

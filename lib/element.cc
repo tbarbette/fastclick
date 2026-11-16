@@ -1084,6 +1084,98 @@ Element::port_flow(bool isoutput, int p, Bitvector* travels) const
     }
 }
 
+/** @brief Return the element's packet code.
+ *
+ * The packet code says what the element does to the packets it receives
+ * and emits, so that the router can find, when it initializes, the
+ * elements that will have to copy each packet.  It uses the syntax of
+ * flow_code(): the codes of the input ports, a slash, and the codes of the
+ * output ports.  Each port has one letter, or a set of letters between
+ * brackets, and the last code repeats for the following ports.  flow_code()
+ * says to which outputs the packets of each input go, and packet_code()
+ * what happens to them on the way.
+ *
+ * Input codes:
+ *
+ * <dl>
+ * <dt><tt>r</tt></dt> <dd>The element only reads the packets (default).</dd>
+ * <dt><tt>w</tt></dt> <dd>The element writes into the packets, with
+ * uniqueify(), push() or put(): it copies every packet that is shared with a
+ * clone.</dd>
+ * </dl>
+ *
+ * Output codes:
+ *
+ * <dl>
+ * <dt><tt>s</tt></dt> <dd>The same packets as received (default).</dd>
+ * <dt><tt>c</tt></dt> <dd>Clones, which share their buffer: of the packets
+ * received, or of a packet the element made itself if no input flows to
+ * this output.</dd>
+ * <dt><tt>n</tt></dt> <dd>New packets, made with Packet::make().</dd>
+ * <dt><tt>m</tt></dt> <dd>New packets in DPDK buffers.</dd>
+ * <dt><tt>d</tt></dt> <dd>Packets in DPDK buffers: those received in one
+ * pass unchanged, the others are copied into a new DPDK buffer.</dd>
+ * </dl>
+ *
+ * For example, Tee's packet code is <tt>"/c"</tt>, InfiniteSource's is also
+ * <tt>"/c"</tt> as it sends clones of one packet, and EtherRewrite's is
+ * <tt>"w"</tt>.  An element whose packet code is empty, the default,
+ * reads its packets and sends them unchanged.
+ *
+ * Unlike flow_code(), packet_code() is called after configure(), so it may
+ * depend on the element's configuration. */
+const char *
+Element::packet_code() const
+{
+    return "";
+}
+
+/** @brief Return the packet code of one of the element's ports.
+ * @param isoutput true for an output port, false for an input port
+ * @param port port number
+ *
+ * Returns the letters of the port's code in packet_code(), or an empty
+ * string for the default (<tt>r</tt> for inputs, <tt>s</tt> for
+ * outputs). */
+String
+Element::port_packet_code(bool isoutput, int port) const
+{
+    const char *code = packet_code();
+    if (!code || !*code)
+        return String();
+    const char *slash = strchr(code, '/');
+    const char *p, *end;
+    if (isoutput) {
+        if (!slash)
+            return String();
+        p = slash + 1;
+        end = p + strlen(p);
+    } else {
+        p = code;
+        end = slash ? slash : code + strlen(code);
+    }
+
+    String last;
+    while (p < end) {
+        String port_code;
+        if (*p == '[') {
+            const char *close = static_cast<const char *>(memchr(p, ']', end - p));
+            if (!close)
+                break;
+            port_code = String(p + 1, close);
+            p = close + 1;
+        } else {
+            port_code = String(p, p + 1);
+            p++;
+        }
+        if (port == 0)
+            return port_code;
+        last = port_code;
+        port--;
+    }
+    return last;
+}
+
 
 // PUSH OR PULL PROCESSING
 
