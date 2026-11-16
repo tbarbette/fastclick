@@ -351,6 +351,8 @@ bool FromMinDump::run_task(Task *) {
   Packet *p = 0;
   for (int i = 0; i < _burst; i++) {
     p = get_packet(1);
+    if (!p)
+      break;
     output(0).push(p);
   }
 #endif
