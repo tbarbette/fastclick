@@ -1,5 +1,5 @@
 %require
-! click-buildtool provides dpdk-packet
+if click-buildtool provides dpdk-packet; then false; fi
 
 %info
 The router warns about the elements that write into packets shared with

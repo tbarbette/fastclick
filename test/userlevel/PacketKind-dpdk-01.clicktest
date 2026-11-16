@@ -1,6 +1,6 @@
 %require
 click-buildtool provides dpdk
-! click-buildtool provides dpdk-packet
+if click-buildtool provides dpdk-packet; then false; fi
 
 %info
 FastUDPFlows sends clones. An EtherRewrite before EnsureDPDKBuffer copies
