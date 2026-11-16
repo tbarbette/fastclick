@@ -1,0 +1,27 @@
+%require
+click-buildtool provides dpdk
+! click-buildtool provides dpdk-packet
+
+%info
+FastUDPFlows sends clones. An EtherRewrite before EnsureDPDKBuffer copies
+every packet, and the router warns about it. After EnsureDPDKBuffer with
+FORCE_COPY, EtherRewrite writes into packets of its own. (Without FORCE_COPY,
+it depends on the build: EnsureDPDKBuffer lets clones that are already in DPDK
+buffers through, as with --enable-dpdk-pool.)
+Skipped with dpdk-packet: CI builds it with --disable-clone, where clones
+are copies and no packet is shared.
+
+%script
+click --dpdk -m 512M --no-huge --no-pci -- AFTER 2>&1 | grep "^warning:" || true
+click --dpdk -m 512M --no-huge --no-pci -- COPY 2>&1 | grep "^warning:" || true
+
+%file AFTER
+fd :: FastUDPFlows(RATE 0, LIMIT 64, LENGTH 64, SRCETH 0:0:0:0:0:1, DSTETH 0:0:0:0:0:2, SRCIP 10.0.0.1, DSTIP 10.0.0.2, FLOWS 4, FLOWSIZE 32, STOP true)
+-> MarkMACHeader -> after :: EtherRewrite(SRC 0:0:0:0:0:1, DST 0:0:0:0:0:2) -> EnsureDPDKBuffer -> Discard;
+
+%file COPY
+FastUDPFlows(RATE 0, LIMIT 64, LENGTH 64, SRCETH 0:0:0:0:0:1, DSTETH 0:0:0:0:0:2, SRCIP 10.0.0.1, DSTIP 10.0.0.2, FLOWS 4, FLOWSIZE 32, STOP true)
+-> EnsureDPDKBuffer(FORCE_COPY true) -> MarkMACHeader -> copy :: EtherRewrite(SRC 0:0:0:0:0:1, DST 0:0:0:0:0:2) -> Discard;
+
+%expect stdout
+warning: after :: EtherRewrite writes into packets shared with clones from fd :: FastUDPFlows, so it copies each of them{{.*}}

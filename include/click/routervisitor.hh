@@ -208,5 +208,24 @@ class ElementNeighborhoodTracker : public ElementTracker { public:
 
 };
 
+/** @class PacketKindChecker
+ * @brief Finds the elements that will copy every packet.
+ *
+ * PacketKindChecker follows, through the router configuration, the kind of
+ * the packets on each port: shared with clones or not, in a Click or a DPDK
+ * buffer.  It uses the elements' Element::packet_code() and
+ * Element::flow_code().  It warns about each element that writes into
+ * packets that may be shared, as such an element copies every packet before
+ * writing into it.  The router runs it once, before initializing the
+ * elements. */
+class PacketKindChecker { public:
+
+    /** @brief Check the configuration of @a router.
+     * @param router the router, whose elements are configured
+     * @param errh receives a warning for each element found */
+    static void check(Router *router, ErrorHandler *errh);
+
+};
+
 CLICK_ENDDECLS
 #endif

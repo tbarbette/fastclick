@@ -31,6 +31,9 @@ RatedSource(DATA "AAAA", LIMIT 1, STOP true)
 -> Print()
 -> Discard();
 
+%ignore stderr
+warning: {{.*}} writes into packets shared with clones{{.*}}
+
 %expect stderr
    4 |  AAAA
    4 |  BAAA

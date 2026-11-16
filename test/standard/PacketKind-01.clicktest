@@ -1,0 +1,39 @@
+%require
+! click-buildtool provides dpdk-packet
+
+%info
+The router warns about the elements that write into packets shared with
+clones, as they copy every packet: after a source that sends clones of one
+packet, after a Tee, and through a queue. A writer that gets packets of its
+own, or that is before the Tee, gets no warning.
+Skipped with dpdk-packet: CI builds it with --disable-clone, where clones
+are copies and no packet is shared.
+
+%script
+click SOURCE
+click TEE
+click QUEUE
+click GOOD
+
+%file SOURCE
+InfiniteSource(LIMIT 2, STOP true) -> MarkMACHeader -> rw :: EtherRewrite(SRC 0:0:0:0:0:1, DST 0:0:0:0:0:2) -> Discard;
+
+%file TEE
+FromIPSummaryDump(IN, STOP true) -> t :: Tee -> MarkMACHeader -> rw :: EtherRewrite(SRC 0:0:0:0:0:1, DST 0:0:0:0:0:2) -> Discard;
+t[1] -> Discard;
+
+%file QUEUE
+InfiniteSource(LIMIT 2, STOP true) -> Queue -> Unqueue -> sd :: StoreData(0, \<00>) -> Discard;
+
+%file GOOD
+FromIPSummaryDump(IN, STOP true) -> MarkMACHeader -> rw :: EtherRewrite(SRC 0:0:0:0:0:1, DST 0:0:0:0:0:2) -> t :: Tee -> Discard;
+t[1] -> Discard;
+
+%file IN
+!data ip_src ip_dst ip_len ip_proto sport dport
+10.0.0.1 10.0.0.2 60 U 1000 53
+
+%expect stderr
+warning: rw :: EtherRewrite writes into packets shared with clones from InfiniteSource@1 :: InfiniteSource, so it copies each of them{{.*}}
+warning: rw :: EtherRewrite writes into packets shared with clones from t :: Tee, so it copies each of them{{.*}}
+warning: sd :: StoreData writes into packets shared with clones from InfiniteSource@1 :: InfiniteSource, so it copies each of them{{.*}}

@@ -23,6 +23,9 @@ InfiniteSource(DATA \<AAABACAD>, LIMIT 1, STOP true)
   -> Print(f)
   -> Discard;
 
+%ignore stderr
+warning: {{.*}} writes into packets shared with clones{{.*}}
+
 %expect stderr
 x:    4 | aaabacad
 a:   22 | 02020202 02020101 01010101 81000001 0800aaab acad
