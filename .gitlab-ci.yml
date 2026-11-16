@@ -65,7 +65,7 @@ dpdk:
             export PKG_CONFIG_PATH=${RTE_SDK}/install/lib/x86_64-linux-gnu/pkgconfig/;
             export LD_LIBRARY_PATH=${RTE_SDK}/install/lib/x86_64-linux-gnu/:${RTE_SDK}/install/lib/:$LD_LIBRARY_PATH;
             if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" ]; then
-                    wget http://dpdk.org/browse/dpdk/snapshot/dpdk-$DPDK_VERSION.tar.gz &&
+                    wget https://fast.dpdk.org/rel/dpdk-$DPDK_VERSION.tar.gz &&
                     tar -zxf dpdk-$DPDK_VERSION.tar.gz &&
                     cd dpdk-$DPDK_VERSION ;
                     pip3 install meson ninja &&
