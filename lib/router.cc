@@ -1477,6 +1477,10 @@ Router::initialize(ErrorHandler *errh)
     }
 #endif
 
+    // Warn about the elements that will copy every packet
+    if (all_ok)
+        PacketKindChecker::check(this, errh);
+
 #if CLICK_DMALLOC
     CLICK_DMALLOC_REG("iHoo");
 #endif
