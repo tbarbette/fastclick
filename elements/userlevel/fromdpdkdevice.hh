@@ -405,6 +405,7 @@ public:
 
     const char *class_name() const override { return "FromDPDKDevice"; }
     const char *port_count() const override { return PORTS_0_1; }
+    const char *packet_code() const override { return "/m"; }
     const char *processing() const override { return PUSH; }
     void* cast(const char* name) override;
 

@@ -35,6 +35,7 @@ public:
 
     const char *class_name() const override        { return "EnsureDPDKBuffer"; }
     const char *port_count() const override        { return PORTS_1_1; }
+    const char *packet_code() const override { return _force ? "/m" : "/d"; }
     const char *processing() const override        { return AGNOSTIC; }
     int configure_phase() const override {
         return CONFIGURE_PHASE_PRIVILEGED + 3;

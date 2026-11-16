@@ -129,6 +129,8 @@ class Element { public:
     virtual const char *flow_code() const;
     static const char COMPLETE_FLOW[];
 
+    virtual const char *packet_code() const;
+
     virtual const char *flags() const;
     int flag_value(int flag) const;
 
@@ -204,6 +206,7 @@ class Element { public:
     inline bool output_is_push(int port) const;
     inline bool output_is_pull(int port) const;
     void port_flow(bool isoutput, int port, Bitvector*) const;
+    String port_packet_code(bool isoutput, int port) const;
 
     // LIVE RECONFIGURATION
     String configuration() const;
