@@ -97,8 +97,8 @@ class FromMinDump : public BatchElement{ public:
     bool _dpdk;
     int _times;
     int _first_packet;
-    int _active;
-    int _stop;
+    bool _active;
+    bool _stop;
     int _verbose;
     int64_t _limit;
     int64_t _this_limit;
