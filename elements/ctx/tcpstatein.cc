@@ -93,7 +93,7 @@ bool TCPStateIN::new_flow(TCPStateEntry* fcb, Packet* p) {
 			fcb->common = 0;
 			return false;
 		}
-		_established ++;
+		_opened ++;
 		return true;
 	}
     if (!_accept_nonsyn && !(p->tcp_header()->th_flags & TH_SYN)) {
@@ -119,7 +119,7 @@ void TCPStateIN::release_flow(TCPStateEntry* fcb) {
     if (fcb->common)
     {
         if (fcb->common->use_count.dec_and_test()) {
-		_established --;
+		_closed++;
             _pool.release(fcb->common);
             if (_verbose)
                 click_chatter("Release FCB common!");
@@ -167,15 +167,22 @@ void TCPStateIN::push_flow(int port, TCPStateEntry* flowdata, PacketBatch* batch
     }
 }
 
-enum {h_map_size, h_established};
+enum {h_map_size, h_established, h_opened, h_closed};
 String TCPStateIN::read_handler(Element* e, void* thunk) {
     TCPStateIN* tc = static_cast<TCPStateIN*>(e);
 
     switch ((intptr_t)thunk) {
         case h_map_size:
             return String(tc->_map.size());
-        case h_established:
-		return String(tc->_established);
+        case h_established: {
+		// Read _closed first: _opened is then at least as large
+		uint64_t closed = tc->_closed;
+		return String(tc->_opened - closed);
+	}
+        case h_opened:
+		return String(tc->_opened);
+        case h_closed:
+		return String(tc->_closed);
     }
     return String("");
 }
@@ -184,6 +191,8 @@ void TCPStateIN::add_handlers() {
 
     add_read_handler("map_size", TCPStateIN::read_handler, h_map_size);
     add_read_handler("established", TCPStateIN::read_handler, h_established);
+    add_read_handler("opened", TCPStateIN::read_handler, h_opened);
+    add_read_handler("closed", TCPStateIN::read_handler, h_closed);
 
 }
 
