@@ -40,6 +40,7 @@ public:
 
     const char *class_name() const        { return "TCPOut"; }
     const char *port_count() const        { return PORTS_1_1X2; }
+    const char *packet_code() const override { return (_allow_resize || !_readonly) ? "w" : ""; }
     const char *processing() const        { return PROCESSING_A_AH; }
 
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;

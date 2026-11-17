@@ -32,6 +32,7 @@ class SimpleLocQuerier : public Element {
 
   const char *class_name() const override		{ return "SimpleLocQuerier"; }
   const char *port_count() const override		{ return PORTS_1_1; }
+  const char *packet_code() const override { return "w"; }
   const char *processing() const override		{ return PUSH; }
   void add_handlers() CLICK_COLD;
 

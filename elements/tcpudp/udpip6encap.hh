@@ -60,6 +60,7 @@ class UDPIP6Encap : public BatchElement { public:
 
     const char *class_name() const override	{ return "UDPIP6Encap"; }
     const char *port_count() const override	{ return PORTS_1_1; }
+    const char *packet_code() const override { return "w"; }
     const char *flags() const		{ return "A"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

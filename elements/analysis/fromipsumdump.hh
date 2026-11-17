@@ -165,7 +165,7 @@ class FromIPSummaryDump : public BatchElement, public IPSummaryDumpInfo { public
 
     const char *class_name() const override	{ return "FromIPSummaryDump"; }
     const char *port_count() const override	{ return PORTS_0_1; }
-    const char *packet_code() const override { return "/n"; }
+    const char *packet_code() const override { return _multipacket ? "/c" : "/n"; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

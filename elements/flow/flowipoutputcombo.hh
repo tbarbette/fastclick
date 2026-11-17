@@ -51,6 +51,7 @@ class FlowIPOutputCombo : public FlowSharedBufferPaintElement {
 
   const char *class_name() const		{ return "FlowIPOutputCombo"; }
   const char *port_count() const		{ return "1/5"; }
+  const char *packet_code() const override { return "w/scs"; }
   const char *processing() const		{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

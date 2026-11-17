@@ -70,6 +70,7 @@ public:
 
   const char *class_name() const override { return "ACKRetrySender"; }
   const char *port_count() const override { return "-/-"; }
+  const char *packet_code() const override { return "/c"; }
   const char *processing() const override { return "la/hh"; }
   const char *flow_code()  const { return "xy/xx"; }
 

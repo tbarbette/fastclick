@@ -62,6 +62,7 @@ public:
 
   const char *class_name() const override		{ return "EtherSpanTree"; }
   const char *port_count() const override		{ return "-/="; }
+  const char *packet_code() const override { return "/n"; }
   const char *processing() const override		{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

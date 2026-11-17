@@ -40,6 +40,7 @@ class RandomBitErrors : public Element {
 
   const char *class_name() const override		{ return "RandomBitErrors"; }
   const char *port_count() const override		{ return PORTS_1_1; }
+  const char *packet_code() const override { return "w"; }
 
   unsigned p_bit_error() const			{ return _p_bit_error; }
   int kind() const				{ return _kind; }

@@ -44,6 +44,7 @@ public:
 
   const char *class_name() const override		{ return "RFC2507Comp"; }
   const char *port_count() const override		{ return PORTS_1_1; }
+  const char *packet_code() const override { return "/n"; }
 
   Packet *simple_action(Packet *);
 

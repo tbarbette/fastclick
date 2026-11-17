@@ -144,6 +144,7 @@ public:
   const char *class_name() const override		{ return "UpdateGridRoutes"; }
   void *cast(const char *);
   const char *port_count() const override		{ return "1/2"; }
+  const char *packet_code() const override { return "/sn"; }
   const char *processing() const override		{ return AGNOSTIC; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

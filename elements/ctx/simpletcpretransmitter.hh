@@ -61,6 +61,7 @@ public:
     // Click related methods
     const char *class_name() const        { return "SimpleTCPRetransmitter"; }
     const char *port_count() const        { return "2/1"; }
+    const char *packet_code() const override { return "/c"; }
     const char *processing() const        { return PUSH; }
     void *cast(const char *);
 

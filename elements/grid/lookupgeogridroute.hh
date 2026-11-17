@@ -56,6 +56,7 @@ class LookupGeographicGridRoute : public Element, public GridRouteActor {
   const char *class_name() const override		{ return "LookupGeographicGridRoute"; }
   void *cast(const char *);
   const char *port_count() const override		{ return "1/2"; }
+  const char *packet_code() const override { return "w"; }
   const char *processing() const override		{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

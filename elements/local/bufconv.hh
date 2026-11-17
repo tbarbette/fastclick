@@ -38,6 +38,7 @@ public:
 
   const char *class_name() const override	{ return "BufferConverter"; }
   const char *port_count() const override	{ return "2/1"; }
+  const char *packet_code() const override { return "/n"; }
   const char *processing() const override	{ return "lh/h"; }
 
   int initialize(ErrorHandler *) CLICK_COLD;

@@ -112,6 +112,7 @@ class FlowIPNAT : public FlowStateElement<FlowIPNAT,NATEntryIN> , TCPHelper {
 
         const char *class_name() const override { return "FlowIPNAT"; }
         const char *port_count() const override { return "1/1"; }
+        const char *packet_code() const override { return "w"; }
         const char *processing() const override { return PUSH; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -151,6 +152,7 @@ class FlowIPNATReverse : public FlowStateElement<FlowIPNATReverse,NATEntryOUT>, 
 
         const char *class_name() const override { return "FlowIPNATReverse"; }
         const char *port_count() const override { return "1/1"; }
+        const char *packet_code() const override { return "w"; }
         const char *processing() const override { return PUSH; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

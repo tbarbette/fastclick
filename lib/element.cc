@@ -1122,6 +1122,12 @@ Element::port_flow(bool isoutput, int p, Bitvector* travels) const
  * <tt>"w"</tt>.  An element whose packet code is empty, the default,
  * reads its packets and sends them unchanged.
  *
+ * Declare what the element does to every packet of a port, not to a few of
+ * them: IPFragmenter, which writes only into the packets it fragments, keeps
+ * the default, and PaintTee, which clones only the packets of its color, is
+ * <tt>"/sc"</tt>.  Otherwise the router would warn about copies that rarely
+ * happen.
+ *
  * Unlike flow_code(), packet_code() is called after configure(), so it may
  * depend on the element's configuration. */
 const char *

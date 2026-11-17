@@ -78,6 +78,7 @@ class EtherPauseSource : public BatchElement { public:
 
     const char *class_name() const override	{ return "EtherPauseSource"; }
     const char *port_count() const override	{ return PORTS_0_1; }
+    const char *packet_code() const override { return "/c"; }
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;

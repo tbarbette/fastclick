@@ -28,6 +28,7 @@ class IPRewriterMap : public Element { public:
 
   const char *class_name() const override		{ return "IPRewriterMap"; }
   const char *port_count() const override		{ return "2/2"; }
+  const char *packet_code() const override { return "w"; }
   const char *processing() const override		{ return PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
