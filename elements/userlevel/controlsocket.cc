@@ -264,6 +264,12 @@ ControlSocket::initialize(ErrorHandler *errh)
   if (_full_proxy)
     _full_proxy->add_error_receiver(proxy_error_function, this);
 
+  // when hot-swapping, take_state() takes the socket of the old element:
+  // with SO_REUSEPORT, a new socket could bind the same port
+  if (ControlSocket *cs = static_cast<ControlSocket *>(hotswap_element()))
+    if (cs->_socket_fd >= 0)
+      return 0;
+
   if (initialize_socket(errh) >= 0)
     return 0;
   else if (_retries >= 0) {
