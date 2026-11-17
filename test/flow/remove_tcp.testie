@@ -78,6 +78,9 @@ tee[1]
 50 1008 1001001 . "beautifull"
 40 1018 1001001 F ""
 
+%ignore stderr
+warning: {{.*}} writes into packets shared with clones{{.*}}
+
 %expect stderr
 
 CONFIG:6: While configuring 'tcpin_rx2 :: TCPIn':
