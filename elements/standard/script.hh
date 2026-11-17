@@ -338,6 +338,12 @@ numbers; for example, 'C<count 5 0 2>' returns "C<3>" and
 Finds the number of items, or the numver of items higher than a given value;
 for example, 'C<gt_vec 5 0 2 7>' returns "C<1>".
 
+=h get_vec "read with parameters"
+
+Returns the item at index N, counted from 0, of the numbers that follow N,
+or 0 if there is no such item;
+for example, 'C<get_vec 2 0 2 7>' returns "C<7>".
+
 =h mul, div, idiv "read with parameters"
 
 Multiplies or divides a space-separated list of numbers and returns the
@@ -539,7 +545,7 @@ class Script : public Element { public:
     enum {
         ST_STEP = 0, ST_RUN, ST_GOTO, ST_GOTOA,
         ar_add = 0, ar_sub, ar_min, ar_max, ar_avg, ar_count,
-        ar_popcount, ar_gt_vec,
+        ar_popcount, ar_gt_vec, ar_get_vec,
         ar_mul, ar_div, ar_idiv, ar_mod, ar_rem,
         ar_neg, ar_abs, ar_floor, ar_round, ar_ceil,
         AR_LT, AR_EQ, AR_GT, AR_GE, AR_NE, AR_LE, // order is important
