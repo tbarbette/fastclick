@@ -775,7 +775,6 @@ inline click_cycles_t cycles_hz() {
     if (likely(dpdk_enabled)) {
         return rte_get_timer_hz();
     }
-    return 0;
 #elif defined(__MACH__) && defined(__APPLE__)
     mach_timebase_info_data_t _clock_timebase;
     mach_timebase_info(&_clock_timebase); // Initialize timebase_info
