@@ -1,6 +1,6 @@
 #ifndef CLICK_SETCRC32_HH
 #define CLICK_SETCRC32_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -16,7 +16,7 @@ CLICK_DECLS
 
 class EtherAddress;
 
-class SetCRC32 : public Element { public:
+class SetCRC32 : public SimpleElement<SetCRC32> { public:
 
   SetCRC32();
 

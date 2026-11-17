@@ -1,6 +1,6 @@
 #ifndef CLICK_CHECKCRC32_HH
 #define CLICK_CHECKCRC32_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
 
@@ -15,7 +15,7 @@ CLICK_DECLS
  * Otherwise, drop the packet.
  * =a SetCRC32
  */
-class CheckCRC32 : public Element { public:
+class CheckCRC32 : public SimpleElement<CheckCRC32> { public:
 
     CheckCRC32();
 
