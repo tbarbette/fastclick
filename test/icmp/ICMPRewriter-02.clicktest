@@ -36,4 +36,5 @@ d~: 1.0.0.1 > 5.0.0.5: icmp echo (10, 0)
 c~: 2.0.0.2 > 5.0.0.5: icmp echo (10, 0)
 
 %ignore stderr
+warning: {{.*}} writes into packets shared with clones{{.*}}
 =={{\d+}}=={{(?!.*\b(?:uninit|[Ii]nvalid|Mismatched).*).*}}

@@ -22,6 +22,9 @@ TimedSource(0.001, ".a. is a .at,", LIMIT 4, STOP true)
 -> Print(CONTENTS ASCII)
 -> Discard();
 
+%ignore stderr
+warning: {{.*}} writes into packets shared with clones{{.*}}
+
 %expect stderr
   13 |  .a. is a  .at,
   13 |  Sam is a  cat,
