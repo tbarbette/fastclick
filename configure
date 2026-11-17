@@ -19455,6 +19455,10 @@ else
     enable_batch="no"
 fi
 
+if test "$enable_clone" != no; then
+    provisions="$provisions clone"
+fi
+
 if test "x$ax_cv_cxx_compile_cxx17" = xyes; then
     provisions="$provisions cxx17"
 fi
