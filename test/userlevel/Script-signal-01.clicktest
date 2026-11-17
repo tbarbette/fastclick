@@ -6,7 +6,7 @@ received.
 /bin/sh THING
 
 %require
-not click-buildtool provides dpdk-packet
+click-buildtool provides -i dpdk-packet
 
 %file THING
 click -e "

@@ -1,5 +1,5 @@
 %require
-click-provides !ctx
+click-buildtool provides -i ctx
 
 %script
 click-mkmindriver -E Print -p foo --no-check -u -

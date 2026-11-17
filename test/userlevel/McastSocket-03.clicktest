@@ -2,7 +2,7 @@
 Test MulticastSocket without loop.
 
 %require
-not click-buildtool provides dpdk-packet
+click-buildtool provides -i dpdk-packet
 
 %script
 # Assumes that a multicast route exists to any network device but 'lo'.
