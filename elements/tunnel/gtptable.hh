@@ -78,6 +78,7 @@ class GTPTable : public BatchElement { public:
 
     const char *class_name() const override	{ return "GTPTable"; }
     const char *port_count() const override	{ return "2/2"; }
+    const char *packet_code() const override { return "/sn"; }
     const char *flow_code() const override  { return "xy/xz"; }
     const char *flags() const		{ return PUSH; }
 

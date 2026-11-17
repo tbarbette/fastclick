@@ -104,6 +104,7 @@ public:
 
     const char *class_name() const override	{ return "FromHost"; }
     const char *port_count() const override	{ return PORTS_0_1; }
+    const char *packet_code() const override { return "/n"; }
     const char *processing() const override	{ return PUSH; }
 
     int configure_phase() const		{ return CONFIGURE_PHASE_FROMHOST; }

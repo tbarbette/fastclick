@@ -41,6 +41,7 @@ public:
 
     const char *class_name() const		{ return "CTXIPLoadBalancer"; }
     const char *port_count() const		{ return "1/1"; }
+    const char *packet_code() const override { return "w"; }
     const char *processing() const		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -66,6 +67,7 @@ public:
 
     const char *class_name() const      { return "CTXIPLoadBalancerReverse"; }
     const char *port_count() const      { return "1/1"; }
+    const char *packet_code() const override { return "w"; }
     const char *processing() const      { return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

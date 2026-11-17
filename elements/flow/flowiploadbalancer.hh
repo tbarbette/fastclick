@@ -71,6 +71,7 @@ class FlowIPLoadBalancer : public FlowStateElement<FlowIPLoadBalancer,IPLBEntry>
 
         const char *class_name() const override { return "FlowIPLoadBalancer"; }
         const char *port_count() const override { return "1/1"; }
+        const char *packet_code() const override { return "w"; }
         const char *processing() const override { return PUSH; }
 
         int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
@@ -141,6 +142,7 @@ class FlowIPLoadBalancerReverse : public BatchElement {
 
         const char *class_name() const override { return "FlowIPLoadBalancerReverse"; }
         const char *port_count() const override { return "1/1"; }
+        const char *packet_code() const override { return "w"; }
         const char *processing() const override { return PUSH; }
 
         int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;

@@ -29,6 +29,7 @@ class SetTransportChecksumIP6 : public SimpleElement<SetTransportChecksumIP6> { 
 
   const char *class_name() const override		{ return "SetTransportChecksumIP6"; }
   const char *port_count() const override		{ return PORTS_1_1; }
+  const char *packet_code() const override { return "w"; }
   int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
 
   Packet *simple_action(Packet *);

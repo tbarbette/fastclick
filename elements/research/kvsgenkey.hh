@@ -23,6 +23,7 @@ class KVSKeyGen : public SimpleElement<KVSKeyGen> {
 
         const char *class_name() const override { return "KVSKeyGen"; }
         const char *port_count() const override { return "1-/="; }
+        const char *packet_code() const override { return "w"; }
         const char *processing() const override { return PUSH; }
 
         int configure(Vector<String>&, ErrorHandler*) override;

@@ -36,6 +36,7 @@ class ProtocolTranslator46 : public Element {
 
   const char *class_name() const override		{ return "ProtocolTranslator46"; }
   const char *port_count() const override		{ return PORTS_1_1; }
+  const char *packet_code() const override { return "/n"; }
   void push(int port, Packet *p);
   void handle_ip4(Packet *);
 

@@ -67,6 +67,7 @@ class RawSocket : public Element { public:
 
   const char *class_name() const override	{ return "RawSocket"; }
   const char *port_count() const override	{ return "0-1/0-1"; }
+  const char *packet_code() const override { return "/n"; }
   const char *processing() const override	{ return "l/h"; }
   const char *flow_code() const override		{ return "x/y"; }
   const char *flags() const		{ return "S3"; }

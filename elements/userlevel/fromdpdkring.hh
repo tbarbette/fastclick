@@ -85,6 +85,7 @@ class FromDPDKRing : public BatchElement, DPDKRing {
 
         const char    *class_name() const { return "FromDPDKRing"; }
         const char    *port_count() const { return PORTS_0_1; }
+        const char *packet_code() const override { return "/m"; }
         const char    *processing() const { return PUSH; }
         int       configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED + 1; }
         bool can_live_reconfigure() const { return false; }

@@ -78,6 +78,7 @@ class StoreFlowID : public FlowStateElement<StoreFlowID, SFEntry> {
 
         const char *class_name() const override { return "StoreFlowID"; }
         const char *port_count() const override { return "1/1"; }
+        const char *packet_code() const override { return "w"; }
         const char *processing() const override { return PUSH; }
         static const int timeout = STOREFLOWID_FLOW_TIMEOUT;
 

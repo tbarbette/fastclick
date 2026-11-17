@@ -34,6 +34,7 @@ class FlowWebGen : public FlowElement {
 
   const char *class_name() const		{ return "FlowWebGen"; }
   const char *port_count() const		{ return PORTS_1_1; }
+  const char *packet_code() const override { return "/n"; }
   const char *processing() const		{ return PUSH; }
   int initialize(ErrorHandler *) CLICK_COLD;
   void cleanup(CleanupStage) CLICK_COLD;

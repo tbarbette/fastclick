@@ -30,6 +30,7 @@ class FlowUnstrip : public FlowElement {
 
   const char *class_name() const	{ return "FlowUnstrip"; }
   const char *port_count() const	{ return PORTS_1_1; }
+  const char *packet_code() const override { return "w"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

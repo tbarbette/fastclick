@@ -32,6 +32,7 @@ class GTPLookup : public BatchElement { public:
 
     const char *class_name() const override	{ return "GTPLookup"; }
     const char *port_count() const override	{ return "1/1"; }
+    const char *packet_code() const override { return "w"; }
     const char *flow_code() const override  { return "x/x"; }
     const char *flags() const		{ return PUSH; }
 

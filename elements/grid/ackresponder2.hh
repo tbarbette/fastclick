@@ -32,6 +32,7 @@ public:
 
   const char *class_name() const override { return "ACKResponder2"; }
   const char *port_count() const override { return "1/2"; }
+  const char *packet_code() const override { return "/sn"; }
   const char *processing() const override { return PROCESSING_A_AH; }
   const char *flow_code()  const { return "x/xy"; }
 

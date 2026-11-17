@@ -187,6 +187,7 @@ class ARPQuerier : public FlowElement { public:
 
     const char *class_name() const override		{ return "ARPQuerier"; }
     const char *port_count() const override		{ return "2/1-2"; }
+    const char *packet_code() const override { return "wr/[sn]"; }
     const char *processing() const override		{ return PUSH; }
     const char *flow_code() const override		{ return "xy/x"; }
     // click-undead should consider all paths live (not just "xy/x"):

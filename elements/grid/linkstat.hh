@@ -232,6 +232,7 @@ private:
 
   const char *class_name() const override		{ return "LinkStat"; }
   const char *port_count() const override		{ return "1/0-1"; }
+  const char *packet_code() const override { return "/n"; }
   const char *processing() const override		{ return PUSH; }
   const char *flow_code() const override                 { return "x/y"; }
 

@@ -43,6 +43,7 @@ class IP6NDAdvertiser : public SimpleElement<IP6NDAdvertiser> { public:
 
   const char *class_name() const override		{ return "IP6NDAdvertiser"; }
   const char *port_count() const override		{ return PORTS_1_1; }
+  const char *packet_code() const override { return "/n"; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
   Packet *simple_action(Packet *);

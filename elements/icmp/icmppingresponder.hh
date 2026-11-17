@@ -38,6 +38,7 @@ class ICMPPingResponder : public BatchElement {
 
         const char *class_name() const override    { return "ICMPPingResponder"; }
         const char *port_count() const override    { return PORTS_1_1X2; }
+        const char *packet_code() const override { return "w"; }
         const char *processing() const override    { return PROCESSING_A_AH; }
 
         Packet      *simple_action      (Packet *);

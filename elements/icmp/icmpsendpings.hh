@@ -130,6 +130,7 @@ class ICMPPingSource : public Element { public:
 
     const char *class_name() const override		{ return "ICMPPingSource"; }
     const char *port_count() const override		{ return "0-1/1"; }
+    const char *packet_code() const override { return "w/n"; }
     const char *processing() const override		{ return "h/a"; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;

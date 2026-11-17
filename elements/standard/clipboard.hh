@@ -51,6 +51,7 @@ public:
     const char *flags()      const { return "S0"; }
     const char *flow_code()  const { return "#/#"; }
     const char *port_count() const override { return "2/2"; }
+    const char *packet_code() const override { return "rw"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     bool can_live_reconfigure() const { return true; }

@@ -109,6 +109,7 @@ class IPRewriterBase : public BatchElement { public:
     };
 
     const char *port_count() const override	{ return "1-/1-"; }
+    const char *packet_code() const override { return "w"; }
     const char *processing() const override	{ return PUSH; }
 
     int thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) override;

@@ -99,6 +99,7 @@ class AnonymizeIPAddr : public Element { public:
 
     const char *class_name() const override	{ return "AnonymizeIPAddr"; }
     const char *port_count() const override	{ return PORTS_1_1X2; }
+    const char *packet_code() const override { return "w"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;

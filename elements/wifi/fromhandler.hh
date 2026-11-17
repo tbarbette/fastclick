@@ -14,6 +14,7 @@ class FromHandler : public Element { public:
 
     const char *class_name() const override		{ return "FromHandler"; }
     const char *port_count() const override		{ return "0/1-2"; }
+    const char *packet_code() const override { return "/n"; }
     const char *processing() const override		{ return PROCESSING_A_AH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

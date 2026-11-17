@@ -179,6 +179,7 @@ class FromDevice : public BatchElement, public EthernetDevice { public:
 
     const char *class_name() const override	{ return "FromDevice"; }
     const char *port_count() const override	{ return "0/1-2"; }
+    const char *packet_code() const override { return "/n"; }
     const char *processing() const override	{ return PUSH; }
 
     enum { default_snaplen = 2046 };

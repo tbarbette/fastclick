@@ -34,6 +34,7 @@ class ForceIP : public Element {
 
   const char *class_name() const override		{ return "ForceIP"; }
   const char *port_count() const override		{ return PORTS_1_1; }
+  const char *packet_code() const override { return "w"; }
 
   Packet *simple_action(Packet *);
 

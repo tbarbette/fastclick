@@ -32,6 +32,7 @@ public:
 
     const char *class_name() const        { return "IPOut"; }
     const char *port_count() const        { return PORTS_1_1; }
+    const char *packet_code() const override { return _readonly ? "" : "w"; }
     const char *processing() const        { return PROCESSING_A_AH; }
 
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
