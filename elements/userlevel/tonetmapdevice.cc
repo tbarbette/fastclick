@@ -320,6 +320,8 @@ do_send:
 
 		if (s.q && s.q_size >= _internal_tx_queue_size && _blocking) {
 			allow_txsync();
+			if (unlikely(!router()->running()))
+				return;
 			goto do_send;
 		}
 	}

@@ -62,7 +62,7 @@ tagain:
     if (nt != h)
 	push_success(h, t, nt, p);
     else {
-        if (_blocking)
+        if (_blocking && router()->running())
             goto tagain;
 	push_failure(p);
     }
