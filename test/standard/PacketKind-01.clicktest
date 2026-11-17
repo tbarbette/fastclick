@@ -1,4 +1,5 @@
 %require
+click-buildtool provides clone
 if click-buildtool provides dpdk-packet; then false; fi
 
 %info
@@ -6,8 +7,8 @@ The router warns about the elements that write into packets shared with
 clones, as they copy every packet: after a source that sends clones of one
 packet, after a Tee, and through a queue. A writer that gets packets of its
 own, or that is before the Tee, gets no warning.
-Skipped with dpdk-packet: CI builds it with --disable-clone, where clones
-are copies and no packet is shared.
+Skipped with --disable-clone, where clones are copies and no packet is
+shared, and with dpdk-packet, which CI builds with --disable-clone.
 
 %script
 click SOURCE

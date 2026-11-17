@@ -1,5 +1,6 @@
 %require
 click-buildtool provides dpdk
+click-buildtool provides clone
 if click-buildtool provides dpdk-packet; then false; fi
 
 %info
@@ -8,8 +9,8 @@ every packet, and the router warns about it. After EnsureDPDKBuffer with
 FORCE_COPY, EtherRewrite writes into packets of its own. (Without FORCE_COPY,
 it depends on the build: EnsureDPDKBuffer lets clones that are already in DPDK
 buffers through, as with --enable-dpdk-pool.)
-Skipped with dpdk-packet: CI builds it with --disable-clone, where clones
-are copies and no packet is shared.
+Skipped with --disable-clone, where clones are copies and no packet is
+shared, and with dpdk-packet, which CI builds with --disable-clone.
 
 %script
 click --dpdk -m 512M --no-huge --no-pci -- AFTER 2>&1 | grep "^warning:" || true

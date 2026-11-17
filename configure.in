@@ -2727,6 +2727,11 @@ else
     enable_batch="no"
 fi
 
+dnl add 'clone' unless compiled with --disable-clone
+if test "$enable_clone" != no; then
+    provisions="$provisions clone"
+fi
+
 dnl add 'cxx17' if compiled a C++17 compiler
 if test "x$ax_cv_cxx_compile_cxx17" = xyes; then
     provisions="$provisions cxx17"
