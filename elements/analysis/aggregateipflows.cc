@@ -606,14 +606,15 @@ AggregateIPFlows::push_batch(int, PacketBatch *batch)
 }
 
 PacketBatch *
-AggregateIPFlows::pull_batch(int, int max)
+AggregateIPFlows::pull_batch(int, unsigned max)
 {
     PacketBatch *batch = input(0).pull_batch(max);
+    PacketBatch *emit = 0;
     if (batch) {
-        auto on_finish = [this,&batch](int action,PacketBatch* subbatch){
-            if (likely(action == 0))
-                batch = subbatch;
-            else if (action == 1)
+        auto on_finish = [this,&emit](int action,PacketBatch* subbatch){
+            if (likely(action == ACT_EMIT))
+                emit = subbatch;
+            else if (action == ACT_DROP)
                 checked_output_push_batch(1,subbatch);
         };
         CLASSIFY_EACH_PACKET(3,handle_packet,batch,on_finish);
@@ -623,7 +624,7 @@ AggregateIPFlows::pull_batch(int, int max)
     if (_active_sec >= _gc_sec)
     reap();
 
-    return batch;
+    return emit;
 }
 #endif
 
