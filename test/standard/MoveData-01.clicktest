@@ -17,6 +17,9 @@ RatedSource(DATA "ABCD", LIMIT 1, STOP true)
 -> Print(CONTENTS ascii)
 -> Discard();
 
+%ignore stderr
+warning: {{.*}} writes into packets shared with clones{{.*}}
+
 %expect stderr
    4 |  ABCD
    4 |  ABAB

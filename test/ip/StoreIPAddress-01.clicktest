@@ -14,6 +14,9 @@ r[3] -> StoreIPAddress(src) -> Print(d) -> d;
 r[4] -> StoreIPAddress(dst) -> Print(e) -> d;
 r[5] -> StoreIPAddress(1.0.0.4, dst) -> Print(f) -> d;
 
+%ignore stderr
+warning: {{.*}} writes into packets shared with clones{{.*}}
+
 %expect stderr
 a:   20 | 99999999 99999999 99999999 99999999 99999999
 b:   20 | 01000002 99999999 99999999 99999999 99999999
