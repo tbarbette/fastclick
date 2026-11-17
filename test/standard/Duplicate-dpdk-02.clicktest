@@ -19,7 +19,7 @@ t[1] -> Print(A) -> Discard();
 t[0] -> Print(B) -> Discard();
 DriverManager(wait 0.5s, stop)
 
-%ignorex stderr
+%ignorex
 EAL.*
 PMD.*
 TELEMETRY.*
