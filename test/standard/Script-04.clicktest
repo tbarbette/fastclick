@@ -22,6 +22,9 @@ s0 :: Script(
    print $(get foovar),
    print $(gt_vec 0 0.01 0.32 0),
    print $(gt_vec 0.02 0.01 0.32 0),
+   print $(get_vec 2 0 2 7),
+   print $(get_vec 1 0.5 1.5 2.5),
+   print $(get_vec 3 1 2),
    print $(ceil 17.35),
    print $(floor 17.33),
    print $(round 17.33),
@@ -47,6 +50,9 @@ bar
 baz
 2
 1
+7
+1.5
+0
 18
 17
 17
