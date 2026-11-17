@@ -2,7 +2,7 @@
 Test MulticastSocket (with loop filtering).
 
 %require -q
-not click-buildtool provides dpdk-packet
+click-buildtool provides -i dpdk-packet
 
 %script
 {

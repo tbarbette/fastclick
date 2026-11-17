@@ -2,7 +2,7 @@
 click CONFIG
 
 %require
-not click-buildtool provides dpdk-packet
+click-buildtool provides -i dpdk-packet
 
 %file CONFIG
 FromIPSummaryDump(STOP true, DATA "!data ip_dst timestamp

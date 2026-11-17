@@ -1331,6 +1331,8 @@ Options:
   -r, --provide REQ        Provide requirement(s) in REQ.
   -e, --elementmap EMAP    Provide requirement(s) from EMAP.
   -l, --print              Print 0 (REQs not provided) or 1 (REQs provided).
+  -i, --invert             Exit with status 0 if a REQ is not provided, and 1
+                           otherwise.
   -h, --help               Print this message and exit.
 
 Report bugs to <click@librelist.com>.
