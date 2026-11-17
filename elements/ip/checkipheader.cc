@@ -82,8 +82,6 @@ CheckIPHeader::InterfacesArg::parse(const String &str, Vector<IPAddress> &result
 
 CheckIPHeader::CheckIPHeader() : _checksum(true), _reason_drops(0)
 {
-    _count = 0;
-    _drops = 0;
 }
 
 CheckIPHeader::~CheckIPHeader()
@@ -142,10 +140,10 @@ CheckIPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
 Packet *
 CheckIPHeader::drop(Reason reason, Packet *p, bool batch)
 {
-    if (_drops == 0 || _verbose) {
+    if (_stats->drops == 0 || _verbose) {
         click_chatter("%s: IP header check failed: %s", name().c_str(), reason_texts[reason]);
     }
-    _drops++;
+    _stats->drops++;
 
     if (_reason_drops) {
         _reason_drops[reason]++;
@@ -220,7 +218,7 @@ inline CheckIPHeader::Reason CheckIPHeader::valid(Packet* p) {
     // reported by Parveen Kumar Patel at Utah -- 4/3/2002
     p->set_dst_ip_anno(ip->ip_dst);
 
-    _count++;
+    _stats->count++;
 
     return NREASONS;
 }
@@ -244,10 +242,12 @@ CheckIPHeader::read_handler(Element *e, void *thunk)
 
     switch (reinterpret_cast<uintptr_t>(thunk)) {
         case h_count: {
-            return String(c->_count);
+            PER_THREAD_MEMBER_SUM(uint64_t, count, c->_stats, count);
+            return String(count);
         }
         case h_drops: {
-            return String(c->_drops);
+            PER_THREAD_MEMBER_SUM(uint64_t, drops, c->_stats, drops);
+            return String(drops);
         }
         case h_drop_details: {
             StringAccum sa;
