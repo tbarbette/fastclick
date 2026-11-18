@@ -53,6 +53,7 @@ public:
 
     const char *class_name() const override		{ return "IPLoadBalancer"; }
     const char *port_count() const override		{ return "1/1"; }
+    const char *packet_code() const override { return "w"; }
     const char *processing() const override		{ return PUSH; }
 
 
@@ -90,6 +91,7 @@ public:
 
     const char *class_name() const override      { return "IPLoadBalancerReverse"; }
     const char *port_count() const override      { return "1/1"; }
+    const char *packet_code() const override { return "w"; }
     const char *processing() const override      { return PUSH; }
 
 

@@ -77,6 +77,7 @@ class FastUDPFlows : public BatchElement {
 
         const char *class_name() const override  { return "FastUDPFlows"; }
         const char *port_count() const override  { return PORTS_0_1; }
+        const char *packet_code() const override { return "/c"; }
         const char *processing() const override  { return AGNOSTIC; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

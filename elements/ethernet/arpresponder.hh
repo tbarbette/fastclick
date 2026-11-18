@@ -86,6 +86,7 @@ class ARPResponder : public FlowElement { public:
 
     const char *class_name() const override		{ return "ARPResponder"; }
     const char *port_count() const override		{ return PORTS_1_1X2; }
+    const char *packet_code() const override { return "/ns"; }
     const char *processing() const override		{ return PROCESSING_A_AH; }
 
     FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("20/0001", FLOW_ARP);

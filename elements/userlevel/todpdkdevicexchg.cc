@@ -489,8 +489,17 @@ void ToDPDKDeviceXCHG::push(int, Packet *p)
         }
         set_flush_timer(iqueue); //We wait until burst for sending packets, so flushing timer is especially important here
 
-        // If we're in blocking mode, we loop until we can put p in the iqueue
-    } while (unlikely(_blocking && congestioned));
+        // If we're in blocking mode, we loop until we can put p in the iqueue. But we stop if the router is not active.
+        if (unlikely(_blocking && congestioned)) {
+            if (unlikely(!router()->running())) {
+                break;
+            }
+            click_relax_fence();
+            //Loop
+        } else {
+            break;
+        }
+    } while (true);
 
 #if !CLICK_PACKET_USE_DPDK
     if (likely(is_fullpush()))
@@ -576,8 +585,17 @@ void ToDPDKDeviceXCHG::push_batch(int, PacketBatch *head)
             flush_internal_tx_queue(iqueue);
         }
         set_flush_timer(iqueue);
-        // If we're in blocking mode, we loop until we can put p in the iqueue
-    } while (unlikely(_blocking && congestioned));
+        // If we're in blocking mode, we loop until we can put p in the iqueue. But we stop if the router is not active.
+        if (unlikely(_blocking && congestioned)) {
+            if (unlikely(!router()->running())) {
+                break;
+            }
+            click_relax_fence();
+            //Loop
+        } else {
+            break;
+        }
+    } while (true);
 
 #  if !CLICK_PACKET_USE_DPDK
     //If non-blocking, drop all packets that could not be sent

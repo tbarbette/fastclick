@@ -1,7 +1,7 @@
 #ifndef CLICK_CHECKIPHEADER_HH
 #define CLICK_CHECKIPHEADER_HH
 #include <click/batchelement.hh>
-#include <click/atomic.hh>
+#include <click/sync.hh>
 CLICK_DECLS
 class Args;
 
@@ -157,8 +157,14 @@ class CheckIPHeader : public SimpleElement<CheckIPHeader> {
 
         Vector<IPAddress> _good_dst;  // array of IP dst addrs for which _bad_src does not apply
 
-        atomic_uint64_t _count;
-        atomic_uint64_t _drops;
+        struct State {
+            State() : count(0), drops(0) {}
+            uint64_t count;
+            uint64_t drops;
+        };
+
+        per_thread<State> _stats;
+
         atomic_uint64_t *_reason_drops;
 
         static const char * const reason_texts[NREASONS];

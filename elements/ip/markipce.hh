@@ -27,6 +27,7 @@ class MarkIPCE : public SimpleElement<MarkIPCE> {
 
         const char *class_name() const override { return "MarkIPCE"; }
         const char *port_count() const override { return PORTS_1_1; }
+        const char *packet_code() const override { return "w"; }
 
         int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
         void add_handlers() CLICK_COLD;

@@ -101,6 +101,7 @@ class RatedSource : public BatchElement, public ActiveNotifier {
 
         const char *class_name() const override        { return "RatedSource"; }
         const char *port_count() const override        { return PORTS_0_1; }
+        const char *packet_code() const override { return "/c"; }
         void add_handlers() CLICK_COLD;
 
         int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;

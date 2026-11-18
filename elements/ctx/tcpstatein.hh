@@ -81,7 +81,8 @@ private:
     TCPStateIN* _return;
     bool _accept_nonsyn;
     int _verbose;
-    atomic_uint32_t _established;
+    atomic_uint64_t _opened;
+    atomic_uint64_t _closed;
 };
 
 CLICK_ENDDECLS

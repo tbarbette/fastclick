@@ -51,6 +51,7 @@ class RadioSim : public Element {
 
   const char *class_name() const override		{ return "RadioSim"; }
   const char *port_count() const override		{ return "-/-"; }
+  const char *packet_code() const override { return "/c"; }
   const char *processing() const override		{ return PULL_TO_PUSH; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *errh) CLICK_COLD;

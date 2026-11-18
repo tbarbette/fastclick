@@ -18,6 +18,7 @@ class ReplayBase : public BatchElement { public:
     ~ReplayBase() CLICK_COLD;
 
     const char *port_count() const override	{ return "1-/="; }
+    const char *packet_code() const override { return (_stop != 1 || _freeonterminate) ? "/c" : ""; }
 
     int parse(Args*);
 

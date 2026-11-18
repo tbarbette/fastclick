@@ -20,6 +20,7 @@ class BIM : public Element {
 
   const char *class_name() const override	{ return "BIM"; }
   const char *port_count() const override	{ return PORTS_1_1; }
+  const char *packet_code() const override { return "/n"; }
   const char *processing() const override	{ return PULL_TO_PUSH; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

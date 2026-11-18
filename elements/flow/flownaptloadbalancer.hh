@@ -103,6 +103,7 @@ public:
 
     const char *class_name() const		{ return "FlowNAPTLoadBalancer"; }
     const char *port_count() const		{ return "1/1"; }
+    const char *packet_code() const override { return "w"; }
     const char *processing() const		{ return PUSH; }
 
     FLOW_ELEMENT_DEFINE_SESSION_DUAL(TCP_SESSION,UDP_SESSION);
@@ -163,6 +164,7 @@ public:
 
     const char *class_name() const      { return "FlowNAPTLoadBalancerReverse"; }
     const char *port_count() const      { return "1/1"; }
+    const char *packet_code() const override { return "w"; }
     const char *processing() const      { return PUSH; }
 
     FLOW_ELEMENT_DEFINE_SESSION_DUAL(TCP_SESSION,UDP_SESSION);

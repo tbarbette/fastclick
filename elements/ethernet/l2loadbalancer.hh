@@ -55,6 +55,7 @@ class L2LoadBalancer : public BatchElement, public LoadBalancer<EtherAddress> {
 
         const char *class_name() const { return "L2LoadBalancer"; }
         const char *port_count() const { return "1/1"; }
+        const char *packet_code() const override { return "w"; }
         const char *processing() const { return PUSH; }
 
         int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;

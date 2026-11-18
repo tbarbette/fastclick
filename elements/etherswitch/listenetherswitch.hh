@@ -32,6 +32,7 @@ class ListenEtherSwitch : public EtherSwitch { public:
 
     const char *class_name() const override		{ return "ListenEtherSwitch"; }
     const char *port_count() const override		{ return "-/=+"; }
+    const char *packet_code() const override { return "/c"; }
 
     void push(int port, Packet* p);
 

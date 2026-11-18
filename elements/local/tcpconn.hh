@@ -48,6 +48,7 @@ public:
 
   const char *class_name() const override		{ return "TCPConn"; }
   const char *port_count() const override		{ return "2/3"; }
+  const char *packet_code() const override { return "rw/ssn"; }
   const char *processing() const override		{ return "hl/hlh"; }
 
   int initialize(ErrorHandler *) CLICK_COLD;

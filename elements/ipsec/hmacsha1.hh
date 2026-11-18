@@ -27,6 +27,7 @@ public:
 
   const char *class_name() const override	{ return "IPsecAuthHMACSHA1"; }
   const char *port_count() const override	{ return "1/-"; }
+  const char *packet_code() const override { return "w"; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;

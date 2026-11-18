@@ -79,7 +79,7 @@ tagain:
 	push_success(h, t, nt, p);
     else {
 	_xtail = t;
-    if (unlikely(_blocking)) {
+    if (unlikely(_blocking && router()->running())) {
         click_relax_fence();
         goto tagain;
     }

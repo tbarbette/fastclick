@@ -45,6 +45,7 @@ class WifiSeq : public Element { public:
 
   const char *class_name() const override	{ return "WifiSeq"; }
   const char *port_count() const override	{ return "1/-"; }
+  const char *packet_code() const override { return "w"; }
   const char *processing() const override	{ return AGNOSTIC; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

@@ -140,6 +140,7 @@ class IPFlowRawSockets : public Element, public AggregateListener { public:
 
     const char *class_name() const override	{ return "IPFlowRawSockets"; }
     const char *port_count() const override	{ return PORTS_1_1; }
+    const char *packet_code() const override { return "/n"; }
     const char *processing() const override	{ return "a/h"; }
     const char *flow_code() const override	{ return "x/y"; }
 

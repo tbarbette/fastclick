@@ -183,7 +183,8 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
             stats->dropped++;
             if (_verbose && ((stats->dropped < 10) || ((stats->dropped & 0xffffffff) == 1)))
                 click_chatter("%p{element} : congestion", this);
-            goto retry;
+            if (router()->running())
+                goto retry;
         }
         int c = head->count();
         head->kill();
@@ -214,7 +215,8 @@ retry:
             if (_verbose && (stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1)))
                 click_chatter("%p{element} : congestion", this);
 
-            goto retry;
+            if (router()->running())
+                goto retry;
         }
         p->kill();
         stats->dropped++;

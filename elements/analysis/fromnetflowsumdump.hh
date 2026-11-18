@@ -135,6 +135,7 @@ class FromNetFlowSummaryDump : public Element { public:
 
     const char *class_name() const override	{ return "FromNetFlowSummaryDump"; }
     const char *port_count() const override	{ return PORTS_0_1; }
+    const char *packet_code() const override { return _multipacket ? "/c" : "/n"; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

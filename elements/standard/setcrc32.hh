@@ -1,6 +1,6 @@
 #ifndef CLICK_SETCRC32_HH
 #define CLICK_SETCRC32_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -16,12 +16,13 @@ CLICK_DECLS
 
 class EtherAddress;
 
-class SetCRC32 : public Element { public:
+class SetCRC32 : public SimpleElement<SetCRC32> { public:
 
   SetCRC32();
 
   const char *class_name() const override	{ return "SetCRC32"; }
   const char *port_count() const override	{ return PORTS_1_1; }
+  const char *packet_code() const override { return "w"; }
 
   Packet *simple_action(Packet *);
 

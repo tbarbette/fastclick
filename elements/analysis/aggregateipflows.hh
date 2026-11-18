@@ -168,11 +168,11 @@ class AggregateIPFlows : public BatchElement, public AggregateNotifier { public:
     bool stats() const			{ return _traceinfo_file; }
 #endif
 
-    void push(int, Packet *);
-    Packet *pull(int);
+    void push(int, Packet *) override;
+    Packet *pull(int) override;
 #if HAVE_BATCH
-    void push_batch(int, PacketBatch *);
-    PacketBatch *pull_batch(int,int);
+    void push_batch(int, PacketBatch *) override;
+    PacketBatch *pull_batch(int, unsigned) override;
 #endif
 
     struct HostPair {

@@ -22,6 +22,9 @@ DriverManager(wait,read diff.average, read diff.perc100, read diff.perc 100,  pr
 %expect stdout
 true
 
+%ignore stderr
+warning: {{.*}} writes into packets shared with clones{{.*}}
+
 %expect stderr
 diff.average:
 {{[0-9.e-]+}}
