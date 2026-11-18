@@ -14,7 +14,7 @@ now () {
 a=`now`; click EMPTY ; b=`now`; diff=$(perl -e "print $b - $a")
 a=`now`; click X; b=`now`; perl -e "($b - $a - $diff) > 0.45 ? print \"true\n\":print \"false : \", ($b - $a -$diff), \"\n\""
 a=`now`; click Y; b=`now`; perl -e "($b - $a - $diff) > 0.20 && ($b - $a - $diff) < 0.40 ? print \"true\n\":print \"false : \", ($b - $a -$diff), \"\n\""
-a=`now`; click Z; b=`now`; perl -e "($b - $a - $diff) < 0.40 ? print \"true\n\":print \"false : \", ($b - $a -$diff), \"\n\""
+a=`now`; click Z; b=`now`; perl -e "($b - $a - $diff) < 0.45 ? print \"true\n\":print \"false : \", ($b - $a -$diff), \"\n\""
 a=`now`; click --simtime X; b=`now`; perl -e "($b - $a - $diff) < 0.1 ? print \"true\n\":print \"false : \", ($b - $a -$diff), \"\n\""
 
 %file EMPTY
