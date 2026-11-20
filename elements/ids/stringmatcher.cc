@@ -25,7 +25,8 @@
 #include <click/router.hh>
 CLICK_DECLS
 
-StringMatcher::StringMatcher() : _matches(0) {
+StringMatcher::StringMatcher() {
+    _matches = 0;
 }
 
 StringMatcher::~StringMatcher() {
@@ -113,7 +114,8 @@ StringMatcher::simple_action(Packet *p) {
 PacketBatch *
 StringMatcher::simple_action_batch(PacketBatch *batch)
 {
-    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    // simple_action() already sent or killed the matching packets
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *){});
     return batch;
 }
 #endif

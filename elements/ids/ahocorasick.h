@@ -81,6 +81,8 @@ int  ac_trie_search (AC_TRIE_t *thiz, AC_TEXT_t *text, int keep,
 
 void ac_trie_settext (AC_TRIE_t *thiz, AC_TEXT_t *text, int keep);
 AC_MATCH_t ac_trie_findnext (AC_TRIE_t *thiz);
+int  ac_trie_match_first (AC_TRIE_t *thiz, const AC_ALPHABET_t *text,
+		size_t length, AC_MATCH_t *match);
 
 int  multifast_replace (AC_TRIE_t *thiz, AC_TEXT_t *text,
 		MF_REPLACE_MODE_t mode, MF_REPLACE_CALBACK_f callback, void *param);

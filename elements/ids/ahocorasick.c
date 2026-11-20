@@ -283,6 +283,60 @@ AC_MATCH_t ac_trie_findnext (AC_TRIE_t *thiz)
 }
 
 /**
+ * @brief finds the first match in a self-contained text
+ *
+ * Unlike _settext()/_findnext(), the search state stays on the stack and the
+ * trie is only read, so several threads can search the same finalized trie
+ * at the same time.
+ *
+ * @param thiz The pointer to the finalized trie
+ * @param text The text to search
+ * @param length The length of the text
+ * @param match Set to the first match, if any
+ * @return
+ * -1:  failed; trie is not finalized
+ *  0:  no match
+ *  1:  a match was found
+ *****************************************************************************/
+int ac_trie_match_first (AC_TRIE_t *thiz, const AC_ALPHABET_t *text,
+		size_t length, AC_MATCH_t *match)
+{
+	size_t position = 0;
+	ACT_NODE_t *current = thiz->root;
+	ACT_NODE_t *next;
+
+	if (thiz->trie_open)
+		return -1;  /* Trie must be finalized first. */
+
+	/* Same walk as ac_trie_search() */
+	while (position < length)
+	{
+		if (!(next = node_find_next_bs (current, text[position])))
+		{
+			if(current->failure_node /* We are not in the root node */)
+				current = current->failure_node;
+			else
+				position++;
+		}
+		else
+		{
+			current = next;
+			position++;
+		}
+
+		if (current->final && next)
+		{
+			match->position = position;
+			match->size = current->matched_size;
+			match->patterns = current->matched;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+/**
  * @brief Release all allocated memories to the trie
  *
  * @param thiz pointer to the trie
