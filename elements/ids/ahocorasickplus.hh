@@ -101,8 +101,15 @@ AhoCorasick::finalize ()
 	ac_trie_finalize (_automata);
 }
 
+// Without keep, a match only reads the trie and can run on several threads at
+// once. With keep, the search position is stored in the trie to continue on the
+// next text, so those calls must not be concurrent.
 inline bool
 AhoCorasick::match_any(const char* text_to_match, int length, bool keep) {
+	if (!keep) {
+		AC_MATCH_t match;
+		return ac_trie_match_first(_automata, text_to_match, length, &match) > 0;
+	}
 	_text->astring = text_to_match;
 	_text->length = length;
 	ac_trie_settext(_automata, _text, (int)keep);
@@ -112,6 +119,12 @@ AhoCorasick::match_any(const char* text_to_match, int length, bool keep) {
 
 inline int
 AhoCorasick::match_first(const char* text_to_match, int length, bool keep) {
+	if (!keep) {
+		AC_MATCH_t match;
+		if (ac_trie_match_first(_automata, text_to_match, length, &match) > 0)
+			return (int) match.patterns->id.u.number;
+		return -1;
+	}
 	_text->astring = text_to_match;
 	_text->length = length;
 	ac_trie_settext(_automata, _text, (int)keep);

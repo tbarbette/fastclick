@@ -62,7 +62,7 @@ class StringMatcher : public BatchElement {
 		static int write_handler(const String &, Element *e, void *thunk, ErrorHandler *errh) CLICK_COLD;
 		AhoCorasick _matcher;
 		Vector<String> _patterns;
-		int _matches;
+		atomic_uint32_t _matches;
 };
 
 
