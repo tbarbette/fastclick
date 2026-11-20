@@ -176,6 +176,9 @@ private:
   // HACK! For interaction between fold() and ~Stats()
   Stats *_prev_deleted, *_next_deleted;
 
+  unsigned _prev_fold_time;	// epoch of the last periodic fold()
+
+  inline bool sample() const;
   void update_rates(Packet *, bool, bool);
   void update(unsigned, int, Packet *, bool, bool);
   void forced_fold();
@@ -238,7 +241,6 @@ IPRateMonitor::update(unsigned addr, int val, Packet *p,
   Stats *s = _base;
   Counter *c = 0;
   unsigned now = EWMAParameters::epoch();
-  static unsigned prev_fold_time = now;
 
   // zoom in to deepest opened level
   addr = ntohl(addr);		// need it in network order
@@ -315,12 +317,19 @@ IPRateMonitor::update(unsigned addr, int val, Packet *p,
     _last = c->next_level;
   }
 
-  if(now - prev_fold_time >= EWMAParameters::epoch_frequency()) {
+  if(now - _prev_fold_time >= EWMAParameters::epoch_frequency()) {
     fold(_thresh);
-    prev_fold_time = now;
+    _prev_fold_time = now;
   }
 }
 
+
+// Whether this packet updates the EWMA: true for a RATIO fraction of packets.
+inline bool
+IPRateMonitor::sample() const
+{
+  return ((click_fast_random() >> 5) & 0xffff) <= _ratio;
+}
 
 // for forward packets (port 0), update based on src IP address;
 // for reverse packets (port 1), update based on dst IP address.

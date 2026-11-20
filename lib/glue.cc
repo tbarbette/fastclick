@@ -520,6 +520,25 @@ click_random(uint32_t high)
     return click_random(0, high - 1);
 }
 
+#if CLICK_USERLEVEL && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS)
+# if HAVE_MULTITHREAD
+__thread uint64_t click_fast_random_state;
+# else
+uint64_t click_fast_random_state;
+# endif
+
+uint64_t
+click_fast_random_init()
+{
+    // xorshift64* never leaves the state 0, so 0 marks an unseeded thread
+    uint64_t x = ((uint64_t) click_random() << 32) ^ click_random();
+    if (x == 0)
+	x = 1;
+    click_fast_random_state = x;
+    return x;
+}
+#endif
+
 CLICK_ENDDECLS
 
 

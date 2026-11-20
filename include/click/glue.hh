@@ -245,6 +245,40 @@ inline void click_srandom(uint32_t seed) {
 #endif
 }
 
+/** @brief Return a number between 0 and CLICK_RAND_MAX, inclusive, like
+ * click_random(), but without any lock.
+ *
+ * At user level, click_random() is libc's random(), which takes a
+ * process-wide lock around a state shared by all threads. This function runs
+ * a xorshift64* generator with one state per thread instead, for the data
+ * path. Each thread seeds its state from click_random() on its first call,
+ * so click_srandom() only affects the threads that did not call it yet. Not
+ * suitable for cryptography. Other drivers fall back to click_random(). */
+#if CLICK_USERLEVEL && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS)
+# if HAVE_MULTITHREAD
+extern __thread uint64_t click_fast_random_state;
+# else
+extern uint64_t click_fast_random_state;
+# endif
+uint64_t click_fast_random_init();
+
+inline uint32_t click_fast_random() {
+    uint64_t x = click_fast_random_state;
+    if (unlikely(x == 0))
+	x = click_fast_random_init();
+    x ^= x >> 12;
+    x ^= x << 25;
+    x ^= x >> 27;
+    click_fast_random_state = x;
+    // The high bits of the product are the best ones
+    return (uint32_t) ((x * 0x2545F4914F6CDD1DULL) >> 33);
+}
+#else
+inline uint32_t click_fast_random() {
+    return click_random();
+}
+#endif
+
 CLICK_ENDDECLS
 
 
