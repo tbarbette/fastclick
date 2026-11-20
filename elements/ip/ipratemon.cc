@@ -31,7 +31,7 @@ IPRateMonitor::IPRateMonitor()
   : _count_packets(true), _anno_packets(true),
     _thresh(1), _memmax(0), _ratio(1),
     _lock(0), _base(0), _alloced_mem(0), _first(0),
-    _last(0), _prev_deleted(0)
+    _last(0), _prev_deleted(0), _prev_fold_time(0)
 {
 }
 
@@ -86,6 +86,7 @@ int
 IPRateMonitor::initialize(ErrorHandler *errh)
 {
   set_resettime();
+  _prev_fold_time = EWMAParameters::epoch();
 
   _lock = new Spinlock();
   if (!_lock)
@@ -112,7 +113,7 @@ void
 IPRateMonitor::push(int port, Packet *p)
 {
   // Only inspect 1 in RATIO packets
-  bool ewma = ((unsigned) ((click_random() >> 5) & 0xffff) <= _ratio);
+  bool ewma = sample();
   _lock->acquire();
   update_rates(p, port == 0, ewma);
   _lock->release();
@@ -124,7 +125,7 @@ IPRateMonitor::pull(int port)
 {
   Packet *p = input(port).pull();
   if (p) {
-    bool ewma = ((unsigned) ((click_random() >> 5) & 0xffff) <= _ratio);
+    bool ewma = sample();
     _lock->acquire();
     update_rates(p, port == 0, ewma);
     _lock->release();
@@ -138,8 +139,7 @@ IPRateMonitor::push_batch(int port, PacketBatch *batch)
 {
   _lock->acquire();
   FOR_EACH_PACKET(batch, p) {
-    bool ewma = ((unsigned) ((click_random() >> 5) & 0xffff) <= _ratio);
-    update_rates(p, port == 0, ewma);
+    update_rates(p, port == 0, sample());
   }
   _lock->release();
   output_push_batch(port, batch);
@@ -152,8 +152,7 @@ IPRateMonitor::pull_batch(int port, unsigned max)
   if (batch) {
     _lock->acquire();
     FOR_EACH_PACKET(batch, p) {
-      bool ewma = ((unsigned) ((click_random() >> 5) & 0xffff) <= _ratio);
-      update_rates(p, port == 0, ewma);
+      update_rates(p, port == 0, sample());
     }
     _lock->release();
   }
@@ -210,7 +209,7 @@ IPRateMonitor::forced_fold()
 void
 IPRateMonitor::fold(int thresh)
 {
-  char forward = (char) click_random(0, 1);
+  char forward = (char) (click_fast_random() & 1);
   _prev_deleted = _next_deleted = 0;
   Stats *s = (forward ? _first : _last);
 
