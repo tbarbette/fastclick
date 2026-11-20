@@ -107,11 +107,24 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     if (!hash)
         return errh->error("Could not init flow table !");
 
-    fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _table_size);
-    bzero(fcbs,_flow_state_size_full * _table_size);
-    CLICK_ASSERT_ALIGNED(fcbs);
+    // The FCB of a flow is at the position rte_hash_add_key() returns. With
+    // MULTI_WRITER_ADD, the hash has more key slots than entries, for the
+    // per-lcore caches, so positions go beyond _table_size once the flows churn.
+    size_t nb_fcbs = _table_size;
+#if RTE_VERSION >= RTE_VERSION_NUM(21,8,0,0)
+    int32_t max_key_id = rte_hash_max_key_id(hash);
+    if (max_key_id >= 0 && (size_t)max_key_id + 1 > nb_fcbs)
+        nb_fcbs = (size_t)max_key_id + 1;
+#else
+    if (_flags & RTE_HASH_EXTRA_FLAGS_MULTI_WRITER_ADD)
+        nb_fcbs += (RTE_MAX_LCORE - 1) * (64 /* LCORE_CACHE_SIZE */ - 1) + 1;
+#endif
+
+    fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * nb_fcbs);
     if (!fcbs)
         return errh->error("Could not init data table !");
+    bzero(fcbs,_flow_state_size_full * nb_fcbs);
+    CLICK_ASSERT_ALIGNED(fcbs);
 
     if (_timeout_epochs > 0) {
         if (_flags) {
