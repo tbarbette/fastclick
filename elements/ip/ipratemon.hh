@@ -36,7 +36,8 @@ CLICK_DECLS
  * MEMORY: How much memory can IPRateMonitor use in kilobytes? Minimum of 100
  * is enforced. 0 is unlimited memory.
  *
- * ANNO: if on (by default, it is), annotate packets with rates.
+ * ANNO: if on, annotate packets with rates. On by default, except with
+ * batching, which uses the same annotation space and does not allow it.
  *
  * =h look (read)
  * Returns the rate of counted to and from a cluster of IP addresses. The first

@@ -44,7 +44,11 @@ IPRateMonitor::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String count_what;
     _memmax = 0;
+#if HAVE_BATCH
+    _anno_packets = false; // REV_RATE_ANNO conflicts with batching
+#else
     _anno_packets = true;
+#endif
     if (Args(conf, this, errh)
 	.read_mp("TYPE", WordArg(), count_what)
 	.read_mp("RATIO", FixedPointArg(16), _ratio)
